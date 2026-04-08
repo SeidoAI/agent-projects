@@ -1,4 +1,4 @@
-# Agent Projects
+# Keel
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -10,28 +10,31 @@ git repo, all cross-referenced, all validated by one 50 ms gate. Designed so
 Claude Code (or any agent with file-write tools) can scope, track, and ship
 real software projects without drifting from the code.
 
-**[Quickstart](#quickstart)** · **[What it does](#what-it-does)** · **[How it works](#how-it-works)** · **[Commands](#commands)** · **[Docs](#docs)**
+**[Quickstart](#quickstart)** · **[What it does](#what-it-does)** · **[Slash commands](#slash-commands)** · **[How it works](#how-it-works)** · **[Docs](#docs)**
 
 ---
 
 ## Quickstart
 
 ```bash
-pip install agent-project
-
-agent-project init my-project --key-prefix MP --base-branch main
+pip install keel
+keel init my-project
 cd my-project
-agent-project scaffold-for-creation
+claude
 ```
 
-Open Claude Code in `my-project/`, load `.claude/skills/project-manager/SKILL.md`,
-and ask it to scope your planning docs. After each batch of file writes:
+Then in Claude Code:
 
-```bash
-agent-project validate --strict --format=json
+```
+/pm-scope Build a knowledge base with nodes and edges. Planning docs in ./planning/.
 ```
 
-Exit 0 → commit. Exit non-zero → the agent has the JSON report and fixes itself.
+That's it. The agent reads your intent, scopes the project, writes the files,
+validates its own work, and hands you a clean project to commit.
+
+`keel init` auto-derives a key prefix from the project name (`my-project-cool` →
+`MPC`), defaults to `main` as the base branch, and prompts for anything
+non-obvious. Pass `--key-prefix`, `--base-branch`, or `--repos` to override.
 
 ## What it does
 
@@ -39,14 +42,14 @@ Exit 0 → commit. Exit non-zero → the agent has the JSON report and fixes its
 - **Dual ID system.** Canonical UUID + atomic human key (`MP-42`), allocated with `fcntl.flock`. Branch-merge safe.
 - **Content-hashed concept graph.** `[[node-id]]` references point at file regions with SHA-256 hashes. Move code → one node updates → every downstream issue catches up. Drift is a validation error.
 - **14-check validation gate.** Schema, references, bidirectional consistency, status transitions, freshness, sequence drift. JSON output. Auto-fix subset. ~50 ms on a typical project. Rebuilds the graph cache as a side effect.
-- **One-shot context dump.** `scaffold-for-creation` gives an agent config, enums, templates, skill examples, next IDs, and the validation loop in a single tool-call result.
+- **One-shot context brief.** `keel brief` gives an agent config, enums, templates, skill examples, next IDs, and the validation loop in a single tool-call result. The PM skill calls it automatically — you never have to.
 - **Customisable session artifacts.** Plans, task checklists, verification checklists, testing plans, post-completion comments — per-project manifest, enforced by the validator.
 - **Progressive-disclosure PM skill.** 33 reference files and canonical examples ship into every `init`. The agent reads the example, not the schema doc.
 
 ## Demo
 
 ```text
-$ agent-project validate --strict --format=json
+$ keel validate --strict --format=json
 {
   "exit_code": 0,
   "errors": [],
@@ -56,7 +59,7 @@ $ agent-project validate --strict --format=json
   "duration_ms": 47
 }
 
-$ agent-project status
+$ keel status
 my-project (MP)
   Issues: 23  (backlog=12, todo=8, in_progress=3)
   Concept nodes: 17 active, 2 stale
@@ -74,30 +77,51 @@ Four principles. Each one is a deliberate choice.
 
 **3. The concept graph is coherence.** Instead of prose like "the auth endpoint," issues reference `[[auth-token-endpoint]]` — a node file pointing at a specific file and line range with a stored content hash. When the code moves, one file updates. Stale hashes surface as validator errors.
 
-**4. Validation is the gate.** Every agent loop ends with `agent-project validate --strict --format=json`. The same command rebuilds the graph cache incrementally. The loop is: write files → validate → fix → validate → commit.
+**4. Validation is the gate.** Every agent loop ends with `keel validate --strict --format=json`. The same command rebuilds the graph cache incrementally. The loop is: write files → validate → fix → validate → commit.
+
+## Slash commands
+
+After `keel init`, every project ships with 10 `/pm-*` slash commands at
+`.claude/commands/`. Type `/pm` in Claude Code to see them all at once.
+
+| Command | What it does |
+|---|---|
+| `/pm-scope <intent>` | Scope a new project from your intent and optional planning docs |
+| `/pm-update <change>` | Apply a surgical change (status, comment, new node, session update) |
+| `/pm-triage` | Process inbound suggestions, comments, and agent messages |
+| `/pm-review <PR>` | Review a PR against the project repo for quality and completeness |
+| `/pm-status` | PM-flavoured project summary with next-step recommendations |
+| `/pm-graph` | Analyse the dependency graph: critical path, parallelizable work, cycles |
+| `/pm-validate` | Run the validator, interpret errors, propose and apply fixes |
+| `/pm-handoff <issue>` | Create a session for an issue and hand off to a coding agent |
+| `/pm-rescope <intent>` | Expand an existing project with new scope |
+| `/pm-close <issue>` | Mark an issue done and write a closing comment |
+
+Each slash command loads the project-manager skill, reads current state via
+`keel brief`, then executes the relevant workflow.
 
 ## Commands
 
 ```text
-agent-project init                     Bootstrap a project with templates + skills
-agent-project scaffold-for-creation    Dump full project context for an agent
-agent-project next-key                 Atomic ID/key allocation (fcntl.flock)
-agent-project validate                 14-check gate  (--strict, --fix, --format=json)
-agent-project status                   Dashboard: issues, nodes, sessions, critical path
-agent-project graph                    Render dependency or concept graph (mermaid/dot/json)
-agent-project refs                     Inspect references to a node or issue
-agent-project node                     List, inspect, freshness-check concept nodes
-agent-project templates                List and instantiate Jinja2 templates
-agent-project enums                    List active enum values
-agent-project artifacts                List session artifact manifest
-agent-project completion <shell>       Print bash/zsh/fish tab completion install snippet
+keel init                     Bootstrap a project with templates + skills
+keel next-key                 Atomic ID/key allocation (fcntl.flock)
+keel validate                 14-check gate  (--strict, --fix, --format=json)
+keel status                   Dashboard: issues, nodes, sessions, critical path
+keel graph                    Render dependency or concept graph (mermaid/dot/json)
+keel refs                     Inspect references to a node or issue
+keel node                     List, inspect, freshness-check concept nodes
+keel templates                List and instantiate Jinja2 templates
+keel enums                    List active enum values
+keel artifacts                List session artifact manifest
+keel brief                    Dump project context (agents use this internally)
+keel completion <shell>       Print bash/zsh/fish tab completion install snippet
 ```
 
-Run `agent-project --help` or `agent-project <cmd> --help` for details.
+Run `keel --help` or `keel <cmd> --help` for details.
 
 ## Project layout
 
-After `agent-project init`:
+After `keel init`:
 
 ```text
 my-project/
@@ -135,7 +159,7 @@ You can't run a real software project on a stack of LLM agents yet, and the reas
 - **You can't run multiple coding agents in parallel without a coordinator.** Each needs a branch, an issue key, an awareness of who owns what. Without atomic key allocation, they stomp on each other.
 - **Drift is a tax on every future invocation.** Mechanical search-and-replace across docs, issues, code, and schemas is exactly what LLMs are bad at. Partial reconciliations leave the next agent with more drift to chase.
 
-`agent-project` fixes this by putting everything in one git repo with cross-referenced YAML, content-hashed concept nodes, and a 14-check validator that catches drift before the next agent reads it.
+`keel` fixes this by putting everything in one git repo with cross-referenced YAML, content-hashed concept nodes, and a 14-check validator that catches drift before the next agent reads it.
 
 </details>
 
@@ -155,7 +179,7 @@ source:
   content_hash: "sha256:e2c5a..."
 ```
 
-`agent-project node check` fetches the current content (local clone preferred, `gh api` fallback) and compares SHA-256 hashes. Three outcomes: `FRESH`, `STALE`, `SOURCE_MISSING`. Stale nodes become validator errors.
+`keel node check` fetches the current content (local clone preferred, `gh api` fallback) and compares SHA-256 hashes. Three outcomes: `FRESH`, `STALE`, `SOURCE_MISSING`. Stale nodes become validator errors.
 
 **Graph cache.** `graph/index.yaml` is an incremental cache of all edges, rebuilt under `fcntl.flock`. `validate` calls `ensure_fresh` which picks between incremental update and full rebuild based on the current state.
 
@@ -181,12 +205,12 @@ Per-project defaults in `orchestration/default.yaml`; per-session overrides in t
 <details>
 <summary><b>Worked example</b> — scoping from raw planning docs</summary>
 
-1. `agent-project init my-project --key-prefix MP --base-branch main` creates the project with 73 templates, 43 skill files, 11 enums.
-2. `agent-project scaffold-for-creation` prints the project config, active enums, artifact manifest, templates, skill examples, and the next issue/session keys — all in one block.
-3. You open Claude Code in `my-project/` and tell it: *"You are the project manager. Load `.claude/skills/project-manager/SKILL.md` and read `raw_planning/*.md`. Scope the project."*
-4. The agent calls `agent-project next-key --type issue` 20 times, writes 20 issue YAML files into `issues/`, writes 15 concept nodes into `graph/nodes/`, writes 3 session folders into `sessions/`.
-5. It runs `agent-project validate --strict --format=json`, parses the JSON, fixes any `ref/dangling`, `body/missing_heading`, or `status/unreachable` errors, re-runs.
-6. Exit 0. The agent commits the result. You `agent-project status` and see a connected dependency graph with a critical path.
+1. `keel init my-project` creates the project with 73 templates, 43 skill files, 10 slash commands, 11 enums. Auto-derives the key prefix from the name (`my-project` → `MP`).
+2. You open Claude Code in `my-project/` and type: `/pm-scope Build a knowledge base. Planning docs in ./raw_planning/.`
+3. The PM skill auto-loads. It calls `keel brief` to read project state, then reads `raw_planning/*.md`.
+4. The agent calls `keel next-key --type issue` 20 times, writes 20 issue YAML files into `issues/`, writes 15 concept nodes into `graph/nodes/`, writes 3 session folders into `sessions/`.
+5. It runs `keel validate --strict --format=json`, parses the JSON, fixes any `ref/dangling`, `body/missing_heading`, or `status/unreachable` errors, re-runs.
+6. Clean. The agent commits the result. You `keel status` and see a connected dependency graph with a critical path.
 
 Everything is in git. Every reference resolves. Every concept node's content hash is current. The next agent that picks up a ticket has the full picture from one clone.
 
@@ -196,15 +220,15 @@ Everything is in git. Every reference resolves. Every concept node's content has
 
 ## Status
 
-**v0.** 362 tests pass. The validation gate is stable. The PM skill ships into every initialised project. APIs may change before v1.
+**v0.** 448 tests pass. The validation gate is stable. The PM skill and 10 `/pm-*` slash commands ship into every initialised project. APIs may change before v1.
 
-**Not in v0:** web UI, managed cloud version, the agent execution runtime itself. Those are tracked in `docs/agent-containers.md` and `docs/agent-projects-ui.md`.
+**Not in v0:** web UI, managed cloud version, the agent execution runtime itself. Those are tracked in `docs/agent-containers.md` and `docs/keel-ui.md`.
 
 ## Docs
 
-- Design: `docs/agent-projects-plan.md`
+- Design: `docs/keel-plan.md`
 - Agent execution runtime: `docs/agent-containers.md`
-- Web dashboard: `docs/agent-projects-ui.md`
+- Web dashboard: `docs/keel-ui.md`
 - Platform plan: `docs/overarching-plan.md`
 
 ## License
