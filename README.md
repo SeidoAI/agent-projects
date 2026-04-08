@@ -1,7 +1,15 @@
-# Keel
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="img/keel_full_black_bg.svg">
+    <source media="(prefers-color-scheme: light)" srcset="img/keel_full_white_bg.svg">
+    <img src="img/keel_full_transparent.svg" alt="Keel" width="340">
+  </picture>
+</p>
 
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+<p align="center">
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
+</p>
 
 > A git-native project tracker where the PM, coders, and verifier are AI agents.
 
