@@ -20,12 +20,15 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import logging
 import subprocess
 from pathlib import Path
 
 from agent_project.models.graph import FreshnessResult, FreshnessStatus
 from agent_project.models.node import ConceptNode, NodeSource
 from agent_project.models.project import ProjectConfig
+
+logger = logging.getLogger(__name__)
 
 HASH_PREFIX = "sha256:"
 
@@ -136,11 +139,24 @@ def fetch_content(source: NodeSource, project: ProjectConfig) -> str | None:
     if local_path:
         expanded = Path(local_path).expanduser()
         if expanded.exists():
+            logger.debug(
+                "freshness: fetching %s:%s from local clone %s",
+                source.repo,
+                source.path,
+                expanded,
+            )
             content = _read_local(expanded / source.path, source.lines)
             if content is not None:
                 return content
+            logger.debug("freshness: local file missing, falling through to GitHub API")
             # File missing locally — fall through to GitHub API.
 
+    logger.debug(
+        "freshness: fetching %s:%s via gh api (branch=%s)",
+        source.repo,
+        source.path,
+        source.branch,
+    )
     return _fetch_github(source.repo, source.path, source.branch, source.lines)
 
 
@@ -192,6 +208,7 @@ def check_node_freshness(
         )
 
     if current_hash == stored_hash:
+        logger.debug("freshness: node %s is FRESH", node.id)
         return FreshnessResult(
             node_id=node.id,
             status=FreshnessStatus.FRESH,
@@ -199,6 +216,12 @@ def check_node_freshness(
             stored_hash=stored_hash,
         )
 
+    logger.info(
+        "freshness: node %s is STALE (current=%s, stored=%s)",
+        node.id,
+        current_hash[:24],
+        stored_hash[:24],
+    )
     return FreshnessResult(
         node_id=node.id,
         status=FreshnessStatus.STALE,

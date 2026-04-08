@@ -36,6 +36,7 @@ Auto-fix subset (`--fix`):
 
 from __future__ import annotations
 
+import logging
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -62,6 +63,9 @@ from agent_project.models.issue import Issue
 from agent_project.models.node import ConceptNode
 from agent_project.models.project import ProjectConfig
 from agent_project.models.session import AgentSession
+
+logger = logging.getLogger(__name__)
+
 
 # ============================================================================
 # Result types
@@ -1327,8 +1331,22 @@ def validate_project(
     from agent_project.core import graph_cache
 
     started = time.monotonic()
+    logger.info(
+        "validate_project: starting (project=%s, strict=%s, fix=%s)",
+        project_dir,
+        strict,
+        fix,
+    )
 
     ctx = load_context(project_dir)
+    logger.debug(
+        "validate_project: loaded context (issues=%d, nodes=%d, sessions=%d, comments=%d, load_errors=%d)",
+        len(ctx.issues),
+        len(ctx.nodes),
+        len(ctx.sessions),
+        len(ctx.comments),
+        len(list(ctx.all_load_errors())),
+    )
 
     findings: list[CheckResult] = list(ctx.all_load_errors())
 
@@ -1336,13 +1354,23 @@ def validate_project(
     if fix:
         # Apply fixes BEFORE running checks so the checks don't report
         # things the fixer has already addressed.
+        logger.info("validate_project: applying auto-fixes")
         fix_results = apply_fixes(ctx)
+        logger.debug("validate_project: applied %d fix(es)", len(fix_results))
         # Re-load context after fixes — the fixes mutated files on disk.
         ctx = load_context(project_dir)
         findings = list(ctx.all_load_errors())
 
     for check in ALL_CHECKS:
-        findings.extend(check(ctx))
+        check_started = time.monotonic()
+        results = check(ctx)
+        findings.extend(results)
+        logger.debug(
+            "validate_project: %s -> %d finding(s) in %.1fms",
+            check.__name__,
+            len(results),
+            (time.monotonic() - check_started) * 1000,
+        )
 
     # Rebuild the graph cache as a side effect. Only attempt if the project
     # config loaded successfully — without it, the cache can't be oriented.
@@ -1376,6 +1404,15 @@ def validate_project(
         exit_code = 0
 
     duration_ms = int((time.monotonic() - started) * 1000)
+    logger.info(
+        "validate_project: complete (exit=%d, errors=%d, warnings=%d, fixed=%d, cache_rebuilt=%s, duration=%dms)",
+        exit_code,
+        len(errors),
+        len(warnings),
+        len(fix_results),
+        cache_rebuilt,
+        duration_ms,
+    )
 
     return ValidationReport(
         exit_code=exit_code,

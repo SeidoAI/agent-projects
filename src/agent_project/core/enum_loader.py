@@ -18,12 +18,15 @@ the package having to know about it.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
 
 from agent_project.models.enums import DEFAULT_ENUMS
+
+logger = logging.getLogger(__name__)
 
 ENUMS_DIRNAME = "enums"
 
@@ -142,10 +145,14 @@ def load_enums(project_dir: Path) -> EnumRegistry:
         project_path = enums_dir / f"{enum_name}.yaml"
         if project_path.exists():
             registry.enums[enum_name] = _load_enum_yaml(project_path, enum_name)
+            logger.debug(
+                "enum_loader: loaded %s from project (%s)", enum_name, project_path
+            )
         else:
             default = _default_enum(enum_name)
             if default is not None:
                 registry.enums[enum_name] = default
+                logger.debug("enum_loader: loaded %s from packaged default", enum_name)
 
     # Also load any project-defined enums that don't correspond to a packaged
     # default — projects can add new enums entirely.
@@ -155,5 +162,13 @@ def load_enums(project_dir: Path) -> EnumRegistry:
             if enum_name in registry.enums:
                 continue
             registry.enums[enum_name] = _load_enum_yaml(path, enum_name)
+            logger.info(
+                "enum_loader: loaded project-only enum %s from %s", enum_name, path
+            )
 
+    logger.info(
+        "enum_loader: loaded %d enums for project at %s",
+        len(registry.enums),
+        project_dir,
+    )
     return registry

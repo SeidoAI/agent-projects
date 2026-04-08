@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import fcntl
 import hashlib
+import logging
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -45,6 +46,8 @@ from agent_project.models.node import ConceptNode
 
 if TYPE_CHECKING:
     pass
+
+logger = logging.getLogger(__name__)
 
 INDEX_REL_PATH = "graph/index.yaml"
 LOCK_REL_PATH = "graph/.index.lock"
@@ -426,6 +429,8 @@ def full_rebuild(project_dir: Path) -> GraphIndex:
     a handy forcing function if you ever suspect the cache is wrong —
     delete `graph/index.yaml` and run `validate`.
     """
+    logger.info("graph_cache: full rebuild starting (project=%s)", project_dir)
+    started = time.monotonic()
     with _index_lock(project_dir):
         cache = _empty_cache()
 
@@ -461,6 +466,12 @@ def full_rebuild(project_dir: Path) -> GraphIndex:
         cache.last_incremental_update = now
 
         save_index(project_dir, cache)
+        logger.info(
+            "graph_cache: full rebuild complete (files=%d, edges=%d, duration=%dms)",
+            len(cache.files),
+            len(cache.edges),
+            int((time.monotonic() - started) * 1000),
+        )
         return cache
 
 
@@ -542,6 +553,7 @@ def ensure_fresh(project_dir: Path) -> bool:
     """
     existing = load_index(project_dir)
     if existing is None:
+        logger.info("graph_cache: cache missing or corrupt, dispatching full rebuild")
         full_rebuild(project_dir)
         return True
 
@@ -590,6 +602,11 @@ def ensure_fresh(project_dir: Path) -> bool:
     for rel in stale:
         update_cache_for_file(project_dir, rel)
         rebuilt = True
+
+    if rebuilt:
+        logger.info("graph_cache: incremental update applied")
+    else:
+        logger.debug("graph_cache: ensure_fresh — no changes detected")
 
     return rebuilt
 
