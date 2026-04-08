@@ -1,0 +1,15 @@
+---
+uuid: 1a2b3c4d-5e6f-47a8-9b0c-1d2e3f4a5b6c
+issue_key: SEI-42
+author: claude
+type: status_change
+created_at: "2026-04-07T15:30:22"
+---
+Starting work on SEI-42. Created branch `claude/SEI-42-auth-endpoint`.
+
+No blockers. SEI-40 merged yesterday, so [[user-model]] is available in
+the `test` branch with the fields I need. [[config-jwt-secret]] is
+confirmed set in the test environment.
+
+Next: read [[contract-auth-token]] to confirm the response shape, then
+draft the plan.

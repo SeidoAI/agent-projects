@@ -1,0 +1,33 @@
+name: IssueStatus
+description: Issue lifecycle states
+values:
+  - id: backlog
+    label: Backlog
+    color: gray
+  - id: todo
+    label: To Do
+    color: blue
+  - id: in_progress
+    label: In Progress
+    color: yellow
+  - id: verifying
+    label: Verifying
+    color: orange
+  - id: reviewing
+    label: Reviewing
+    color: purple
+  - id: testing
+    label: Testing
+    color: cyan
+  - id: ready
+    label: Ready
+    color: lime
+  - id: updating
+    label: Updating
+    color: pink
+  - id: done
+    label: Done
+    color: green
+  - id: canceled
+    label: Canceled
+    color: red

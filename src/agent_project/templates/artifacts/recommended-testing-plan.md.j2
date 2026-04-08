@@ -1,0 +1,23 @@
+# Recommended Testing Plan — {{ session_id | default("<session-id>") }}
+
+_Written near the end of the session. Tells the human reviewer and any
+downstream verifier agent what should be tested manually or in higher
+environments beyond what CI covers. Be specific about environments,
+commands, and expected outcomes._
+
+## Manual / exploratory checks
+{{ manual_checks | default("1. Describe the first scenario to exercise by hand\n2. Describe the second scenario\n3. Edge cases the reviewer should try") }}
+
+## Environment-specific
+{{ environment_checks | default("- Verify `<env var>` is set in the test environment\n- Confirm the deploy succeeded in `<environment>`\n- Check observability dashboards for any regressions") }}
+
+## Regression watchlist
+{{ regression_watchlist | default("- List pre-existing features that share code with this change and could regress") }}
+
+## Commands
+```bash
+{{ commands | default("# Commands the reviewer can run to verify manually\n# Example:\n# uv run pytest tests/integration -k auth\n# curl -s http://localhost:8000/auth/token | jq") }}
+```
+
+## Known limitations
+{{ limitations | default("- Things this session deliberately does not handle. Document them so reviewers know what NOT to file as bugs.") }}

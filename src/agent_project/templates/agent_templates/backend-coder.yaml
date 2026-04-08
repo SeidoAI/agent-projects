@@ -1,0 +1,51 @@
+---
+id: backend-coder
+name: "Backend Coding Agent"
+description: "Implements backend issues in Python repos"
+runtime: claude-code
+skill: backend-development
+
+# GitHub identity — each agent gets its own bot account or app installation.
+# Update the username and email to match your project's bot accounts.
+github_identity:
+  username: seido-backend-bot
+  email: backend-bot@example.com
+  token_env: GITHUB_TOKEN_BACKEND
+
+# Permissions and resources. Egress is enforced by agent-containers at
+# the network level.
+permissions:
+  github: read-write
+  gcp: none
+  network:
+    - "github.com"
+    - "api.github.com"
+    - "pypi.org"
+    - "objects.githubusercontent.com"
+resources:
+  memory: "8Gi"
+  cpus: 4
+tools:
+  - git
+  - gh
+  - uv
+  - ruff
+  - python
+
+# What this agent gets mounted in its workspace.
+context:
+  skills:
+    - backend-development
+    - agent-messaging
+  docs: []
+  mcp_servers:
+    - agent-messaging
+
+# Multi-ticket capability
+multi_ticket: true
+max_concurrent_issues: 5
+grouping_rules:
+  same_repo: required
+  file_overlap: preferred
+  sequential_deps: preferred
+---

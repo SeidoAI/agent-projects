@@ -1,0 +1,60 @@
+---
+uuid: {{ uuid | default("<generate-a-uuid4>") }}
+id: {{ id | default("<PREFIX>-<N>") }}
+title: {{ title | default("<one-line summary>") }}
+status: {{ status | default("todo") }}
+priority: {{ priority | default("medium") }}
+executor: {{ executor | default("ai") }}
+verifier: {{ verifier | default("required") }}
+agent: {{ agent | default("backend-coder") }}
+labels: {{ labels | default([]) }}
+parent: {{ parent | default("null") }}
+repo: {{ repo | default("<org>/<repo>") }}
+base_branch: {{ base_branch | default("test") }}
+implements: {{ implements | default([]) }}
+blocked_by: {{ blocked_by | default([]) }}
+docs: {{ docs | default([]) }}
+created_at: "{{ created_at | default("<ISO datetime>") }}"
+updated_at: "{{ updated_at | default("<ISO datetime>") }}"
+created_by: {{ created_by | default("pm-agent") }}
+---
+## Context
+{{ context | default("What is this issue about? Why is it needed now? Reference concept nodes with [[node-id]] so the validator can check them.") }}
+
+## Implements
+{{ implements_text | default("Which requirements, decisions, or contracts does this implement? Use [[reference]] if they exist as nodes.") }}
+
+## Repo scope
+- Repo: {{ repo | default("<org>/<repo>") }}
+- Base branch: {{ base_branch | default("test") }}
+- Primary paths: {{ primary_paths | default("<list of files or directories this will touch>") }}
+- Required config: {{ required_config | default("<[[config-node]] references or env var names>") }}
+
+## Requirements
+{{ requirements | default("Bullet list of requirements. Be specific — agents read this literally.") }}
+
+## Execution constraints
+- Do not make new product or architecture decisions.
+- If any ambiguity blocks correct work, stop and ask in the issue comments (or via a blocking message for containerised agents).
+
+## Acceptance criteria
+- [ ] {{ criterion_1 | default("First acceptance criterion") }}
+- [ ] {{ criterion_2 | default("Second acceptance criterion") }}
+- [ ] CI passing
+- [ ] All acceptance criteria verified by the verifier
+
+## Test plan
+```bash
+{{ test_commands | default("# Commands to run to verify this issue\nuv run pytest tests/unit/test_<module>.py -v\nmake lint") }}
+```
+
+## Dependencies
+{{ dependencies | default("List any blocking issues by key, or write `none` if standalone. Also reference `[[concept-nodes]]` this work depends on.") }}
+
+## Definition of Done
+- [ ] Implementation complete
+- [ ] Tests added/updated
+- [ ] Completion comment added
+- [ ] docs/issues/{{ id | default("<KEY>") }}/developer.md added
+- [ ] docs/issues/{{ id | default("<KEY>") }}/verified.md added
+- [ ] Concept nodes created/updated for new artifacts

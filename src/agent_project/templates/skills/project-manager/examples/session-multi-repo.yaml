@@ -1,0 +1,58 @@
+---
+uuid: 2a1f3e4b-5c6d-47e8-9f0a-1b2c3d4e5f6a
+id: wave2-agent-b
+name: "Agent B: Auth + Terraform secrets"
+agent: backend-coder
+issues:
+  - SEI-40
+  - SEI-42
+  - SEI-47
+wave: 2
+# Multi-repo: every repo the session can branch and PR in. All equal,
+# all writable. The agent treats them symmetrically.
+repos:
+  - repo: SeidoAI/web-app-backend
+    base_branch: test
+    branch: claude/SEI-42-auth
+    pr_number: 142
+  - repo: SeidoAI/web-app-infrastructure
+    base_branch: test
+    branch: claude/SEI-47-tf-secrets
+    pr_number: 18
+docs:
+  - docs/integration/cross-service-flow.md
+estimated_size: large
+blocked_by_sessions: []
+key_files:
+  - src/api/auth.py
+  - src/models/user.py
+  - modules/secrets/main.tf
+grouping_rationale: "SEI-42 and SEI-47 together — the endpoint depends on the new secret being provisioned, so one agent owns both to avoid a handoff."
+status: waiting_for_ci
+current_state: implementing
+# Optional orchestration override — this session wants a plan approval gate
+# even though the project default has it off.
+orchestration:
+  pattern: default
+  overrides:
+    plan_approval_required: true
+    auto_merge_on_pass: false
+artifact_overrides: []
+runtime_state:
+  claude_session_id: "sess_abc123"
+  langgraph_thread_id: null
+  workspace_volume: "vol-wave2-b"
+engagements:
+  - started_at: "2026-04-07T14:00:00"
+    trigger: initial_launch
+    ended_at: "2026-04-07T16:30:00"
+    outcome: pr_opened
+  - started_at: "2026-04-07T17:15:00"
+    trigger: ci_failure
+    context: "Lint failure in src/api/auth.py:45 — ruff E302"
+    ended_at: "2026-04-07T17:25:00"
+    outcome: fix_pushed
+created_at: "2026-04-07T13:50:00"
+updated_at: "2026-04-07T17:25:00"
+created_by: pm-agent
+---

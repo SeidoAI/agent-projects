@@ -1,0 +1,23 @@
+---
+uuid: {{ uuid | default("<generate-a-uuid4>") }}
+issue_key: {{ issue_key | default("<PREFIX>-<N>") }}
+author: {{ author | default("claude") }}
+type: completion
+created_at: "{{ created_at | default("<ISO datetime>") }}"
+---
+## Summary
+{{ summary | default("One-paragraph description of what was done.") }}
+
+## Acceptance criteria
+{{ criteria_check | default("- [x] Each criterion, ticked when met.") }}
+
+## Concept nodes touched
+{{ nodes_touched | default("- [[node-a]] — created\n- [[node-b]] — updated (rehashed)") }}
+
+## Artifacts
+- PR: {{ pr_url | default("<link>") }}
+- developer.md: docs/issues/{{ issue_key | default("<KEY>") }}/developer.md
+- verified.md: docs/issues/{{ issue_key | default("<KEY>") }}/verified.md
+
+## Follow-ups
+{{ followups | default("Any work deferred to a follow-up issue. Reference [[nodes]] if relevant.") }}

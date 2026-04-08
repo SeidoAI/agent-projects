@@ -1,0 +1,46 @@
+# Session artifact manifest — declares what every session must produce.
+#
+# An `approval_gate: true` on any artifact tells the orchestrator to stop
+# the agent after that artifact is written and wait for human approval
+# before re-engaging. For fast-iteration projects, leave all gates false.
+#
+# Projects can add, remove, or reshape artifacts. The validator checks
+# that every `required: true` artifact exists for sessions in `completed`
+# status. Sessions can override this manifest via `artifact_overrides` in
+# their session YAML.
+
+artifacts:
+  - name: plan
+    file: plan.md
+    template: plan.md.j2
+    produced_at: planning
+    required: true
+    approval_gate: false
+
+  - name: task-checklist
+    file: task-checklist.md
+    template: task-checklist.md.j2
+    produced_at: planning
+    required: true
+    approval_gate: false
+
+  - name: verification-checklist
+    file: verification-checklist.md
+    template: verification-checklist.md.j2
+    produced_at: planning
+    required: true
+    approval_gate: false
+
+  - name: recommended-testing-plan
+    file: recommended-testing-plan.md
+    template: recommended-testing-plan.md.j2
+    produced_at: completion
+    required: true
+    approval_gate: false
+
+  - name: post-completion-comments
+    file: post-completion-comments.md
+    template: post-completion-comments.md.j2
+    produced_at: completion
+    required: true
+    approval_gate: false

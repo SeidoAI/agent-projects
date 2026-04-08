@@ -1,0 +1,37 @@
+---
+id: verifier
+name: "Verification Agent"
+description: "Verifies that a coding agent's PR meets every acceptance criterion"
+runtime: claude-code
+skill: verification
+
+github_identity:
+  username: seido-verifier-bot
+  email: verifier-bot@example.com
+  token_env: GITHUB_TOKEN_VERIFIER
+
+# Verifier is read-only — it cannot push code, only post PR reviews.
+permissions:
+  github: read
+  gcp: none
+  network:
+    - "github.com"
+    - "api.github.com"
+resources:
+  memory: "4Gi"
+  cpus: 2
+tools:
+  - git
+  - gh
+  - uv
+
+context:
+  skills:
+    - verification
+    - agent-messaging
+  docs: []
+  mcp_servers:
+    - agent-messaging
+
+multi_ticket: false
+---

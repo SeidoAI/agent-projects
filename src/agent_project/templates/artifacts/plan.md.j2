@@ -1,0 +1,34 @@
+# Plan — {{ session_id | default("<session-id>") }}
+
+_Produced at planning. Equivalent to Claude Code's plan output but
+committed into the project repo so the PM agent and reviewers can see it.
+Reference concept nodes with `[[node-id]]` wherever possible._
+
+## Goal
+{{ goal | default("What is this session trying to achieve, in one paragraph?") }}
+
+## Issues in scope
+{{ issues | default("- <KEY>: title\n- <KEY>: title") }}
+
+## Repos
+{{ repos | default("- <org>/<repo-a> (primary; branch <claude/...>)\n- <org>/<repo-b> (if multi-repo)") }}
+
+## Approach
+
+### Phase 1: {{ phase_1 | default("Investigation") }}
+{{ phase_1_detail | default("What to read, what to understand, what assumptions to verify.") }}
+
+### Phase 2: {{ phase_2 | default("Implementation") }}
+{{ phase_2_detail | default("What to build, in what order. Reference the concept nodes you will touch: [[node-a]], [[node-b]].") }}
+
+### Phase 3: {{ phase_3 | default("Verification") }}
+{{ phase_3_detail | default("How you will check your own work before declaring done.") }}
+
+## Key decisions
+{{ decisions | default("- Decision: <what>. Rationale: <why>. Alternative considered: <other>.") }}
+
+## Risks and unknowns
+{{ risks | default("- Risk: <what could go wrong>. Mitigation: <plan B>.") }}
+
+## Out of scope
+{{ out_of_scope | default("- Things I could do but will NOT in this session.") }}

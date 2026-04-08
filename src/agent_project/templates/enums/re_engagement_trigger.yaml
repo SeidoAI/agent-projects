@@ -1,0 +1,45 @@
+name: ReEngagementTrigger
+description: Why a session was re-engaged (restarted with new context)
+values:
+  - id: initial_launch
+    label: Initial Launch
+    color: blue
+  - id: ci_failure
+    label: CI Failure
+    color: red
+  - id: verifier_rejection
+    label: Verifier Rejection
+    color: orange
+  - id: human_review_changes
+    label: Human Review Changes
+    color: yellow
+  - id: bug_found
+    label: Bug Found
+    color: red
+  - id: deploy_failure
+    label: Deploy Failure
+    color: red
+  - id: stale_reference
+    label: Stale Reference
+    color: orange
+  - id: scope_change
+    label: Scope Change
+    color: purple
+  - id: merge_conflict
+    label: Merge Conflict
+    color: orange
+  - id: dependency_conflict
+    label: Dependency Conflict
+    color: orange
+  - id: human_response
+    label: Human Response
+    color: cyan
+  - id: plan_approved
+    label: Plan Approved
+    color: green
+  - id: plan_rejected
+    label: Plan Rejected
+    color: red
+  - id: manual
+    label: Manual
+    color: gray

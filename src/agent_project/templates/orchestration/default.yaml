@@ -1,0 +1,67 @@
+name: default
+description: |
+  Standard project default — the PM agent auto-orchestrates with a
+  single human gate on plan approval (when enabled in project.yaml).
+  Verifier runs on every PR; auto-merge on pass is off by default.
+
+  The runtime that reads this pattern lives in the `agent-containers`
+  package (`agent_containers/core/orchestration.py`), not in
+  `agent-project`. This file is configuration for that runtime.
+
+events:
+  session_started:
+    actions:
+      - require_artifact: plan.md
+      - require_artifact: task-checklist.md
+      - require_artifact: verification-checklist.md
+      - if: project.plan_approval_required
+        then:
+          - send_message: { type: plan_approval, priority: blocking }
+          - wait_for: human_response
+        else:
+          - continue
+
+  plan_approved:
+    actions:
+      - re_engage: { trigger: plan_approved }
+
+  plan_rejected:
+    actions:
+      - re_engage: { trigger: plan_rejected, context_from: message_response }
+
+  ci_failure:
+    actions:
+      - re_engage: { trigger: ci_failure, context_from: ci_logs }
+
+  pr_opened:
+    actions:
+      - launch_agent: verifier
+      - on_verifier_pass:
+          - if: project.auto_merge_on_pass
+            then: [ merge_pr ]
+            else: [ notify_human ]
+      - on_verifier_fail:
+          - re_engage: { trigger: verifier_rejection, context_from: verifier_review }
+
+  human_review_changes:
+    actions:
+      - re_engage: { trigger: human_review_changes, context_from: pr_comments }
+
+  status_message_received:
+    actions:
+      - update_session_status_summary: { from: message }
+      - publish_to_ui
+
+  artifact_updated:
+    when: artifact == "task-checklist.md"
+    actions:
+      - publish_to_ui
+
+  session_stuck:
+    actions:
+      - notify_human
+      # Do NOT auto-re-engage — a stuck session probably needs judgement.
+
+# Optional: call out to a Python hook for custom logic.
+# Hooks live in orchestration/hooks/*.py and are invoked by dotted name.
+hooks: {}

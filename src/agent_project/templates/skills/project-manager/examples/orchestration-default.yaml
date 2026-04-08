@@ -1,0 +1,47 @@
+name: default
+description: |
+  Standard project default pattern. PM auto-orchestrates with a single
+  human gate on plan approval (only if plan_approval_required is true in
+  project.yaml). Verifier runs on every PR; auto-merge is off.
+
+events:
+  session_started:
+    actions:
+      - require_artifact: plan.md
+      - require_artifact: task-checklist.md
+      - require_artifact: verification-checklist.md
+      - if: project.plan_approval_required
+        then:
+          - send_message: { type: plan_approval, priority: blocking }
+          - wait_for: human_response
+        else:
+          - continue
+
+  plan_approved:
+    actions:
+      - re_engage: { trigger: plan_approved }
+
+  ci_failure:
+    actions:
+      - re_engage: { trigger: ci_failure, context_from: ci_logs }
+
+  pr_opened:
+    actions:
+      - launch_agent: verifier
+      - on_verifier_pass:
+          - if: project.auto_merge_on_pass
+            then: [ merge_pr ]
+            else: [ notify_human ]
+      - on_verifier_fail:
+          - re_engage: { trigger: verifier_rejection, context_from: verifier_review }
+
+  human_review_changes:
+    actions:
+      - re_engage: { trigger: human_review_changes, context_from: pr_comments }
+
+  status_message_received:
+    actions:
+      - update_session_status_summary: { from: message }
+      - publish_to_ui
+
+hooks: {}

@@ -1,0 +1,15 @@
+name: NodeStatus
+description: Concept node lifecycle state
+values:
+  - id: active
+    label: Active
+    color: green
+  - id: planned
+    label: Planned
+    color: blue
+  - id: deprecated
+    label: Deprecated
+    color: orange
+  - id: stale
+    label: Stale
+    color: red

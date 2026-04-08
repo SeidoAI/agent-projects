@@ -1,0 +1,12 @@
+name: Verifier
+description: Whether verification is required for this issue
+values:
+  - id: required
+    label: Required
+    color: red
+  - id: optional
+    label: Optional
+    color: yellow
+  - id: none
+    label: None
+    color: gray

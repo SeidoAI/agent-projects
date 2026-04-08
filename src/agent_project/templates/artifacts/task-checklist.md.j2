@@ -1,0 +1,20 @@
+# Task Checklist — {{ session_id | default("<session-id>") }}
+
+_Updated live as the agent works. Status values: `pending`,
+`in_progress`, `done`, `blocked`, `skipped`. Comments capture
+decisions, deviations, problems, external dependencies, or anything
+notable. The PM agent reads this to track progress without re-running
+the whole session._
+
+| # | Task | Status | Comments |
+|---|------|--------|----------|
+| 1 | {{ task_1 | default("Investigate the existing code and confirm assumptions") }} | pending | — |
+| 2 | {{ task_2 | default("Draft the implementation plan and write it to plan.md") }} | pending | — |
+| 3 | {{ task_3 | default("Implement the core changes") }} | pending | — |
+| 4 | {{ task_4 | default("Add or update tests") }} | pending | — |
+| 5 | {{ task_5 | default("Run the full test suite and lint") }} | pending | — |
+| 6 | {{ task_6 | default("Update or create concept nodes for new artifacts") }} | pending | — |
+| 7 | {{ task_7 | default("Run agent-project validate --strict until clean") }} | pending | — |
+| 8 | {{ task_8 | default("Write the verification-checklist.md") }} | pending | — |
+| 9 | {{ task_9 | default("Write recommended-testing-plan.md and post-completion-comments.md") }} | pending | — |
+| 10 | {{ task_10 | default("Commit and open PR") }} | pending | — |

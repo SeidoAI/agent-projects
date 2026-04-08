@@ -1,0 +1,10 @@
+---
+uuid: {{ uuid | default("<generate-a-uuid4>") }}
+issue_key: {{ issue_key | default("<PREFIX>-<N>") }}
+author: {{ author | default("claude") }}
+type: status_change
+created_at: "{{ created_at | default("<ISO datetime>") }}"
+---
+{{ body | default("Status changed from `<old>` to `<new>`. Rationale: ...") }}
+
+Related concept nodes: {{ related | default("[[node-id-1]], [[node-id-2]]") }}

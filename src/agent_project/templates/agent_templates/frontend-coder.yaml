@@ -1,0 +1,45 @@
+---
+id: frontend-coder
+name: "Frontend Coding Agent"
+description: "Implements frontend issues in TypeScript/React repos"
+runtime: claude-code
+skill: frontend-development
+
+github_identity:
+  username: seido-frontend-bot
+  email: frontend-bot@example.com
+  token_env: GITHUB_TOKEN_FRONTEND
+
+permissions:
+  github: read-write
+  gcp: none
+  network:
+    - "github.com"
+    - "api.github.com"
+    - "registry.npmjs.org"
+    - "objects.githubusercontent.com"
+resources:
+  memory: "8Gi"
+  cpus: 4
+tools:
+  - git
+  - gh
+  - node
+  - npm
+  - pnpm
+
+context:
+  skills:
+    - frontend-development
+    - agent-messaging
+  docs: []
+  mcp_servers:
+    - agent-messaging
+
+multi_ticket: true
+max_concurrent_issues: 5
+grouping_rules:
+  same_repo: required
+  file_overlap: preferred
+  sequential_deps: preferred
+---

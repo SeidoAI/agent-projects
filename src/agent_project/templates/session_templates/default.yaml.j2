@@ -1,0 +1,61 @@
+---
+uuid: {{ uuid | default("<generate-a-uuid4>") }}
+id: {{ id | default("<session-slug>") }}
+name: {{ name | default("<human-readable session name>") }}
+agent: {{ agent | default("backend-coder") }}
+issues:
+{%- for issue in issues | default([]) %}
+  - {{ issue }}
+{%- else %}
+  - # List of issue keys in this session
+{%- endfor %}
+wave: {{ wave | default(1) }}
+
+# Multi-repo: every repo the session can branch and PR in. All equal,
+# all writable. Replaces the old single `repo:` field.
+repos:
+{%- for repo in repos | default([]) %}
+  - repo: {{ repo.repo }}
+    base_branch: {{ repo.base_branch | default("test") }}
+    branch: {{ repo.branch | default("null") }}
+    pr_number: {{ repo.pr_number | default("null") }}
+{%- else %}
+  - repo: <org>/<repo>
+    base_branch: test
+{%- endfor %}
+
+docs: {{ docs | default([]) }}
+
+estimated_size: {{ estimated_size | default("medium") }}
+blocked_by_sessions: {{ blocked_by_sessions | default([]) }}
+key_files: {{ key_files | default([]) }}
+grouping_rationale: {{ grouping_rationale | default("Why these issues are grouped into one session.") }}
+
+status: planned
+current_state: null
+
+# Optional orchestration override — drop this section to use the
+# project default pattern unchanged.
+# orchestration:
+#   pattern: default
+#   overrides:
+#     plan_approval_required: true
+#     auto_merge_on_pass: false
+
+# Optional per-session artifact overrides on top of the project manifest.
+artifact_overrides: []
+
+# Runtime state — persisted across container restarts. Managed by the
+# orchestrator; humans should not hand-edit this.
+runtime_state:
+  claude_session_id: null
+  langgraph_thread_id: null
+  workspace_volume: null
+
+# Re-engagement history — append-only log of every container start.
+engagements: []
+
+created_at: "{{ created_at | default("<ISO datetime>") }}"
+updated_at: "{{ updated_at | default("<ISO datetime>") }}"
+created_by: {{ created_by | default("pm-agent") }}
+---

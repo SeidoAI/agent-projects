@@ -1,0 +1,15 @@
+name: Priority
+description: Issue priority ordering
+values:
+  - id: urgent
+    label: Urgent
+    color: red
+  - id: high
+    label: High
+    color: orange
+  - id: medium
+    label: Medium
+    color: yellow
+  - id: low
+    label: Low
+    color: gray

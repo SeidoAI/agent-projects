@@ -1,0 +1,27 @@
+name: SessionStatus
+description: Agent session lifecycle states
+values:
+  - id: planned
+    label: Planned
+    color: gray
+  - id: active
+    label: Active
+    color: blue
+  - id: waiting_for_ci
+    label: Waiting for CI
+    color: yellow
+  - id: waiting_for_review
+    label: Waiting for Review
+    color: yellow
+  - id: waiting_for_deploy
+    label: Waiting for Deploy
+    color: yellow
+  - id: re_engaged
+    label: Re-engaged
+    color: orange
+  - id: completed
+    label: Completed
+    color: green
+  - id: failed
+    label: Failed
+    color: red

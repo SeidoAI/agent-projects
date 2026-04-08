@@ -1,0 +1,31 @@
+---
+uuid: 4e7c2a1b-8f5d-49a3-b2c6-3d8e1f9a4b7c
+id: user-model
+type: model
+name: "User (Firestore)"
+description: "The canonical user model backed by a Firestore collection"
+source:
+  repo: SeidoAI/web-app-backend
+  path: src/models/user.py
+  lines: [12, 45]
+  branch: test
+  content_hash: "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+related:
+  - auth-token-endpoint
+tags: [model, auth]
+status: active
+created_at: "2026-04-07T09:45:00"
+updated_at: "2026-04-07T09:45:00"
+created_by: claude
+---
+The User model represents a single user record in the Firestore users
+collection. Fields:
+
+- `uid` — Firebase auth UID (primary key)
+- `email` — verified email address
+- `display_name` — user-facing name
+- `created_at` — ISO datetime of account creation
+- `last_login` — ISO datetime of the most recent successful login
+
+The model exposes `find_by_email()` and `verify_password()` for
+authentication flows. Consumed by [[auth-token-endpoint]].

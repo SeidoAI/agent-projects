@@ -1,0 +1,55 @@
+# {{ project_name }} — Project Standards
+
+This document captures project-specific rules the PM agent enforces
+during PR review. Edit it freely — the validator reads this file and
+the PM agent's review checks it. Anything you write here is something
+the agent will try to enforce.
+
+## Naming conventions
+
+- Issue keys use the `{{ key_prefix }}-<N>` prefix.
+- Concept node ids are lowercase slugs: `user-model`, `auth-token-endpoint`, `dec-003-session-tokens`.
+- Session ids are human-readable slugs: `wave1-agent-a`, `critical-prod-fix`.
+
+## Body conventions
+
+- Every issue body must have these top-level headings (the validator checks this):
+  `Context`, `Implements`, `Repo scope`, `Requirements`, `Execution constraints`,
+  `Acceptance criteria`, `Test plan`, `Dependencies`, `Definition of Done`.
+- Every issue must have at least one `[[concept-node]]` reference somewhere in
+  the body — otherwise the validator warns about a coherence gap.
+- Every issue must include the "stop and ask" guidance so agents know they
+  can bail out on ambiguity instead of guessing.
+- Acceptance criteria must be checkboxes (`- [ ] ...`), not prose.
+
+## Concept graph
+
+- Create a concept node whenever a concept is referenced by 2+ issues OR
+  crosses a repo boundary. One-off mentions stay as inline prose.
+- Every active node must have a valid `source` with `content_hash` set.
+  The PM agent rehashes nodes during the update workflow.
+- `related` on concept nodes is bi-directional. If A.related contains B,
+  B.related must contain A. The validator auto-fixes this.
+
+## Session artifacts
+
+- Sessions in `completed` status must have all required artifacts from
+  `templates/artifacts/manifest.yaml`. The validator enforces this.
+- `plan.md`, `task-checklist.md`, `verification-checklist.md` are written
+  at planning. `recommended-testing-plan.md` and `post-completion-comments.md`
+  are written at completion.
+
+## Commits and PRs
+
+- Branch naming: `<agent-id>/<ISSUE-KEY>-<slug>` (e.g. `claude/{{ key_prefix }}-42-auth-endpoint`).
+- Commit messages reference the issue key in the first line.
+- PR title starts with `[{{ key_prefix }}-<N>] <summary>`.
+- Draft a PR body from the completion comment template.
+
+## Validation gate
+
+- Every batch of file writes must be followed by:
+  `agent-project validate --strict --format=json`
+- Fix every error. Do not commit until `exit_code` is 0.
+- The gate also rebuilds the graph cache as a side effect — no need to
+  run `refs rebuild` separately.

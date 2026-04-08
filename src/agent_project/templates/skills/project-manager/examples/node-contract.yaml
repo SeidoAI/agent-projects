@@ -1,0 +1,37 @@
+---
+uuid: 8c7b6a5d-4e3f-42a1-9c8b-7d6e5f4a3b2c
+id: contract-auth-token
+type: contract
+name: "Auth Token Contract"
+description: "The OpenAPI contract section covering the auth token endpoint"
+source:
+  repo: SeidoAI/web-app-backend
+  path: docs/api-contract.yaml
+  lines: [120, 180]
+  branch: test
+  content_hash: "sha256:6dcd4ce23d88e2ee9568ba546c007c63d7d5e93f20b91020d3f5ae4a35d9013c"
+related:
+  - auth-token-endpoint
+tags: [contract, api, auth]
+status: active
+created_at: "2026-03-28T09:00:00"
+updated_at: "2026-03-28T09:00:00"
+created_by: claude
+---
+OpenAPI 3.1 contract for the authentication endpoint. Covers:
+
+- `POST /auth/token` — request/response shapes, error envelope
+
+Response envelope for errors:
+
+```json
+{
+  "error": {
+    "code": "invalid_credentials",
+    "message": "Email or password is incorrect."
+  }
+}
+```
+
+The contract is the source of truth for [[auth-token-endpoint]]. Any
+implementation drift is a bug.

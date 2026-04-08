@@ -1,0 +1,78 @@
+---
+uuid: 7c3a4b1d-9f2e-4a8c-b5d6-1e2f3a4b5c6d
+id: SEI-42
+title: Implement JWT authentication endpoint
+status: todo
+priority: high
+executor: ai
+verifier: required
+agent: backend-coder
+labels:
+  - domain/backend
+  - env/test
+repo: SeidoAI/web-app-backend
+base_branch: test
+implements:
+  - REQ-AUTH-001
+  - DEC-003
+docs:
+  - docs/auth/jwt-spec.md
+created_at: "2026-04-07T10:00:00"
+updated_at: "2026-04-07T10:00:00"
+created_by: pm-agent
+---
+## Context
+The frontend SPA needs a JWT-based authentication endpoint. The endpoint
+must consume the [[user-model]] for credential validation and implements
+the contract in [[contract-auth-token]]. JWTs are stored in httpOnly
+cookies, not localStorage — see [[dec-003-session-tokens]].
+
+## Implements
+REQ-AUTH-001, DEC-003
+
+## Repo scope
+- Repo: SeidoAI/web-app-backend
+- Base branch: test
+- Primary paths: `src/api/auth.py`, `tests/unit/test_auth.py`
+- Required config: [[config-jwt-secret]]
+
+## Requirements
+- `POST /auth/token` accepts `{email, password}`, returns `{access_token, expires_in, token_type}`.
+- JWT expires after 1 hour.
+- Invalid credentials return 401 with the standard error envelope.
+- Expired token replay returns 403.
+- Must use [[user-model]] for lookups — no direct Firestore calls.
+- Response shape must match [[contract-auth-token]].
+
+## Execution constraints
+- Do not make new product or architecture decisions.
+- If any ambiguity blocks correct work, stop and ask in the issue comments
+  (or via a blocking `send_message` for containerised agents).
+
+## Acceptance criteria
+- [ ] Happy path returns 200 + valid JWT
+- [ ] Invalid credentials return 401 with standard error envelope
+- [ ] Expired token replay returns 403
+- [ ] Response shape matches [[contract-auth-token]]
+- [ ] Unit tests cover all four cases
+- [ ] CI passing
+
+## Test plan
+```bash
+uv run pytest tests/unit/test_auth.py -v
+uv run pytest tests/integration/test_auth_flow.py -v
+make lint
+```
+
+## Dependencies
+- [[user-model]] must be available in the test branch.
+- [[config-jwt-secret]] must be set in the test environment.
+
+## Definition of Done
+- [ ] Implementation complete
+- [ ] Unit and integration tests added
+- [ ] Completion comment added to the issue
+- [ ] `docs/issues/SEI-42/developer.md` written
+- [ ] `docs/issues/SEI-42/verified.md` written (by the verifier agent)
+- [ ] [[auth-token-endpoint]] node created and referenced here
+- [ ] `agent-project validate --strict` exits 0

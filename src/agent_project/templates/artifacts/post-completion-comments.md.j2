@@ -1,0 +1,23 @@
+# Post-Completion Comments — {{ session_id | default("<session-id>") }}
+
+_Written at the very end. The agent's reflective notes: decisions made,
+things deferred, surprises encountered, follow-ups for later. Used by
+the PM agent when triaging follow-up issues, and by humans during review._
+
+## Decisions
+{{ decisions | default("- Chose X over Y because <reason>.\n- Used <library> because <reason>.") }}
+
+## Deferred
+{{ deferred | default("- Did not implement <feature>. Reason: <out of scope / needs human input / future work>.\n- <Other deferrals>") }}
+
+## Surprises
+{{ surprises | default("- Discovered <thing> that wasn't in the plan. Handled by <response>.\n- <Other surprises>") }}
+
+## Drift notes
+{{ drift_notes | default("- Found a mismatch between <doc/contract> and <code>. Fixed it by <action>, OR left a `[[stale-node]]` flag for the PM agent.") }}
+
+## Follow-ups (suggested for PM)
+{{ followups | default("- Open issue: <what needs a separate piece of work>\n- <Other follow-ups>") }}
+
+## Thanks
+{{ thanks | default("- Any tooling, skill, or prior work that made this easier worth calling out.") }}

@@ -1,0 +1,29 @@
+---
+uuid: 6f1e2d3c-4b5a-4e9f-8a7b-6c5d4e3f2a1b
+id: config-jwt-secret
+type: config
+name: "JWT_SECRET"
+description: "HMAC signing key for JWT tokens. Must be at least 32 characters."
+source:
+  repo: SeidoAI/web-app-backend
+  path: src/api/config.py
+  lines: [22, 28]
+  branch: test
+  content_hash: "sha256:3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b"
+related: []
+tags: [auth, secret, config]
+status: active
+created_at: "2026-03-20T11:00:00"
+updated_at: "2026-03-20T11:00:00"
+created_by: claude
+---
+The HMAC signing key used by [[auth-token-endpoint]] to sign and verify
+JWTs. Read at service startup via `os.environ["JWT_SECRET"]`.
+
+Constraints:
+
+- Minimum 32 characters (enforced by the startup check in `src/api/config.py`)
+- Rotated quarterly by the infra team
+- Different value per environment — `test`, `staging`, `prod`
+- Never logged, never passed over the wire
+

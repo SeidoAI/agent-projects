@@ -1,0 +1,29 @@
+---
+uuid: 7e6d5c4b-3a2f-41e8-9d7c-6b5a4f3e2d1c
+id: wave1-agent-a
+name: "Agent A: Auth endpoint"
+agent: backend-coder
+issues:
+  - SEI-42
+wave: 1
+repos:
+  - repo: SeidoAI/web-app-backend
+    base_branch: test
+estimated_size: medium
+blocked_by_sessions: []
+key_files:
+  - src/api/auth.py
+  - tests/unit/test_auth.py
+grouping_rationale: "Single-issue session — SEI-42 is a contained backend change."
+status: planned
+current_state: null
+artifact_overrides: []
+runtime_state:
+  claude_session_id: null
+  langgraph_thread_id: null
+  workspace_volume: null
+engagements: []
+created_at: "2026-04-07T10:30:00"
+updated_at: "2026-04-07T10:30:00"
+created_by: pm-agent
+---

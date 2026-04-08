@@ -1,0 +1,12 @@
+name: Executor
+description: Who does the work on this issue
+values:
+  - id: ai
+    label: AI Agent
+    color: blue
+  - id: human
+    label: Human
+    color: green
+  - id: mixed
+    label: Mixed
+    color: purple

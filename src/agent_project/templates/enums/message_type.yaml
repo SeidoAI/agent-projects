@@ -1,0 +1,27 @@
+name: MessageType
+description: MCP message types agents send via the send_message tool
+values:
+  - id: question
+    label: Question
+    color: blue
+  - id: plan_approval
+    label: Plan Approval
+    color: purple
+  - id: progress
+    label: Progress
+    color: cyan
+  - id: stuck
+    label: Stuck
+    color: red
+  - id: escalation
+    label: Escalation
+    color: orange
+  - id: handover
+    label: Handover
+    color: yellow
+  - id: fyi
+    label: FYI
+    color: gray
+  - id: status
+    label: Status
+    color: green

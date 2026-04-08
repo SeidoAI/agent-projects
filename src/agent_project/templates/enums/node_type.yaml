@@ -1,0 +1,33 @@
+name: NodeType
+description: Concept node types — the kind of artifact this node points at
+values:
+  - id: endpoint
+    label: Endpoint
+    color: blue
+  - id: model
+    label: Model
+    color: green
+  - id: config
+    label: Config
+    color: orange
+  - id: tf_output
+    label: Terraform Output
+    color: purple
+  - id: contract
+    label: Contract
+    color: cyan
+  - id: decision
+    label: Decision
+    color: yellow
+  - id: requirement
+    label: Requirement
+    color: lime
+  - id: service
+    label: Service
+    color: pink
+  - id: schema
+    label: Schema
+    color: red
+  - id: custom
+    label: Custom
+    color: gray

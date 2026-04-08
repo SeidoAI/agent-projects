@@ -1,0 +1,19 @@
+---
+uuid: {{ uuid | default("<generate-a-uuid4>") }}
+issue_key: {{ issue_key | default("<PREFIX>-<N>") }}
+author: {{ author | default("claude") }}
+type: question
+created_at: "{{ created_at | default("<ISO datetime>") }}"
+---
+## Question
+{{ question | default("What is the specific question blocking progress?") }}
+
+## Context
+{{ context | default("What has the agent already tried or discovered? Reference any relevant [[concept-nodes]].") }}
+
+## Options considered
+1. {{ option_1 | default("First option with trade-offs") }}
+2. {{ option_2 | default("Second option with trade-offs") }}
+
+## Preferred
+{{ preferred | default("Which option the agent would pick if left to decide, and why.") }}
