@@ -1,4 +1,4 @@
-# agent-project
+# Agent Projects
 
 > Git-native project management with a concept graph, designed for AI agents.
 
