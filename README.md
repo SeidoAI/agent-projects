@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="img/keel_full_black_bg.svg">
     <source media="(prefers-color-scheme: light)" srcset="img/keel_full_white_bg.svg">
-    <img src="img/keel_full_transparent.svg" alt="Keel" width="340">
+    <img src="img/keel_full_transparent.svg" alt="Keel" width="520">
   </picture>
 </p>
 

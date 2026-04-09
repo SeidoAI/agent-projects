@@ -40,6 +40,7 @@ CREATED_DIRS = [
     "graph/nodes",
     "sessions",
     "docs/issues",
+    "planning",
 ]
 PROJECT_TEMPLATE_SUBDIR = "project"
 
@@ -556,8 +557,12 @@ def init_cmd(
     console.print()
     console.print("Then in Claude Code, start scoping with:")
     console.print(
-        "  [cyan]/pm-scope[/cyan] Describe what you want built. "
-        "Planning docs in ./planning/ if you have them."
+        "  [cyan]/pm-scope[/cyan] Describe what you want built."
+    )
+    console.print()
+    console.print(
+        "[dim]Drop raw planning docs in [/dim][cyan]./planning/[/cyan]"
+        "[dim] first — /pm-scope reads them automatically.[/dim]"
     )
     console.print()
     console.print(

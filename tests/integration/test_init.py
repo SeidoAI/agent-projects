@@ -65,7 +65,7 @@ class TestInitBasics:
         assert (target / ".gitignore").exists()
 
         # Empty project directories with .gitkeep markers
-        for rel in ("issues", "graph/nodes", "sessions", "docs/issues"):
+        for rel in ("issues", "graph/nodes", "sessions", "docs/issues", "planning"):
             assert (target / rel).is_dir(), f"Missing directory: {rel}"
             assert (target / rel / ".gitkeep").exists(), f"Missing .gitkeep in {rel}"
 

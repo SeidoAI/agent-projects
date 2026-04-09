@@ -7,9 +7,10 @@ and sessions that pass validate.
 
 ## Precondition
 
-You are in a freshly-init'd `keel` directory. There is a
-`raw_planning/` (or equivalent) subdirectory with one or more markdown
-files describing what the project should be.
+You are in a freshly-init'd `keel` directory. `keel init` creates an
+empty `./planning/` subdirectory by default — drop any raw planning
+markdown files in there before invoking scoping. Scoping also works
+from user intent alone if `./planning/` is empty or missing.
 
 ## Procedure
 
@@ -21,8 +22,10 @@ Read the output. Note the `next issue key`, active enums, artifact
 manifest, orchestration pattern, template paths, and skill example paths.
 
 ### 2. Read the planning docs
-Read every file under the planning directory (e.g. `raw_planning/*.md`).
-Read them in full — you cannot scope what you haven't read.
+Read every `.md` file under `./planning/` in full — you cannot scope
+what you haven't read. If `./planning/` is empty or missing, use the
+user's intent (passed via `$ARGUMENTS` to `/pm-scope`) as your sole
+source and proceed.
 
 ### 3. Read the canonical examples
 Before writing any file, read at least:

@@ -16,8 +16,10 @@ Before writing any files:
 
 1. Run `keel brief` to load the current project state (next IDs, enums,
    templates, skill examples, validation gate command).
-2. If the user's intent references a path to planning docs (e.g.
-   `./planning/`), read every `.md` file in that path.
+2. Read every `.md` file in `./planning/` as supplementary context on top
+   of the user's intent above. `keel init` creates this directory by
+   default; if it is empty or missing, proceed with the user's intent
+   alone — do not ask the user to point at a path.
 3. Follow the Initial Scoping workflow end-to-end:
    - Identify the set of issues, concept nodes, and sessions the project needs.
    - Allocate issue keys via `keel next-key --type issue` (one per issue).
