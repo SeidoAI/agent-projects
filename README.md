@@ -34,7 +34,7 @@ claude
 Then in Claude Code:
 
 ```
-/pm-scope Build a knowledge base with nodes and edges. Planning docs in ./planning/.
+/pm-scope Build a knowledge base with nodes and edges. Planning docs in ./plans/.
 ```
 
 That's it. The agent reads your intent, scopes the project, writes the files,
@@ -234,8 +234,8 @@ Per-project defaults in `orchestration/default.yaml`; per-session overrides in t
 <summary><b>Worked example</b> — scoping from raw planning docs</summary>
 
 1. `keel init my-project` creates the project with 73 templates, 43 skill files, 10 slash commands, 11 enums. Auto-derives the key prefix from the name (`my-project` → `MP`).
-2. You open Claude Code in `my-project/` and type: `/pm-scope Build a knowledge base. Planning docs in ./raw_planning/.`
-3. The PM skill auto-loads. It calls `keel brief` to read project state, then reads `raw_planning/*.md`.
+2. You open Claude Code in `my-project/` and type: `/pm-scope Build a knowledge base. Planning docs in ./plans/.`
+3. The PM skill auto-loads. It calls `keel brief` to read project state, then reads `plans/*.md`.
 4. The agent calls `keel next-key --type issue` 20 times, writes 20 issue YAML files into `issues/`, writes 15 concept nodes into `graph/nodes/`, writes 3 session folders into `sessions/`.
 5. It runs `keel validate --strict --format=json`, parses the JSON, fixes any `ref/dangling`, `body/missing_heading`, or `status/unreachable` errors, re-runs.
 6. Clean. The agent commits the result. You `keel status` and see a connected dependency graph with a critical path.
@@ -244,11 +244,92 @@ Everything is in git. Every reference resolves. Every concept node's content has
 
 </details>
 
+<details>
+<summary><b>What we learned building this</b> — agent behaviour and workflow design</summary>
+
+These insights come from running a real PM agent against an 8,000-line
+planning corpus and watching what happened.
+
+### Agents don't self-check unless forced
+
+The agent produced 20 issues and declared done. When asked "what did
+you miss?", it found 7 more issues and 4 missing concept nodes. The
+capability was there — the workflow just never said "review your work."
+
+Keel's scoping workflow now has a gap analysis step: after validation
+passes, the agent rereads the planning docs and maps every deliverable
+to an issue. Gaps become visible in a `scoping-verification.md`
+artifact.
+
+### Every workflow step must be load-bearing
+
+If a step produces an artifact nothing reads, agents skip it. If step
+N produces a file that step N+1 reads by name, skipping N breaks N+1.
+
+The scoping plan is a file, not a mental sketch, because the next
+step reads it. The compliance checklist is consumed by the commit
+step. Every artifact earns its keep by being referenced downstream.
+
+### Agents anchor, rationalize, and reason as if they were human
+
+Agents don't experience time pressure or fatigue, but they produce
+outputs that mirror those patterns — because their training data is
+full of humans who do. The PM agent anchored on "15 issues" as a
+target, compressed work into overstuffed issues, and said "with more
+time I would split this." It doesn't lack time. It generates text
+*as if* it does because that's what its training data looks like.
+
+The same applies to rationalization: the agent hand-crafted UUIDs for
+mental tracking, acknowledged the violation of its own rules, and
+continued anyway — mimicking a human who knows the rule but judges
+the shortcut acceptable.
+
+The skill text overrides these learned patterns:
+- "Do not set a target number before reading the docs"
+- "You are not constrained by time. Split it now."
+- "Write for the execution agent — it has not read the planning docs"
+
+Red-flag tables (`| Agent thought | Reality |`) in each workflow
+interrupt the pattern before the agent completes the rationalization
+chain.
+
+### Structure and semantics are different problems
+
+`keel validate` checks structural integrity: schemas, references,
+freshness. It does NOT check completeness — it can't know whether
+you've covered every endpoint in the planning docs.
+
+A clean validate is necessary but not sufficient. The gap analysis
+step handles completeness. The PM skill says this explicitly so
+agents don't treat the gate as proof of coverage.
+
+### When in doubt, create the node
+
+The original rule was "2+ issues or cross-repo." The agent applied
+it conservatively and missed concepts referenced by 5+ issues.
+
+The rule now: when in doubt, create it. The cost of an extra node
+is 30 seconds. The cost of a missing node is undetected drift across
+every issue that mentions the concept in prose.
+
+### The project ships its own instruction set
+
+`keel init` doesn't just create a data directory — it ships the PM
+skill (33 files), 12 slash commands, and canonical examples. The
+methodology is versioned in-tree with the project. Fork a project,
+fork the methodology. Evolve it in a PR, review it like code.
+
+Across every adjacent tool we studied (Linear, dbt, Terraform,
+Obsidian, Fossil, superpowers, TDD), Keel is the only one that ships
+methodology alongside state, versioned together.
+
+</details>
+
 ---
 
 ## Status
 
-**v0.** 448 tests pass. The validation gate is stable. The PM skill and 10 `/pm-*` slash commands ship into every initialised project. APIs may change before v1.
+**v0.2.** 502 tests pass. The validation gate is stable. The PM skill (33 reference files, 13 canonical examples) and 12 `/pm-*` slash commands ship into every initialised project. v0.2 added self-healing workflow loops, gap analysis, agent psychology defenses, JSON-first CLI defaults, and RFC 4122 UUID generation. APIs may change before v1.
 
 **Not in v0:** web UI, managed cloud version, the agent execution runtime itself. Those are tracked in `docs/agent-containers.md` and `docs/keel-ui.md`.
 

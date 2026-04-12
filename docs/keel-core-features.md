@@ -130,3 +130,55 @@ For a human solo developer, git + a README is enough because human memory closes
 The corollary worth tracking: if Claude (or whoever) eventually gets robust episodic memory across sessions, a meaningful chunk of Keel's coherence machinery becomes redundant. It wouldn't invalidate the tool, but it would shrink the gap and shift the value toward the parts that survive regardless of memory — the per-project methodology shipping, the strict schemas, the git-native durability, the human-readable-forever data format. Those survive. The drift-detection-as-external-memory part might not need to work as hard.
 
 For now, all of it is load-bearing. Every piece.
+
+---
+
+## Lessons from real-world testing
+
+These emerged from running a PM agent against a real 8,000-line
+planning corpus (the kb-pivot project) and analysing its behaviour.
+
+### Self-healing loops
+
+The agent scoped 20 issues and stopped. When prompted to self-review,
+it found 7 missing issues and 4 missing nodes in minutes. The workflow
+now includes explicit review loops: a gap analysis step that rereads
+planning docs and maps deliverables to issues, a second-pass node
+check, and compliance/verification artifacts the agent produces about
+its own work.
+
+### Load-bearing workflow steps
+
+If a workflow step produces an artifact that nothing downstream reads,
+agents skip it. The fix: make every artifact consumed by a subsequent
+step. The scoping plan is a file (not a mental sketch) because ID
+allocation reads it. The compliance checklist is consumed by the
+commit step. Skip a step and the next step breaks.
+
+### Agent psychology is a design surface
+
+Agents don't experience time pressure, but they produce outputs that
+mirror it — trained on text from humans who do. They anchor on
+arbitrary targets ("15 issues feels like enough"), generate text as if
+they're time-constrained ("with more time I would split this"), and
+rationalize past rules they've read and acknowledged. The skill text
+must override these learned patterns: red-flag tables interrupt
+specific rationalizations, anti-anchoring instructions prevent target-
+setting, and the theory-of-mind instruction ("write for the execution
+agent who hasn't read the planning docs") forces thoroughness.
+
+### Structure vs. semantics
+
+The validation gate checks structural integrity (schemas, references,
+freshness). It cannot check semantic completeness — whether the
+planning docs' 14 phases are fully covered by 20 issues. A clean
+validate is necessary but not sufficient. The gap analysis step
+handles the semantic side. The PM skill says this explicitly.
+
+### "When in doubt, create the node"
+
+The original node creation threshold ("2+ issues or cross-repo") was
+applied conservatively by the agent, missing concepts referenced by
+5+ issues. The cost of a missing node is undetected drift. The cost
+of an extra node is 30 seconds. For a coherence tool, recall matters
+more than precision. The rule now: when in doubt, create it.
