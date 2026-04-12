@@ -744,3 +744,50 @@ class TestCategorySummary:
         assert cats["schema"] == {"errors": 1, "warnings": 0, "fixed": 0}
         assert cats["freshness"] == {"errors": 0, "warnings": 1, "fixed": 0}
         assert cats["timestamp"] == {"errors": 0, "warnings": 0, "fixed": 1}
+
+
+class TestUuidV4Validation:
+    """Tests for the uuid/not_v4 check (v0.2)."""
+
+    def test_real_uuid4_passes(self, empty_project: Path) -> None:
+        import uuid
+        write_issue(empty_project, "TST-1", uuid=str(uuid.uuid4()))
+        report = validate_project(empty_project)
+        assert not any(e.code == "uuid/not_v4" for e in report.errors)
+
+    def test_hand_crafted_uuid_fails(self, empty_project: Path) -> None:
+        # Version nibble is '1' (not '4') and variant is '0' (not 8-b)
+        write_issue(empty_project, "TST-1", uuid="10a1b2c3-d4e5-1f6a-0b8c-9d0e1f2a3b4c")
+        report = validate_project(empty_project)
+        assert any(e.code == "uuid/not_v4" for e in report.errors)
+
+    def test_uuid_with_correct_version_but_wrong_variant(self, empty_project: Path) -> None:
+        # Version nibble is '4' but variant is '0' (should be 8/9/a/b)
+        write_issue(empty_project, "TST-1", uuid="10a1b2c3-d4e5-4f6a-0b8c-9d0e1f2a3b4c")
+        report = validate_project(empty_project)
+        assert any(e.code == "uuid/not_v4" for e in report.errors)
+
+
+class TestCoverageWarnings:
+    """Tests for coverage heuristic warnings (v0.2)."""
+
+    def test_issue_with_no_node_refs_warns(self, empty_project: Path) -> None:
+        write_issue(
+            empty_project, "TST-1",
+            body="## Context\nNo concept references here.\n"
+        )
+        report = validate_project(empty_project)
+        assert any(
+            w.code == "coverage/no_nodes_referenced" for w in report.warnings
+        )
+
+    def test_issue_with_node_ref_no_warning(self, empty_project: Path) -> None:
+        write_node(empty_project, "user-model")
+        write_issue(
+            empty_project, "TST-1",
+            body="## Context\nUses [[user-model]] for lookups.\n"
+        )
+        report = validate_project(empty_project)
+        assert not any(
+            w.code == "coverage/no_nodes_referenced" for w in report.warnings
+        )

@@ -57,7 +57,7 @@ non-obvious. Pass `--key-prefix`, `--base-branch`, or `--repos` to override.
 ## Demo
 
 ```text
-$ keel validate --strict --format=json
+$ keel validate --strict
 {
   "exit_code": 0,
   "errors": [],
@@ -67,12 +67,20 @@ $ keel validate --strict --format=json
   "duration_ms": 47
 }
 
-$ keel status
+$ keel status --format=rich
 my-project (MP)
   Issues: 23  (backlog=12, todo=8, in_progress=3)
   Concept nodes: 17 active, 2 stale
   Sessions: 4  (2 completed, 1 in_progress, 1 waiting_for_review)
   Critical path: MP-1 → MP-7 → MP-12 → MP-18  (length 4)
+
+$ keel uuid --count 3
+# Entity 1
+a1b2c3d4-e5f6-4789-abcd-ef0123456789
+# Entity 2
+f9e8d7c6-b5a4-4321-8765-432109876543
+# Entity 3
+12345678-90ab-4cde-8f01-234567890abc
 ```
 
 ## How it works
@@ -128,10 +136,14 @@ keel artifacts                List session artifact manifest
 keel brief                    Dump project context (agents use this internally)
 keel agenda                   Aggregated view of everything in flight
 keel plan                     Preview what init would produce (dry-run)
+keel uuid                     Generate RFC 4122 UUID4 values (--count N)
 keel refresh                  Rebuild the graph cache from filesystem
 keel view                     Serve a read-only HTML project viewer
 keel completion <shell>       Print bash/zsh/fish tab completion install snippet
 ```
+
+All commands output JSON by default (agent-first). Add `--format=text`
+or `--format=rich` for human-readable output.
 
 Run `keel --help` or `keel <cmd> --help` for details.
 

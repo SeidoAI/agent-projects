@@ -67,13 +67,25 @@ def test_issue_examples_have_required_body_sections() -> None:
         "## Definition of Done",
     )
     for path in _all_example_files("issue-"):
+        if "epic" in path.name:
+            continue  # Epic issues have a different structure
         body = path.read_text(encoding="utf-8")
         for heading in required_headings:
             assert heading in body, f"{path.name} missing required heading {heading!r}"
 
 
+def test_epic_issue_example_has_basic_sections() -> None:
+    """Epic issues need Context and Acceptance criteria but not the full set."""
+    for path in _all_example_files("issue-epic"):
+        body = path.read_text(encoding="utf-8")
+        assert "## Context" in body, f"{path.name} missing ## Context"
+        assert "## Acceptance criteria" in body, f"{path.name} missing ## Acceptance criteria"
+
+
 def test_issue_examples_have_stop_and_ask_guidance() -> None:
     for path in _all_example_files("issue-"):
+        if "epic" in path.name:
+            continue  # Epics don't have execution constraints
         body = path.read_text(encoding="utf-8").lower()
         assert "stop and ask" in body or "stop, ask" in body, (
             f"{path.name} missing 'stop and ask' guidance"

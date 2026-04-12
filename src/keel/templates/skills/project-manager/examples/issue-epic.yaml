@@ -1,0 +1,30 @@
+---
+uuid: a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d
+id: SEI-1
+title: "Epic: Backend infrastructure and core services"
+status: backlog
+priority: high
+executor: ai
+verifier: required
+labels:
+  - domain/backend
+  - type/epic
+created_at: "2026-04-07T10:00:00"
+updated_at: "2026-04-07T10:00:00"
+---
+## Context
+
+Top-level epic grouping all backend infrastructure work: storage
+adapter, API endpoints, middleware, and database migrations.
+
+Child issues: SEI-8 (storage adapter), SEI-9 (KB CRUD endpoints),
+SEI-10 (mutation endpoint), SEI-11 (wiki endpoints), SEI-12
+(billing middleware).
+
+## Requirements
+- All child issues completed and passing validation
+- Integration tests across all backend endpoints
+
+## Acceptance criteria
+- [ ] All child issues in `done` status
+- [ ] `keel validate --strict` exits 0 with no backend issues open
