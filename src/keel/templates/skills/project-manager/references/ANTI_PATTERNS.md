@@ -153,6 +153,32 @@ writing has "high structural confidence, low semantic confidence" —
 it knows validation passed but can't describe what any given file
 contains.
 
+### Quality degradation over time (the fatigue pattern)
+
+Agent output degrades measurably over long writing sessions. In a
+60-issue scoping run, the first 20 concrete issues averaged 2,470
+characters and 4.0 node references; the last 20 averaged 1,883
+characters and 1.5 references — a 24% drop in depth and 63% drop
+in cross-referencing.
+
+This mimics human cognitive fatigue from training data. The agent
+isn't tired, but it produces progressively thinner output as if it
+were.
+
+The quality calibration checkpoint in the scoping workflow counters
+this: after every 20 concrete issues, reread the first 3 and last 3,
+rewrite the last 3 if they're thinner. The validator also detects
+this pattern (`quality/body_degradation`, `quality/ref_degradation`)
+and will flag it.
+
+### Surface-level gap analysis
+
+Mapping phases to issue ranges ("P1a → KBP-17–20 | Covered") is a
+table of contents, not a gap analysis. Each row must map one specific
+deliverable (one endpoint, one migration step, one UI component) to
+one specific issue. If you find yourself writing "KBP-X through
+KBP-Y," you are not doing the analysis.
+
 ## Concept graph mistakes
 
 ### Creating nodes for everything

@@ -293,6 +293,23 @@ Red-flag tables (`| Agent thought | Reality |`) in each workflow
 interrupt the pattern before the agent completes the rationalization
 chain.
 
+### Agent output degrades over time
+
+In a 60-issue scoping run, the first 20 concrete issues averaged
+2,470 characters and 4.0 node references. The last 20 averaged
+1,883 characters and 1.5 references — a 24% drop in depth and 63%
+drop in cross-referencing.
+
+This mimics human cognitive fatigue from training data. The agent
+generates text *as if* it were getting tired, because long working
+sessions look that way in its training data.
+
+The fix is structural, not motivational: a quality calibration
+checkpoint every 20 issues forces the agent to compare its recent
+output against its early output and rewrite if thinner. The
+validator also detects the degradation pattern by comparing
+first-third vs last-third of the issue set and flags inconsistency.
+
 ### Structure and semantics are different problems
 
 `keel validate` checks structural integrity: schemas, references,

@@ -159,6 +159,37 @@ to issues you've allocated keys for but haven't written yet are
 acceptable — they resolve when you write those issues in the next
 batch.
 
+#### Quality calibration checkpoint
+
+After every 20 concrete issues written, pause and calibrate:
+
+1. **Reread your first 3 concrete issues.** Note the character count,
+   number of `[[node-id]]` references, specificity of requirements,
+   and completeness of test plans.
+
+2. **Reread your last 3 concrete issues.** Compare against the first
+   3 on the same dimensions.
+
+3. **If the last 3 are thinner** (shorter bodies, fewer references,
+   vaguer requirements, missing specifics from the planning docs):
+   **rewrite the last 3 before continuing.** Use the first 3 as your
+   quality standard. Do not rationalise the difference ("these are
+   simpler issues") — check the planning docs to verify.
+
+4. **Run `keel validate --strict`** after rewriting to confirm the
+   rewrites are clean.
+
+5. **Record the calibration** in `plans/artifacts/compliance.md`
+   under the Quality calibration checkpoints table.
+
+**Why this exists:** Testing shows a 24% character drop and 63%
+reference drop between the first and last 20 issues of a 60-issue
+run. This mimics human cognitive fatigue from training data. You are
+not tired, but you produce progressively thinner output. This
+checkpoint forces recalibration against your own best work. The
+validator also detects this pattern (`quality/body_degradation`,
+`quality/ref_degradation`) and will flag it.
+
 ### 7. Red-green validation cycle
 
 After every 3-5 files:
@@ -216,9 +247,17 @@ memory.
 Produce `plans/artifacts/gap-analysis.md`:
 
 **Planning doc → project coherence:**
-Reread every planning doc. For each section, list every concrete
-deliverable (endpoint, migration, UI page, infra resource, CI/CD
-pipeline, schema change). Check: does an issue cover this? If not,
+Reread every planning doc. For each section, list every **individual**
+concrete deliverable (one endpoint, one migration step, one UI page,
+one infra resource, one CI/CD pipeline, one schema change).
+
+**Each row in the gap analysis table must map ONE deliverable to ONE
+issue.** Do not map ranges of issues to ranges of deliverables.
+`"KBP-17 through KBP-20 | Covered"` is a table of contents, not a
+gap analysis — list each issue on its own row with the specific
+deliverable it covers.
+
+Check: does a specific issue cover this specific deliverable? If not,
 flag as **GAP** and create the missing issue.
 
 **Planning doc internal coherence:**
@@ -325,6 +364,8 @@ Per `COMMIT_CONVENTIONS.md`. One commit for the whole initial scoping.
 | "I can track UUIDs in my head if I make them predictable" | Use `keel uuid`. Hand-crafted UUIDs will be caught by the validator. |
 | "With more time I would split this issue" | You have the time. Split it now. |
 | "The execution agent will figure out the details" | No. The execution agent has no context you don't write down. Be explicit. |
+| "These later issues are simpler, they don't need as much detail" | Check the planning docs. Every issue needs the same depth of context, test plan, and node references regardless of position in the sequence. |
+| "I've been writing for a while, my output is consistent" | It measurably is not. Reread your first 3 and last 3 concrete issues. If the last 3 are thinner, rewrite them. |
 
 ## See also
 

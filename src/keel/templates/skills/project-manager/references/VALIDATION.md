@@ -115,6 +115,20 @@ Fix the file, re-run, continue.
   content (warning).
 - `artifact/missing` — completed session missing a required artifact.
 
+### Quality consistency (warnings)
+- `quality/body_degradation` — last-third of concrete issues (sorted by
+  key) are >20% shorter than first-third. Indicates output quality
+  degrading over the session. Run the quality calibration checkpoint.
+- `quality/ref_degradation` — last-third of concrete issues have >40%
+  fewer unique `[[node-id]]` references than first-third. Add refs to
+  later issues.
+
+### Phase requirements
+- `phase/missing_artifact` — a phase-required artifact is missing.
+- `phase/incomplete_artifact` — artifact exists but not marked
+  `<!-- status: complete -->`.
+- `phase/missing_session_plan` — session directory has no `plan.md`.
+
 ### Counters and timestamps
 - `sequence/drift` — `next_issue_number` behind max existing key
   (warning, auto-fixable).

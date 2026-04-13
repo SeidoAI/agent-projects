@@ -1,23 +1,32 @@
-# Gap analysis — kb-pivot initial scoping
+# Gap analysis — initial scoping
+
+<!-- status: complete -->
 
 ## Planning doc → project coherence
 
 ### api-spec.md
-| Deliverable | Issue | Status |
-|---|---|---|
-| KB CRUD (6 endpoints) | SEI-9 | Covered |
-| Unified mutation (9 op types) | SEI-10 | Covered |
-| Wiki endpoints (5) | SEI-11 | Covered |
-| Upload endpoints (4) | SEI-21 | **Added after gap analysis** |
-| Chat session updates (3) | SEI-22 | **Added after gap analysis** |
-| Billing middleware | SEI-12 | Covered |
+| Section | Deliverable | Covering issue | Status |
+|---|---|---|---|
+| §2.1 | POST /kb (create KB) | SEI-9 | Covered |
+| §2.2 | GET /kb (list KBs) | SEI-9 | Covered |
+| §2.3 | GET /kb/{id} | SEI-9 | Covered |
+| §2.4 | PATCH /kb/{id} | SEI-9 | Covered |
+| §2.5 | DELETE /kb/{id} | SEI-9 | Covered |
+| §3.1 | POST /graph/mutate | SEI-10 | Covered |
+| §3.2 | GET /graph/overview | SEI-10 | Covered |
+| §4.1 | GET /wiki/{path} | SEI-11 | Covered |
+| §4.2 | PUT /wiki/{path} | SEI-11 | Covered |
+| §5.1 | POST /uploads | — | **Gap → created SEI-21** |
+| §5.2 | GET /uploads/{id} | — | **Gap → created SEI-21** |
+| §6.1 | Billing gate middleware | SEI-12 | Covered |
 
 ### infra-spec.md
-| Deliverable | Issue | Status |
-|---|---|---|
-| GCS bucket + Terraform | SEI-6 | Covered |
-| Agent Cloud Run provisioning | SEI-23 | **Added after gap analysis** |
-| Neo4j decommission | SEI-7 | Covered |
+| Section | Deliverable | Covering issue | Status |
+|---|---|---|---|
+| §1.1 | GCS bucket Terraform module | SEI-6 | Covered |
+| §1.2 | IAM bindings for Cloud Run | SEI-6 | Covered |
+| §2.1 | Neo4j module removal | SEI-7 | Covered |
+| §3.1 | Agent Cloud Run service | — | **Gap → created SEI-23** |
 
 ## Planning doc internal coherence
 
@@ -27,10 +36,6 @@
    If either changes, the other silently drifts. → Created
    `[[sse-event-model]]` concept node to track this.
 
-2. **Firestore schema fields:** transition-spec.md §7.1 lists
-   specific user fields; architecture.md §2.7 references "user
-   soft-delete fields" without listing. → Noted in SEI-12 body.
-
 ## Project self-coherence
 
 - Issues with 0 node refs: **0** (all resolved in second-pass)
@@ -38,3 +43,11 @@
   Acceptable — infra nodes are naturally single-issue.
 - Sessions with 0 issues: **0**
 - Dependency cycles: **none**
+
+## Gaps found and resolved
+
+| Gap | Resolution |
+|---|---|
+| Upload endpoints (api-spec §5) | Created SEI-21, added to Epic 3 |
+| Chat session updates (api-spec §5.3) | Created SEI-22, added to Epic 3 |
+| Agent Cloud Run provisioning (infra-spec §3) | Created SEI-23, added to Epic 1 |

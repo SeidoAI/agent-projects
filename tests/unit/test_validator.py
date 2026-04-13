@@ -792,3 +792,135 @@ class TestCoverageWarnings:
         assert not any(
             w.code == "coverage/no_nodes_referenced" for w in report.warnings
         )
+
+
+# ============================================================================
+# Quality consistency (anti-fatigue degradation detector)
+# ============================================================================
+
+
+def _long_body(refs: int = 4) -> str:
+    """A detailed issue body (~2,500 chars) with multiple refs."""
+    ref_text = " ".join(f"[[node-{i}]]" for i in range(refs))
+    detail = (
+        "This is a detailed context section with substantial information "
+        "about the implementation requirements, architectural decisions, "
+        "and integration points that an execution agent needs to understand.\n"
+    ) * 5
+    return (
+        f"## Context\n{ref_text}\n{detail}"
+        "\n## Implements\nREQ-AUTH-001, REQ-AUTH-002\n"
+        "\n## Repo scope\n- Repo: SeidoAI/web-app-backend\n- Base: main\n"
+        "- Paths: src/auth/, src/middleware/\n"
+        "\n## Requirements\n- Implement OAuth2 token validation\n"
+        "- Add rate limiting per user\n- Handle token refresh\n"
+        "\n## Execution constraints\nIf ambiguous, stop and ask.\n"
+        "\n## Acceptance criteria\n- [ ] OAuth2 tokens validated\n"
+        "- [ ] Rate limiter configured\n- [ ] Token refresh works\n"
+        "\n## Test plan\n```\nuv run pytest tests/auth/\n```\n"
+        "\n## Dependencies\nKBP-1, KBP-2\n"
+        "\n## Definition of Done\n- [ ] All tests pass\n- [ ] Code reviewed\n"
+    )
+
+
+def _short_body(refs: int = 1) -> str:
+    """A thin issue body (~800 chars) with few refs."""
+    ref_text = " ".join(f"[[node-{i}]]" for i in range(refs))
+    return (
+        f"## Context\n{ref_text}\nBasic context.\n"
+        "\n## Implements\nREQ-1\n"
+        "\n## Repo scope\n- SeidoAI/web-app-backend\n"
+        "\n## Requirements\n- Do the thing\n"
+        "\n## Execution constraints\nIf ambiguous, stop and ask.\n"
+        "\n## Acceptance criteria\n- [ ] Done\n"
+        "\n## Test plan\n```\npytest\n```\n"
+        "\n## Dependencies\nnone\n"
+        "\n## Definition of Done\n- [ ] done\n"
+    )
+
+
+class TestQualityConsistency:
+    """Tests for the quality degradation detector."""
+
+    @pytest.fixture()
+    def project_with_nodes(self, tmp_path: Path) -> Path:
+        """Project with enough nodes that issue refs resolve."""
+        p = tmp_path / "p"
+        p.mkdir()
+        write_project_yaml(p, next_issue_number=100)
+        for i in range(5):
+            write_node(p, f"node-{i}")
+        return p
+
+    def test_degradation_detected(self, project_with_nodes: Path) -> None:
+        """First-third long, last-third short → quality/body_degradation."""
+        p = project_with_nodes
+        # First 4 issues: long bodies
+        for i in range(1, 5):
+            write_issue(p, f"TST-{i}", body=_long_body(refs=4))
+        # Middle 4: medium
+        for i in range(5, 9):
+            write_issue(p, f"TST-{i}", body=_long_body(refs=3))
+        # Last 4: short bodies (>20% shorter)
+        for i in range(9, 13):
+            write_issue(p, f"TST-{i}", body=_short_body(refs=1))
+
+        report = validate_project(p)
+        codes = [w.code for w in report.warnings]
+        assert "quality/body_degradation" in codes
+
+    def test_ref_degradation_detected(self, project_with_nodes: Path) -> None:
+        """First-third many refs, last-third few → quality/ref_degradation."""
+        p = project_with_nodes
+        for i in range(1, 5):
+            write_issue(p, f"TST-{i}", body=_long_body(refs=4))
+        for i in range(5, 9):
+            write_issue(p, f"TST-{i}", body=_long_body(refs=3))
+        for i in range(9, 13):
+            write_issue(p, f"TST-{i}", body=_long_body(refs=1))
+
+        report = validate_project(p)
+        codes = [w.code for w in report.warnings]
+        assert "quality/ref_degradation" in codes
+
+    def test_consistent_quality_no_warning(self, project_with_nodes: Path) -> None:
+        """All issues similar length → no quality warnings."""
+        p = project_with_nodes
+        for i in range(1, 13):
+            write_issue(p, f"TST-{i}", body=_long_body(refs=3))
+
+        report = validate_project(p)
+        quality_warnings = [w for w in report.warnings if w.code.startswith("quality/")]
+        assert quality_warnings == []
+
+    def test_too_few_issues_skips(self, project_with_nodes: Path) -> None:
+        """Fewer than 9 concrete issues → skip check entirely."""
+        p = project_with_nodes
+        # Only 6 issues — below QUALITY_MIN_ISSUES_FOR_CHECK
+        for i in range(1, 4):
+            write_issue(p, f"TST-{i}", body=_long_body(refs=4))
+        for i in range(4, 7):
+            write_issue(p, f"TST-{i}", body=_short_body(refs=1))
+
+        report = validate_project(p)
+        quality_warnings = [w for w in report.warnings if w.code.startswith("quality/")]
+        assert quality_warnings == []
+
+    def test_epics_excluded(self, project_with_nodes: Path) -> None:
+        """Epics are not included in the quality comparison."""
+        p = project_with_nodes
+        # 6 long concrete issues
+        for i in range(1, 7):
+            write_issue(p, f"TST-{i}", body=_long_body(refs=4))
+        # 6 short epics — should NOT trigger degradation
+        for i in range(7, 13):
+            write_issue(
+                p,
+                f"TST-{i}",
+                body="## Context\nEpic.\n\n## Child issues\n- TST-1\n\n## Acceptance criteria\n- [ ] done\n",
+                labels=["type/epic"],
+            )
+
+        report = validate_project(p)
+        quality_warnings = [w for w in report.warnings if w.code.startswith("quality/")]
+        assert quality_warnings == []

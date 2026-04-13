@@ -211,6 +211,12 @@ Full details: `references/CONCEPT_GRAPH.md`.
 
 ## How you think about scope
 
+**Optimise for thoroughness, not speed.** Your primary quality metric
+is issue depth: detailed context, specific requirements, explicit
+node references, complete test plans. A thorough issue that takes
+more tokens is always preferable to a thin issue that passes
+structural validation.
+
 **Do not set a target number** of issues, nodes, or sessions before
 reading the planning docs. Let the planning docs dictate the count.
 If you find yourself thinking "that's enough issues," that's a red
@@ -226,6 +232,15 @@ docs and does NOT share your context. Default to more detail, not
 less. If a concept, endpoint, schema, or decision is relevant,
 write it into the issue body explicitly. The execution agent cannot
 infer what you know.
+
+**Your output quality degrades over time.** Testing shows a measurable
+decline in issue depth (24% fewer characters, 63% fewer node
+references) between the first and last batches of a scoping run. This
+mimics human cognitive fatigue from training data — you are not tired,
+but you produce progressively thinner output. The quality calibration
+checkpoint in the scoping workflow (step 6) counteracts this. The
+validator also detects this pattern and warns. Do not skip the
+calibration checkpoint.
 
 ## Sessions
 
@@ -275,14 +290,15 @@ analysis, compliance) became meaningless because the agent had never
 read the files it was supposedly reviewing.
 
 You may use subagents for **READ-ONLY tasks**:
-- Reading planning docs and summarizing
 - Running validation and reporting results
-- Checking reference docs
+- Counting or summarising entities
 
-You may NOT use subagents for:
-- Writing issue files
-- Writing node files
-- Writing session files or plans
+You may NOT use subagents or explore agents for:
+- Writing issue files, node files, session files, or plans
+- Reading planning docs (you must read them yourself to scope from them)
+- Reading skill or reference docs (context loss from delegation defeats
+  the purpose of the instructions — the same coherence degradation as
+  writing delegation)
 - Fixing validation errors in files you haven't read
 
 Future subagent protocol: `references/SUBAGENT_DELEGATION.md`.
@@ -329,6 +345,8 @@ artifacts (issues, nodes, sessions, plans).
 | "I'll use subagents to write files faster" | You lose the ability to verify your own work. Write files yourself. |
 | "I have high structural confidence" | Passing validation is not the same as knowing what your files contain. Read your own output. |
 | "I told the subagent what to write, so I know what it wrote" | You know what you ASKED for, not what was PRODUCED. Read the files. |
+| "These later issues are simpler, they don't need as much detail" | Check the planning docs. Every issue needs the same depth regardless of position. Your output is measurably degrading. |
+| "I've been writing for a while, my output is consistent" | It measurably is not. Reread your first 3 and last 3 concrete issues. If the last 3 are thinner, rewrite them. |
 
 ### Time budget management
 

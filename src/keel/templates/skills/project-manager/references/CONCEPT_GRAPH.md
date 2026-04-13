@@ -61,6 +61,26 @@ Bad candidates (keep as prose):
 - Local variables or implementation details
 - Things internal to a single file that nothing else references
 
+## Granularity benchmarks
+
+**Target ratio:** ~0.7-0.9x the number of concrete issues. An
+8,000-line planning corpus with 60 concrete issues should produce
+40-55 nodes. If your node count is below 0.6x your concrete issue
+count, you are likely grouping concepts that should be separate
+nodes.
+
+**Splitting signals:**
+- A node whose description uses "and" to join two distinct concepts
+  should be split (e.g., "auth endpoint and rate limiter" → two
+  nodes).
+- A node referenced by issues that don't otherwise overlap — those
+  issues reference different aspects of the grouped concept.
+
+**Merging signals:**
+- A node referenced by only 1 issue after the second-pass check is
+  a candidate for merging, unless it's genuinely unique (e.g., a
+  single Terraform resource).
+
 ## Reference syntax
 
 `[[node-id]]` in any Markdown body (issue, node description, comment)

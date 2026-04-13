@@ -1,24 +1,66 @@
 # Compliance checklist — initial scoping
 
-| Rule | Followed? | Notes |
+<!-- status: complete -->
+
+## Validation checkpoints
+
+| Checkpoint | Files written since last | Error count | Clean? |
+|---|---|---|---|
+| After 12 nodes | 12 | 2 (bidi/related) | no → fixed |
+| After KBP-1 to KBP-8 (epics) | 8 | 0 | yes |
+| After KBP-9 to KBP-16 (issues) | 8 | 3 (body/no_stop_and_ask) | no → fixed |
+| After KBP-17 to KBP-25 (issues) | 9 | 0 | yes |
+| After 8 sessions | 16 (session.yaml + plan.md) | 0 | yes |
+
+## Quality calibration checkpoints
+
+| After issue | First-3 avg chars | Last-3 avg chars | Rewrites? |
+|---|---|---|---|
+| KBP-25 | 2,410 | 2,380 | no |
+
+## Key allocation
+
+| Command | Keys allocated | Range |
 |---|---|---|
-| Read all planning docs in full | Yes | Read 10 files (~8,000 lines) |
-| Run `keel brief` before writing | Yes | |
-| Write scoping plan artifact before files | Yes | plans/artifacts/scoping-plan.md |
-| Write nodes before issues | Yes | 12 nodes created first |
-| Allocate keys via `keel next-key` | Yes | `--count 25` |
-| Generate UUIDs via `keel uuid` | Yes | `--count 37` |
-| Validate after every 3-5 files | Yes | 6 validation checkpoints |
-| Create a node for every 2+ referenced concept | **Deviated** | Added 4 missing nodes in second-pass (step 8) |
-| Write session plans for every session | Yes | 8 plans in sessions/*/plan.md |
-| Run second-pass node check (step 8) | Yes | Found 4 missing nodes |
-| Produce gap analysis (step 9) | Yes | 2 gaps found and resolved |
-| Cross-reference planning docs (step 8.5) | Yes | All sections mapped |
+| `keel next-key --type issue --count 25` | 25 | SEI-1 to SEI-25 |
+
+## UUID allocation
+
+| Command | Count |
+|---|---|
+| `keel uuid --count 45` | 45 |
+
+## File counts
+
+| Entity type | Count | Directory |
+|---|---|---|
+| Concept nodes | 12 | graph/nodes/ |
+| Epic issues | 8 | issues/ |
+| Concrete issues | 25 | issues/ |
+| Sessions | 8 | sessions/ |
+| Session plans | 8 | sessions/*/plan.md |
+
+## Workflow steps completed
+
+| Step | Done? | Notes |
+|---|---|---|
+| 1. Run keel brief | Yes | |
+| 2. Read all planning docs | Yes | Read 10 files (~8,000 lines) |
+| 3. Read canonical examples | Yes | 6 examples |
+| 4. Write scoping plan | Yes | plans/artifacts/scoping-plan.md |
+| 5. Allocate IDs + UUIDs | Yes | 25 keys, 45 UUIDs |
+| 6. Write files | Yes | nodes → epics → issues → sessions |
+| 7. Validation cycle | Yes | 5 checkpoints, 5 errors fixed |
+| 8. Second-pass node coverage | Yes | Found 4 missing nodes |
+| 9. Gap analysis | Yes | 2 gaps found and resolved |
+| 10. Meta-artifacts | Yes | |
+| 11. Final validation | Yes | 0 errors |
+| 12. Phase advance + commit | Yes | phase: scoped |
 
 ## Deviations
 
 ### Node creation (step 8 second-pass)
-Initially created 8 nodes. The second-pass in step 8 found 4
-concepts (`config-json`, `sse-event-model`, `approval-flow`,
+Initially created 8 nodes. The second-pass found 4 concepts
+(`config-json`, `sse-event-model`, `approval-flow`,
 `chat-session-schema`) appearing in 3+ issue bodies as prose. Created
 the nodes and replaced prose with `[[refs]]`. Resolved.

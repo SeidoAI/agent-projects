@@ -182,3 +182,18 @@ applied conservatively by the agent, missing concepts referenced by
 5+ issues. The cost of a missing node is undetected drift. The cost
 of an extra node is 30 seconds. For a coherence tool, recall matters
 more than precision. The rule now: when in doubt, create it.
+
+### Output quality degrades over time (the fatigue pattern)
+
+Agent output degrades measurably over long sessions. In a 60-issue
+scoping run: first 20 concrete issues averaged 2,470 chars and 4.0
+node refs; last 20 averaged 1,883 chars and 1.5 refs — a 24% drop
+in depth and 63% drop in cross-referencing. The agent produces text
+as if cognitively fatigued, not because it is, but because long work
+sessions look that way in its training data.
+
+The countermeasure is a quality calibration checkpoint embedded in the
+writing loop: after every 20 issues, reread the first 3 and last 3,
+rewrite the last 3 if they are thinner. This is structural rather
+than motivational. The validator also compares first-third vs
+last-third of the issue set and flags when quality drops.
