@@ -12,7 +12,7 @@ For a typical issue implementing one feature:
 | 1 | Tests (red phase) | `tests/unit/test_<feature>.py`, `tests/integration/test_<feature>.py`, any `conftest.py` fixture updates | `test(SEI-42): add failing tests for auth token endpoint` |
 | 2 | Implementation | `src/api/<feature>.py`, service/model changes | `feat(SEI-42): implement auth token endpoint` |
 | 3 | Wiring | Router registration in `main.py`, middleware, config | `chore(SEI-42): wire auth router into main app` |
-| 4 | Documentation | `docs/issues/<KEY>/developer.md`, README updates | `docs(SEI-42): add developer note for auth endpoint` |
+| 4 | Documentation | `issues/<KEY>/developer.md`, README updates | `docs(SEI-42): add developer note for auth endpoint` |
 
 Not every issue needs all four. Small bug fixes might be one commit
 (tests + fix + docs together). Large features might have more

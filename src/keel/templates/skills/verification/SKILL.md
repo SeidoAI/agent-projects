@@ -60,7 +60,7 @@ You produce two artifacts:
 1. **A PR review** (canonical) — either `approve` or `request-changes`,
    with specific evidence for each finding.
 2. **A `verified.md` doc** at
-   `<project>/docs/issues/<KEY>/verified.md` — structured summary of
+   `<project>/issues/<KEY>/verified.md` — structured summary of
    the verification result with evidence. Committed to the project
    repo via your own PR.
 
@@ -71,7 +71,7 @@ incomplete implementation.
 
 ### Phase 1: Read the context
 
-1. **Read the issue** at `<project>/issues/<KEY>.yaml`. Note the
+1. **Read the issue** at `<project>/issues/<KEY>/issue.yaml`. Note the
    acceptance criteria, the body, the required nodes.
 2. **Read the PR**:
    ```bash
@@ -146,7 +146,7 @@ incomplete implementation.
     Definition of Done says they should be.
 15. **Run the project-level validator**:
     ```bash
-    keel validate --strict --format=json
+    keel validate --strict
     ```
     Any errors must be fixed before approval.
 
@@ -197,7 +197,7 @@ incomplete implementation.
        that makes the token appear valid. The test passes but
        doesn't exercise the real expiry logic.
     3. **Stale node**: [[user-model]] was modified but its
-       content_hash wasn't updated (graph/nodes/user-model.yaml).
+       content_hash wasn't updated (nodes/user-model.yaml).
 
     ### What needs to change
     1. Fix the 403 return (one-line change in auth.py)
@@ -212,7 +212,7 @@ incomplete implementation.
 
 ### Phase 8: Write `verified.md`
 
-19. **Write `<project>/docs/issues/<KEY>/verified.md`** using the
+19. **Write `<project>/issues/<KEY>/verified.md`** using the
     template at `<project>/.claude/skills/project-manager/examples/`
     (adapt a completion-comment example — there's no dedicated
     `verified.md` template in v0).

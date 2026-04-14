@@ -18,7 +18,8 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from keel.core.store import ProjectNotFoundError, load_project
+from keel.cli._utils import require_project as _require_project
+from keel.core import paths
 
 console = Console()
 
@@ -26,12 +27,12 @@ console = Console()
 # `templates/artifacts` is the one exception that stays under `templates/`;
 # everything else lives at the project root.
 TEMPLATE_SUBDIRS = (
-    "issue_templates",
-    "comment_templates",
-    "session_templates",
-    "templates/artifacts",
-    "agents",
-    "orchestration",
+    paths.ISSUE_TEMPLATES_DIR,
+    paths.COMMENT_TEMPLATES_DIR,
+    paths.SESSION_TEMPLATES_DIR,
+    paths.TEMPLATES_ARTIFACTS_DIR,
+    paths.AGENTS_DIR,
+    paths.ORCHESTRATION_DIR,
 )
 
 
@@ -144,10 +145,3 @@ def _collect_templates(project_dir: Path) -> list[tuple[str, str]]:
             if f.is_file() and f.name != ".gitkeep":
                 rows.append((str(f.relative_to(project_dir)), subdir))
     return rows
-
-
-def _require_project(project_dir: Path) -> None:
-    try:
-        load_project(project_dir)
-    except ProjectNotFoundError as exc:
-        raise click.ClickException(str(exc)) from exc

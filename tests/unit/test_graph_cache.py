@@ -75,7 +75,10 @@ def make_issue(
         parent=parent,
         body=body or f"Body for {key}.\n",
     )
-    save_issue(project_dir, issue)
+    # These tests exercise the graph cache's own dispatcher logic
+    # (ensure_fresh, full_rebuild). Skip the automatic cache invalidation
+    # on save so the tests see the pre-invalidation state.
+    save_issue(project_dir, issue, update_cache=False)
 
 
 def make_node(
@@ -99,7 +102,7 @@ def make_node(
             content_hash="sha256:abc",
         ),
     )
-    save_node(project_dir, node)
+    save_node(project_dir, node, update_cache=False)
 
 
 # ============================================================================
@@ -176,9 +179,9 @@ class TestFullRebuild:
         cache = full_rebuild(tmp_path)
 
         assert len(cache.files) == 3
-        assert "issues/TST-1.yaml" in cache.files
-        assert "graph/nodes/user-model.yaml" in cache.files
-        assert "graph/nodes/auth-endpoint.yaml" in cache.files
+        assert "issues/TST-1/issue.yaml" in cache.files
+        assert "nodes/user-model.yaml" in cache.files
+        assert "nodes/auth-endpoint.yaml" in cache.files
 
         # Edges: TST-1 → user-model, TST-1 → auth-endpoint (both `references`)
         ref_edges = [e for e in cache.edges if e.type == "references"]
@@ -216,7 +219,7 @@ class TestFullRebuild:
         make_issue(tmp_path, "TST-2", blocked_by=["TST-1"])
         make_issue(tmp_path, "TST-3", blocked_by=["TST-1"])
         cache = full_rebuild(tmp_path)
-        tst1_fp = cache.files["issues/TST-1.yaml"]
+        tst1_fp = cache.files["issues/TST-1/issue.yaml"]
         assert sorted(tst1_fp.blocks) == ["TST-2", "TST-3"]
 
     def test_related_edges(self, tmp_path: Path) -> None:
@@ -241,13 +244,13 @@ class TestIncrementalUpdate:
         make_node(tmp_path, "user-model")
         make_issue(tmp_path, "TST-1", body="## Context\n[[user-model]]\n")
 
-        update_cache_for_file(tmp_path, "graph/nodes/user-model.yaml")
-        update_cache_for_file(tmp_path, "issues/TST-1.yaml")
+        update_cache_for_file(tmp_path, "nodes/user-model.yaml")
+        update_cache_for_file(tmp_path, "issues/TST-1/issue.yaml")
 
         cache = load_index(tmp_path)
         assert cache is not None
-        assert "issues/TST-1.yaml" in cache.files
-        assert "graph/nodes/user-model.yaml" in cache.files
+        assert "issues/TST-1/issue.yaml" in cache.files
+        assert "nodes/user-model.yaml" in cache.files
         ref_edges = [e for e in cache.edges if e.type == "references"]
         assert len(ref_edges) == 1
 
@@ -260,7 +263,7 @@ class TestIncrementalUpdate:
 
         # Rewrite the issue to point at node-b instead of node-a
         make_issue(tmp_path, "TST-1", body="## Context\n[[node-b]]\n")
-        update_cache_for_file(tmp_path, "issues/TST-1.yaml")
+        update_cache_for_file(tmp_path, "issues/TST-1/issue.yaml")
 
         cache = load_index(tmp_path)
         assert cache is not None
@@ -277,13 +280,13 @@ class TestIncrementalUpdate:
         make_issue(tmp_path, "TST-1", body="## Context\n[[user-model]]\n")
         full_rebuild(tmp_path)
 
-        (tmp_path / "issues" / "TST-1.yaml").unlink()
-        result = update_cache_for_file(tmp_path, "issues/TST-1.yaml")
+        (tmp_path / "issues" / "TST-1" / "issue.yaml").unlink()
+        result = update_cache_for_file(tmp_path, "issues/TST-1/issue.yaml")
         assert result is True
 
         cache = load_index(tmp_path)
         assert cache is not None
-        assert "issues/TST-1.yaml" not in cache.files
+        assert "issues/TST-1/issue.yaml" not in cache.files
         # No edges should remain for the deleted issue.
         assert not any(e.from_id == "TST-1" for e in cache.edges)
 
@@ -294,8 +297,8 @@ class TestIncrementalUpdate:
         make_issue(tmp_path, "TST-2", body="## Context\n[[user-model]]\n")
         full_rebuild(tmp_path)
 
-        (tmp_path / "issues" / "TST-1.yaml").unlink()
-        update_cache_for_file(tmp_path, "issues/TST-1.yaml")
+        (tmp_path / "issues" / "TST-1" / "issue.yaml").unlink()
+        update_cache_for_file(tmp_path, "issues/TST-1/issue.yaml")
 
         cache = load_index(tmp_path)
         assert cache is not None
@@ -304,7 +307,7 @@ class TestIncrementalUpdate:
     def test_update_unrelated_file_is_noop(self, tmp_path: Path) -> None:
         make_project(tmp_path)
         full_rebuild(tmp_path)
-        # Files outside issues/ and graph/nodes/ should be ignored entirely.
+        # Files outside issues/ and nodes/ should be ignored entirely.
         assert update_cache_for_file(tmp_path, "docs/README.md") is False
 
     def test_blocks_updates_incrementally(self, tmp_path: Path) -> None:
@@ -315,11 +318,11 @@ class TestIncrementalUpdate:
 
         # Modify TST-2 to no longer be blocked by TST-1
         make_issue(tmp_path, "TST-2", blocked_by=[])
-        update_cache_for_file(tmp_path, "issues/TST-2.yaml")
+        update_cache_for_file(tmp_path, "issues/TST-2/issue.yaml")
 
         cache = load_index(tmp_path)
         assert cache is not None
-        assert cache.files["issues/TST-1.yaml"].blocks == []
+        assert cache.files["issues/TST-1/issue.yaml"].blocks == []
 
 
 # ============================================================================
@@ -356,7 +359,7 @@ class TestEnsureFresh:
         assert result is True
         cache = load_index(tmp_path)
         assert cache is not None
-        assert "issues/TST-2.yaml" in cache.files
+        assert "issues/TST-2/issue.yaml" in cache.files
 
     def test_detects_modified_file(self, tmp_path: Path) -> None:
         make_project(tmp_path)
@@ -385,12 +388,12 @@ class TestEnsureFresh:
         make_issue(tmp_path, "TST-1")
         ensure_fresh(tmp_path)
 
-        (tmp_path / "issues" / "TST-1.yaml").unlink()
+        (tmp_path / "issues" / "TST-1" / "issue.yaml").unlink()
         result = ensure_fresh(tmp_path)
         assert result is True
         cache = load_index(tmp_path)
         assert cache is not None
-        assert "issues/TST-1.yaml" not in cache.files
+        assert "issues/TST-1/issue.yaml" not in cache.files
 
     def test_rebuild_on_missing_cache(self, tmp_path: Path) -> None:
         make_project(tmp_path)
@@ -432,13 +435,13 @@ class TestEquivalence:
 
         # Incremental path: update each file one by one
         for rel in [
-            "graph/nodes/user-model.yaml",
-            "graph/nodes/auth-endpoint.yaml",
-            "graph/nodes/node-a.yaml",
-            "graph/nodes/node-b.yaml",
-            "issues/TST-1.yaml",
-            "issues/TST-2.yaml",
-            "issues/TST-3.yaml",
+            "nodes/user-model.yaml",
+            "nodes/auth-endpoint.yaml",
+            "nodes/node-a.yaml",
+            "nodes/node-b.yaml",
+            "issues/TST-1/issue.yaml",
+            "issues/TST-2/issue.yaml",
+            "issues/TST-3/issue.yaml",
         ]:
             update_cache_for_file(tmp_path, rel)
 

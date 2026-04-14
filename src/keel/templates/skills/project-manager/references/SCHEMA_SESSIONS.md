@@ -1,20 +1,39 @@
 # Schema: Agent Sessions
 
-Sessions live at `sessions/<id>.yaml`. A session is the persistence
-anchor for one logical agent invocation that may span many container
-restarts (re-engagements). The canonical examples are
-`examples/session-single-issue.yaml` and `examples/session-multi-repo.yaml`.
+Sessions live at `sessions/<id>/session.yaml`. A session is the
+persistence anchor for one logical agent invocation that may span many
+container restarts (re-engagements). The canonical examples are
+`examples/session-single-issue.yaml` and
+`examples/session-multi-repo.yaml` — both show the YAML content, which
+lives inside the session's directory.
+
+## Directory layout
+
+Each session is a directory containing:
+
+```
+sessions/<id>/
+├── session.yaml       # the session definition (this schema)
+├── plan.md            # the implementation plan (required before
+│                      # phase `executing`)
+├── artifacts/         # session artifacts produced during execution
+│   ├── plan.md
+│   ├── task-checklist.md
+│   └── verification-checklist.md
+└── comments/          # session-level messages (optional)
+```
+
+The directory name must match the session's `id` field.
 
 ## Frontmatter fields
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `uuid` | UUID4 | yes | Agent-generated canonical identity. |
-| `id` | string | yes | Slug (e.g. `wave1-agent-a`). Matches filename. |
+| `id` | string | yes | Slug (e.g. `auth-endpoint`). Matches the session directory name. |
 | `name` | string | yes | Human-readable session name. |
 | `agent` | string | yes | Agent definition id; must match a file in `agents/`. |
 | `issues` | list[string] | no | Issue keys this session works on. |
-| `wave` | int or null | no | Wave number if using wave-based orchestration. |
 | `repos` | list[RepoBinding] | no | Multi-repo: every repo the session can branch and PR in. |
 | `docs` | list[string] or null | no | Session-level extra docs. |
 | `estimated_size` | string | no | Free-form (e.g. `small`, `medium`, `large`). |
@@ -97,7 +116,9 @@ straight field-level override.
 
 ## File path
 
-`<project>/sessions/<id>.yaml`. Filename must match `id`.
+`<project>/sessions/<id>/session.yaml`. The directory name must match
+the session's `id` field. See "Directory layout" above for the full
+structure.
 
 ## See also
 

@@ -11,7 +11,7 @@ What init does, in order:
 4. Copy the entire `templates/` tree from the package into the target
 5. Render `.j2` files through Jinja2 with the collected config
 6. Create the empty subdirectories the project expects (`issues/`,
-   `graph/nodes/`, `sessions/`, `docs/issues/`) with `.gitkeep`
+   `nodes/`, `sessions/`, `plans/`) with `.gitkeep`
 7. Run `git init` (unless `--no-git`) and stage the initial tree
 
 After init, the project owns the copied templates and is ready for the
@@ -32,15 +32,15 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from rich.console import Console
 from rich.panel import Panel
 
+from keel.core import paths
 from keel.templates import get_templates_dir
 
 KEY_PREFIX_PATTERN = re.compile(r"^[A-Z][A-Z0-9]*$")
 CREATED_DIRS = [
-    "issues",
-    "graph/nodes",
-    "sessions",
-    "docs/issues",
-    "plans",
+    paths.ISSUES_DIR,
+    paths.NODES_DIR,
+    paths.SESSIONS_DIR,
+    paths.PLANS_DIR,
 ]
 PROJECT_TEMPLATE_SUBDIR = "project"
 
@@ -449,9 +449,16 @@ def init_cmd(
 
     existing_project_yaml = target_dir / "project.yaml"
     if existing_project_yaml.exists() and not force:
-        raise InitError(
-            f"{existing_project_yaml} already exists. Use --force to overwrite."
-        )
+        if non_interactive:
+            raise InitError(
+                f"{existing_project_yaml} already exists. Use --force to overwrite."
+            )
+        if not click.confirm(
+            f"{existing_project_yaml} already exists. Overwrite?",
+            default=False,
+        ):
+            raise InitError("Aborted by user.")
+        force = True
 
     # ------------------------------------------------------------------
     # Collect config

@@ -11,20 +11,17 @@ increment it, write it back.
 
 from __future__ import annotations
 
-import fcntl
-import time
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
 
 import yaml
 
+from keel.core import paths
 from keel.core.id_generator import format_key
+from keel.core.locks import DEFAULT_LOCK_TIMEOUT_S, LockTimeout, project_lock
 
-LOCK_FILENAME = ".keel.lock"
-DEFAULT_LOCK_TIMEOUT_S = 10.0
-LOCK_POLL_INTERVAL_S = 0.05
+# Backwards-compatible alias — prefer `keel.core.paths.PROJECT_LOCK`.
+LOCK_FILENAME = paths.PROJECT_LOCK
 
 KeyType = Literal["issue", "session"]
 COUNTER_FIELD: dict[KeyType, str] = {
@@ -35,39 +32,6 @@ COUNTER_FIELD: dict[KeyType, str] = {
 
 class KeyAllocationError(RuntimeError):
     """Raised when the next-key allocator cannot allocate a key."""
-
-
-@contextmanager
-def _project_lock(
-    project_dir: Path, timeout_s: float = DEFAULT_LOCK_TIMEOUT_S
-) -> Iterator[None]:
-    """Acquire an exclusive `flock` on the project lock file.
-
-    Polls with a tight loop because `flock(LOCK_EX | LOCK_NB)` returns
-    immediately and we need a timeout. The lock file is created on first use
-    and persisted (it stays in the project repo, gitignored).
-    """
-    lock_path = project_dir / LOCK_FILENAME
-    lock_path.touch(exist_ok=True)
-
-    deadline = time.monotonic() + timeout_s
-    with lock_path.open("a") as fh:
-        while True:
-            try:
-                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except BlockingIOError:
-                if time.monotonic() >= deadline:
-                    raise KeyAllocationError(
-                        f"Could not acquire lock {lock_path} within "
-                        f"{timeout_s}s. Another keel process may be "
-                        f"holding it."
-                    ) from None
-                time.sleep(LOCK_POLL_INTERVAL_S)
-        try:
-            yield
-        finally:
-            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
 
 
 def allocate_keys(
@@ -94,7 +58,7 @@ def allocate_keys(
             f"Unknown key_type {key_type!r}. Expected one of {list(COUNTER_FIELD)}."
         )
 
-    project_yaml_path = project_dir / "project.yaml"
+    project_yaml_path = paths.project_config_path(project_dir)
     if not project_yaml_path.exists():
         raise KeyAllocationError(
             f"project.yaml not found at {project_yaml_path}. Run `keel init` first."
@@ -102,33 +66,38 @@ def allocate_keys(
 
     counter_field = COUNTER_FIELD[key_type]
 
-    with _project_lock(project_dir, timeout_s=timeout_s):
-        try:
-            raw = yaml.safe_load(project_yaml_path.read_text(encoding="utf-8")) or {}
-        except yaml.YAMLError as exc:
-            raise KeyAllocationError(
-                f"Could not parse {project_yaml_path}: {exc}"
-            ) from exc
+    try:
+        with project_lock(project_dir, timeout_s=timeout_s):
+            try:
+                raw = (
+                    yaml.safe_load(project_yaml_path.read_text(encoding="utf-8")) or {}
+                )
+            except yaml.YAMLError as exc:
+                raise KeyAllocationError(
+                    f"Could not parse {project_yaml_path}: {exc}"
+                ) from exc
 
-        if not isinstance(raw, dict):
-            raise KeyAllocationError(
-                f"project.yaml must be a mapping, got {type(raw).__name__}"
+            if not isinstance(raw, dict):
+                raise KeyAllocationError(
+                    f"project.yaml must be a mapping, got {type(raw).__name__}"
+                )
+
+            prefix = raw.get("key_prefix")
+            if not prefix:
+                raise KeyAllocationError(
+                    "project.yaml is missing required field `key_prefix`."
+                )
+
+            current = int(raw.get(counter_field, 1))
+            allocated = list(range(current, current + count))
+            raw[counter_field] = current + count
+
+            project_yaml_path.write_text(
+                yaml.safe_dump(raw, sort_keys=False, default_flow_style=False),
+                encoding="utf-8",
             )
-
-        prefix = raw.get("key_prefix")
-        if not prefix:
-            raise KeyAllocationError(
-                "project.yaml is missing required field `key_prefix`."
-            )
-
-        current = int(raw.get(counter_field, 1))
-        allocated = list(range(current, current + count))
-        raw[counter_field] = current + count
-
-        project_yaml_path.write_text(
-            yaml.safe_dump(raw, sort_keys=False, default_flow_style=False),
-            encoding="utf-8",
-        )
+    except LockTimeout as exc:
+        raise KeyAllocationError(str(exc)) from exc
 
     if key_type == "issue":
         return [format_key(prefix, n) for n in allocated]

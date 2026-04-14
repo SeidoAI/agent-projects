@@ -16,8 +16,8 @@ created_at: "{{ created_at | default("<ISO datetime>") }}"
 
 ## Artifacts
 - PR: {{ pr_url | default("<link>") }}
-- developer.md: docs/issues/{{ issue_key | default("<KEY>") }}/developer.md
-- verified.md: docs/issues/{{ issue_key | default("<KEY>") }}/verified.md
+- developer.md: issues/{{ issue_key | default("<KEY>") }}/developer.md
+- verified.md: issues/{{ issue_key | default("<KEY>") }}/verified.md
 
 ## Follow-ups
 {{ followups | default("Any work deferred to a follow-up issue. Reference [[nodes]] if relevant.") }}

@@ -14,8 +14,8 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from keel.cli._utils import require_project as _require_project
 from keel.core.enum_loader import load_enums
-from keel.core.store import ProjectNotFoundError, load_project
 
 console = Console()
 
@@ -131,10 +131,3 @@ def enums_show(name: str, project_dir: Path, output_format: str) -> None:
 # ============================================================================
 # Helpers
 # ============================================================================
-
-
-def _require_project(project_dir: Path) -> None:
-    try:
-        load_project(project_dir)
-    except ProjectNotFoundError as exc:
-        raise click.ClickException(str(exc)) from exc

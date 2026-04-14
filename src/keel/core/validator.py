@@ -47,13 +47,14 @@ from typing import Any
 import yaml
 
 from keel.core import freshness as freshness_mod
+from keel.core import paths
 from keel.core.enum_loader import EnumRegistry, load_enums
 from keel.core.id_generator import parse_key
+from keel.core.locks import LockTimeout, project_lock
 from keel.core.parser import ParseError, parse_frontmatter_body
 from keel.core.reference_parser import extract_references
 from keel.core.status import is_status_reachable
 from keel.core.store import (
-    ISSUES_DIRNAME,
     PROJECT_CONFIG_FILENAME,
     ProjectNotFoundError,
     load_project,
@@ -277,26 +278,35 @@ def _try_load_project(ctx: ValidationContext) -> None:
         )
 
 
-def _load_entity_files(
-    ctx: ValidationContext,
-    subdir: str,
-    model_cls: type,
-    bucket: list[LoadedEntity],
-    error_bucket: list[CheckResult],
-    code_prefix: str,
-) -> None:
-    """Walk one entity directory and load every YAML file into the context."""
-    target = ctx.project_dir / subdir
-    if not target.is_dir():
+# Loader convention
+# -----------------
+# Each entity type gets a dedicated `_load_<type>` function. Don't try to
+# abstract them into a single generic loader — the directory layouts vary
+# (nodes are flat, issues and sessions are directories with a fixed child
+# filename), and the previous attempt at a generic helper is what let the
+# session-directory bug hide in Phase 1-2: the shared glob was `*.yaml`,
+# which silently skipped every directory-layout entity. If you add a new
+# entity type, copy the closest existing loader (sessions/issues for
+# directory layout; nodes for flat layout) and adapt the error codes.
+
+
+def _load_nodes(ctx: ValidationContext) -> None:
+    """Load every concept node at `nodes/<id>.yaml`.
+
+    Nodes are flat YAML files (unlike issues and sessions which have
+    per-entity directories).
+    """
+    nodes_root = paths.nodes_dir(ctx.project_dir)
+    if not nodes_root.is_dir():
         return
-    for path in sorted(target.glob("*.yaml")):
+    for path in sorted(nodes_root.glob("*.yaml")):
         rel = _rel_path(ctx.project_dir, path)
         try:
             text = path.read_text(encoding="utf-8")
         except OSError as exc:
-            error_bucket.append(
+            ctx.node_load_errors.append(
                 CheckResult(
-                    code=f"{code_prefix}/io_error",
+                    code="node/io_error",
                     severity="error",
                     file=rel,
                     message=f"Could not read file: {exc}",
@@ -306,34 +316,195 @@ def _load_entity_files(
         try:
             frontmatter, body = parse_frontmatter_body(text)
         except ParseError as exc:
-            error_bucket.append(
+            ctx.node_load_errors.append(
                 CheckResult(
-                    code=f"{code_prefix}/parse_error",
+                    code="node/parse_error",
                     severity="error",
                     file=rel,
                     message=str(exc),
-                    fix_hint="Check the frontmatter delimiters (`---`) and YAML syntax.",
-                )
-            )
-            continue
-        try:
-            model = model_cls.model_validate({**frontmatter, "body": body})
-        except ValueError as exc:
-            error_bucket.append(
-                CheckResult(
-                    code=f"{code_prefix}/schema_invalid",
-                    severity="error",
-                    file=rel,
-                    message=f"Schema validation failed: {exc}",
                     fix_hint=(
-                        f"Check the field types and required fields for {model_cls.__name__}. "
-                        f"Compare against the example file in "
-                        f".claude/skills/project-manager/examples/."
+                        "Check the frontmatter delimiters (`---`) and YAML syntax."
                     ),
                 )
             )
             continue
-        bucket.append(
+        try:
+            model = ConceptNode.model_validate({**frontmatter, "body": body})
+        except ValueError as exc:
+            ctx.node_load_errors.append(
+                CheckResult(
+                    code="node/schema_invalid",
+                    severity="error",
+                    file=rel,
+                    message=f"Schema validation failed: {exc}",
+                    fix_hint=(
+                        "Check the field types and required fields for "
+                        "ConceptNode. Compare against the example file "
+                        "in .claude/skills/project-manager/examples/."
+                    ),
+                )
+            )
+            continue
+        ctx.nodes.append(
+            LoadedEntity(
+                rel_path=rel, raw_frontmatter=frontmatter, body=body, model=model
+            )
+        )
+
+
+def _load_sessions(ctx: ValidationContext) -> None:
+    """Load every session at `sessions/<id>/session.yaml`.
+
+    Walks each subdirectory of `sessions/` instead of globbing `*.yaml`
+    at the top level (which would miss the directory layout and silently
+    skip every session, as was the case before Phase 3).
+    """
+    sessions_root = paths.sessions_dir(ctx.project_dir)
+    if not sessions_root.is_dir():
+        return
+    for sdir in sorted(p for p in sessions_root.iterdir() if p.is_dir()):
+        if sdir.name.startswith("."):
+            continue
+        yaml_path = sdir / paths.SESSION_FILENAME
+        rel = _rel_path(ctx.project_dir, yaml_path)
+        if not yaml_path.is_file():
+            ctx.session_load_errors.append(
+                CheckResult(
+                    code="session/no_session_yaml",
+                    severity="error",
+                    file=rel,
+                    message=(
+                        f"Session directory {sdir.name!r} has no "
+                        f"{paths.SESSION_FILENAME}. Each session must have "
+                        f"a YAML file at that path."
+                    ),
+                )
+            )
+            continue
+        try:
+            text = yaml_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            ctx.session_load_errors.append(
+                CheckResult(
+                    code="session/io_error",
+                    severity="error",
+                    file=rel,
+                    message=f"Could not read file: {exc}",
+                )
+            )
+            continue
+        try:
+            frontmatter, body = parse_frontmatter_body(text)
+        except ParseError as exc:
+            ctx.session_load_errors.append(
+                CheckResult(
+                    code="session/parse_error",
+                    severity="error",
+                    file=rel,
+                    message=str(exc),
+                    fix_hint=(
+                        "Check the frontmatter delimiters (`---`) and YAML syntax."
+                    ),
+                )
+            )
+            continue
+        try:
+            model = AgentSession.model_validate({**frontmatter, "body": body})
+        except ValueError as exc:
+            ctx.session_load_errors.append(
+                CheckResult(
+                    code="session/schema_invalid",
+                    severity="error",
+                    file=rel,
+                    message=f"Schema validation failed: {exc}",
+                    fix_hint=(
+                        "Check the field types and required fields for "
+                        "AgentSession. Compare against the example file "
+                        "in .claude/skills/project-manager/examples/."
+                    ),
+                )
+            )
+            continue
+        ctx.sessions.append(
+            LoadedEntity(
+                rel_path=rel, raw_frontmatter=frontmatter, body=body, model=model
+            )
+        )
+
+
+def _load_issues(ctx: ValidationContext) -> None:
+    """Load every issue at `issues/<KEY>/issue.yaml`.
+
+    Walks each subdirectory of `issues/` so per-issue comments and
+    developer notes can live alongside the spec. Mirrors `_load_sessions`.
+    """
+    issues_root = paths.issues_dir(ctx.project_dir)
+    if not issues_root.is_dir():
+        return
+    for idir in sorted(p for p in issues_root.iterdir() if p.is_dir()):
+        if idir.name.startswith("."):
+            continue
+        yaml_path = idir / paths.ISSUE_FILENAME
+        rel = _rel_path(ctx.project_dir, yaml_path)
+        if not yaml_path.is_file():
+            ctx.issue_load_errors.append(
+                CheckResult(
+                    code="issue/no_issue_yaml",
+                    severity="error",
+                    file=rel,
+                    message=(
+                        f"Issue directory {idir.name!r} has no "
+                        f"{paths.ISSUE_FILENAME}. Each issue must have a "
+                        f"YAML file at that path."
+                    ),
+                )
+            )
+            continue
+        try:
+            text = yaml_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            ctx.issue_load_errors.append(
+                CheckResult(
+                    code="issue/io_error",
+                    severity="error",
+                    file=rel,
+                    message=f"Could not read file: {exc}",
+                )
+            )
+            continue
+        try:
+            frontmatter, body = parse_frontmatter_body(text)
+        except ParseError as exc:
+            ctx.issue_load_errors.append(
+                CheckResult(
+                    code="issue/parse_error",
+                    severity="error",
+                    file=rel,
+                    message=str(exc),
+                    fix_hint=(
+                        "Check the frontmatter delimiters (`---`) and YAML syntax."
+                    ),
+                )
+            )
+            continue
+        try:
+            model = Issue.model_validate({**frontmatter, "body": body})
+        except ValueError as exc:
+            ctx.issue_load_errors.append(
+                CheckResult(
+                    code="issue/schema_invalid",
+                    severity="error",
+                    file=rel,
+                    message=f"Schema validation failed: {exc}",
+                    fix_hint=(
+                        "Check the field types and required fields for "
+                        "Issue. Compare against the example file in "
+                        ".claude/skills/project-manager/examples/."
+                    ),
+                )
+            )
+            continue
+        ctx.issues.append(
             LoadedEntity(
                 rel_path=rel, raw_frontmatter=frontmatter, body=body, model=model
             )
@@ -341,12 +512,12 @@ def _load_entity_files(
 
 
 def _load_comments(ctx: ValidationContext) -> None:
-    """Comments live under `docs/issues/<KEY>/comments/<filename>.yaml`."""
-    docs_issues = ctx.project_dir / "docs" / ISSUES_DIRNAME
-    if not docs_issues.is_dir():
+    """Comments live under `issues/<KEY>/comments/<filename>.yaml`."""
+    issues_root = paths.issues_dir(ctx.project_dir)
+    if not issues_root.is_dir():
         return
-    for issue_dir in sorted(docs_issues.iterdir()):
-        comments_dir = issue_dir / "comments"
+    for issue_dir in sorted(p for p in issues_root.iterdir() if p.is_dir()):
+        comments_dir = issue_dir / paths.COMMENTS_SUBDIR
         if not comments_dir.is_dir():
             continue
         for path in sorted(comments_dir.glob("*.yaml")):
@@ -404,13 +575,9 @@ def load_context(project_dir: Path) -> ValidationContext:
     ctx = ValidationContext(project_dir=project_dir)
     _try_load_project(ctx)
     ctx.enums = load_enums(project_dir)
-    _load_entity_files(ctx, "issues", Issue, ctx.issues, ctx.issue_load_errors, "issue")
-    _load_entity_files(
-        ctx, "graph/nodes", ConceptNode, ctx.nodes, ctx.node_load_errors, "node"
-    )
-    _load_entity_files(
-        ctx, "sessions", AgentSession, ctx.sessions, ctx.session_load_errors, "session"
-    )
+    _load_issues(ctx)
+    _load_nodes(ctx)
+    _load_sessions(ctx)
     _load_comments(ctx)
     return ctx
 
@@ -630,10 +797,10 @@ def check_reference_integrity(ctx: ValidationContext) -> list[CheckResult]:
                         field="body",
                         message=f"Reference [[{ref}]] does not resolve to any node or issue.",
                         fix_hint=(
-                            f"Create graph/nodes/{ref}.yaml or fix the reference. "
-                            f"Existing nodes: {sorted(node_ids)[:5]}..."
+                            f"Create {paths.NODES_DIR}/{ref}.yaml or fix the "
+                            f"reference. Existing nodes: {sorted(node_ids)[:5]}..."
                             if node_ids
-                            else f"Create graph/nodes/{ref}.yaml or fix the reference."
+                            else f"Create {paths.NODES_DIR}/{ref}.yaml or fix the reference."
                         ),
                     )
                 )
@@ -777,7 +944,7 @@ def check_reference_integrity(ctx: ValidationContext) -> list[CheckResult]:
 
 def _discover_agent_ids(project_dir: Path) -> set[str]:
     """Read `<project>/agents/*.yaml` and return the set of declared agent ids."""
-    agents_dir = project_dir / "agents"
+    agents_dir = project_dir / paths.AGENTS_DIR
     if not agents_dir.is_dir():
         return set()
     ids: set[str] = set()
@@ -949,7 +1116,7 @@ def check_freshness(ctx: ValidationContext) -> list[CheckResult]:
     nodes = [e.model for e in ctx.nodes]
     rel_by_id = {e.model.id: e.rel_path for e in ctx.nodes}
     for fr in freshness_mod.check_all_nodes(nodes, ctx.project_config):
-        rel = rel_by_id.get(fr.node_id, f"graph/nodes/{fr.node_id}.yaml")
+        rel = rel_by_id.get(fr.node_id, f"{paths.NODES_DIR}/{fr.node_id}.yaml")
         if fr.status == freshness_mod.FreshnessStatus.SOURCE_MISSING:
             results.append(
                 CheckResult(
@@ -976,7 +1143,7 @@ def check_freshness(ctx: ValidationContext) -> list[CheckResult]:
 
 def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
     """Sessions in `completed` status must have all required artifacts."""
-    manifest_path = ctx.project_dir / "templates" / "artifacts" / "manifest.yaml"
+    manifest_path = paths.templates_artifacts_manifest_path(ctx.project_dir)
     if not manifest_path.exists():
         return []
     try:
@@ -995,7 +1162,7 @@ def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
         session: AgentSession = entity.model
         if session.status != "completed":
             continue
-        artifacts_dir = ctx.project_dir / "sessions" / session.id / "artifacts"
+        artifacts_dir = paths.session_artifacts_dir(ctx.project_dir, session.id)
         for artifact_file in required_files:
             if not (artifacts_dir / artifact_file).exists():
                 results.append(
@@ -1008,7 +1175,10 @@ def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
                             f"Completed session {session.id!r} is missing required artifact "
                             f"{artifact_file!r}."
                         ),
-                        fix_hint=f"Write sessions/{session.id}/artifacts/{artifact_file}.",
+                        fix_hint=(
+                            f"Write {paths.SESSIONS_DIR}/{session.id}/"
+                            f"{paths.SESSION_ARTIFACTS_SUBDIR}/{artifact_file}."
+                        ),
                     )
                 )
     return results
@@ -1156,11 +1326,11 @@ def check_project_standards(ctx: ValidationContext) -> list[CheckResult]:
     """V0 standards check: just confirm `<project>/standards.md` exists if any
     file references it. Future versions will read project-defined rules.
     """
-    standards_path = ctx.project_dir / "standards.md"
+    standards_path = ctx.project_dir / paths.STANDARDS
     referenced = False
     for bucket in (ctx.issues, ctx.nodes, ctx.sessions):
         for entity in bucket:
-            if "standards.md" in entity.body:
+            if paths.STANDARDS in entity.body:
                 referenced = True
                 break
         if referenced:
@@ -1326,7 +1496,32 @@ def _rewrite_entity_file(project_dir: Path, entity: LoadedEntity) -> None:
 
 
 def apply_fixes(ctx: ValidationContext) -> list[CheckResult]:
-    """Apply the auto-fix subset and return a list of fix CheckResults."""
+    """Apply the auto-fix subset and return a list of fix CheckResults.
+
+    Serialised across concurrent invocations by `project_lock`: two
+    `keel validate --fix` calls can't interleave their writes and lose
+    each other's changes. Bidirectional-ref fixes can write multiple
+    files in one batch, so a single lock covers the whole transaction.
+    """
+    try:
+        with project_lock(ctx.project_dir):
+            return _apply_fixes_locked(ctx)
+    except LockTimeout as exc:
+        # Return a single fix result describing the failure so callers
+        # can surface it; don't silently skip fixes.
+        return [
+            CheckResult(
+                code="fix/lock_timeout",
+                severity="error",
+                file=None,
+                message=str(exc),
+            )
+        ]
+
+
+def _apply_fixes_locked(ctx: ValidationContext) -> list[CheckResult]:
+    """Apply every auto-fix under the assumption that the project lock
+    is already held. Extracted so `apply_fixes` stays a thin wrapper."""
     fixes: list[CheckResult] = []
     dirty: set[str] = set()  # rel_paths that need rewriting
 
@@ -1357,6 +1552,15 @@ def apply_fixes(ctx: ValidationContext) -> list[CheckResult]:
         for entity in bucket:
             if entity.rel_path in dirty:
                 _rewrite_entity_file(ctx.project_dir, entity)
+
+    # Invalidate the graph cache for every file we touched so a subsequent
+    # read inside the same process sees the new state. Comments and
+    # sessions are no-ops (graph_cache._classify ignores them).
+    if dirty:
+        from keel.core.graph_cache import update_cache_for_file
+
+        for rel in dirty:
+            update_cache_for_file(ctx.project_dir, rel)
 
     return fixes
 
@@ -1462,9 +1666,9 @@ def check_coverage_heuristics(ctx: ValidationContext) -> list[CheckResult]:
 # ============================================================================
 
 # Scoping-phase artifacts and their required status marker.
-_SCOPING_PLAN_PATH = "plans/artifacts/scoping-plan.md"
-_GAP_ANALYSIS_PATH = "plans/artifacts/gap-analysis.md"
-_COMPLIANCE_PATH = "plans/artifacts/compliance.md"
+_SCOPING_PLAN_PATH = f"{paths.PLANS_ARTIFACTS_DIR}/scoping-plan.md"
+_GAP_ANALYSIS_PATH = f"{paths.PLANS_ARTIFACTS_DIR}/gap-analysis.md"
+_COMPLIANCE_PATH = f"{paths.PLANS_ARTIFACTS_DIR}/compliance.md"
 
 
 def _artifact_status(project_dir: Path, rel_path: str) -> str | None:
@@ -1553,20 +1757,23 @@ def check_phase_requirements(ctx: ValidationContext) -> list[CheckResult]:
                     )
                 )
 
-        # All sessions must have plan.md
-        for session_dir in sorted(ctx.project_dir.glob("sessions/*/")):
-            if session_dir.name.startswith("."):
-                continue
-            plan = session_dir / "plan.md"
+        # All sessions must have plan.md. Iterate ctx.sessions (loaded by
+        # _load_sessions) instead of re-globbing the filesystem.
+        for entity in ctx.sessions:
+            session: AgentSession = entity.model
+            plan = paths.session_plan_path(ctx.project_dir, session.id)
             if not plan.is_file():
                 results.append(
                     CheckResult(
                         code="phase/missing_session_plan",
                         severity="error",
-                        file=f"sessions/{session_dir.name}/plan.md",
+                        file=(
+                            f"{paths.SESSIONS_DIR}/{session.id}/{paths.SESSION_PLAN}"
+                        ),
                         message=(
-                            f"Session '{session_dir.name}' has no plan.md. "
-                            f"All sessions must have plans before phase '{phase.value}'."
+                            f"Session {session.id!r} has no "
+                            f"{paths.SESSION_PLAN}. All sessions must have "
+                            f"plans before phase '{phase.value}'."
                         ),
                     )
                 )

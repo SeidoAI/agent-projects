@@ -131,3 +131,37 @@ def test_concurrent_processes_no_collisions(project_dir: Path) -> None:
     assert len(set(results)) == 10
     expected = {f"TST-{i}" for i in range(1, 11)}
     assert set(results) == expected
+
+
+# ============================================================================
+# Stale lock handling (Phase 2.3 of v0.5 architectural refactor)
+# ============================================================================
+
+
+class TestStaleLock:
+    def test_acquires_over_stale_lock_file(self, project_dir: Path, caplog) -> None:
+        """A lock file older than STALE_LOCK_AGE_S should not block
+        acquisition — the advisory `flock` is released on process exit,
+        so an old file left behind by a crashed process is cosmetic only.
+        We expect a warning log entry."""
+        import logging
+        import os
+        import time as _time
+
+        from keel.core.locks import STALE_LOCK_AGE_S, project_lock
+
+        # Create a "stale" lock file with an old mtime.
+        lock_path = project_dir / ".keel.lock"
+        lock_path.touch()
+        old_mtime = _time.time() - (STALE_LOCK_AGE_S + 10)
+        os.utime(lock_path, (old_mtime, old_mtime))
+
+        caplog.set_level(logging.WARNING, logger="keel.core.locks")
+
+        with project_lock(project_dir):
+            pass  # Acquired without error.
+
+        warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert any("Lock file" in r.getMessage() for r in warnings), (
+            f"expected a stale-lock warning, got: {[r.getMessage() for r in warnings]}"
+        )

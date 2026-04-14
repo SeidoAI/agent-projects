@@ -1,4 +1,7 @@
 ---
+# This file lives at: sessions/<id>/session.yaml
+# The sessions/<id>/ directory also contains plan.md, artifacts/, and
+# optionally comments/. See SCHEMA_SESSIONS.md for the full layout.
 uuid: 2a1f3e4b-5c6d-47e8-9f0a-1b2c3d4e5f6a
 id: wave2-agent-b
 name: "Agent B: Auth + Terraform secrets"
@@ -7,7 +10,6 @@ issues:
   - SEI-40
   - SEI-42
   - SEI-47
-wave: 2
 # Multi-repo: every repo the session can branch and PR in. All equal,
 # all writable. The agent treats them symmetrically.
 repos:

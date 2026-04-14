@@ -16,8 +16,8 @@ project shape and catches stale assumptions.
 
 ### 2. Read the entity you're touching
 ```bash
-cat issues/<KEY>.yaml
-# or: cat graph/nodes/<id>.yaml
+cat issues/<KEY>/issue.yaml
+# or: cat nodes/<id>.yaml
 # or: cat sessions/<id>.yaml
 ```
 
@@ -27,15 +27,15 @@ cat issues/<KEY>.yaml
   file, change the value, update `updated_at`. Don't rewrite the whole
   file unless you're changing the body too.
 - **Comment** → write a new file at
-  `docs/issues/<KEY>/comments/<NNN>-<topic>-<date>.yaml`. Use the next
+  `issues/<KEY>/comments/<NNN>-<topic>-<date>.yaml`. Use the next
   sequence number (look at existing comments in that directory). See
   `examples/comment-status-change.yaml`.
 - **New concept node** → write a new file at
-  `graph/nodes/<id>.yaml`. Use the example most similar to what you're
+  `nodes/<id>.yaml`. Use the example most similar to what you're
   creating (endpoint, model, decision, config, contract). Then add
   `[[<id>]]` references to wherever it's needed.
 - **New issue** → call `keel next-key --type issue` for the
-  key, then write `issues/<KEY>.yaml`. See the initial scoping workflow
+  key, then write `issues/<KEY>/issue.yaml`. See the initial scoping workflow
   for the full issue-creation procedure.
 - **Session update (e.g. re-engagement event)** → edit
   `sessions/<id>.yaml` to append an engagement entry. Don't overwrite
@@ -52,7 +52,7 @@ cannot rehash, but it can at least flag and report).
 
 ### 5. Validate
 ```bash
-keel validate --strict --format=json
+keel validate --strict
 ```
 Fix every error. Re-run until clean.
 
@@ -66,7 +66,7 @@ one commit per logical edit is fine.
 1. Read the issue file
 2. Edit the `status` field
 3. Update `updated_at`
-4. Add a `status_change` comment at `docs/issues/<KEY>/comments/NNN-start-YYYY-MM-DD.yaml`
+4. Add a `status_change` comment at `issues/<KEY>/comments/NNN-start-YYYY-MM-DD.yaml`
 5. Validate
 
 ### Response to a status message from a coding agent

@@ -234,7 +234,6 @@ class TestAgentSession:
             name="x",
             agent="backend-coder",
             issues=["SEI-40", "SEI-42"],
-            wave=1,
             repos=[
                 RepoBinding(
                     repo="SeidoAI/web-app-backend",

@@ -36,7 +36,7 @@ first 3 concrete issues against your last 3 at each checkpoint.
 
 | Entity type | Count | Directory |
 |---|---|---|
-| Concept nodes | _ | graph/nodes/ |
+| Concept nodes | _ | nodes/ |
 | Epic issues | _ | issues/ |
 | Concrete issues | _ | issues/ |
 | Sessions | _ | sessions/ |

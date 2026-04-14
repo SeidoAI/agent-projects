@@ -1,8 +1,26 @@
 # Schema: Issues
 
-Issues live at `issues/<KEY>.yaml`. Each is a YAML frontmatter + Markdown
-body file. The canonical example is `examples/issue-fully-formed.yaml` —
-**if this doc disagrees with that example, trust the example**.
+Issues live at `issues/<KEY>/issue.yaml`. Each is a YAML frontmatter +
+Markdown body file. The canonical example is
+`examples/issue-fully-formed.yaml` — **if this doc disagrees with that
+example, trust the example**.
+
+## Directory layout
+
+Each issue is a directory:
+
+```
+issues/<KEY>/
+├── issue.yaml         # the issue definition (this schema)
+├── comments/          # structured comments written during execution
+│   └── 001-status-2026-04-07.yaml
+├── developer.md       # completion notes from the dev agent
+└── verified.md        # verification report from the verification agent
+```
+
+The directory name must match the issue's `id` field. `comments/`,
+`developer.md`, and `verified.md` are produced during execution; the PM
+agent only writes `issue.yaml` during scoping.
 
 ## Frontmatter fields
 
@@ -78,7 +96,7 @@ See `examples/issue-epic.yaml` for the canonical epic format.
 
 ## File path
 
-`<project>/issues/<KEY>.yaml`. The filename (minus `.yaml`) must exactly
+`<project>/issues/<KEY>/issue.yaml`. The filename (minus `.yaml`) must exactly
 match the `id` field in frontmatter — the validator checks this via the
 ID collision detector.
 

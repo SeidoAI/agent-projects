@@ -126,12 +126,14 @@ def _filter_report_by_selector(
         """True if the finding relates to a selected entity."""
         if not finding.file:
             return True  # project-level findings always included
-        # Extract entity ID from file path: issues/SEI-1.yaml → SEI-1
-        # graph/nodes/user-model.yaml → user-model
-        stem = finding.file.rsplit("/", 1)[-1]
-        if stem.endswith(".yaml"):
-            stem = stem[:-5]
-        return stem in selected_ids
+        # Extract entity ID from file path:
+        #   issues/SEI-1/issue.yaml → SEI-1 (parent dir name)
+        #   nodes/user-model.yaml → user-model (stem)
+        #   sessions/wave1/session.yaml → wave1 (parent dir name)
+        p = Path(finding.file)
+        if p.name in {"issue.yaml", "session.yaml"}:
+            return p.parent.name in selected_ids
+        return p.stem in selected_ids
 
     report.errors = [f for f in report.errors if _matches(f)]
     report.warnings = [f for f in report.warnings if _matches(f)]

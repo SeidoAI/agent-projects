@@ -1,4 +1,7 @@
 ---
+# This file lives at: sessions/<id>/session.yaml
+# The sessions/<id>/ directory also contains plan.md and artifacts/.
+# See SCHEMA_SESSIONS.md for the full layout.
 uuid: f1e2d3c4-b5a6-4978-8901-234567890abc
 id: storage-adapter-impl
 name: "Implement StorageAdapter layer + GCS integration"

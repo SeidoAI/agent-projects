@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING
 
 import yaml
 
+from keel.core import paths
 from keel.core.parser import parse_frontmatter_body
 from keel.core.reference_parser import extract_references
 from keel.models.graph import FileFingerprint, GraphEdge, GraphIndex
@@ -49,12 +50,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-INDEX_REL_PATH = "graph/index.yaml"
-LOCK_REL_PATH = "graph/.index.lock"
+# Backwards-compatible aliases — prefer importing from `keel.core.paths`.
+INDEX_REL_PATH = paths.GRAPH_CACHE
+LOCK_REL_PATH = paths.GRAPH_LOCK
 CACHE_VERSION = 2
 
-ISSUES_PREFIX = "issues/"
-NODES_PREFIX = "graph/nodes/"
+ISSUES_PREFIX = f"{paths.ISSUES_DIR}/"
+NODES_PREFIX = f"{paths.NODES_DIR}/"
 
 
 # ============================================================================
@@ -156,17 +158,18 @@ def _empty_cache() -> GraphIndex:
 
 
 def issue_key_from_rel_path(rel_path: str) -> str | None:
-    """Extract the issue key from `issues/<KEY>.yaml`."""
+    """Extract the issue key from `issues/<KEY>/issue.yaml`."""
     if not rel_path.startswith(ISSUES_PREFIX):
         return None
     p = Path(rel_path)
-    if p.suffix != ".yaml":
+    if p.name != paths.ISSUE_FILENAME:
         return None
-    return p.stem
+    # `issues/<KEY>/issue.yaml` → parent dir name is the key
+    return p.parent.name
 
 
 def node_id_from_rel_path(rel_path: str) -> str | None:
-    """Extract the node id from `graph/nodes/<id>.yaml`."""
+    """Extract the node id from `<NODES_DIR>/<id>.yaml`."""
     if not rel_path.startswith(NODES_PREFIX):
         return None
     p = Path(rel_path)
@@ -177,7 +180,9 @@ def node_id_from_rel_path(rel_path: str) -> str | None:
 
 def _classify(rel_path: str) -> str | None:
     """Return `"issue"`, `"node"`, or None for non-tracked files."""
-    if rel_path.startswith(ISSUES_PREFIX) and rel_path.endswith(".yaml"):
+    if rel_path.startswith(ISSUES_PREFIX) and rel_path.endswith(
+        f"/{paths.ISSUE_FILENAME}"
+    ):
         return "issue"
     if rel_path.startswith(NODES_PREFIX) and rel_path.endswith(".yaml"):
         return "node"
@@ -363,14 +368,14 @@ def _rebuild_blocks(cache: GraphIndex) -> None:
 
     key_to_rel: dict[str, str] = {}
     for rel, _fp in cache.files.items():
-        if rel.startswith(ISSUES_PREFIX):
-            key = Path(rel).stem
+        key = issue_key_from_rel_path(rel)
+        if key is not None:
             key_to_rel[key] = rel
 
     for rel, fp in cache.files.items():
-        if not rel.startswith(ISSUES_PREFIX):
+        source_key = issue_key_from_rel_path(rel)
+        if source_key is None:
             continue
-        source_key = Path(rel).stem
         for blocker in fp.blocked_by:
             target_rel = key_to_rel.get(blocker)
             if target_rel and source_key not in cache.files[target_rel].blocks:
@@ -434,10 +439,15 @@ def full_rebuild(project_dir: Path) -> GraphIndex:
     with _index_lock(project_dir):
         cache = _empty_cache()
 
-        # Pass 1: issue files
-        issues_dir = project_dir / "issues"
-        if issues_dir.is_dir():
-            for abs_path in sorted(issues_dir.glob("*.yaml")):
+        # Pass 1: issue files (issues/<KEY>/issue.yaml)
+        issues_root = paths.issues_dir(project_dir)
+        if issues_root.is_dir():
+            for idir in sorted(p for p in issues_root.iterdir() if p.is_dir()):
+                if idir.name.startswith("."):
+                    continue
+                abs_path = idir / paths.ISSUE_FILENAME
+                if not abs_path.is_file():
+                    continue
                 rel_path = str(abs_path.relative_to(project_dir))
                 parsed = _load_issue_file(project_dir, rel_path)
                 if parsed is None:
@@ -447,9 +457,9 @@ def full_rebuild(project_dir: Path) -> GraphIndex:
                 cache.edges.extend(_issue_edges(issue, rel_path, body))
 
         # Pass 2: node files
-        nodes_dir = project_dir / "graph" / "nodes"
-        if nodes_dir.is_dir():
-            for abs_path in sorted(nodes_dir.glob("*.yaml")):
+        nodes_root = paths.nodes_dir(project_dir)
+        if nodes_root.is_dir():
+            for abs_path in sorted(nodes_root.glob("*.yaml")):
                 rel_path = str(abs_path.relative_to(project_dir))
                 parsed = _load_node_file(project_dir, rel_path)
                 if parsed is None:
@@ -541,7 +551,7 @@ def ensure_fresh(project_dir: Path) -> bool:
 
     Decision tree:
     1. If `graph/index.yaml` is missing or version-mismatched → full rebuild
-    2. Otherwise walk `issues/` and `graph/nodes/` and compare file mtimes
+    2. Otherwise walk `issues/` and `nodes/` and compare file mtimes
        against the stored fingerprints:
        - For every file on disk whose mtime or sha is newer than the cache,
          run `update_cache_for_file`
@@ -559,13 +569,20 @@ def ensure_fresh(project_dir: Path) -> bool:
 
     # Collect current files on disk
     current_files: set[str] = set()
-    for subdir in ("issues", "graph/nodes"):
-        target = project_dir / subdir
-        if not target.is_dir():
-            continue
-        for abs_path in sorted(target.glob("*.yaml")):
-            rel = str(abs_path.relative_to(project_dir))
-            current_files.add(rel)
+
+    issues_root = paths.issues_dir(project_dir)
+    if issues_root.is_dir():
+        for idir in issues_root.iterdir():
+            if not idir.is_dir() or idir.name.startswith("."):
+                continue
+            abs_path = idir / paths.ISSUE_FILENAME
+            if abs_path.is_file():
+                current_files.add(str(abs_path.relative_to(project_dir)))
+
+    nodes_root = paths.nodes_dir(project_dir)
+    if nodes_root.is_dir():
+        for abs_path in nodes_root.glob("*.yaml"):
+            current_files.add(str(abs_path.relative_to(project_dir)))
 
     rebuilt = False
 

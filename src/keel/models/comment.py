@@ -1,8 +1,9 @@
 """Comment model.
 
 Comments are stored as individual files under
-`docs/issues/<KEY>/comments/<sequence>-<topic>-<date>.yaml`. Each comment
-carries a UUID for canonical identity and a free-form Markdown body.
+`issues/<KEY>/comments/<sequence>-<topic>-<date>.yaml`, alongside the
+issue YAML they belong to. Each comment carries a UUID for canonical
+identity and a free-form Markdown body.
 """
 
 import uuid as _uuid

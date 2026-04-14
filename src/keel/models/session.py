@@ -104,7 +104,6 @@ class AgentSession(BaseModel):
     name: str
     agent: str  # references agents/<id>.yaml in the project repo
     issues: list[str] = Field(default_factory=list)
-    wave: int | None = None
 
     # Multi-repo: all repos equal, all writable. Replaces the old single
     # `repo: str` field.

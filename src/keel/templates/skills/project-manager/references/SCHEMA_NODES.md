@@ -1,6 +1,6 @@
 # Schema: Concept Nodes
 
-Concept nodes live at `graph/nodes/<id>.yaml`. They are named, versioned
+Concept nodes live at `nodes/<id>.yaml`. They are named, versioned
 pointers to concrete artifacts in the codebase — the core mechanism for
 coherence in an agent-driven project. The canonical examples are under
 `examples/node-*.yaml` — **trust the examples over this doc**.
@@ -75,7 +75,7 @@ check.
 
 ## File path
 
-`<project>/graph/nodes/<id>.yaml`. The filename (minus `.yaml`) must
+`<project>/nodes/<id>.yaml`. The filename (minus `.yaml`) must
 exactly match the `id` field.
 
 ## Bi-directional `related`

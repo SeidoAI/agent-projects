@@ -3,6 +3,10 @@
 Things agents get wrong most often. Each one fails validation and
 costs you an iteration. Read this once carefully — it'll save hours.
 
+This is the detailed reference for the "five mortal sins" summary in
+`SKILL.md`. Read that first for the short list, then come here for the
+bad/good examples and the reasoning behind each rule.
+
 ## The five mortal sins
 
 1. **Inventing fields not in the schema.** You add `priority_score: 5`
@@ -25,7 +29,7 @@ costs you an iteration. Read this once carefully — it'll save hours.
    it. Use a real uuid4 — most languages have a one-liner for it.
 
 5. **Dangling references.** You write `[[user-model]]` in an issue
-   body but you haven't created `graph/nodes/user-model.yaml`. The
+   body but you haven't created `nodes/user-model.yaml`. The
    validator reports `ref/dangling`. Either create the node or fix
    the reference.
 

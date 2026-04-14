@@ -17,12 +17,13 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
-from keel.core.store import ProjectNotFoundError, load_project
+from keel.cli._utils import require_project as _require_project
+from keel.core import paths
 
 console = Console()
 
-ARTIFACTS_SUBPATH = "artifacts"
-MANIFEST_REL = "templates/artifacts/manifest.yaml"
+ARTIFACTS_SUBPATH = paths.SESSION_ARTIFACTS_SUBDIR
+MANIFEST_REL = paths.TEMPLATES_ARTIFACTS_MANIFEST
 
 
 @click.group(name="artifacts")
@@ -54,8 +55,7 @@ def artifacts_list(session_id: str, project_dir: Path, output_format: str) -> No
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
-    session_dir = resolved / "sessions" / session_id
-    artifacts_dir = session_dir / ARTIFACTS_SUBPATH
+    artifacts_dir = paths.session_artifacts_dir(resolved, session_id)
     manifest = _load_manifest(resolved)
 
     rows: list[dict[str, str]] = []
@@ -137,7 +137,7 @@ def artifacts_show(session_id: str, artifact_name: str, project_dir: Path) -> No
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
-    artifacts_dir = resolved / "sessions" / session_id / ARTIFACTS_SUBPATH
+    artifacts_dir = paths.session_artifacts_dir(resolved, session_id)
     if not artifacts_dir.is_dir():
         raise click.ClickException(
             f"No artifacts directory for session {session_id!r}: {artifacts_dir}"
@@ -199,10 +199,3 @@ def _load_manifest(project_dir: Path) -> list[dict]:
     if not isinstance(entries, list):
         return []
     return [e for e in entries if isinstance(e, dict)]
-
-
-def _require_project(project_dir: Path) -> None:
-    try:
-        load_project(project_dir)
-    except ProjectNotFoundError as exc:
-        raise click.ClickException(str(exc)) from exc

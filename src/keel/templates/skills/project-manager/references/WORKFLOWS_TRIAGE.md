@@ -7,7 +7,7 @@ project changes. This is the "someone said something, now what?" flow.
 ## Sources of inbound
 
 - **Comments on issues** — humans or agents adding notes to
-  `docs/issues/<KEY>/comments/`
+  `issues/<KEY>/comments/`
 - **Agent messages** — blocking or informational messages from a
   coding agent (`question`, `stuck`, `escalation`, `fyi`)
 - **Post-completion comments** — a completed session's
@@ -60,7 +60,7 @@ Add a comment to the existing issue. Mark the inbound item as processed
 
 ### 6. Validate and commit
 ```bash
-keel validate --strict --format=json
+keel validate --strict
 ```
 Every new issue, every new comment, every new node must pass the gate.
 

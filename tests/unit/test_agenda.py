@@ -35,8 +35,8 @@ def write_project_yaml(project_dir: Path) -> None:
 
 
 def write_issue(project_dir: Path, key: str, **overrides: object) -> None:
-    issues_dir = project_dir / "issues"
-    issues_dir.mkdir(exist_ok=True)
+    idir = project_dir / "issues" / key
+    idir.mkdir(parents=True, exist_ok=True)
     fm = {
         "uuid": str(uuid.uuid4()),
         "id": key,
@@ -50,7 +50,7 @@ def write_issue(project_dir: Path, key: str, **overrides: object) -> None:
     }
     fm.update(overrides)
     body = "## Context\nTest.\n\n## Acceptance criteria\n- [ ] ok\n"
-    (issues_dir / f"{key}.yaml").write_text(
+    (idir / "issue.yaml").write_text(
         serialize_frontmatter_body(fm, body), encoding="utf-8"
     )
 
@@ -59,7 +59,7 @@ def write_issue(project_dir: Path, key: str, **overrides: object) -> None:
 def project(tmp_path: Path) -> Path:
     write_project_yaml(tmp_path)
     (tmp_path / "issues").mkdir()
-    (tmp_path / "graph" / "nodes").mkdir(parents=True)
+    (tmp_path / "nodes").mkdir(parents=True)
     return tmp_path
 
 

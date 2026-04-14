@@ -65,9 +65,12 @@ class TestInitBasics:
         assert (target / ".gitignore").exists()
 
         # Empty project directories with .gitkeep markers
-        for rel in ("issues", "graph/nodes", "sessions", "docs/issues", "plans"):
+        for rel in ("issues", "nodes", "sessions", "plans"):
             assert (target / rel).is_dir(), f"Missing directory: {rel}"
             assert (target / rel / ".gitkeep").exists(), f"Missing .gitkeep in {rel}"
+        # docs/issues is no longer created by init (Phase 4 of v0.5 refactor
+        # colocated issue artifacts under issues/<KEY>/ instead).
+        assert not (target / "docs" / "issues").exists()
 
     def test_project_yaml_has_rendered_fields(
         self, runner: CliRunner, tmp_path: Path
@@ -93,6 +96,44 @@ class TestInitBasics:
         claude = (target / "CLAUDE.md").read_text()
         assert "# seido" in claude
         assert "SEI" in claude
+
+    def test_jinja_renders_project_name_and_key_prefix_completely(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """Full Jinja render check: every templated file must substitute
+        all `{{ var }}` markers, and the rendered files must NOT contain
+        any leftover `{{` or `}}` from unrendered templates.
+        """
+        target = tmp_path / "render-test"
+        result = runner.invoke(
+            cli,
+            _init_args(
+                target,
+                name="render-project",
+                key_prefix="RND",
+                base_branch="develop",
+            ),
+        )
+        assert result.exit_code == 0, result.output
+
+        # Every file at the project root that was rendered from a .j2
+        # template must contain the substituted values, not the raw markers.
+        claude = (target / "CLAUDE.md").read_text()
+        assert "render-project" in claude
+        assert "RND" in claude
+        assert "develop" in claude
+        # No leftover Jinja markers — these would mean a variable wasn't
+        # substituted (StrictUndefined would have raised, but defence in
+        # depth is cheap).
+        assert "{{" not in claude
+        assert "}}" not in claude
+
+        # Same for project.yaml — it's also rendered from a .j2 template.
+        project_yaml = (target / "project.yaml").read_text()
+        assert "render-project" in project_yaml
+        assert "RND" in project_yaml
+        assert "{{" not in project_yaml
+        assert "}}" not in project_yaml
 
     def test_gitignore_includes_runtime_state(
         self, runner: CliRunner, tmp_path: Path

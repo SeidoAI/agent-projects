@@ -23,9 +23,9 @@ slug rule as `ConceptNode.id` validation.
 
 References work in any Markdown body:
 
-- Issue bodies (`issues/<KEY>.yaml`)
-- Node bodies (`graph/nodes/<id>.yaml`)
-- Comment bodies (`docs/issues/<KEY>/comments/*.yaml`)
+- Issue bodies (`issues/<KEY>/issue.yaml`)
+- Node bodies (`nodes/<id>.yaml`)
+- Comment bodies (`issues/<KEY>/comments/*.yaml`)
 - Session artifact markdown (`sessions/<id>/artifacts/*.md`)
 
 The validator extracts them from every body during validation.
@@ -52,11 +52,11 @@ The `related` field on a concept node is bi-directional. If node A's
 `related` contains B, node B's `related` must contain A:
 
 ```yaml
-# graph/nodes/node-a.yaml
+# nodes/node-a.yaml
 id: node-a
 related: [node-b]
 
-# graph/nodes/node-b.yaml
+# nodes/node-b.yaml
 id: node-b
 related: [node-a]  # required — B must point back
 ```
@@ -97,7 +97,7 @@ validator reports it as `ref/dangling`. Common causes:
 
 - **Typo**: `[[user-modle]]` instead of `[[user-model]]`. Fix the typo.
 - **Forgot to create the node**: the node exists in your plan but you
-  never wrote the `graph/nodes/<id>.yaml` file. Create it.
+  never wrote the `nodes/<id>.yaml` file. Create it.
 - **Wrong slug**: you referenced `[[user-model]]` but the file is
   `user_model.yaml`. Rename the file or the reference.
 - **Reference in an example you copied**: the example had `[[user-model]]`

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from keel.core import graph_cache
+from keel.core import graph_cache, paths
 from keel.core.node_store import list_nodes
 from keel.core.store import list_issues
 from keel.models.graph import (
@@ -39,11 +39,12 @@ def _from_cache(cache: GraphIndex, project_dir: Path) -> FullGraphResult:
     nodes: list[GraphNode] = []
     node_ids: set[str] = set()
 
-    # Issue files → GraphNode(kind="issue")
+    # Issue files → GraphNode(kind="issue"). Issues live at
+    # `issues/<KEY>/issue.yaml`, so the key is the parent dir name.
     for rel, _fp in cache.files.items():
-        if not rel.startswith("issues/"):
+        issue_id = graph_cache.issue_key_from_rel_path(rel)
+        if issue_id is None:
             continue
-        issue_id = Path(rel).stem
         node_ids.add(issue_id)
         # Read title from the issue file for the graph label
         label = None
@@ -62,9 +63,9 @@ def _from_cache(cache: GraphIndex, project_dir: Path) -> FullGraphResult:
     # file to populate the display fields; we read the file here (still
     # cheaper than a full scan because the cache gave us the exact file set).
     for rel, _fp in cache.files.items():
-        if not rel.startswith("graph/nodes/"):
+        node_id = graph_cache.node_id_from_rel_path(rel)
+        if node_id is None:
             continue
-        node_id = Path(rel).stem
         parsed = graph_cache._load_node_file(project_dir, rel)
         if parsed is None:
             continue
@@ -93,9 +94,9 @@ def _from_scan(project_dir: Path) -> FullGraphResult:
     full filesystem walk. Only used when `graph/index.yaml` is missing and
     the caller hasn't (yet) run `ensure_fresh` to create it.
     """
-    issues = list_issues(project_dir) if (project_dir / "issues").is_dir() else []
+    issues = list_issues(project_dir) if paths.issues_dir(project_dir).is_dir() else []
     nodes_list = (
-        list_nodes(project_dir) if (project_dir / "graph" / "nodes").is_dir() else []
+        list_nodes(project_dir) if paths.nodes_dir(project_dir).is_dir() else []
     )
 
     graph_nodes: list[GraphNode] = [
@@ -116,10 +117,10 @@ def _from_scan(project_dir: Path) -> FullGraphResult:
     from keel.core.graph_cache import _issue_edges, _node_edges
 
     for issue in issues:
-        rel = f"issues/{issue.id}.yaml"
+        rel = f"{paths.ISSUES_DIR}/{issue.id}/{paths.ISSUE_FILENAME}"
         edges.extend(_issue_edges(issue, rel, issue.body))
     for node in nodes_list:
-        rel = f"graph/nodes/{node.id}.yaml"
+        rel = f"{paths.NODES_DIR}/{node.id}.yaml"
         edges.extend(_node_edges(node, rel, node.body))
 
     all_ids = {gn.id for gn in graph_nodes}

@@ -22,7 +22,7 @@ read the relevant workflow reference from the skill (usually
 After every batch of file writes, run:
 
 ```
-keel validate --strict --format=json
+keel validate --strict
 ```
 
 This is the gate. Parse the JSON, fix every error, re-run until exit 0.
@@ -30,9 +30,9 @@ This is the gate. Parse the JSON, fix every error, re-run until exit 0.
 ## For humans
 
 - `issues/` — one YAML file per issue
-- `graph/nodes/` — one YAML file per concept node
+- `nodes/` — one YAML file per concept node
 - `sessions/` — agent session definitions and runtime state
-- `docs/issues/<KEY>/` — per-issue developer notes, comments, verified records
+- `issues/<KEY>/` — per-issue developer notes, comments, verified records
 - `project.yaml` — project config (status flow, repos, orchestration defaults)
 - `.claude/skills/project-manager/` — PM skill (loaded by agents; edit to
   customise agent behaviour for this project)

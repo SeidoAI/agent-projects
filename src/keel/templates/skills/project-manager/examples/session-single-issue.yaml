@@ -1,11 +1,13 @@
 ---
+# This file lives at: sessions/<id>/session.yaml
+# The sessions/<id>/ directory also contains plan.md, artifacts/, and
+# optionally comments/. See SCHEMA_SESSIONS.md for the full layout.
 uuid: 7e6d5c4b-3a2f-41e8-9d7c-6b5a4f3e2d1c
 id: wave1-agent-a
 name: "Agent A: Auth endpoint"
 agent: backend-coder
 issues:
   - SEI-42
-wave: 1
 repos:
   - repo: SeidoAI/web-app-backend
     base_branch: test

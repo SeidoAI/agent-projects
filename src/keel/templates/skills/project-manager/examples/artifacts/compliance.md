@@ -34,7 +34,7 @@
 
 | Entity type | Count | Directory |
 |---|---|---|
-| Concept nodes | 12 | graph/nodes/ |
+| Concept nodes | 12 | nodes/ |
 | Epic issues | 8 | issues/ |
 | Concrete issues | 25 | issues/ |
 | Sessions | 8 | sessions/ |

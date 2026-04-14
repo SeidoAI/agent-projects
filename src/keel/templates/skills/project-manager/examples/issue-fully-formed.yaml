@@ -72,7 +72,7 @@ make lint
 - [ ] Implementation complete
 - [ ] Unit and integration tests added
 - [ ] Completion comment added to the issue
-- [ ] `docs/issues/SEI-42/developer.md` written
-- [ ] `docs/issues/SEI-42/verified.md` written (by the verifier agent)
+- [ ] `issues/SEI-42/developer.md` written
+- [ ] `issues/SEI-42/verified.md` written (by the verifier agent)
 - [ ] [[auth-token-endpoint]] node created and referenced here
 - [ ] `keel validate --strict` exits 0

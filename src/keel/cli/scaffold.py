@@ -27,16 +27,19 @@ from typing import Any
 import click
 import yaml
 
+from keel.core import paths
 from keel.core.enum_loader import load_enums
 from keel.core.id_generator import format_key
-from keel.core.store import ProjectNotFoundError, load_project
+from keel.core.node_store import list_nodes
+from keel.core.session_store import list_sessions
+from keel.core.store import ProjectNotFoundError, list_issues, load_project
 from keel.models.project import ProjectConfig
 
-ARTIFACT_MANIFEST_REL = "templates/artifacts/manifest.yaml"
-ORCHESTRATION_DIR = "orchestration"
-ISSUE_TEMPLATES_DIR = "issue_templates"
-COMMENT_TEMPLATES_DIR = "comment_templates"
-SESSION_TEMPLATES_DIR = "session_templates"
+ARTIFACT_MANIFEST_REL = paths.TEMPLATES_ARTIFACTS_MANIFEST
+ORCHESTRATION_DIR = paths.ORCHESTRATION_DIR
+ISSUE_TEMPLATES_DIR = paths.ISSUE_TEMPLATES_DIR
+COMMENT_TEMPLATES_DIR = paths.COMMENT_TEMPLATES_DIR
+SESSION_TEMPLATES_DIR = paths.SESSION_TEMPLATES_DIR
 SKILL_EXAMPLES_DIR = ".claude/skills/project-manager/examples"
 
 
@@ -192,31 +195,31 @@ def _collect_templates(project_dir: Path) -> list[str]:
     and `templates/artifacts/` (which is the one place templates live
     under a nested `templates/` directory in v0's layout).
     """
-    paths: list[str] = []
+    template_paths: list[str] = []
     for rel_dir in (
         ISSUE_TEMPLATES_DIR,
         COMMENT_TEMPLATES_DIR,
         SESSION_TEMPLATES_DIR,
-        "templates/artifacts",
+        paths.TEMPLATES_ARTIFACTS_DIR,
     ):
         abs_dir = project_dir / rel_dir
         if not abs_dir.is_dir():
             continue
         for f in sorted(abs_dir.rglob("*")):
             if f.is_file() and f.name != ".gitkeep":
-                paths.append(str(f.relative_to(project_dir)))
-    return paths
+                template_paths.append(str(f.relative_to(project_dir)))
+    return template_paths
 
 
 def _collect_skill_examples(project_dir: Path) -> list[str]:
     examples_dir = project_dir / SKILL_EXAMPLES_DIR
     if not examples_dir.is_dir():
         return []
-    paths: list[str] = []
+    example_paths: list[str] = []
     for f in sorted(examples_dir.rglob("*")):
         if f.is_file() and f.name != ".gitkeep":
-            paths.append(str(f.relative_to(project_dir)))
-    return paths
+            example_paths.append(str(f.relative_to(project_dir)))
+    return example_paths
 
 
 # ============================================================================
@@ -233,36 +236,35 @@ def collect_scaffold(project_dir: Path) -> ScaffoldData:
     project = load_project(project_dir)
     next_issue, next_session, next_node = _collect_next_ids(project)
 
-    # Entity counts
-    issue_files = (
-        list((project_dir / "issues").glob("*.yaml"))
-        if (project_dir / "issues").is_dir()
-        else []
-    )
-    node_files = (
-        list((project_dir / "graph" / "nodes").glob("*.yaml"))
-        if (project_dir / "graph" / "nodes").is_dir()
-        else []
-    )
-    session_dirs = (
-        [d for d in (project_dir / "sessions").iterdir() if d.is_dir()]
-        if (project_dir / "sessions").is_dir()
-        else []
-    )
+    # Entity counts via the store abstractions (single source of truth
+    # for where entities live on disk). Parse errors surface as thrown
+    # exceptions; we swallow them into a synthetic `parse_error` bucket
+    # so the brief stays informative even if one file is malformed.
+    try:
+        issues = list_issues(project_dir)
+    except Exception:
+        issues = []
+    try:
+        nodes = list_nodes(project_dir)
+    except Exception:
+        nodes = []
+    try:
+        sessions = list_sessions(project_dir)
+    except Exception:
+        sessions = []
 
     issue_by_status: dict[str, int] = {}
-    for f in issue_files:
-        try:
-            from keel.core.parser import parse_frontmatter_body
+    for issue in issues:
+        s = getattr(issue, "status", None) or "unknown"
+        issue_by_status[s] = issue_by_status.get(s, 0) + 1
 
-            fm, _ = parse_frontmatter_body(f.read_text(encoding="utf-8"))
-            s = fm.get("status", "unknown")
-            issue_by_status[s] = issue_by_status.get(s, 0) + 1
-        except Exception:
-            issue_by_status["parse_error"] = issue_by_status.get("parse_error", 0) + 1
+    # Retained for downstream consumers that count entities (len()).
+    issue_files = issues
+    node_files = nodes
+    session_dirs = sessions
 
     # Collect existing node IDs for agent context
-    node_ids = sorted(f.stem for f in node_files)
+    node_ids = sorted(n.id for n in nodes)
 
     return ScaffoldData(
         project_name=project.name,

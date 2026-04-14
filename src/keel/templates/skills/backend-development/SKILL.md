@@ -34,10 +34,10 @@ directly — that's the PM's job. What you DO write:
 - **Session artifacts** in `<project>/sessions/<id>/artifacts/` —
   plan.md, task-checklist.md, verification-checklist.md,
   recommended-testing-plan.md, post-completion-comments.md
-- **Concept nodes** in `<project>/graph/nodes/` when you create new
+- **Concept nodes** in `<project>/nodes/` when you create new
   artifacts that other issues will reference (endpoints, models, etc.)
-- **Completion comments** in `<project>/docs/issues/<KEY>/comments/` and
-  the developer doc at `<project>/docs/issues/<KEY>/developer.md`
+- **Completion comments** in `<project>/issues/<KEY>/comments/` and
+  the developer doc at `<project>/issues/<KEY>/developer.md`
 
 The PM skill's reference `SCHEMA_ARTIFACTS.md` covers the artifact
 shape. The PM skill's `SCHEMA_NODES.md` covers concept nodes.
@@ -48,7 +48,7 @@ Before committing ANY changes to the project repo (artifacts,
 comments, nodes), run:
 
 ```bash
-keel validate --strict --format=json
+keel validate --strict
 ```
 
 Parse the JSON. Fix every error. Re-run until exit 0. This is
@@ -58,10 +58,10 @@ separate from the target code repo's test suite — both must pass.
 
 ### Phase 1: Discovery
 
-1. **Read the issue** at `<project>/issues/<KEY>.yaml`. Read the full
+1. **Read the issue** at `<project>/issues/<KEY>/issue.yaml`. Read the full
    frontmatter and body. Note the acceptance criteria.
 2. **Resolve concept nodes**: for every `[[reference]]` in the body,
-   read the corresponding `<project>/graph/nodes/<id>.yaml`. These
+   read the corresponding `<project>/nodes/<id>.yaml`. These
    are the live links to the actual code — they tell you where to
    look and what the current content hash is.
 3. **Check dependencies**: if the issue has `blocked_by: [...]`,
@@ -141,7 +141,7 @@ separate from the target code repo's test suite — both must pass.
     checkable (✓ or ✗). If anything fails, fix it and re-run.
 20. **Run the project-level validate**:
     ```bash
-    keel validate --strict --format=json
+    keel validate --strict
     ```
     Must exit 0. Parse errors, fix, re-run.
 21. **Run the target repo's checks**:
@@ -159,10 +159,10 @@ separate from the target code repo's test suite — both must pass.
     should test manually beyond CI.
 24. **Write `post-completion-comments.md`** — decisions, deferred
     work, surprises, follow-up suggestions for the PM.
-25. **Write `developer.md`** to `<project>/docs/issues/<KEY>/developer.md`
+25. **Write `developer.md`** to `<project>/issues/<KEY>/developer.md`
     — implementation summary, scope, testing instructions, risks.
 26. **Write a completion comment** to
-    `<project>/docs/issues/<KEY>/comments/<NNN>-completion-YYYY-MM-DD.yaml`
+    `<project>/issues/<KEY>/comments/<NNN>-completion-YYYY-MM-DD.yaml`
     — use the PM skill's `examples/comment-status-change.yaml` as a
     shape reference (but set `type: completion`).
 27. **Commit the project-repo changes** (artifacts, nodes, comments,

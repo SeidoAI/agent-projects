@@ -4,10 +4,36 @@
 It's the gate you must pass after every batch of file writes before
 declaring any work done.
 
+## Error code quick reference
+
+| Code prefix | Severity | Auto-fixable | Covers |
+|---|---|---|---|
+| `schema/` | error | no | YAML parsing + Pydantic validation |
+| `issue/*`, `node/*`, `session/*`, `comment/*` | error | no | Per-entity load errors (parse, schema, io) |
+| `uuid/missing` | error | yes (`fix_uuid`) | Entity without a `uuid` field |
+| `uuid/not_v4` | error | no | UUID that isn't RFC 4122 v4 |
+| `ref/dangling` | error | no | `[[ref]]` pointing to unknown node/issue |
+| `ref/bidirectional_mismatch` | error | yes | Node.related missing back-edge |
+| `ref/blocked_by`, `ref/session_issue`, `ref/comment_issue` | error | no | Link to unknown entity |
+| `body/*` | error | no | Required headings missing from issue body |
+| `enum/*` | error | no | Value outside the active enum |
+| `collision/id` | error | no | Two entities share an `id` |
+| `sequence/drift` | error | yes | `next_issue_number` below observed max |
+| `timestamp/missing` | error | yes | Entity missing `created_at`/`updated_at` |
+| `sorted/list` | fixed | yes | List fields sorted in place |
+| `bidi/related` | fixed | yes | Back-reference added to related node |
+| `phase/*` | error | no | Phase transition gate (artifacts, plans) |
+| `quality/*` | warning | no | Output-degradation heuristics (anti-fatigue) |
+| `coverage/*` | warning | no | Semantic-gap heuristics (unreferenced nodes, etc.) |
+| `freshness/*` | warning | yes | Source hash vs stored hash mismatch |
+| `standards/missing` | warning | no | A file references `standards.md` but it doesn't exist |
+| `artifact/missing` | error | no | Completed session missing a required artifact |
+| `fix/lock_timeout` | error | no | Concurrent `--fix` couldn't acquire the project lock |
+
 ## The one command
 
 ```bash
-keel validate --strict --format=json
+keel validate --strict
 ```
 
 - `--strict` promotes warnings to errors (your normal mode)
@@ -46,7 +72,7 @@ errors → validate → exit 0 → commit.
       "line": 18,
       "field": "body",
       "message": "Reference [[user-modle]] does not resolve to any node or issue.",
-      "fix_hint": "Did you mean [[user-model]]? Or create a node 'user-modle' in graph/nodes/."
+      "fix_hint": "Did you mean [[user-model]]? Or create a node 'user-modle' in nodes/."
     }
   ],
   "warnings": [],
@@ -145,7 +171,7 @@ Fix the file, re-run, continue.
 ## Auto-fix (`--fix`)
 
 ```bash
-keel validate --strict --fix --format=json
+keel validate --strict --fix
 ```
 
 Safely repairs:

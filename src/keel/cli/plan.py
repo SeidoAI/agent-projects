@@ -12,6 +12,7 @@ import json
 
 import click
 
+from keel.cli.init import _extract_key_prefix
 from keel.core.planner import preview_init
 
 
@@ -41,11 +42,9 @@ def plan_cmd(name: str, key_prefix: str | None, output_format: str) -> None:
     Shows directories, files, sizes, and sources without writing anything.
     """
     if key_prefix is None:
-        # Simple auto-derive: first letter of each word
-        parts = [p for p in name.replace("_", "-").split("-") if p]
-        key_prefix = "".join(p[0].upper() for p in parts) if parts else "KP"
-        if len(key_prefix) < 2 and parts:
-            key_prefix = (parts[0][:2]).upper()
+        # Use the same extraction as `keel init` so plan and init agree on
+        # what prefix they would suggest (including camelCase handling).
+        key_prefix = _extract_key_prefix(name) or "KP"
 
     preview = preview_init(
         project_name=name,

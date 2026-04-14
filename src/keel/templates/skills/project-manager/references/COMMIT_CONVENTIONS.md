@@ -38,7 +38,7 @@ Types: `feat`, `fix`, `docs`, `refactor`, `chore`, `scoping`.
 Examples:
 
 ```
-scoping: initial project scope from raw_planning/
+scoping: initial project scope from plans/
 
 20 issues across 4 epics, 15 concept nodes, 3 sessions.
 Validated clean.
@@ -60,7 +60,7 @@ Format: `[<KEY>] <one-line summary>` — or for scoping work,
 Examples:
 
 - `[SEI-42] Implement JWT authentication endpoint`
-- `[scoping] Initial project scope from raw_planning/`
+- `[scoping] Initial project scope from plans/`
 - `[PKB-18] Add Firestore user model`
 
 ## PR body
@@ -73,11 +73,11 @@ Use a section-heavy structure so reviewers can skim:
 
 ## Touched
 - issues/SEI-42.yaml (new)
-- graph/nodes/auth-token-endpoint.yaml (new)
+- nodes/auth-token-endpoint.yaml (new)
 - sessions/wave1-agent-a/artifacts/plan.md (new)
 
 ## Validator
-`keel validate --strict --format=json` exits 0.
+`keel validate --strict` exits 0.
 
 ## Concept graph
 - Created [[auth-token-endpoint]] pointing at src/api/auth.py:45-82

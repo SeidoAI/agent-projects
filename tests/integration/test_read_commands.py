@@ -67,8 +67,8 @@ def write_issue_file(
     body: str | None = None,
     **frontmatter: Any,
 ) -> None:
-    issues_dir = project_dir / "issues"
-    issues_dir.mkdir(exist_ok=True)
+    idir = project_dir / "issues" / key
+    idir.mkdir(parents=True, exist_ok=True)
 
     fm: dict[str, Any] = {
         "uuid": str(uuid.uuid4()),
@@ -98,7 +98,7 @@ def write_issue_file(
             "## Definition of Done\n- [ ] done\n"
         )
 
-    path = issues_dir / f"{key}.yaml"
+    path = idir / "issue.yaml"
     path.write_text(serialize_frontmatter_body(fm, body), encoding="utf-8")
 
 
@@ -110,7 +110,7 @@ def write_node_file(
     related: list[str] | None = None,
     body: str = "Description.\n",
 ) -> None:
-    nodes_dir = project_dir / "graph" / "nodes"
+    nodes_dir = project_dir / "nodes"
     nodes_dir.mkdir(parents=True, exist_ok=True)
     fm = {
         "uuid": str(uuid.uuid4()),
@@ -255,7 +255,7 @@ class TestStatus:
         populate_project(runner, target)
         # Use rich format for human-readable assertions
         result = runner.invoke(
-            cli, ["status", "--project-dir", str(target), "--format", "rich"]
+            cli, ["status", "--project-dir", str(target), "--format", "text"]
         )
         assert result.exit_code == 0
         assert "3 issues" in result.output
@@ -297,10 +297,19 @@ class TestStatus:
 
 
 class TestGraph:
-    def test_json_is_default(self, runner: CliRunner, tmp_path: Path) -> None:
+    def test_mermaid_is_default(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         populate_project(runner, target)
         result = runner.invoke(cli, ["graph", "--project-dir", str(target)])
+        assert result.exit_code == 0
+        assert result.output.startswith("graph LR")
+
+    def test_json_format(self, runner: CliRunner, tmp_path: Path) -> None:
+        target = tmp_path / "p"
+        populate_project(runner, target)
+        result = runner.invoke(
+            cli, ["graph", "--project-dir", str(target), "--format", "json"]
+        )
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert len(payload["nodes"]) == 3
@@ -354,13 +363,14 @@ class TestGraph:
                 "graph",
                 "--project-dir",
                 str(target),
+                "--format",
+                "json",
                 "--output",
                 str(out),
             ],
         )
         assert result.exit_code == 0
         assert out.exists()
-        # Default is JSON now
         payload = json.loads(out.read_text())
         assert "nodes" in payload
 

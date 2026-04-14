@@ -23,6 +23,26 @@ from keel.core.validator import (
 # ============================================================================
 # Fixtures and helpers
 # ============================================================================
+#
+# Two flavours of entity fixture exist in this file:
+#
+# - `write_issue` / `write_node` / `write_session` — hand-written YAML.
+#   Use when the test needs to exercise *parsing or content* edge cases:
+#   malformed frontmatter, missing required fields, schema-invalid types,
+#   hand-crafted UUIDs, etc. The whole point of these helpers is to get
+#   around the model's validation so we can see how the validator
+#   reports the resulting invalid file.
+#
+# - `save_test_issue` / `save_test_node` / `save_test_session` — go
+#   through `keel.core.store` / `node_store` / `session_store`. Use when
+#   the test only cares about *validator behaviour* on structurally
+#   valid input. These helpers stay green when the on-disk layout
+#   changes — the stores encapsulate the layout.
+#
+# Rule of thumb: if the test would still make sense after a layout
+# change (issue colocation, session directories, etc.), use the
+# save-based helpers. If it tests something specific about how bytes
+# look on disk, use the manual helpers.
 
 
 def write_project_yaml(project_dir: Path, **overrides: Any) -> None:
@@ -75,9 +95,10 @@ def write_issue(
     body: str | None = None,
     **frontmatter_overrides: Any,
 ) -> Path:
-    """Write a syntactically valid issue with all required body sections."""
-    issues_dir = project_dir / "issues"
-    issues_dir.mkdir(exist_ok=True)
+    """Write a syntactically valid issue to `issues/<key>/issue.yaml`
+    with all required body sections."""
+    idir = project_dir / "issues" / key
+    idir.mkdir(parents=True, exist_ok=True)
 
     fm: dict[str, Any] = {
         "uuid": str(_uuid.uuid4()),
@@ -105,7 +126,7 @@ def write_issue(
             "\n## Definition of Done\n- [ ] done\n"
         )
     text = serialize_frontmatter_body(fm, body)
-    path = issues_dir / f"{key}.yaml"
+    path = idir / "issue.yaml"
     path.write_text(text, encoding="utf-8")
     return path
 
@@ -117,7 +138,7 @@ def write_node(
     body: str = "Description.\n",
     **frontmatter_overrides: Any,
 ) -> Path:
-    nodes_dir = project_dir / "graph" / "nodes"
+    nodes_dir = project_dir / "nodes"
     nodes_dir.mkdir(parents=True, exist_ok=True)
     fm: dict[str, Any] = {
         "uuid": str(_uuid.uuid4()),
@@ -138,10 +159,14 @@ def write_node(
 def write_session(
     project_dir: Path,
     session_id: str,
+    *,
+    plan: bool = False,
     **frontmatter_overrides: Any,
 ) -> Path:
-    sessions_dir = project_dir / "sessions"
-    sessions_dir.mkdir(exist_ok=True)
+    """Write a session in the canonical directory layout:
+    `sessions/<id>/session.yaml`, with an optional `plan.md`."""
+    sdir = project_dir / "sessions" / session_id
+    sdir.mkdir(parents=True, exist_ok=True)
     fm: dict[str, Any] = {
         "uuid": str(_uuid.uuid4()),
         "id": session_id,
@@ -153,9 +178,109 @@ def write_session(
     }
     fm.update(frontmatter_overrides)
     text = serialize_frontmatter_body(fm, "")
-    path = sessions_dir / f"{session_id}.yaml"
+    path = sdir / "session.yaml"
     path.write_text(text, encoding="utf-8")
+    if plan:
+        (sdir / "plan.md").write_text("# Plan\n", encoding="utf-8")
     return path
+
+
+# ---- Store-based helpers (see module comment at top for when to use) ----
+
+
+def save_test_issue(
+    project_dir: Path,
+    key: str,
+    *,
+    body: str | None = None,
+    **kwargs: Any,
+) -> None:
+    """Save a minimal valid Issue through `store.save_issue`.
+
+    Layout-agnostic: stays correct as long as `store.save_issue` stays
+    correct. Use for tests that assert validator behaviour on
+    structurally valid input.
+    """
+    from keel.core.store import save_issue
+    from keel.models import Issue
+
+    default_body = (
+        "## Context\nWith [[user-model]] reference.\n"
+        "\n## Implements\nREQ-1\n"
+        "\n## Repo scope\n- SeidoAI/web-app-backend\n"
+        "\n## Requirements\n- thing\n"
+        "\n## Execution constraints\nIf ambiguous, stop and ask.\n"
+        "\n## Acceptance criteria\n- [ ] thing\n"
+        "\n## Test plan\n```\nuv run pytest\n```\n"
+        "\n## Dependencies\nnone\n"
+        "\n## Definition of Done\n- [ ] done\n"
+    )
+    fm: dict[str, Any] = {
+        "id": key,
+        "title": f"Test {key}",
+        "status": "todo",
+        "priority": "medium",
+        "executor": "ai",
+        "verifier": "required",
+        "body": body or default_body,
+    }
+    fm.update(kwargs)
+    save_issue(project_dir, Issue.model_validate(fm), update_cache=False)
+
+
+def save_test_node(
+    project_dir: Path,
+    node_id: str,
+    *,
+    body: str = "Description.\n",
+    **kwargs: Any,
+) -> None:
+    """Save a minimal valid ConceptNode through `node_store.save_node`."""
+    from keel.core.node_store import save_node
+    from keel.models import ConceptNode
+
+    fm: dict[str, Any] = {
+        "id": node_id,
+        "type": "model",
+        "name": "User",
+        "status": "active",
+        "body": body,
+    }
+    fm.update(kwargs)
+    save_node(project_dir, ConceptNode.model_validate(fm), update_cache=False)
+
+
+def save_test_session(
+    project_dir: Path,
+    session_id: str,
+    *,
+    plan: bool = False,
+    **kwargs: Any,
+) -> None:
+    """Save a minimal valid AgentSession through `session_store.save_session`.
+
+    If `plan=True`, also writes a stub `plan.md` alongside the session
+    YAML. The session directory layout is handled by the store — callers
+    don't need to know about it.
+    """
+    from keel.core import paths
+    from keel.core.session_store import save_session
+    from keel.models import AgentSession
+
+    fm: dict[str, Any] = {
+        "id": session_id,
+        "name": "Test session",
+        "agent": "backend-coder",
+        "issues": [],
+        "status": "planned",
+        "repos": [],
+    }
+    fm.update(kwargs)
+    save_session(project_dir, AgentSession.model_validate(fm))
+    if plan:
+        paths.session_plan_path(project_dir, session_id).write_text(
+            "# Plan\n", encoding="utf-8"
+        )
 
 
 @pytest.fixture
@@ -209,15 +334,17 @@ class TestLoading:
         assert any(c.startswith("schema/project") for c in codes(report))
 
     def test_unparseable_issue(self, empty_project: Path) -> None:
-        (empty_project / "issues").mkdir()
-        (empty_project / "issues" / "TST-1.yaml").write_text("no frontmatter at all")
+        (empty_project / "issues" / "TST-1").mkdir(parents=True)
+        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(
+            "no frontmatter at all"
+        )
         report = validate_project(empty_project)
         assert "issue/parse_error" in codes(report)
 
     def test_schema_invalid_issue(self, empty_project: Path) -> None:
-        (empty_project / "issues").mkdir()
+        (empty_project / "issues" / "TST-1").mkdir(parents=True)
         # Missing required fields like title, status, etc.
-        (empty_project / "issues" / "TST-1.yaml").write_text(
+        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(
             "---\nuuid: 7c3a4b1d-9f2e-4a8c-b5d6-1e2f3a4b5c6d\nid: TST-1\n---\nbody\n"
         )
         report = validate_project(empty_project)
@@ -238,7 +365,7 @@ class TestLoading:
 class TestUuidPresence:
     def test_missing_uuid_is_error(self, empty_project: Path) -> None:
         # Hand-write an issue without uuid (bypassing the helper).
-        (empty_project / "issues").mkdir()
+        (empty_project / "issues" / "TST-1").mkdir(parents=True)
         text = serialize_frontmatter_body(
             {
                 "id": "TST-1",
@@ -250,7 +377,7 @@ class TestUuidPresence:
             },
             "## Context\n[[user-model]]\n\n## Implements\nx\n\n## Repo scope\nx\n\n## Requirements\nx\n\n## Execution constraints\nstop and ask.\n\n## Acceptance criteria\n- [ ] x\n\n## Test plan\nx\n\n## Dependencies\nnone\n\n## Definition of Done\n- [ ] done\n",
         )
-        (empty_project / "issues" / "TST-1.yaml").write_text(text)
+        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(text)
         report = validate_project(empty_project)
         assert "uuid/missing" in codes(report)
 
@@ -446,34 +573,18 @@ class TestIdCollisions:
         # Write two issue files claiming the same id but with different uuids.
         write_node(empty_project, "user-model")
         write_issue(empty_project, "TST-1")
-        # Now overwrite with a second file at a different location? Issues
-        # are stored by filename = id, so we can't have two on disk. Instead
-        # we simulate by modifying the existing file's uuid then writing a
-        # second file with the same id and a different filename.
-        # Easiest: write a second file `TST-1-dup.yaml` with id TST-1.
-        (empty_project / "issues" / "TST-1-dup.yaml").write_text(
-            (empty_project / "issues" / "TST-1.yaml")
-            .read_text()
-            .replace(
-                str(_uuid.UUID("00000000-0000-0000-0000-000000000000")),
-                str(_uuid.uuid4()),
-            )
-        )
-        # The two files have different uuids (the dup got a uuid replacement
-        # via re-load + we mutate). But our replace above won't trigger since
-        # the uuid in TST-1.yaml is real, not the placeholder. Do it directly:
-        original = (empty_project / "issues" / "TST-1.yaml").read_text()
-        # Force a different uuid in the dup
+        # Simulate a collision: a second issue directory with a different
+        # name but the same `id` field in its frontmatter.
+        original = (empty_project / "issues" / "TST-1" / "issue.yaml").read_text()
         new_uuid = str(_uuid.uuid4())
-        # Replace the line `uuid: <something>` with `uuid: <new>`
         lines = original.splitlines()
         for i, line in enumerate(lines):
             if line.startswith("uuid:"):
                 lines[i] = f"uuid: {new_uuid}"
                 break
-        (empty_project / "issues" / "TST-1-dup.yaml").write_text(
-            "\n".join(lines) + "\n"
-        )
+        dup_dir = empty_project / "issues" / "TST-1-dup"
+        dup_dir.mkdir(parents=True)
+        (dup_dir / "issue.yaml").write_text("\n".join(lines) + "\n")
 
         report = validate_project(empty_project)
         assert "collision/id" in codes(report)
@@ -516,7 +627,7 @@ class TestCommentProvenance:
     def test_invalid_comment_type_caught(self, empty_project: Path) -> None:
         write_node(empty_project, "user-model")
         write_issue(empty_project, "TST-1")
-        comment_dir = empty_project / "docs" / "issues" / "TST-1" / "comments"
+        comment_dir = empty_project / "issues" / "TST-1" / "comments"
         comment_dir.mkdir(parents=True)
         text = serialize_frontmatter_body(
             {
@@ -561,7 +672,7 @@ class TestProjectStandards:
 class TestAutoFix:
     def test_fix_missing_uuid(self, empty_project: Path) -> None:
         # Hand-write an issue without uuid.
-        (empty_project / "issues").mkdir()
+        (empty_project / "issues" / "TST-1").mkdir(parents=True)
         body = (
             "## Context\n[[user-model]]\n\n## Implements\nx\n\n## Repo scope\nx\n\n"
             "## Requirements\nx\n\n## Execution constraints\nstop and ask.\n\n"
@@ -581,14 +692,14 @@ class TestAutoFix:
             },
             body,
         )
-        (empty_project / "issues" / "TST-1.yaml").write_text(text)
+        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(text)
         write_node(empty_project, "user-model")
 
         report = validate_project(empty_project, fix=True)
         # Fix recorded
         assert "uuid/missing" in [f.code for f in report.fixed]
         # File now has a uuid
-        new_text = (empty_project / "issues" / "TST-1.yaml").read_text()
+        new_text = (empty_project / "issues" / "TST-1" / "issue.yaml").read_text()
         assert new_text.startswith("---\nuuid:")
 
     def test_fix_sequence_drift(self, empty_project: Path) -> None:
@@ -612,7 +723,7 @@ class TestAutoFix:
         report = validate_project(empty_project, fix=True)
         assert "bidi/related" in [f.code for f in report.fixed]
         # node-b's file should now contain node-a in its related list.
-        b_text = (empty_project / "graph" / "nodes" / "node-b.yaml").read_text()
+        b_text = (empty_project / "nodes" / "node-b.yaml").read_text()
         assert "node-a" in b_text
 
     def test_fix_sorted_lists(self, empty_project: Path) -> None:
@@ -624,7 +735,7 @@ class TestAutoFix:
         report = validate_project(empty_project, fix=True)
         sorted_codes = [f.code for f in report.fixed if f.code == "sorted/list"]
         assert len(sorted_codes) >= 1
-        text = (empty_project / "graph" / "nodes" / "user-model.yaml").read_text()
+        text = (empty_project / "nodes" / "user-model.yaml").read_text()
         # alpha should come before monkey before zebra in the sorted list
         a = text.find("alpha")
         m = text.find("monkey")
@@ -924,3 +1035,251 @@ class TestQualityConsistency:
         report = validate_project(p)
         quality_warnings = [w for w in report.warnings if w.code.startswith("quality/")]
         assert quality_warnings == []
+
+
+# ============================================================================
+# Phase requirements (locks the contract of check_phase_requirements before
+# Phase 3 of the v0.5 refactor restructures session loading)
+# ============================================================================
+
+
+_COMPLETE_MARKER = "<!-- status: complete -->\n"
+
+
+def _write_artifact(project_dir: Path, rel_path: str, *, complete: bool = True) -> None:
+    """Write a meta-artifact file with optional completion marker."""
+    full = project_dir / rel_path
+    full.parent.mkdir(parents=True, exist_ok=True)
+    body = "Body.\n"
+    if complete:
+        body += _COMPLETE_MARKER
+    full.write_text(body, encoding="utf-8")
+
+
+# `write_session` (above) already writes the directory layout; the old
+# `write_session` helper that used to live here was redundant.
+
+
+class TestPhaseRequirements:
+    """Contract tests for `check_phase_requirements`.
+
+    These tests exercise the *behaviour* of phase enforcement (which
+    artifacts are required at which phase, what the error codes look
+    like) rather than the file layout. They use the `save_test_*`
+    helpers so they stay correct across layout changes — the store
+    modules own the on-disk layout.
+    """
+
+    def test_scoping_phase_warns_when_plan_missing_but_issues_exist(
+        self, empty_project: Path
+    ) -> None:
+        write_project_yaml(empty_project, phase="scoping")
+        save_test_node(empty_project, "user-model")
+        save_test_issue(empty_project, "TST-1")
+        report = validate_project(empty_project)
+        assert "phase/missing_artifact" in codes(report, "warning")
+
+    def test_scoping_phase_no_warning_when_no_issues(self, empty_project: Path) -> None:
+        write_project_yaml(empty_project, phase="scoping")
+        report = validate_project(empty_project)
+        warnings = [w for w in report.warnings if w.code.startswith("phase/")]
+        assert warnings == []
+
+    def test_scoping_phase_pass_when_plan_present(self, empty_project: Path) -> None:
+        write_project_yaml(empty_project, phase="scoping")
+        save_test_node(empty_project, "user-model")
+        save_test_issue(empty_project, "TST-1")
+        _write_artifact(empty_project, "plans/artifacts/scoping-plan.md")
+        report = validate_project(empty_project)
+        warnings = [w for w in report.warnings if w.code.startswith("phase/")]
+        assert warnings == []
+
+    def test_scoped_phase_errors_when_gap_analysis_missing(
+        self, empty_project: Path
+    ) -> None:
+        write_project_yaml(empty_project, phase="scoped")
+        save_test_node(empty_project, "user-model")
+        save_test_issue(empty_project, "TST-1")
+        _write_artifact(empty_project, "plans/artifacts/compliance.md")
+        report = validate_project(empty_project)
+        gap_errors = [
+            e
+            for e in report.errors
+            if e.code == "phase/missing_artifact" and "gap-analysis" in (e.file or "")
+        ]
+        assert gap_errors
+
+    def test_scoped_phase_errors_when_compliance_missing(
+        self, empty_project: Path
+    ) -> None:
+        write_project_yaml(empty_project, phase="scoped")
+        save_test_node(empty_project, "user-model")
+        save_test_issue(empty_project, "TST-1")
+        _write_artifact(empty_project, "plans/artifacts/gap-analysis.md")
+        report = validate_project(empty_project)
+        compliance_errors = [
+            e
+            for e in report.errors
+            if e.code == "phase/missing_artifact" and "compliance" in (e.file or "")
+        ]
+        assert compliance_errors
+
+    def test_scoped_phase_errors_when_artifact_incomplete(
+        self, empty_project: Path
+    ) -> None:
+        write_project_yaml(empty_project, phase="scoped")
+        save_test_node(empty_project, "user-model")
+        save_test_issue(empty_project, "TST-1")
+        _write_artifact(
+            empty_project, "plans/artifacts/gap-analysis.md", complete=False
+        )
+        _write_artifact(empty_project, "plans/artifacts/compliance.md")
+        report = validate_project(empty_project)
+        assert "phase/incomplete_artifact" in codes(report)
+
+    def test_scoped_phase_errors_when_session_missing_plan(
+        self, empty_project: Path
+    ) -> None:
+        write_project_yaml(empty_project, phase="scoped")
+        save_test_node(empty_project, "user-model")
+        save_test_issue(empty_project, "TST-1")
+        _write_artifact(empty_project, "plans/artifacts/gap-analysis.md")
+        _write_artifact(empty_project, "plans/artifacts/compliance.md")
+        save_test_session(empty_project, "wave1-agent", plan=False)
+        report = validate_project(empty_project)
+        plan_errors = [
+            e for e in report.errors if e.code == "phase/missing_session_plan"
+        ]
+        assert plan_errors
+
+    def test_scoped_phase_passes_with_all_artifacts_and_plans(
+        self, empty_project: Path
+    ) -> None:
+        write_project_yaml(empty_project, phase="scoped")
+        save_test_node(empty_project, "user-model")
+        save_test_issue(empty_project, "TST-1")
+        _write_artifact(empty_project, "plans/artifacts/gap-analysis.md")
+        _write_artifact(empty_project, "plans/artifacts/compliance.md")
+        save_test_session(empty_project, "wave1-agent", plan=True)
+        report = validate_project(empty_project)
+        phase_errors = [e for e in report.errors if e.code.startswith("phase/")]
+        assert phase_errors == []
+
+    def test_executing_phase_has_same_requirements_as_scoped(
+        self, empty_project: Path
+    ) -> None:
+        write_project_yaml(empty_project, phase="executing")
+        save_test_node(empty_project, "user-model")
+        save_test_issue(empty_project, "TST-1")
+        save_test_session(empty_project, "wave1-agent", plan=False)
+        report = validate_project(empty_project)
+        codes_seen = codes(report)
+        assert "phase/missing_artifact" in codes_seen
+        assert "phase/missing_session_plan" in codes_seen
+
+    def test_reviewing_phase_has_same_requirements_as_scoped(
+        self, empty_project: Path
+    ) -> None:
+        write_project_yaml(empty_project, phase="reviewing")
+        save_test_node(empty_project, "user-model")
+        save_test_issue(empty_project, "TST-1")
+        report = validate_project(empty_project)
+        codes_seen = codes(report)
+        assert "phase/missing_artifact" in codes_seen
+
+    def test_default_phase_has_no_phase_errors(self, empty_project: Path) -> None:
+        save_test_node(empty_project, "user-model")
+        save_test_issue(empty_project, "TST-1")
+        report = validate_project(empty_project)
+        phase_errors = [e for e in report.errors if e.code.startswith("phase/")]
+        assert phase_errors == []
+
+
+# ============================================================================
+# Auto-fix idempotency: running --fix twice produces identical files.
+# Locks the contract before Phase 2 introduces file locking around fixes
+# and Phase 6 routes fixes through store functions.
+# ============================================================================
+
+
+def _file_snapshots(project_dir: Path) -> dict[str, str]:
+    """Read every YAML file in the project tree into a path→content dict."""
+    out: dict[str, str] = {}
+    for path in sorted(project_dir.rglob("*.yaml")):
+        rel = str(path.relative_to(project_dir))
+        out[rel] = path.read_text(encoding="utf-8")
+    return out
+
+
+class TestAutoFixIdempotency:
+    """Running `--fix` twice must produce byte-identical files.
+
+    Each test seeds a project that triggers exactly one auto-fix, runs
+    `--fix`, snapshots every YAML, runs `--fix` again, and asserts the
+    snapshots are equal.
+    """
+
+    def test_fix_missing_uuid_idempotent(self, empty_project: Path) -> None:
+        (empty_project / "issues" / "TST-1").mkdir(parents=True)
+        body = (
+            "## Context\n[[user-model]]\n\n## Implements\nx\n\n"
+            "## Repo scope\nx\n\n## Requirements\nx\n\n"
+            "## Execution constraints\nstop and ask.\n\n"
+            "## Acceptance criteria\n- [ ] x\n\n## Test plan\nx\n\n"
+            "## Dependencies\nnone\n\n## Definition of Done\n- [ ] x\n"
+        )
+        text = serialize_frontmatter_body(
+            {
+                "id": "TST-1",
+                "title": "x",
+                "status": "todo",
+                "priority": "medium",
+                "executor": "ai",
+                "verifier": "required",
+                "created_at": "2026-04-07T10:00:00",
+                "updated_at": "2026-04-07T10:00:00",
+            },
+            body,
+        )
+        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(text)
+        write_node(empty_project, "user-model")
+
+        validate_project(empty_project, fix=True)
+        snap = _file_snapshots(empty_project)
+        validate_project(empty_project, fix=True)
+        assert _file_snapshots(empty_project) == snap
+
+    def test_fix_sequence_drift_idempotent(self, empty_project: Path) -> None:
+        write_node(empty_project, "user-model")
+        write_issue(empty_project, "TST-5")
+        validate_project(empty_project, fix=True)
+        snap = _file_snapshots(empty_project)
+        validate_project(empty_project, fix=True)
+        assert _file_snapshots(empty_project) == snap
+
+    def test_fix_missing_timestamps_idempotent(self, empty_project: Path) -> None:
+        write_node(empty_project, "user-model")
+        write_issue(empty_project, "TST-1", created_at=None, updated_at=None)
+        validate_project(empty_project, fix=True)
+        snap = _file_snapshots(empty_project)
+        validate_project(empty_project, fix=True)
+        assert _file_snapshots(empty_project) == snap
+
+    def test_fix_bidirectional_related_idempotent(self, empty_project: Path) -> None:
+        write_node(empty_project, "node-a", related=["node-b"])
+        write_node(empty_project, "node-b")
+        validate_project(empty_project, fix=True)
+        snap = _file_snapshots(empty_project)
+        validate_project(empty_project, fix=True)
+        assert _file_snapshots(empty_project) == snap
+
+    def test_fix_sorted_lists_idempotent(self, empty_project: Path) -> None:
+        write_node(
+            empty_project,
+            "user-model",
+            tags=["zebra", "alpha", "monkey"],
+        )
+        validate_project(empty_project, fix=True)
+        snap = _file_snapshots(empty_project)
+        validate_project(empty_project, fix=True)
+        assert _file_snapshots(empty_project) == snap

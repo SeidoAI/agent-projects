@@ -37,7 +37,7 @@ class ConceptNode(BaseModel):
     """A node in the concept graph.
 
     Mirrors the YAML frontmatter + optional Markdown body file format under
-    `graph/nodes/<id>.yaml`.
+    `nodes/<id>.yaml`.
     """
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)

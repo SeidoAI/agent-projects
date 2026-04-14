@@ -1,6 +1,6 @@
 # Schema: Comments
 
-Comments live under `docs/issues/<KEY>/comments/`. Each comment is a
+Comments live under `issues/<KEY>/comments/`. Each comment is a
 single YAML frontmatter + Markdown body file. The filename convention
 is `<NNN>-<short-topic>-<YYYY-MM-DD>.yaml` where `NNN` is a
 zero-padded sequence number within the issue.
@@ -36,20 +36,20 @@ these are parsed and count toward the reference integrity check.
 
 ## Filename convention
 
-`<project>/docs/issues/<KEY>/comments/<NNN>-<short-topic>-<YYYY-MM-DD>.yaml`
+`<project>/issues/<KEY>/comments/<NNN>-<short-topic>-<YYYY-MM-DD>.yaml`
 
 - `NNN` — zero-padded sequence number (`001`, `002`, ...). Look at
   existing comments in the directory for the next number.
 - `<short-topic>` — a kebab-case one-or-two-word summary.
 - `<YYYY-MM-DD>` — ISO date.
 
-Example: `docs/issues/SEI-42/comments/003-blocked-rate-limiter-2026-04-07.yaml`.
+Example: `issues/SEI-42/comments/003-blocked-rate-limiter-2026-04-07.yaml`.
 
 ## Creation rules
 
 - Use the next free sequence number — don't reuse a number.
 - If you're writing the first comment on an issue, the directory
-  `docs/issues/<KEY>/comments/` probably doesn't exist yet. Create it.
+  `issues/<KEY>/comments/` probably doesn't exist yet. Create it.
 - `issue_key` must reference an existing issue — the validator catches
   dangling references.
 - Don't invent `type` values — stick to the enum.

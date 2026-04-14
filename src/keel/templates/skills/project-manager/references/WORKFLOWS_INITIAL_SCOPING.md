@@ -131,13 +131,13 @@ hyphenated). Session ids should be descriptive: `storage-adapter-impl`,
 Write in dependency order so early files can be referenced by later
 ones:
 
-1. **Concept nodes first** → `graph/nodes/<id>.yaml`
-2. **Epic issues** → `issues/<KEY>.yaml`. Epics MUST have the
+1. **Concept nodes first** → `nodes/<id>.yaml`
+2. **Epic issues** → `issues/<KEY>/issue.yaml`. Epics MUST have the
    `type/epic` label. Required body sections for epics: Context,
    Child issues, Acceptance criteria. Epics do NOT need Implements,
    Repo scope, Execution constraints, Test plan, Dependencies, or
    Definition of Done. See `examples/issue-epic.yaml`.
-3. **Concrete issues** → `issues/<KEY>.yaml`. Reference epics as
+3. **Concrete issues** → `issues/<KEY>/issue.yaml`. Reference epics as
    `parent`, reference concept nodes via `[[node-id]]` in the body.
    Required body sections: all 9 (Context, Implements, Repo scope,
    Requirements, Execution constraints, Acceptance criteria, Test

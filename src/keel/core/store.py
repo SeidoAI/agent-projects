@@ -5,8 +5,10 @@ types. It uses the parser to split frontmatter from body and the model layer
 to construct typed objects from the parsed dict.
 
 Project config is read from `<project>/project.yaml` (no body, just YAML).
-Issues live at `<project>/issues/<KEY>.yaml`.
-Comments live at `<project>/docs/issues/<KEY>/comments/<sequence>-*.yaml`.
+Issues live at `<project>/issues/<KEY>/issue.yaml` (directory layout; the
+per-issue comments, developer notes, and verification artifacts live
+alongside under `<project>/issues/<KEY>/`).
+Comments live at `<project>/issues/<KEY>/comments/<sequence>-*.yaml`.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ from pathlib import Path
 
 import yaml
 
+from keel.core import paths
 from keel.core.parser import (
     ParseError,
     parse_frontmatter_body,
@@ -25,9 +28,10 @@ from keel.models.comment import Comment
 from keel.models.issue import Issue
 from keel.models.project import ProjectConfig
 
-ISSUES_DIRNAME = "issues"
-PROJECT_CONFIG_FILENAME = "project.yaml"
-COMMENTS_DIRNAME = "comments"
+# Backwards-compatible aliases — prefer importing from `keel.core.paths`.
+ISSUES_DIRNAME = paths.ISSUES_DIR
+PROJECT_CONFIG_FILENAME = paths.PROJECT_CONFIG
+COMMENTS_DIRNAME = paths.COMMENTS_SUBDIR
 
 
 # ============================================================================
@@ -46,7 +50,7 @@ def load_project(project_dir: Path) -> ProjectConfig:
         ProjectNotFoundError: if project.yaml is missing.
         ValueError: if the file cannot be parsed.
     """
-    path = project_dir / PROJECT_CONFIG_FILENAME
+    path = paths.project_config_path(project_dir)
     if not path.exists():
         raise ProjectNotFoundError(
             f"project.yaml not found at {path}. Run `keel init` first."
@@ -61,7 +65,7 @@ def load_project(project_dir: Path) -> ProjectConfig:
 
 def save_project(project_dir: Path, config: ProjectConfig) -> None:
     """Write a ProjectConfig back to `<project_dir>/project.yaml`."""
-    path = project_dir / PROJECT_CONFIG_FILENAME
+    path = paths.project_config_path(project_dir)
     data = config.model_dump(mode="json", exclude_none=True)
     path.write_text(
         yaml.safe_dump(data, sort_keys=False, default_flow_style=False),
@@ -75,7 +79,7 @@ def save_project(project_dir: Path, config: ProjectConfig) -> None:
 
 
 def issue_path(project_dir: Path, key: str) -> Path:
-    return project_dir / ISSUES_DIRNAME / f"{key}.yaml"
+    return paths.issue_path(project_dir, key)
 
 
 def load_issue(project_dir: Path, key: str) -> Issue:
@@ -91,10 +95,13 @@ def load_issue(project_dir: Path, key: str) -> Issue:
     return Issue.model_validate({**frontmatter, "body": body})
 
 
-def save_issue(project_dir: Path, issue: Issue) -> None:
+def save_issue(project_dir: Path, issue: Issue, *, update_cache: bool = True) -> None:
     """Serialise an Issue to `<project_dir>/issues/<id>.yaml`.
 
-    Sets `updated_at` to now if it is unset.
+    Sets `updated_at` to now if it is unset. If `update_cache` is True
+    (the default), invalidates the graph cache for this file so the next
+    read sees the new state. Batch writers that invalidate explicitly at
+    the end of a transaction should pass `update_cache=False`.
     """
     if issue.updated_at is None:
         issue.updated_at = datetime.now()
@@ -106,20 +113,30 @@ def save_issue(project_dir: Path, issue: Issue) -> None:
     text = serialize_frontmatter_body(data, issue.body)
     path.write_text(text, encoding="utf-8")
 
+    if update_cache:
+        from keel.core.graph_cache import update_cache_for_file
+
+        update_cache_for_file(project_dir, str(path.relative_to(project_dir)))
+
 
 def list_issues(project_dir: Path) -> list[Issue]:
-    """Load every issue file under `<project_dir>/issues/`.
+    """Load every issue at `<project_dir>/issues/<KEY>/issue.yaml`.
 
     Files that fail to parse raise the parse error so callers can decide
     whether to skip them. The validator should be the gate that catches
     invalid files at scan time.
     """
-    issues_dir = project_dir / ISSUES_DIRNAME
+    issues_dir = paths.issues_dir(project_dir)
     if not issues_dir.is_dir():
         return []
     issues: list[Issue] = []
-    for path in sorted(issues_dir.glob("*.yaml")):
-        text = path.read_text(encoding="utf-8")
+    for idir in sorted(p for p in issues_dir.iterdir() if p.is_dir()):
+        if idir.name.startswith("."):
+            continue
+        yaml_path = idir / paths.ISSUE_FILENAME
+        if not yaml_path.is_file():
+            continue
+        text = yaml_path.read_text(encoding="utf-8")
         frontmatter, body = parse_frontmatter_body(text)
         issues.append(Issue.model_validate({**frontmatter, "body": body}))
     return issues
@@ -135,11 +152,11 @@ def issue_exists(project_dir: Path, key: str) -> bool:
 
 
 def comments_dir(project_dir: Path, issue_key: str) -> Path:
-    return project_dir / "docs" / ISSUES_DIRNAME / issue_key / COMMENTS_DIRNAME
+    return paths.comments_dir(project_dir, issue_key)
 
 
 def load_comments(project_dir: Path, issue_key: str) -> list[Comment]:
-    """Load every comment under `<project_dir>/docs/issues/<key>/comments/`."""
+    """Load every comment under `<project_dir>/issues/<key>/comments/`."""
     cdir = comments_dir(project_dir, issue_key)
     if not cdir.is_dir():
         return []
@@ -152,10 +169,13 @@ def load_comments(project_dir: Path, issue_key: str) -> list[Comment]:
 
 
 def save_comment(project_dir: Path, comment: Comment, filename: str) -> None:
-    """Save one comment under `<project_dir>/docs/issues/<key>/comments/<filename>`.
+    """Save one comment under `<project_dir>/issues/<key>/comments/<filename>`.
 
     The caller picks the filename (e.g. `001-start-2026-03-26.yaml`) so the
     sequence number convention is preserved.
+
+    Comments don't contribute to the concept graph, so the graph cache is
+    not invalidated here.
     """
     cdir = comments_dir(project_dir, comment.issue_key)
     cdir.mkdir(parents=True, exist_ok=True)

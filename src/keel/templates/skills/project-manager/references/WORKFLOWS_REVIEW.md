@@ -3,7 +3,7 @@
 The workflow for reviewing a pull request against the **project repo**
 (not a target code repo). Coding agents open PRs to the project repo
 whenever they finish an issue — these contain updates to
-`issues/<KEY>.yaml`, new concept nodes, session artifacts, and comments.
+`issues/<KEY>/issue.yaml`, new concept nodes, session artifacts, and comments.
 
 Your job is to confirm the PR meets project standards before it lands.
 
@@ -30,7 +30,7 @@ the PR's state.
 
 ### 3. Run the validation gate
 ```bash
-keel validate --strict --format=json
+keel validate --strict
 ```
 If this exits non-zero, the PR fails review. Comment on the PR with
 the specific errors from the JSON output (one line per error, with

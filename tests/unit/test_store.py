@@ -119,7 +119,7 @@ class TestIssueStore:
             verifier="none",
         )
         save_issue(tmp_path, issue)
-        assert (tmp_path / "issues" / "TST-1.yaml").exists()
+        assert (tmp_path / "issues" / "TST-1" / "issue.yaml").exists()
 
     def test_load_missing_issue_raises(self, project_dir: Path) -> None:
         with pytest.raises(FileNotFoundError):
@@ -186,7 +186,7 @@ class TestIssueStore:
         original_uuid = original.uuid
         save_issue(project_dir, original)
         # Read the raw YAML to confirm uuid is the first frontmatter field.
-        raw = (project_dir / "issues" / "TST-1.yaml").read_text()
+        raw = (project_dir / "issues" / "TST-1" / "issue.yaml").read_text()
         assert raw.startswith("---\nuuid:")
         loaded = load_issue(project_dir, "TST-1")
         assert loaded.uuid == original_uuid
@@ -224,3 +224,52 @@ class TestCommentStore:
 
     def test_load_comments_for_unknown_issue(self, project_dir: Path) -> None:
         assert load_comments(project_dir, "TST-999") == []
+
+
+# ============================================================================
+# Cache invalidation on save (Phase 2.2 of v0.5 architectural refactor)
+# ============================================================================
+
+
+class TestCacheInvalidationOnSave:
+    """save_issue and save_node (default update_cache=True) must leave
+    the graph cache consistent with what's on disk."""
+
+    def test_save_issue_updates_graph_cache(self, project_dir: Path) -> None:
+        from keel.core.graph_cache import load_index
+
+        issue = Issue(
+            id="TST-42",
+            title="Cache me",
+            status="todo",
+            priority="medium",
+            executor="ai",
+            verifier="required",
+            body="Body.\n",
+        )
+        save_issue(project_dir, issue)
+
+        cache = load_index(project_dir)
+        assert cache is not None, "save_issue should have created the cache"
+        assert "issues/TST-42/issue.yaml" in cache.files
+
+    def test_save_issue_with_update_cache_false_does_not_touch_cache(
+        self, project_dir: Path
+    ) -> None:
+        from keel.core.graph_cache import load_index
+
+        issue = Issue(
+            id="TST-99",
+            title="No cache",
+            status="todo",
+            priority="medium",
+            executor="ai",
+            verifier="required",
+            body="Body.\n",
+        )
+        save_issue(project_dir, issue, update_cache=False)
+
+        cache = load_index(project_dir)
+        # Either no cache file at all, or the cache doesn't include TST-99.
+        if cache is not None:
+            assert "issues/TST-99/issue.yaml" not in cache.files

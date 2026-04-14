@@ -93,6 +93,7 @@ def view_cmd(project_dir: Path, port: int, open_browser: bool) -> None:
     single static page. Ctrl+C to stop.
     """
     resolved = project_dir.expanduser().resolve()
+    click.echo("Building project view…")
     try:
         html = _build_page(resolved)
     except ProjectNotFoundError as exc:

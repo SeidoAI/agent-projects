@@ -22,15 +22,14 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from keel.cli._utils import require_project as _require_project
 from keel.core import graph_cache
 from keel.core.node_store import list_nodes, node_exists
 from keel.core.reference_parser import extract_references
 from keel.core.store import (
-    ProjectNotFoundError,
     issue_exists,
     list_issues,
     load_issue,
-    load_project,
 )
 
 console = Console()
@@ -38,7 +37,7 @@ console = Console()
 
 @click.group(name="refs")
 def refs_cmd() -> None:
-    """Reference inspection (list, reverse, check)."""
+    """Reference inspection (list, reverse, check, summary)."""
 
 
 # ============================================================================
@@ -375,10 +374,3 @@ def refs_summary(project_dir: Path, output_format: str) -> None:
 # ============================================================================
 # Helpers
 # ============================================================================
-
-
-def _require_project(project_dir: Path) -> None:
-    try:
-        load_project(project_dir)
-    except ProjectNotFoundError as exc:
-        raise click.ClickException(str(exc)) from exc

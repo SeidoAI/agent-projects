@@ -23,6 +23,7 @@ from keel.cli.plan import plan_cmd
 from keel.cli.refresh import refresh_cmd
 from keel.cli.refs import refs_cmd
 from keel.cli.scaffold import brief_cmd, scaffold_cmd
+from keel.cli.session import session_cmd
 from keel.cli.status import status_cmd
 from keel.cli.templates import templates_cmd
 from keel.cli.uuid_cmd import uuid_cmd
@@ -86,6 +87,7 @@ cli.add_command(graph_cmd)
 cli.add_command(refresh_cmd)
 cli.add_command(refs_cmd)
 cli.add_command(node_cmd)
+cli.add_command(session_cmd)
 cli.add_command(templates_cmd)
 cli.add_command(enums_cmd)
 cli.add_command(artifacts_cmd)

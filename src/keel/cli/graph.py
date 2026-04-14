@@ -51,9 +51,9 @@ from keel.core.store import (
     "--format",
     "output_format",
     type=click.Choice(["mermaid", "dot", "json"]),
-    default="json",
+    default="mermaid",
     show_default=True,
-    help="Output format.",
+    help="Output format. JSON is available for programmatic consumers.",
 )
 @click.option(
     "--output",
@@ -157,18 +157,19 @@ def _filter_graph_by_direction(
     if target_id not in all_ids:
         raise click.ClickException(f"Node '{target_id}' not found in graph.")
 
+    # Edge direction convention: `from_id -> to_id` means from_id *depends
+    # on* / *references* to_id (the source depends on the target).
+    #
+    #   --upstream X:   the things X depends on. Follow the outgoing
+    #                   edges of X (the forward adjacency): X -> to_id.
+    #   --downstream X: the things that depend on X. Follow the incoming
+    #                   edges of X (the reverse adjacency): from_id -> X.
     if upstream_id:
-        # upstream = nodes that this ID depends on (follow edges backwards)
-        # edge: from_id -> to_id means from_id depends on / references to_id
-        # So "upstream of X" = follow to_id from X outward
         adj: dict[str, set[str]] = {}
         for e in edges:
             adj.setdefault(e.from_id, set()).add(e.to_id)
         keep = _bfs_reachable(upstream_id, adj)
     else:
-        # downstream = nodes that depend on this ID (follow edges forward)
-        # "downstream of X" = follow from_id towards X
-        # i.e., reverse adjacency: who points TO the target?
         adj = {}
         for e in edges:
             adj.setdefault(e.to_id, set()).add(e.from_id)
@@ -232,7 +233,7 @@ def _concept_to_mermaid(result: object) -> str:
     """
     lines = ["graph LR"]
     for node in result.nodes:  # type: ignore[attr-defined]
-        label = (node.label or node.id).replace('"', "'")
+        label = _mermaid_escape_label(node.label or node.id)
         if node.kind == "node":
             lines.append(f'  {_safe_id(node.id)}(("{label}"))')
         else:
@@ -248,7 +249,7 @@ def _concept_to_dot(result: object) -> str:
     """Render a FullGraphResult as Graphviz DOT."""
     lines = ["digraph concept {", "  rankdir=LR;"]
     for node in result.nodes:  # type: ignore[attr-defined]
-        label = (node.label or node.id).replace('"', "'")
+        label = (node.label or node.id).replace('"', '\\"')
         shape = "ellipse" if node.kind == "node" else "box"
         lines.append(f'  "{node.id}" [label="{label}", shape={shape}];')
     for edge in result.edges:  # type: ignore[attr-defined]
@@ -260,3 +261,19 @@ def _concept_to_dot(result: object) -> str:
 def _safe_id(raw: str) -> str:
     """Mermaid node IDs must be alphanumeric + underscore. Replace `-` with `_`."""
     return raw.replace("-", "_").replace(".", "_")
+
+
+def _mermaid_escape_label(raw: str) -> str:
+    """Make a string safe to sit inside `["..."]` or `(("..."))` in Mermaid.
+
+    Mermaid v10+ supports `#quot;` as an HTML entity for a literal double
+    quote inside a quoted label; any other character with semantic meaning
+    (`[`, `]`, `(`, `)`) can confuse the older parser, so we replace them
+    with visually-similar alternatives rather than escape them. Newlines
+    become `<br/>` (Mermaid's in-label break).
+    """
+    out = raw
+    out = out.replace('"', "#quot;")
+    out = out.replace("\n", "<br/>")
+    out = out.replace("[", "(").replace("]", ")")
+    return out

@@ -40,10 +40,13 @@ from keel.core.key_allocator import (
 )
 @click.option(
     "--count",
-    type=click.IntRange(min=1),
+    type=click.IntRange(min=1, max=1000),
     default=1,
     show_default=True,
-    help="How many keys to allocate in a single atomic operation.",
+    help=(
+        "How many keys to allocate in a single atomic operation. "
+        "Capped at 1000 to guard against runaway agents."
+    ),
 )
 def next_key_cmd(project_dir: Path, key_type: str, count: int) -> None:
     """Atomically allocate the next sequential key(s) for this project.

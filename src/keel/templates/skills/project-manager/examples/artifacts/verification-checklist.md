@@ -28,8 +28,8 @@
 - [x] verification-checklist.md committed (this file)
 - [x] recommended-testing-plan.md committed
 - [x] post-completion-comments.md committed
-- [x] developer.md draft at `docs/issues/SEI-42/developer.md`
+- [x] developer.md draft at `issues/SEI-42/developer.md`
 
 ## PM review gate
-- [x] `keel validate --strict --format=json` exits 0
+- [x] `keel validate --strict` exits 0
 - [x] No standards violations from `standards.md`
