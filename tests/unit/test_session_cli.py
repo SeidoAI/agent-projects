@@ -170,3 +170,72 @@ class TestSessionCheck:
         assert result.exit_code != 0
         assert "blocker" in result.output.lower()
         assert "TMP-1" in result.output
+
+
+class TestSessionProgress:
+    def test_progress_aggregates_active_only(
+        self, save_test_issue, save_test_session, tmp_path_project
+    ):
+        save_test_issue(
+            tmp_path_project, key="TMP-1", kind="feat", title="One"
+        )
+        save_test_issue(
+            tmp_path_project, key="TMP-2", kind="feat", title="Two"
+        )
+        save_test_session(
+            tmp_path_project,
+            session_id="session-one",
+            issues=["TMP-1"],
+            status="implementing",
+        )
+        save_test_session(
+            tmp_path_project,
+            session_id="session-two",
+            issues=["TMP-2"],
+            status="planned",
+        )
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            ["progress", "--project-dir", str(tmp_path_project)],
+        )
+        assert result.exit_code == 0, result.output
+        assert "session-one" in result.output
+        assert "session-two" not in result.output
+
+    def test_progress_counts_tasks_from_checklist(
+        self, save_test_issue, save_test_session, tmp_path_project
+    ):
+        save_test_issue(
+            tmp_path_project, key="TMP-1", kind="feat", title="X"
+        )
+        save_test_session(
+            tmp_path_project,
+            session_id="session-x",
+            issues=["TMP-1"],
+            status="implementing",
+        )
+        checklist = (
+            tmp_path_project / "sessions" / "session-x" / "task-checklist.md"
+        )
+        checklist.write_text(
+            "- [x] one\n- [x] two\n- [ ] three\n- [ ] four\n",
+            encoding="utf-8",
+        )
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            [
+                "progress",
+                "--project-dir",
+                str(tmp_path_project),
+                "--format",
+                "json",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        import json as _json
+
+        payload = _json.loads(result.output)
+        assert payload[0]["tasks_total"] == 4
+        assert payload[0]["tasks_done"] == 2
