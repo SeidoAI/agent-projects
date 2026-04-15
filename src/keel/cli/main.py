@@ -30,6 +30,7 @@ from keel.cli.templates import templates_cmd
 from keel.cli.uuid_cmd import uuid_cmd
 from keel.cli.validate import validate_cmd
 from keel.cli.view import view_cmd
+from keel.cli.workspace import workspace_cmd
 
 # Verbose count → logging level. -v = INFO, -vv = DEBUG, default = WARNING.
 LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
@@ -95,6 +96,7 @@ cli.add_command(enums_cmd)
 cli.add_command(artifacts_cmd)
 cli.add_command(completion_cmd)
 cli.add_command(view_cmd)
+cli.add_command(workspace_cmd)
 
 
 if __name__ == "__main__":
