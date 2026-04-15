@@ -725,3 +725,207 @@ def workspace_pull_cmd(
         click.echo(f"  - {n}")
     click.echo("\nBrief generation + /pm-project-sync ship in T19.")
     raise click.exceptions.Exit(EXIT_PULL_MERGES_PENDING)
+
+
+# ============================================================================
+# push
+# ============================================================================
+
+
+@workspace_cmd.command("push")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+@click.option(
+    "--nodes",
+    default=None,
+    help="Comma-separated node ids (default: all with pending changes).",
+)
+@click.option(
+    "--dry-run", is_flag=True, default=False, help="Report without applying."
+)
+def workspace_push_cmd(
+    project_dir: Path, nodes: str | None, dry_run: bool
+) -> None:
+    """Propose project node changes upstream to workspace.
+
+    Two kinds of nodes participate:
+    1. Modified workspace-origin (origin=workspace, scope=workspace)
+    2. Promotion candidates (origin=local, scope=workspace)
+
+    Upstream divergence (another agent pushed something since our last
+    pull on the same node) causes push to refuse with exit 11.
+    """
+    import yaml as _yaml
+
+    from keel.core.node_store import list_nodes, save_node
+    from keel.core.paths import workspace_node_path
+    from keel.core.workspace_sync import MergeStatus, merge_nodes
+    from keel.core.workspace_store import update_project_push_state
+    from keel.models.node import ConceptNode
+
+    proj = project_dir.expanduser().resolve()
+    _require_project(proj)
+    ws_dir = _resolve_workspace(proj)
+
+    target_ids = set(nodes.split(",")) if nodes else None
+
+    pushes: list[tuple[str, str, dict]] = []  # (node_id, action, final_dict)
+    diverged: list[str] = []
+    collisions: list[str] = []
+
+    for node in list_nodes(proj):
+        if target_ids is not None and node.id not in target_ids:
+            continue
+
+        if node.origin == "workspace" and node.scope == "workspace":
+            # Check for local modifications + upstream divergence.
+            ours_dict = node.model_dump(mode="python")
+            try:
+                theirs_node = _load_workspace_node(ws_dir, node.id)
+            except FileNotFoundError:
+                # Deleted upstream — skip. (Handled by pull's deletion warning.)
+                continue
+            theirs_dict = theirs_node.model_dump(mode="python")
+            try:
+                base_dict = _git_show_node(
+                    ws_dir, node.workspace_sha, node.id
+                )
+            except FileNotFoundError:
+                # Stale workspace_sha — treat as diverged, user must pull/fork.
+                diverged.append(node.id)
+                continue
+
+            result = merge_nodes(
+                base=base_dict, ours=ours_dict, theirs=theirs_dict
+            )
+            if result.status is MergeStatus.CONFLICT:
+                diverged.append(node.id)
+                continue
+            if result.status is MergeStatus.NO_UPSTREAM_CHANGES:
+                pushes.append((node.id, "fast-forward", ours_dict))
+            elif result.status is MergeStatus.AUTO_MERGED:
+                pushes.append((node.id, "auto-merged", result.merged))  # type: ignore[arg-type]
+            # NO_CHANGES / FAST_FORWARD (ours==base): nothing to push.
+
+        elif node.origin == "local" and node.scope == "workspace":
+            # Promotion candidate: check for id collision in workspace.
+            if workspace_node_path(ws_dir, node.id).exists():
+                collisions.append(node.id)
+                continue
+            pushes.append((node.id, "promotion", node.model_dump(mode="python")))
+
+    if diverged:
+        click.echo("Cannot push — upstream has diverged since last pull for:")
+        for n in diverged:
+            click.echo(f"  - {n}")
+        click.echo(
+            "\nRun `keel workspace pull` first to merge upstream changes, "
+            "then push."
+        )
+        raise click.exceptions.Exit(EXIT_PUSH_UPSTREAM_DIVERGED)
+
+    if collisions:
+        click.echo("Cannot push — workspace already has these ids:")
+        for n in collisions:
+            click.echo(f"  - {n}")
+        click.echo(
+            "\nRename your local node, or pull+fork if you're intentionally "
+            "overriding."
+        )
+        raise click.exceptions.Exit(1)
+
+    if not pushes:
+        click.echo("nothing to push")
+        return
+
+    if dry_run:
+        for node_id, action, _ in pushes:
+            click.echo(f"would {action}: {node_id}")
+        return
+
+    # Write each push to the workspace working tree.
+    for node_id, _action, final_dict in pushes:
+        canonical = dict(final_dict)
+        canonical["origin"] = "workspace"
+        canonical["scope"] = "workspace"
+        # Canonical nodes in the workspace repo don't carry project-side
+        # bookkeeping.
+        for field_to_strip in (
+            "workspace_sha",
+            "workspace_pulled_at",
+        ):
+            canonical.pop(field_to_strip, None)
+
+        dest = workspace_node_path(ws_dir, node_id)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+
+        # Serialise via the shared parser's convention (frontmatter + body).
+        body = canonical.pop("body", "")
+        from keel.core.parser import serialize_frontmatter_body
+
+        # Normalise for YAML: datetimes → iso strings, UUIDs → str,
+        # anything else that doesn't round-trip through yaml.safe_dump
+        # gets coerced via json-mode dump.
+        from uuid import UUID as _UUID
+
+        clean: dict[str, object] = {}
+        for k, v in canonical.items():
+            if hasattr(v, "isoformat"):
+                clean[k] = v.isoformat()
+            elif isinstance(v, _UUID):
+                clean[k] = str(v)
+            else:
+                clean[k] = v
+        dest.write_text(
+            serialize_frontmatter_body(clean, body), encoding="utf-8"
+        )
+
+    subprocess.run(["git", "add", "nodes/"], cwd=ws_dir, check=True)
+    cfg = load_project_config(proj)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=keel",
+            "-c",
+            "user.email=keel@seido.dev",
+            "commit",
+            "-q",
+            "-m",
+            f"push: {len(pushes)} node(s) from {cfg.name}",
+        ],
+        cwd=ws_dir,
+        check=True,
+    )
+    new_sha = _git_head(ws_dir)
+
+    # Update local bookkeeping on each pushed node.
+    for node_id, action, final_dict in pushes:
+        local = dict(final_dict)
+        local.update(
+            {
+                "origin": "workspace",
+                "scope": "workspace",
+                "workspace_sha": new_sha,
+                "workspace_pulled_at": datetime.now(tz=timezone.utc),
+            }
+        )
+        save_node(proj, ConceptNode.model_validate(local), update_cache=False)
+
+    # Update workspace.yaml's last_pushed_sha for this project.
+    entry = _find_workspace_entry_for_project(ws_dir, proj)
+    if entry is not None:
+        update_project_push_state(
+            ws_dir,
+            slug=entry.slug,
+            sha=new_sha,
+            at=datetime.now(tz=timezone.utc),
+        )
+
+    for node_id, action, _ in pushes:
+        click.echo(f"✓ {node_id}: {action}")
+    click.echo(f"\n{len(pushes)} node(s) pushed; workspace at {new_sha}.")

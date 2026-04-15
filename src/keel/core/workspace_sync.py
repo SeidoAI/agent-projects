@@ -46,11 +46,31 @@ class MergeResult:
     auto_merged_fields: list[str] = field(default_factory=list)
 
 
+def _normalize(d: dict) -> dict:
+    """Drop bookkeeping + fields that are absent-equivalent.
+
+    Treats as equivalent to "missing":
+    - ``None``
+    - ``""`` (empty string — Pydantic defaults Issue.body etc. to "")
+    - ``[]`` (empty list — Pydantic defaults `related`, `tags` to [])
+    - ``{}`` (empty dict)
+
+    This lets Pydantic-hydrated dicts compare equal to raw YAML frontmatter
+    dicts that simply omit unused fields.
+    """
+    out: dict = {}
+    for k, v in d.items():
+        if k in EXCLUDED_FROM_MERGE:
+            continue
+        if v is None or v == "" or v == [] or v == {}:
+            continue
+        out[k] = v
+    return out
+
+
 def _content_equal(a: dict, b: dict) -> bool:
-    """Dict equality ignoring bookkeeping fields."""
-    ak = {k: v for k, v in a.items() if k not in EXCLUDED_FROM_MERGE}
-    bk = {k: v for k, v in b.items() if k not in EXCLUDED_FROM_MERGE}
-    return ak == bk
+    """Dict equality ignoring bookkeeping fields and absent/None/[] gaps."""
+    return _normalize(a) == _normalize(b)
 
 
 def merge_nodes(
