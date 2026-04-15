@@ -67,9 +67,7 @@ def lint_scoping(project_dir: Path, output_format: str) -> None:
     default="text",
     show_default=True,
 )
-def lint_handoff(
-    session_id: str | None, project_dir: Path, output_format: str
-) -> None:
+def lint_handoff(session_id: str | None, project_dir: Path, output_format: str) -> None:
     """Run handoff-stage lint rules (optionally for one session)."""
     _run_stage("handoff", project_dir, output_format, session_id=session_id)
 
@@ -89,9 +87,7 @@ def lint_handoff(
     default="text",
     show_default=True,
 )
-def lint_session(
-    session_id: str, project_dir: Path, output_format: str
-) -> None:
+def lint_session(session_id: str, project_dir: Path, output_format: str) -> None:
     """Run session-stage lint rules for one session."""
     _run_stage("session", project_dir, output_format, session_id=session_id)
 

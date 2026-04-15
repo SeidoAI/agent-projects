@@ -61,9 +61,7 @@ def register_rule(*, stage: LintStage, code: str, severity: LintSeverity):
     """
 
     def _wrap(func):
-        _registry.append(
-            LintRule(code=code, stage=stage, severity=severity, func=func)
-        )
+        _registry.append(LintRule(code=code, stage=stage, severity=severity, func=func))
         return func
 
     return _wrap

@@ -10,11 +10,7 @@ from pathlib import Path
 import yaml
 
 COMMANDS_DIR = (
-    Path(__file__).parent.parent.parent
-    / "src"
-    / "keel"
-    / "templates"
-    / "commands"
+    Path(__file__).parent.parent.parent / "src" / "keel" / "templates" / "commands"
 )
 
 ALLOWED_NAMES = {
@@ -58,9 +54,7 @@ COMMANDS_THAT_TAKE_ARGS = ALLOWED_NAMES - {
 
 def _load_frontmatter(path: Path) -> dict:
     text = path.read_text(encoding="utf-8")
-    assert text.startswith("---\n"), (
-        f"{path.name} missing frontmatter start delimiter"
-    )
+    assert text.startswith("---\n"), f"{path.name} missing frontmatter start delimiter"
     parts = text.split("---", 2)
     return yaml.safe_load(parts[1])
 
@@ -76,9 +70,7 @@ def test_every_file_has_name_matching_filename():
 def test_every_file_has_description():
     for path in COMMANDS_DIR.glob("pm-*.md"):
         fm = _load_frontmatter(path)
-        assert "description" in fm and fm["description"], (
-            f"{path.name}: missing or empty description"
-        )
+        assert fm.get("description"), f"{path.name}: missing or empty description"
         assert len(fm["description"]) <= 80, (
             f"{path.name}: description > 80 chars: {fm['description']!r}"
         )

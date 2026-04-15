@@ -42,12 +42,14 @@ class TestIsValidBranchName:
 
     def test_accepts_exact_max_length(self):
         from keel.core.branch_naming import MAX_BRANCH_LENGTH
+
         # feat/ = 5 chars; fill rest with 'a' up to the limit.
         slug = "a" * (MAX_BRANCH_LENGTH - len("feat/"))
         assert is_valid_branch_name(f"feat/{slug}") is True
 
     def test_rejects_one_over_max_length(self):
         from keel.core.branch_naming import MAX_BRANCH_LENGTH
+
         slug = "a" * (MAX_BRANCH_LENGTH - len("feat/") + 1)
         assert is_valid_branch_name(f"feat/{slug}") is False
 
@@ -82,4 +84,11 @@ class TestDeriveBranchName:
 
 class TestAllowedTypes:
     def test_contains_expected_set(self):
-        assert set(ALLOWED_TYPES) == {"feat", "fix", "refactor", "docs", "chore", "test"}
+        assert set(ALLOWED_TYPES) == {
+            "feat",
+            "fix",
+            "refactor",
+            "docs",
+            "chore",
+            "test",
+        }

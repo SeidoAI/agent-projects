@@ -62,15 +62,21 @@ class TestArtifactManifest:
         manifest = ArtifactManifest(
             artifacts=[
                 ArtifactEntry(
-                    name="plan", file="plan.md", template="plan.md.j2",
-                    produced_at="planning", produced_by="pm", owned_by="pm",
+                    name="plan",
+                    file="plan.md",
+                    template="plan.md.j2",
+                    produced_at="planning",
+                    produced_by="pm",
+                    owned_by="pm",
                     required=True,
                 ),
                 ArtifactEntry(
-                    name="task-checklist", file="task-checklist.md",
+                    name="task-checklist",
+                    file="task-checklist.md",
                     template="task-checklist.md.j2",
                     produced_at="implementing",
-                    produced_by="execution-agent", owned_by="execution-agent",
+                    produced_by="execution-agent",
+                    owned_by="execution-agent",
                     required=True,
                 ),
             ]

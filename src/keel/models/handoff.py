@@ -49,7 +49,5 @@ class SessionHandoff(BaseModel):
     @classmethod
     def _validate_branch(cls, v: str) -> str:
         if not is_valid_branch_name(v):
-            raise ValueError(
-                f"branch '{v}' does not match <type>/<slug> convention"
-            )
+            raise ValueError(f"branch '{v}' does not match <type>/<slug> convention")
         return v

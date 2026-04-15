@@ -152,9 +152,7 @@ def _load_manifest_for_check(project_dir: Path):
 
     manifest_path = project_dir / "templates" / "artifacts" / "manifest.yaml"
     if not manifest_path.exists():
-        raise click.ClickException(
-            f"manifest.yaml not found at {manifest_path}"
-        )
+        raise click.ClickException(f"manifest.yaml not found at {manifest_path}")
     return ArtifactManifest.model_validate(
         _yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
     )
@@ -191,9 +189,7 @@ def _compute_readiness(project_dir: Path, session_id: str) -> list[ReadinessItem
                 passing=present,
                 severity="error",
                 fix_hint=(
-                    None
-                    if present
-                    else f"Write {entry.file} from {entry.template}"
+                    None if present else f"Write {entry.file} from {entry.template}"
                 ),
             )
         )
@@ -253,7 +249,7 @@ def _compute_readiness(project_dir: Path, session_id: str) -> list[ReadinessItem
                     severity="error",
                 )
             )
-        except Exception as exc:  # noqa: BLE001 — surface parser/validation failures
+        except Exception as exc:
             items.append(
                 ReadinessItem(
                     label=f"handoff.yaml invalid: {exc}",
@@ -281,9 +277,7 @@ def _compute_readiness(project_dir: Path, session_id: str) -> list[ReadinessItem
     default="text",
     show_default=True,
 )
-def session_check_cmd(
-    session_id: str, project_dir: Path, output_format: str
-) -> None:
+def session_check_cmd(session_id: str, project_dir: Path, output_format: str) -> None:
     """Report launch-readiness for a session — no state transition."""
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
@@ -353,9 +347,7 @@ def _days_since(when: datetime | None) -> int:
     default="text",
     show_default=True,
 )
-@click.option(
-    "--focus", default=None, help="Filter by session id substring."
-)
+@click.option("--focus", default=None, help="Filter by session id substring.")
 def session_progress_cmd(
     project_dir: Path, output_format: str, focus: str | None
 ) -> None:

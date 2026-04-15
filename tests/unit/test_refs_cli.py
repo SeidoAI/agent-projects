@@ -11,9 +11,7 @@ from keel.cli.refs import refs_cmd
 
 def test_refs_check_exits_zero_on_clean_project(tmp_path_project):
     runner = CliRunner()
-    result = runner.invoke(
-        refs_cmd, ["check", "--project-dir", str(tmp_path_project)]
-    )
+    result = runner.invoke(refs_cmd, ["check", "--project-dir", str(tmp_path_project)])
     assert result.exit_code == 0, result.output
 
 
@@ -35,6 +33,4 @@ def test_refs_check_reports_broken_ref(save_test_issue, tmp_path_project):
 
     assert result.exit_code != 0, result.output
     payload = _json.loads(result.output)
-    assert any(
-        d["ref"] == "nonexistent-node" for d in payload["dangling"]
-    ), payload
+    assert any(d["ref"] == "nonexistent-node" for d in payload["dangling"]), payload

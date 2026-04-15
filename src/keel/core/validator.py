@@ -1901,9 +1901,7 @@ def check_handoff_artifact(ctx: ValidationContext) -> list[CheckResult]:
         if session.status != "queued":
             continue
 
-        handoff_file_rel = (
-            f"{paths.SESSIONS_DIR}/{session.id}/{paths.HANDOFF_FILENAME}"
-        )
+        handoff_file_rel = f"{paths.SESSIONS_DIR}/{session.id}/{paths.HANDOFF_FILENAME}"
         handoff_file = paths.handoff_path(ctx.project_dir, session.id)
         if not handoff_file.is_file():
             results.append(

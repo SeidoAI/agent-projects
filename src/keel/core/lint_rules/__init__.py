@@ -4,8 +4,10 @@ Import this package before running the linter so every rule gets
 registered. ``src/keel/cli/lint.py`` does so at module load time.
 """
 
-from . import branch_convention  # noqa: F401
-from . import gap_analysis  # noqa: F401
-from . import orphan_concepts  # noqa: F401
-from . import session_stale  # noqa: F401
-from . import unpushed_promotions  # noqa: F401
+from . import (
+    branch_convention,  # noqa: F401
+    gap_analysis,  # noqa: F401
+    orphan_concepts,  # noqa: F401
+    session_stale,  # noqa: F401
+    unpushed_promotions,  # noqa: F401
+)

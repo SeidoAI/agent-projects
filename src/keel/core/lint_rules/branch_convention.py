@@ -14,9 +14,7 @@ from keel.core.linter import LintFinding, register_rule
 from keel.core.paths import handoff_path
 
 
-@register_rule(
-    stage="handoff", code="lint/branch_convention", severity="error"
-)
+@register_rule(stage="handoff", code="lint/branch_convention", severity="error")
 def _check(ctx):
     if ctx.session_id is None:
         return

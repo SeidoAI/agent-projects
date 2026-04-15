@@ -27,9 +27,7 @@ def test_handoff_schema_required_at_queued(tmp_project_manifest):
     project_dir = tmp_project_manifest([])
     _write_session_yaml(project_dir, "session-x", "queued")
     result = validate_project(project_dir)
-    assert any(
-        f.code == "handoff_schema/required_at_queued" for f in result.findings
-    )
+    assert any(f.code == "handoff_schema/required_at_queued" for f in result.findings)
 
 
 def test_handoff_schema_planned_does_not_require_handoff(tmp_project_manifest):
@@ -62,9 +60,7 @@ branch: not-valid
 """
     )
     result = validate_project(project_dir)
-    assert any(
-        f.code == "handoff_schema/branch_format" for f in result.findings
-    )
+    assert any(f.code == "handoff_schema/branch_format" for f in result.findings)
 
 
 def test_handoff_schema_valid_handoff_no_findings(tmp_project_manifest):

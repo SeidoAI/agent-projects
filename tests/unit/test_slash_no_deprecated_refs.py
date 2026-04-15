@@ -8,11 +8,7 @@ the old names anywhere in their prose.
 from pathlib import Path
 
 COMMANDS_DIR = (
-    Path(__file__).parent.parent.parent
-    / "src"
-    / "keel"
-    / "templates"
-    / "commands"
+    Path(__file__).parent.parent.parent / "src" / "keel" / "templates" / "commands"
 )
 
 FORWARDER_FILES = {"pm-handoff.md", "pm-close.md", "pm-update.md", "pm-plan.md"}

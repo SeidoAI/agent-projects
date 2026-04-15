@@ -74,9 +74,7 @@ repos: []
     assert branch == f"feat/{slug}", branch
 
     # session check should FAIL: handoff.yaml missing.
-    check_missing = _run_keel(
-        tmp_path_project, "session", "check", session_id
-    )
+    check_missing = _run_keel(tmp_path_project, "session", "check", session_id)
     assert check_missing.returncode != 0
     assert "handoff.yaml" in check_missing.stdout.lower()
 
@@ -107,6 +105,4 @@ last_verification_passed_at: null
     # We don't insist on exit 0 because the freshly-scaffolded project
     # may have phase/heuristic findings unrelated to our session work.
     # What we do insist on: no handoff_schema/* findings in the output.
-    assert "handoff_schema/" not in validate.stdout, (
-        validate.stdout + validate.stderr
-    )
+    assert "handoff_schema/" not in validate.stdout, validate.stdout + validate.stderr

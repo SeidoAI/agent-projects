@@ -18,8 +18,7 @@ def tmp_path_project(tmp_path: Path) -> Path:
     project_dir = tmp_path / "proj"
     project_dir.mkdir()
     (project_dir / "project.yaml").write_text(
-        "name: tmp\nkey_prefix: TMP\nnext_issue_number: 1\n"
-        "next_session_number: 1\n"
+        "name: tmp\nkey_prefix: TMP\nnext_issue_number: 1\nnext_session_number: 1\n"
     )
     for sub in ("issues", "nodes", "sessions", "docs", "plans"):
         (project_dir / sub).mkdir()
@@ -141,7 +140,9 @@ def save_test_node():
 def write_handoff_yaml():
     """Factory fixture: write a minimal handoff.yaml for a session."""
 
-    def _factory(project_dir: Path, session_id: str, *, branch: str = "feat/test") -> None:
+    def _factory(
+        project_dir: Path, session_id: str, *, branch: str = "feat/test"
+    ) -> None:
         from datetime import datetime, timezone
         from uuid import uuid4
 
@@ -169,8 +170,7 @@ def tmp_project_manifest(tmp_path: Path):
         project_dir = tmp_path / "proj"
         project_dir.mkdir()
         (project_dir / "project.yaml").write_text(
-            "name: tmp\nkey_prefix: TMP\nnext_issue_number: 1\n"
-            "next_session_number: 1\n"
+            "name: tmp\nkey_prefix: TMP\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
         (project_dir / "issues").mkdir()
         (project_dir / "nodes").mkdir()

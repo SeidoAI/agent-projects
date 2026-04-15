@@ -10,9 +10,7 @@ class TestDeriveBranch:
         self, save_test_issue, save_test_session, tmp_path_project
     ):
         """derive-branch reads primary issue kind and emits <kind>/<slug>."""
-        save_test_issue(
-            tmp_path_project, key="TMP-1", kind="feat", title="Setup Infra"
-        )
+        save_test_issue(tmp_path_project, key="TMP-1", kind="feat", title="Setup Infra")
         save_test_session(
             tmp_path_project,
             session_id="session-setup-infra",
@@ -72,9 +70,7 @@ class TestSessionCheck:
     def test_session_check_reports_missing_handoff(
         self, save_test_issue, save_test_session, tmp_path_project
     ):
-        save_test_issue(
-            tmp_path_project, key="TMP-1", kind="feat", title="Setup"
-        )
+        save_test_issue(tmp_path_project, key="TMP-1", kind="feat", title="Setup")
         save_test_session(
             tmp_path_project,
             session_id="session-setup",
@@ -103,9 +99,7 @@ class TestSessionCheck:
         tmp_path_project,
         write_handoff_yaml,
     ):
-        save_test_issue(
-            tmp_path_project, key="TMP-1", kind="feat", title="Setup"
-        )
+        save_test_issue(tmp_path_project, key="TMP-1", kind="feat", title="Setup")
         save_test_session(
             tmp_path_project,
             session_id="session-setup",
@@ -113,9 +107,7 @@ class TestSessionCheck:
             plan=True,
             status="planned",
         )
-        write_handoff_yaml(
-            tmp_path_project, "session-setup", branch="feat/setup"
-        )
+        write_handoff_yaml(tmp_path_project, "session-setup", branch="feat/setup")
 
         runner = CliRunner()
         result = runner.invoke(
@@ -153,9 +145,7 @@ class TestSessionCheck:
             issues=["TMP-2"],
             plan=True,
         )
-        write_handoff_yaml(
-            tmp_path_project, "session-blocked", branch="feat/blocked"
-        )
+        write_handoff_yaml(tmp_path_project, "session-blocked", branch="feat/blocked")
 
         runner = CliRunner()
         result = runner.invoke(
@@ -176,12 +166,8 @@ class TestSessionProgress:
     def test_progress_aggregates_active_only(
         self, save_test_issue, save_test_session, tmp_path_project
     ):
-        save_test_issue(
-            tmp_path_project, key="TMP-1", kind="feat", title="One"
-        )
-        save_test_issue(
-            tmp_path_project, key="TMP-2", kind="feat", title="Two"
-        )
+        save_test_issue(tmp_path_project, key="TMP-1", kind="feat", title="One")
+        save_test_issue(tmp_path_project, key="TMP-2", kind="feat", title="Two")
         save_test_session(
             tmp_path_project,
             session_id="session-one",
@@ -206,18 +192,14 @@ class TestSessionProgress:
     def test_progress_counts_tasks_from_checklist(
         self, save_test_issue, save_test_session, tmp_path_project
     ):
-        save_test_issue(
-            tmp_path_project, key="TMP-1", kind="feat", title="X"
-        )
+        save_test_issue(tmp_path_project, key="TMP-1", kind="feat", title="X")
         save_test_session(
             tmp_path_project,
             session_id="session-x",
             issues=["TMP-1"],
             status="implementing",
         )
-        checklist = (
-            tmp_path_project / "sessions" / "session-x" / "task-checklist.md"
-        )
+        checklist = tmp_path_project / "sessions" / "session-x" / "task-checklist.md"
         checklist.write_text(
             "- [x] one\n- [x] two\n- [ ] three\n- [ ] four\n",
             encoding="utf-8",

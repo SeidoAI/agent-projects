@@ -8,4 +8,4 @@ Agents create issues, nodes, and sessions by writing files directly.
 See docs/keel-plan.md for the full design.
 """
 
-__version__ = "0.5.0"
+__version__ = "0.6.0a1"

@@ -1,8 +1,8 @@
 """Lint framework: stage dispatch, rule registration, severity exit codes."""
 
 from keel.core.linter import (
-    LintFinding,
     Linter,
+    LintFinding,
     exit_code_for,
     register_rule,
 )
@@ -55,9 +55,7 @@ class TestExitCode:
 
     def test_warning_present_exits_one(self):
         assert (
-            exit_code_for(
-                [_make_finding("x", "info"), _make_finding("y", "warning")]
-            )
+            exit_code_for([_make_finding("x", "info"), _make_finding("y", "warning")])
             == 1
         )
 

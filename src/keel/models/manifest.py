@@ -29,7 +29,7 @@ class ArtifactEntry(BaseModel):
     approval_gate: bool = False
 
     @model_validator(mode="after")
-    def _default_owned_by_to_produced_by(self) -> "ArtifactEntry":
+    def _default_owned_by_to_produced_by(self) -> ArtifactEntry:
         if self.owned_by is None:
             object.__setattr__(self, "owned_by", self.produced_by)
         return self
