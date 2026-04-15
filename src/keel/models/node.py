@@ -8,11 +8,15 @@ one node file is updated instead of N issues.
 import re
 import uuid as _uuid
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 NODE_ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]*$")
+
+NodeOrigin = Literal["workspace", "local"]
+NodeScope = Literal["workspace", "local"]
 
 
 class NodeSource(BaseModel):
@@ -65,6 +69,13 @@ class ConceptNode(BaseModel):
 
     body: str = ""
 
+    # v0.6b workspace integration fields.
+    # Existing nodes load with the defaults (local/local, no workspace_sha).
+    origin: NodeOrigin = "local"
+    scope: NodeScope = "local"
+    workspace_sha: str | None = None
+    workspace_pulled_at: datetime | None = None
+
     @field_validator("id")
     @classmethod
     def _validate_id_format(cls, v: str) -> str:
@@ -74,3 +85,12 @@ class ConceptNode(BaseModel):
                 f"(letters, digits, hyphens). Pattern: {NODE_ID_PATTERN.pattern}"
             )
         return v
+
+    @model_validator(mode="after")
+    def _workspace_sha_consistent_with_origin(self) -> "ConceptNode":
+        """workspace_sha is required iff origin=workspace."""
+        if self.origin == "workspace" and self.workspace_sha is None:
+            raise ValueError("workspace_sha is required when origin=workspace")
+        if self.origin == "local" and self.workspace_sha is not None:
+            raise ValueError("workspace_sha is forbidden when origin=local")
+        return self
