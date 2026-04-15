@@ -1089,3 +1089,75 @@ def workspace_promote_cmd(
         nodes=node_id,
         dry_run=False,
     )
+
+
+# ============================================================================
+# merge-resolve
+# ============================================================================
+
+
+@workspace_cmd.command("merge-resolve")
+@click.argument("node_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def workspace_merge_resolve_cmd(node_id: str, project_dir: Path) -> None:
+    """Finalize an agent-resolved merge.
+
+    Validates the resolved node against the schema, bumps its
+    workspace_sha to the current workspace HEAD, and deletes the
+    merge brief. If validation fails, the brief is preserved so the
+    agent can fix the node and retry.
+    """
+    from keel.core.merge_brief import (
+        delete_merge_brief,
+        list_pending_briefs,
+        load_merge_brief,
+    )
+    from keel.core.node_store import load_node, save_node
+
+    proj = project_dir.expanduser().resolve()
+    _require_project(proj)
+    ws_dir = _resolve_workspace(proj)
+
+    brief = load_merge_brief(proj, node_id)
+    if brief is None:
+        raise click.ClickException(
+            f"no pending merge brief for '{node_id}' at "
+            f".keel/merge-briefs/{node_id}.yaml"
+        )
+
+    try:
+        node = load_node(proj, node_id)
+    except Exception as exc:  # noqa: BLE001 — surface any parse/validate error
+        raise click.ClickException(
+            f"node '{node_id}' failed to load after resolve: {exc}. "
+            "Brief preserved — fix the node file and retry."
+        ) from exc
+
+    workspace_head = _git_head(ws_dir)
+    resolved = node.model_copy(
+        update={
+            "origin": "workspace",
+            "scope": "workspace",
+            "workspace_sha": workspace_head,
+            "workspace_pulled_at": datetime.now(tz=timezone.utc),
+        }
+    )
+    save_node(proj, resolved, update_cache=False)
+    delete_merge_brief(proj, node_id)
+
+    click.echo(f"✓ {node_id}: resolved")
+    click.echo(f"  workspace_sha → {workspace_head}")
+    click.echo("  brief deleted")
+
+    remaining = list_pending_briefs(proj)
+    if remaining:
+        click.echo(
+            f"\n{len(remaining)} brief(s) still pending: {', '.join(remaining)}"
+        )
+    else:
+        click.echo("\nAll merges resolved. Pull complete.")
