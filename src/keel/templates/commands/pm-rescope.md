@@ -1,6 +1,6 @@
 ---
 name: pm-rescope
-description: Expand the scope of an existing project with new intent or newly-added planning docs.
+description: Expand an existing project's scope with new intent or planning docs.
 argument-hint: "<free-text new-scope description, optional path to new planning docs>"
 ---
 

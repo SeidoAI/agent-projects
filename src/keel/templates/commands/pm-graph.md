@@ -1,6 +1,6 @@
 ---
 name: pm-graph
-description: Analyse the dependency and concept graph — components, critical path, parallelizable work.
+description: Analyse the dependency or concept graph for critical path and cycles.
 argument-hint: "[deps|concept]"
 ---
 

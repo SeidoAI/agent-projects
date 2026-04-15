@@ -1,6 +1,6 @@
 ---
 name: pm-triage
-description: Process inbound suggestions, comments, and messages and convert them into project changes.
+description: Process inbound suggestions and convert them into project changes.
 argument-hint: "[optional item ID, or blank for all pending]"
 ---
 

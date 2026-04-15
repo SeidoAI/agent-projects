@@ -25,18 +25,27 @@ from keel.templates import get_templates_dir
 COMMANDS_DIR = get_templates_dir() / "commands"
 
 EXPECTED_COMMANDS: tuple[str, ...] = (
+    # v0.6a retained + renamed + new commands:
     "pm-agenda",
-    "pm-plan",
-    "pm-scope",
-    "pm-update",
-    "pm-triage",
-    "pm-review",
-    "pm-status",
+    "pm-edit",
     "pm-graph",
-    "pm-validate",
-    "pm-handoff",
+    "pm-issue-close",
+    "pm-lint",
     "pm-rescope",
+    "pm-review",
+    "pm-scope",
+    "pm-session-check",
+    "pm-session-create",
+    "pm-session-launch",
+    "pm-session-progress",
+    "pm-status",
+    "pm-triage",
+    "pm-validate",
+    # Deprecated forwarders (still shipped in v0.6a, removed in v0.7):
     "pm-close",
+    "pm-handoff",
+    "pm-plan",
+    "pm-update",
 )
 
 REQUIRED_FRONTMATTER_FIELDS: tuple[str, ...] = ("name", "description", "argument-hint")
