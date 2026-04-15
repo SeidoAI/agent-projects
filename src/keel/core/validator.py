@@ -1880,6 +1880,124 @@ def check_phase_requirements(ctx: ValidationContext) -> list[CheckResult]:
 
 
 # ============================================================================
+# Handoff artifact (v0.6a)
+# ============================================================================
+
+
+def check_handoff_artifact(ctx: ValidationContext) -> list[CheckResult]:
+    """v0.6a: sessions in ``queued`` state require a valid handoff.yaml.
+
+    Three possible findings:
+    - ``handoff_schema/required_at_queued`` — session queued but file missing.
+    - ``handoff_schema/branch_format`` — handoff.yaml.branch violates
+      the ``<type>/<slug>`` convention (extracted via raw YAML parse so
+      malformed branches surface cleanly, not as generic schema errors).
+    - ``handoff_schema/malformed`` — any other parse/schema failure.
+    """
+    results: list[CheckResult] = []
+
+    for entity in ctx.sessions:
+        session: AgentSession = entity.model
+        if session.status != "queued":
+            continue
+
+        handoff_file_rel = (
+            f"{paths.SESSIONS_DIR}/{session.id}/{paths.HANDOFF_FILENAME}"
+        )
+        handoff_file = paths.handoff_path(ctx.project_dir, session.id)
+        if not handoff_file.is_file():
+            results.append(
+                CheckResult(
+                    code="handoff_schema/required_at_queued",
+                    severity="error",
+                    file=handoff_file_rel,
+                    message=(
+                        f"Session {session.id!r} is queued but handoff.yaml "
+                        "is missing — launch requires a structured handoff "
+                        "artifact."
+                    ),
+                    fix_hint=(
+                        "Run `/pm-session-launch` which creates handoff.yaml, "
+                        "or write sessions/<id>/handoff.yaml manually."
+                    ),
+                )
+            )
+            continue
+
+        # Check branch format via raw YAML parse first so malformed branch
+        # strings surface as handoff_schema/branch_format (the specific code
+        # callers expect), not as a generic Pydantic ValidationError.
+        try:
+            text = handoff_file.read_text(encoding="utf-8")
+            frontmatter, _body = parse_frontmatter_body(text)
+        except (ParseError, OSError) as exc:
+            results.append(
+                CheckResult(
+                    code="handoff_schema/malformed",
+                    severity="error",
+                    file=handoff_file_rel,
+                    message=f"handoff.yaml failed to parse: {exc}",
+                )
+            )
+            continue
+
+        branch = frontmatter.get("branch") if isinstance(frontmatter, dict) else None
+        if isinstance(branch, str):
+            from keel.core.branch_naming import is_valid_branch_name
+
+            if not is_valid_branch_name(branch):
+                results.append(
+                    CheckResult(
+                        code="handoff_schema/branch_format",
+                        severity="error",
+                        file=handoff_file_rel,
+                        field="branch",
+                        message=(
+                            f"handoff.yaml.branch {branch!r} does not match "
+                            "the <type>/<slug> convention."
+                        ),
+                        fix_hint=(
+                            "Run `keel session derive-branch <session-id>` "
+                            "and copy its output."
+                        ),
+                    )
+                )
+                continue
+
+        # Pydantic validation catches any other schema problems (missing
+        # required fields, bad types). The branch validator inside
+        # SessionHandoff raises the same branch-format error, but this
+        # function already handled that code above, so any ValidationError
+        # here is structural.
+        try:
+            from keel.core.handoff_store import load_handoff
+
+            load_handoff(ctx.project_dir, session.id)
+        except ValidationError as exc:
+            results.append(
+                CheckResult(
+                    code="handoff_schema/malformed",
+                    severity="error",
+                    file=handoff_file_rel,
+                    message=f"handoff.yaml schema validation failed: {exc}",
+                )
+            )
+        except ValueError as exc:
+            # branch format (caught again via SessionHandoff validator) or
+            # unparseable YAML.
+            results.append(
+                CheckResult(
+                    code="handoff_schema/malformed",
+                    severity="error",
+                    file=handoff_file_rel,
+                    message=str(exc),
+                )
+            )
+
+    return results
+
+
+# ============================================================================
 # Quality consistency (anti-fatigue)
 # ============================================================================
 
@@ -2007,6 +2125,7 @@ ALL_CHECKS = [
     check_project_standards,
     check_coverage_heuristics,
     check_phase_requirements,
+    check_handoff_artifact,
     check_quality_consistency,
 ]
 

@@ -91,6 +91,9 @@ SESSION_FILENAME = "session.yaml"
 SESSION_PLAN = "plan.md"
 SESSION_ARTIFACTS_SUBDIR = "artifacts"
 
+# Handoff record written at session launch (v0.6a): sessions/<id>/handoff.yaml.
+HANDOFF_FILENAME = "handoff.yaml"
+
 # Issues are directories: `issues/<KEY>/issue.yaml` plus `comments/`,
 # `developer.md`, `verified.md` alongside. Enforced by `keel.core.store`
 # since Phase 4.
@@ -163,6 +166,11 @@ def session_plan_path(project_dir: Path, session_id: str) -> Path:
 
 def session_artifacts_dir(project_dir: Path, session_id: str) -> Path:
     return session_dir(project_dir, session_id) / SESSION_ARTIFACTS_SUBDIR
+
+
+def handoff_path(project_dir: Path, session_id: str) -> Path:
+    """Path to sessions/<session_id>/handoff.yaml (v0.6a)."""
+    return session_dir(project_dir, session_id) / HANDOFF_FILENAME
 
 
 def graph_cache_path(project_dir: Path) -> Path:
