@@ -55,20 +55,26 @@ def parse_branch_name(name: str) -> tuple[str, str]:
 def derive_branch_name(session_id: str, primary_issue_kind: str) -> str:
     """Build the canonical branch name from session id + primary issue kind.
 
-    The session id has its "session-" prefix stripped if present. The kind
-    must be one of ALLOWED_TYPES; other kinds (e.g. "epic") have no
-    canonical branch and raise BranchNameError.
+    Normalises the session id to a branch slug:
+    - strips any "session-" prefix
+    - lowercases (git accepts uppercase but convention is lowercase,
+      and session keys allocated via `keel next-key --type session`
+      look like "TST-S1" — uppercase with hyphens)
+
+    The kind must be one of ALLOWED_TYPES; other kinds (e.g. "epic")
+    have no canonical branch and raise BranchNameError.
     """
     if primary_issue_kind not in ALLOWED_TYPES:
         raise BranchNameError(
             f"issue kind '{primary_issue_kind}' has no branch type "
             f"(allowed kinds: {ALLOWED_TYPES})"
         )
-    slug = session_id.removeprefix(SESSION_ID_PREFIX)
+    slug = session_id.removeprefix(SESSION_ID_PREFIX).lower()
     candidate = f"{primary_issue_kind}/{slug}"
     if not is_valid_branch_name(candidate):
         raise BranchNameError(
-            f"derived branch '{candidate}' invalid — session id '{session_id}' "
-            "must yield a lowercase hyphen-only slug"
+            f"derived branch '{candidate}' invalid — session id "
+            f"'{session_id}' must yield a hyphen-only slug after "
+            "lowercasing and prefix stripping."
         )
     return candidate

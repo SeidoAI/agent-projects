@@ -74,6 +74,11 @@ class TestDeriveBranchName:
         with pytest.raises(BranchNameError):
             derive_branch_name("session-x", "epic")
 
+    def test_lowercases_uppercase_session_key(self):
+        """`keel next-key --type session` emits keys like 'TST-S1' (uppercase).
+        Derive must lowercase the slug so the result matches convention."""
+        assert derive_branch_name("TST-S1", "feat") == "feat/tst-s1"
+
 
 class TestAllowedTypes:
     def test_contains_expected_set(self):
