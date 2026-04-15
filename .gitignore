@@ -43,3 +43,6 @@ coverage.xml
 # Project-specific
 # (none yet)
 tmp/
+
+# Worktrees
+.worktrees/
