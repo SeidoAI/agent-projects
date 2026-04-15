@@ -39,6 +39,11 @@ class Issue(BaseModel):
     executor: str
     verifier: str
 
+    # Conventional-commits-style kind. Optional; used by
+    # `keel session derive-branch` to emit the canonical <type>/<slug>
+    # branch name. Valid values track keel.core.branch_naming.ALLOWED_TYPES.
+    kind: str | None = None
+
     agent: str | None = None
     labels: list[str] = Field(default_factory=list)
     parent: str | None = None

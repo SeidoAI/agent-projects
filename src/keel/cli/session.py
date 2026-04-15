@@ -135,6 +135,46 @@ def session_show_cmd(session_id: str, project_dir: Path, output_format: str) -> 
     click.echo(yaml_path.read_text(encoding="utf-8"))
 
 
+@session_cmd.command("derive-branch")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_derive_branch_cmd(session_id: str, project_dir: Path) -> None:
+    """Print the canonical branch name for a session.
+
+    Format: <kind>/<session-slug> where kind is the primary issue's
+    kind (first item in session.yaml.issues).
+    """
+    from keel.core.branch_naming import BranchNameError, derive_branch_name
+    from keel.core.store import load_issue
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session '{session_id}' not found") from exc
+    if not session.issues:
+        raise click.ClickException(
+            f"session '{session_id}' has no issues; cannot derive branch"
+        )
+    primary_key = session.issues[0]
+    try:
+        issue = load_issue(resolved, primary_key)
+    except FileNotFoundError as exc:
+        raise click.ClickException(
+            f"primary issue '{primary_key}' not found for session '{session_id}'"
+        ) from exc
+    try:
+        click.echo(derive_branch_name(session_id, issue.kind))
+    except BranchNameError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
 # Alias `keel session artifacts <id>` to the existing `keel artifacts list <id>`.
 # Exposes session-related commands in one place instead of making users
 # remember that artifact browsing sits under a separate top-level command.
