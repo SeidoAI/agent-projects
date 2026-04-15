@@ -423,8 +423,7 @@ def _link_to_workspace(
     )
     if link_result.returncode != 0:
         raise InitError(
-            f"Failed to link to workspace at {workspace_path}:\n"
-            f"{link_result.stderr}"
+            f"Failed to link to workspace at {workspace_path}:\n{link_result.stderr}"
         )
 
     console.print(
@@ -452,9 +451,7 @@ def _link_to_workspace(
                 f"[yellow]Warning: failed to copy nodes: {copy_result.stderr}[/yellow]"
             )
         else:
-            console.print(
-                f"[dim]✓ Copied {len(node_ids)} node(s) from workspace[/dim]"
-            )
+            console.print(f"[dim]✓ Copied {len(node_ids)} node(s) from workspace[/dim]")
 
 
 @click.command(name="init")

@@ -93,9 +93,7 @@ class TestWorkspacePushTrivial:
             update_cache=False,
         )
 
-        result = runner.invoke(
-            workspace_cmd, ["push", "--project-dir", str(proj_dir)]
-        )
+        result = runner.invoke(workspace_cmd, ["push", "--project-dir", str(proj_dir)])
         assert result.exit_code == 0, result.output
 
         # Workspace repo should now reflect the edit.
@@ -123,9 +121,7 @@ class TestWorkspacePushTrivial:
         # Create a local node marked for promotion.
         save_test_node(proj_dir, node_id="webhook-handler", scope="workspace")
 
-        result = runner.invoke(
-            workspace_cmd, ["push", "--project-dir", str(proj_dir)]
-        )
+        result = runner.invoke(workspace_cmd, ["push", "--project-dir", str(proj_dir)])
         assert result.exit_code == 0, result.output
 
         # Workspace should now have the new node.
@@ -159,9 +155,7 @@ class TestWorkspacePushTrivial:
         # Local node with same id as the already-existing workspace node.
         save_test_node(proj_dir, node_id="auth-system", scope="workspace")
 
-        result = runner.invoke(
-            workspace_cmd, ["push", "--project-dir", str(proj_dir)]
-        )
+        result = runner.invoke(workspace_cmd, ["push", "--project-dir", str(proj_dir)])
         assert result.exit_code != 0, result.output
         assert "collision" in result.output.lower() or "auth-system" in result.output
 
@@ -183,8 +177,6 @@ class TestWorkspacePushTrivial:
             ["copy", "auth-system", "--project-dir", str(proj_dir)],
         )
 
-        result = runner.invoke(
-            workspace_cmd, ["push", "--project-dir", str(proj_dir)]
-        )
+        result = runner.invoke(workspace_cmd, ["push", "--project-dir", str(proj_dir)])
         assert result.exit_code == 0, result.output
         assert "nothing to push" in result.output.lower()

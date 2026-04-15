@@ -80,6 +80,10 @@ class TestMergeEngine:
         theirs = _node_dict(description="Shared change.")
         result = merge_nodes(base=base, ours=ours, theirs=theirs)
         # Since ours == theirs on this field, no conflict; either is fine.
-        assert result.status in (MergeStatus.AUTO_MERGED, MergeStatus.FAST_FORWARD, MergeStatus.NO_UPSTREAM_CHANGES)
+        assert result.status in (
+            MergeStatus.AUTO_MERGED,
+            MergeStatus.FAST_FORWARD,
+            MergeStatus.NO_UPSTREAM_CHANGES,
+        )
         assert result.merged is not None
         assert result.merged["description"] == "Shared change."

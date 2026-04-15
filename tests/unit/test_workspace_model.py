@@ -14,16 +14,16 @@ def _now():
 
 
 def _minimal_workspace(**kwargs):
-    defaults = dict(
-        uuid=uuid4(),
-        name="Seido",
-        slug="seido",
-        description="",
-        schema_version=1,
-        keel_version="0.6.0",
-        created_at=_now(),
-        updated_at=_now(),
-    )
+    defaults = {
+        "uuid": uuid4(),
+        "name": "Seido",
+        "slug": "seido",
+        "description": "",
+        "schema_version": 1,
+        "keel_version": "0.6.0",
+        "created_at": _now(),
+        "updated_at": _now(),
+    }
     defaults.update(kwargs)
     return Workspace(**defaults)
 

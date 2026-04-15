@@ -10,15 +10,15 @@ from keel.models.node import ConceptNode
 
 
 def _base_node(**overrides):
-    defaults = dict(
-        uuid=uuid4(),
-        id="test-node",
-        type="concept",
-        name="Test",
-        status="active",
-        created_at=datetime.now(tz=timezone.utc),
-        updated_at=datetime.now(tz=timezone.utc),
-    )
+    defaults = {
+        "uuid": uuid4(),
+        "id": "test-node",
+        "type": "concept",
+        "name": "Test",
+        "status": "active",
+        "created_at": datetime.now(tz=timezone.utc),
+        "updated_at": datetime.now(tz=timezone.utc),
+    }
     defaults.update(overrides)
     return ConceptNode(**defaults)
 

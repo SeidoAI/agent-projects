@@ -13,13 +13,26 @@ from keel.core.paths import workspace_nodes_dir
 def _git_commit_all(repo: Path, message: str) -> str:
     subprocess.run(["git", "add", "."], cwd=repo, check=True)
     subprocess.run(
-        ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-         "commit", "-q", "-m", message],
-        cwd=repo, check=True,
+        [
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "-m",
+            message,
+        ],
+        cwd=repo,
+        check=True,
     )
     return subprocess.run(
         ["git", "rev-parse", "--short", "HEAD"],
-        cwd=repo, check=True, capture_output=True, text=True,
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
 
 
@@ -45,6 +58,7 @@ tags: []
         )
         subprocess.run(["git", "init", "-q"], cwd=ws_dir, check=True)
         return _git_commit_all(ws_dir, "add auth-system")
+
     return _factory
 
 
@@ -57,10 +71,13 @@ class TestFork:
         proj_dir = fresh_project(tmp_path / "proj", name="x", key_prefix="X")
 
         runner = CliRunner()
-        runner.invoke(workspace_cmd,
-                      ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"])
-        runner.invoke(workspace_cmd,
-                      ["copy", "auth-system", "--project-dir", str(proj_dir)])
+        runner.invoke(
+            workspace_cmd,
+            ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"],
+        )
+        runner.invoke(
+            workspace_cmd, ["copy", "auth-system", "--project-dir", str(proj_dir)]
+        )
 
         result = runner.invoke(
             workspace_cmd,
@@ -69,6 +86,7 @@ class TestFork:
         assert result.exit_code == 0, result.output
 
         from keel.core.node_store import load_node
+
         node = load_node(proj_dir, "auth-system")
         assert node.origin == "workspace"  # preserved for audit
         assert node.scope == "local"  # flipped
@@ -83,15 +101,20 @@ class TestFork:
         save_test_node(proj_dir, node_id="local-only")
 
         runner = CliRunner()
-        runner.invoke(workspace_cmd,
-                      ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"])
+        runner.invoke(
+            workspace_cmd,
+            ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"],
+        )
 
         result = runner.invoke(
             workspace_cmd,
             ["fork", "local-only", "--project-dir", str(proj_dir)],
         )
         assert result.exit_code != 0
-        assert "local" in result.output.lower() or "nothing to fork" in result.output.lower()
+        assert (
+            "local" in result.output.lower()
+            or "nothing to fork" in result.output.lower()
+        )
 
     def test_fork_idempotent_on_already_forked(
         self, tmp_path, workspace_with_auth, fresh_project
@@ -101,12 +124,16 @@ class TestFork:
         proj_dir = fresh_project(tmp_path / "proj", name="x", key_prefix="X")
 
         runner = CliRunner()
-        runner.invoke(workspace_cmd,
-                      ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"])
-        runner.invoke(workspace_cmd,
-                      ["copy", "auth-system", "--project-dir", str(proj_dir)])
-        runner.invoke(workspace_cmd,
-                      ["fork", "auth-system", "--project-dir", str(proj_dir)])
+        runner.invoke(
+            workspace_cmd,
+            ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"],
+        )
+        runner.invoke(
+            workspace_cmd, ["copy", "auth-system", "--project-dir", str(proj_dir)]
+        )
+        runner.invoke(
+            workspace_cmd, ["fork", "auth-system", "--project-dir", str(proj_dir)]
+        )
 
         # Second fork should be a no-op success.
         result = runner.invoke(
@@ -134,8 +161,10 @@ class TestPromote:
         save_test_node(proj_dir, node_id="webhook-handler")
 
         runner = CliRunner()
-        runner.invoke(workspace_cmd,
-                      ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"])
+        runner.invoke(
+            workspace_cmd,
+            ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"],
+        )
 
         result = runner.invoke(
             workspace_cmd,
@@ -147,6 +176,7 @@ class TestPromote:
         assert (workspace_nodes_dir(ws_dir) / "webhook-handler.yaml").is_file()
 
         from keel.core.node_store import load_node
+
         node = load_node(proj_dir, "webhook-handler")
         assert node.origin == "workspace"
         assert node.scope == "workspace"
@@ -161,8 +191,10 @@ class TestPromote:
         save_test_node(proj_dir, node_id="auth-system")  # collides
 
         runner = CliRunner()
-        runner.invoke(workspace_cmd,
-                      ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"])
+        runner.invoke(
+            workspace_cmd,
+            ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"],
+        )
 
         result = runner.invoke(
             workspace_cmd,
@@ -178,10 +210,13 @@ class TestPromote:
         proj_dir = fresh_project(tmp_path / "proj", name="x", key_prefix="X")
 
         runner = CliRunner()
-        runner.invoke(workspace_cmd,
-                      ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"])
-        runner.invoke(workspace_cmd,
-                      ["copy", "auth-system", "--project-dir", str(proj_dir)])
+        runner.invoke(
+            workspace_cmd,
+            ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"],
+        )
+        runner.invoke(
+            workspace_cmd, ["copy", "auth-system", "--project-dir", str(proj_dir)]
+        )
 
         result = runner.invoke(
             workspace_cmd,

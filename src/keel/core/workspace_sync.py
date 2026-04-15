@@ -89,9 +89,7 @@ def merge_nodes(
         return MergeResult(status=MergeStatus.FAST_FORWARD, merged=dict(theirs))
 
     if _content_equal(theirs, base):
-        return MergeResult(
-            status=MergeStatus.NO_UPSTREAM_CHANGES, merged=dict(ours)
-        )
+        return MergeResult(status=MergeStatus.NO_UPSTREAM_CHANGES, merged=dict(ours))
 
     # Both sides diverged from base. Check field-by-field.
     all_keys = (set(base) | set(ours) | set(theirs)) - EXCLUDED_FROM_MERGE

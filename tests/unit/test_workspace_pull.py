@@ -5,17 +5,13 @@ once T19 wires brief generation in.
 """
 
 import subprocess
-from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
 
 import pytest
 from click.testing import CliRunner
 
 from keel.cli.workspace import workspace_cmd
 from keel.core.paths import workspace_nodes_dir
-from keel.core.workspace_store import save_workspace
-from keel.models.workspace import Workspace
 
 
 def _git_commit_all(repo: Path, message: str) -> str:
@@ -90,9 +86,7 @@ class TestWorkspacePullTrivial:
             workspace_cmd,
             ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"],
         )
-        result = runner.invoke(
-            workspace_cmd, ["pull", "--project-dir", str(proj_dir)]
-        )
+        result = runner.invoke(workspace_cmd, ["pull", "--project-dir", str(proj_dir)])
         assert result.exit_code == 0, result.output
 
     def test_pull_fast_forwards_unchanged_local(
@@ -134,9 +128,7 @@ tags: []
         new_sha = _git_commit_all(ws_dir, "update auth-system to v2")
 
         # Pull.
-        result = runner.invoke(
-            workspace_cmd, ["pull", "--project-dir", str(proj_dir)]
-        )
+        result = runner.invoke(workspace_cmd, ["pull", "--project-dir", str(proj_dir)])
         assert result.exit_code == 0, result.output
 
         # Local copy should reflect v2 now, with workspace_sha bumped.
@@ -190,9 +182,7 @@ tags: []
         )
         _git_commit_all(ws_dir, "update")
 
-        result = runner.invoke(
-            workspace_cmd, ["pull", "--project-dir", str(proj_dir)]
-        )
+        result = runner.invoke(workspace_cmd, ["pull", "--project-dir", str(proj_dir)])
         assert result.exit_code == 0, result.output
 
         # Forked node unchanged.
@@ -237,9 +227,7 @@ tags: []
             encoding="utf-8",
         )
         head_sha = _git_commit_all(ws_dir, "update")
-        runner.invoke(
-            workspace_cmd, ["pull", "--project-dir", str(proj_dir)]
-        )
+        runner.invoke(workspace_cmd, ["pull", "--project-dir", str(proj_dir)])
 
         from keel.core.workspace_store import load_workspace
 

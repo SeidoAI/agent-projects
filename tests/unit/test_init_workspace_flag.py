@@ -15,9 +15,12 @@ from keel.core.workspace_store import load_workspace
 def _init_args(target, **overrides):
     args = [
         str(target),
-        "--name", overrides.get("name", "test-proj"),
-        "--key-prefix", overrides.get("key_prefix", "TST"),
-        "--base-branch", overrides.get("base_branch", "main"),
+        "--name",
+        overrides.get("name", "test-proj"),
+        "--key-prefix",
+        overrides.get("key_prefix", "TST"),
+        "--base-branch",
+        overrides.get("base_branch", "main"),
         "--non-interactive",
     ]
     if "workspace" in overrides:
@@ -30,13 +33,26 @@ def _init_args(target, **overrides):
 def _git_commit_all(repo: Path, message: str = "init") -> str:
     subprocess.run(["git", "add", "."], cwd=repo, check=True)
     subprocess.run(
-        ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-         "commit", "-q", "-m", message],
-        cwd=repo, check=True,
+        [
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "-m",
+            message,
+        ],
+        cwd=repo,
+        check=True,
     )
     return subprocess.run(
         ["git", "rev-parse", "--short", "HEAD"],
-        cwd=repo, check=True, capture_output=True, text=True,
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
 
 
@@ -62,6 +78,7 @@ tags: []
         )
         subprocess.run(["git", "init", "-q"], cwd=ws_dir, check=True)
         return _git_commit_all(ws_dir, f"add {node_id}")
+
     return _factory
 
 
@@ -83,9 +100,7 @@ class TestInitWithWorkspace:
         target = tmp_path / "p"
 
         runner = CliRunner()
-        result = runner.invoke(
-            init_cmd, _init_args(target, workspace=ws_dir)
-        )
+        result = runner.invoke(init_cmd, _init_args(target, workspace=ws_dir))
         assert result.exit_code == 0, result.output
 
         cfg = load_project(target)
@@ -107,14 +122,13 @@ class TestInitWithWorkspace:
         assert result.exit_code == 0, result.output
 
         from keel.core.node_store import list_nodes
+
         nodes = list_nodes(target)
         assert any(n.id == "auth-system" for n in nodes)
 
     def test_init_copy_nodes_requires_workspace(self, tmp_path):
         target = tmp_path / "p"
         runner = CliRunner()
-        result = runner.invoke(
-            init_cmd, _init_args(target, copy_nodes="auth-system")
-        )
+        result = runner.invoke(init_cmd, _init_args(target, copy_nodes="auth-system"))
         assert result.exit_code != 0
         assert "workspace" in result.output.lower()

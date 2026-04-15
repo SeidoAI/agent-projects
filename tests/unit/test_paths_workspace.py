@@ -24,9 +24,7 @@ def test_workspace_lock_path_reuses_project_lock_filename():
 
 
 def test_merge_briefs_dir():
-    assert paths.merge_briefs_dir(Path("/proj")) == Path(
-        "/proj/.keel/merge-briefs"
-    )
+    assert paths.merge_briefs_dir(Path("/proj")) == Path("/proj/.keel/merge-briefs")
 
 
 def test_merge_brief_path():

@@ -18,7 +18,7 @@ def _has_linked_workspace(ctx) -> bool:
         from keel.core.store import load_project
 
         cfg = load_project(ctx.project_dir)
-    except Exception:  # noqa: BLE001 — malformed project.yaml; treat as no link
+    except Exception:
         return False
     if cfg.workspace is None:
         return False

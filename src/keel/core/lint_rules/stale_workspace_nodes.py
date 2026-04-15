@@ -17,7 +17,7 @@ from keel.core.store import load_project
 def _check(ctx):
     try:
         cfg = load_project(ctx.project_dir)
-    except Exception:  # noqa: BLE001 — project might be malformed; skip lint
+    except Exception:
         return
     if cfg.workspace is None:
         return
@@ -26,15 +26,13 @@ def _check(ctx):
         return  # unreachable or orphan — other rules handle that
 
     try:
-        head = (
-            subprocess.run(
-                ["git", "rev-parse", "--short", "HEAD"],
-                cwd=ws_dir,
-                capture_output=True,
-                text=True,
-                check=True,
-            ).stdout.strip()
-        )
+        head = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=ws_dir,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
     except subprocess.CalledProcessError:
         return
 
@@ -46,8 +44,7 @@ def _check(ctx):
                 code="lint/stale_workspace_nodes",
                 severity="warning",
                 message=(
-                    f"node {n.id}: workspace_sha {n.workspace_sha} behind "
-                    f"HEAD {head}"
+                    f"node {n.id}: workspace_sha {n.workspace_sha} behind HEAD {head}"
                 ),
                 file=f"nodes/{n.id}.yaml",
                 fix_hint="Run /pm-project-sync or `keel workspace pull`.",

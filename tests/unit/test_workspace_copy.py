@@ -44,7 +44,9 @@ def _git_commit_all(repo: Path, message: str = "test commit") -> str:
 def workspace_with_node():
     """Factory: create a workspace with a committed canonical node."""
 
-    def _factory(ws_dir: Path, node_id: str = "auth-system", description: str = "Original.") -> str:
+    def _factory(
+        ws_dir: Path, node_id: str = "auth-system", description: str = "Original."
+    ) -> str:
         ws_dir.mkdir(parents=True, exist_ok=True)
         workspace_nodes_dir(ws_dir).mkdir(parents=True, exist_ok=True)
         now = datetime.now(tz=timezone.utc)

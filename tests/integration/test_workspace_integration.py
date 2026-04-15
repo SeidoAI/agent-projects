@@ -11,10 +11,6 @@ import subprocess
 import threading
 from pathlib import Path
 
-import pytest
-import yaml
-
-
 # ============================================================================
 # Helpers
 # ============================================================================
@@ -35,25 +31,46 @@ def _run_keel(
 def _git_commit_all(repo: Path, message: str = "update") -> str:
     subprocess.run(["git", "add", "."], cwd=repo, check=True)
     subprocess.run(
-        ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-         "commit", "-q", "-m", message],
-        cwd=repo, check=True,
+        [
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "-m",
+            message,
+        ],
+        cwd=repo,
+        check=True,
     )
     return subprocess.run(
         ["git", "rev-parse", "--short", "HEAD"],
-        cwd=repo, check=True, capture_output=True, text=True,
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
 
 
 def _bootstrap_workspace_with_node(
-    tmp_path: Path, ws_name: str = "ws", node_id: str = "auth-system",
+    tmp_path: Path,
+    ws_name: str = "ws",
+    node_id: str = "auth-system",
     description: str = "v1",
 ) -> Path:
     ws_dir = tmp_path / ws_name
     r = _run_keel(
-        tmp_path, "workspace", "init",
-        "--name", ws_name, "--slug", ws_name,
-        "--workspace-dir", str(ws_dir),
+        tmp_path,
+        "workspace",
+        "init",
+        "--name",
+        ws_name,
+        "--slug",
+        ws_name,
+        "--workspace-dir",
+        str(ws_dir),
     )
     assert r.returncode == 0, r.stdout + r.stderr
 
@@ -89,10 +106,15 @@ class TestCreateAndLinkTwoProjects:
         for name, slug in [("proj-a", "pa"), ("proj-b", "pb")]:
             proj_dir = tmp_path / name
             r = _run_keel(
-                tmp_path, "init",
-                "--name", name, "--key-prefix", slug.upper(),
+                tmp_path,
+                "init",
+                "--name",
+                name,
+                "--key-prefix",
+                slug.upper(),
                 "--non-interactive",
-                "--workspace", str(ws_dir),
+                "--workspace",
+                str(ws_dir),
                 str(proj_dir),
             )
             assert r.returncode == 0, r.stdout + r.stderr
@@ -114,11 +136,17 @@ class TestSyncHappyPath:
         for name, slug in [("proj-a", "PA"), ("proj-b", "PB")]:
             proj_dir = tmp_path / name
             r = _run_keel(
-                tmp_path, "init",
-                "--name", name, "--key-prefix", slug,
+                tmp_path,
+                "init",
+                "--name",
+                name,
+                "--key-prefix",
+                slug,
                 "--non-interactive",
-                "--workspace", str(ws_dir),
-                "--copy-nodes", "auth-system",
+                "--workspace",
+                str(ws_dir),
+                "--copy-nodes",
+                "auth-system",
                 str(proj_dir),
             )
             assert r.returncode == 0, r.stdout + r.stderr
@@ -162,11 +190,17 @@ class TestSyncConflict:
             ("proj-b", "PB", proj_b),
         ]:
             r = _run_keel(
-                tmp_path, "init",
-                "--name", name, "--key-prefix", slug,
+                tmp_path,
+                "init",
+                "--name",
+                name,
+                "--key-prefix",
+                slug,
                 "--non-interactive",
-                "--workspace", str(ws_dir),
-                "--copy-nodes", "auth-system",
+                "--workspace",
+                str(ws_dir),
+                "--copy-nodes",
+                "auth-system",
                 str(proj_dir),
             )
             assert r.returncode == 0
@@ -216,8 +250,12 @@ class TestStandaloneProjectUnchanged:
         """Project with no workspace pointer passes keel validate."""
         proj = tmp_path / "standalone"
         r = _run_keel(
-            tmp_path, "init",
-            "--name", "standalone", "--key-prefix", "SOL",
+            tmp_path,
+            "init",
+            "--name",
+            "standalone",
+            "--key-prefix",
+            "SOL",
             "--non-interactive",
             str(proj),
         )
@@ -254,10 +292,15 @@ class TestConcurrentPushes:
             slug = f"P{i}"
             proj_dir = tmp_path / name
             r = _run_keel(
-                tmp_path, "init",
-                "--name", name, "--key-prefix", slug,
+                tmp_path,
+                "init",
+                "--name",
+                name,
+                "--key-prefix",
+                slug,
                 "--non-interactive",
-                "--workspace", str(ws_dir),
+                "--workspace",
+                str(ws_dir),
                 str(proj_dir),
             )
             assert r.returncode == 0
@@ -295,9 +338,7 @@ tags: []
             t.join()
 
         for i, r in enumerate(results):
-            assert r.returncode == 0, (
-                f"proj-{i} push failed: {r.stdout}\n{r.stderr}"
-            )
+            assert r.returncode == 0, f"proj-{i} push failed: {r.stdout}\n{r.stderr}"
 
         # All 5 nodes should now be in the workspace.
         for i in range(5):

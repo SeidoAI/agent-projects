@@ -7,12 +7,12 @@ from keel.models.project import ProjectConfig, ProjectWorkspacePointer
 
 
 def _project_fields():
-    return dict(
-        name="test",
-        key_prefix="TST",
-        next_issue_number=1,
-        next_session_number=1,
-    )
+    return {
+        "name": "test",
+        "key_prefix": "TST",
+        "next_issue_number": 1,
+        "next_session_number": 1,
+    }
 
 
 def test_workspace_field_optional():

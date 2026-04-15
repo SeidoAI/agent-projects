@@ -46,7 +46,7 @@ class Workspace(BaseModel):
     projects: list[WorkspaceProjectEntry] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def _schema_version_supported(self) -> "Workspace":
+    def _schema_version_supported(self) -> Workspace:
         if self.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
             raise ValueError(
                 f"workspace schema_version {self.schema_version} not supported "
@@ -55,7 +55,7 @@ class Workspace(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _project_slugs_unique(self) -> "Workspace":
+    def _project_slugs_unique(self) -> Workspace:
         slugs = [p.slug for p in self.projects]
         if len(slugs) != len(set(slugs)):
             dups = {s for s in slugs if slugs.count(s) > 1}

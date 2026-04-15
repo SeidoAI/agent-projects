@@ -14,13 +14,26 @@ from keel.core.paths import merge_brief_path, workspace_nodes_dir
 def _git_commit_all(repo: Path, message: str) -> str:
     subprocess.run(["git", "add", "."], cwd=repo, check=True)
     subprocess.run(
-        ["git", "-c", "user.name=t", "-c", "user.email=t@t",
-         "commit", "-q", "-m", message],
-        cwd=repo, check=True,
+        [
+            "git",
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "-m",
+            message,
+        ],
+        cwd=repo,
+        check=True,
     )
     return subprocess.run(
         ["git", "rev-parse", "--short", "HEAD"],
-        cwd=repo, check=True, capture_output=True, text=True,
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
 
 
@@ -46,6 +59,7 @@ tags: []
         )
         subprocess.run(["git", "init", "-q"], cwd=ws_dir, check=True)
         return _git_commit_all(ws_dir, "add auth-system")
+
     return _factory
 
 
@@ -59,17 +73,23 @@ class TestPullWritesBriefOnConflict:
         proj_dir = fresh_project(tmp_path / "proj", name="x", key_prefix="X")
 
         runner = CliRunner()
-        runner.invoke(workspace_cmd,
-                      ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"])
-        runner.invoke(workspace_cmd,
-                      ["copy", "auth-system", "--project-dir", str(proj_dir)])
+        runner.invoke(
+            workspace_cmd,
+            ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"],
+        )
+        runner.invoke(
+            workspace_cmd, ["copy", "auth-system", "--project-dir", str(proj_dir)]
+        )
 
         # Project modifies description locally.
         from keel.core.node_store import load_node, save_node
+
         node = load_node(proj_dir, "auth-system")
-        save_node(proj_dir,
-                  node.model_copy(update={"description": "Project edit"}),
-                  update_cache=False)
+        save_node(
+            proj_dir,
+            node.model_copy(update={"description": "Project edit"}),
+            update_cache=False,
+        )
 
         # Workspace modifies description with a different value, commits.
         (workspace_nodes_dir(ws_dir) / "auth-system.yaml").write_text(
@@ -91,9 +111,7 @@ tags: []
         _git_commit_all(ws_dir, "update upstream")
 
         # Pull should detect conflict, write brief, exit 10.
-        result = runner.invoke(
-            workspace_cmd, ["pull", "--project-dir", str(proj_dir)]
-        )
+        result = runner.invoke(workspace_cmd, ["pull", "--project-dir", str(proj_dir)])
         assert result.exit_code == 10, result.output
 
         # Brief file should exist with expected content.
@@ -114,16 +132,22 @@ tags: []
         proj_dir = fresh_project(tmp_path / "proj", name="x", key_prefix="X")
 
         runner = CliRunner()
-        runner.invoke(workspace_cmd,
-                      ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"])
-        runner.invoke(workspace_cmd,
-                      ["copy", "auth-system", "--project-dir", str(proj_dir)])
+        runner.invoke(
+            workspace_cmd,
+            ["link", str(ws_dir), "--project-dir", str(proj_dir), "--slug", "x"],
+        )
+        runner.invoke(
+            workspace_cmd, ["copy", "auth-system", "--project-dir", str(proj_dir)]
+        )
 
         from keel.core.node_store import load_node, save_node
+
         node = load_node(proj_dir, "auth-system")
-        save_node(proj_dir,
-                  node.model_copy(update={"description": "Ours"}),
-                  update_cache=False)
+        save_node(
+            proj_dir,
+            node.model_copy(update={"description": "Ours"}),
+            update_cache=False,
+        )
 
         (workspace_nodes_dir(ws_dir) / "auth-system.yaml").write_text(
             """---

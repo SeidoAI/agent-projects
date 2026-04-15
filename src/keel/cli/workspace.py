@@ -113,12 +113,8 @@ def workspace_init_cmd(
     default=".",
     show_default=True,
 )
-@click.option(
-    "--slug", required=True, help="Workspace-local alias for this project."
-)
-def workspace_link_cmd(
-    workspace_path: Path, project_dir: Path, slug: str
-) -> None:
+@click.option("--slug", required=True, help="Workspace-local alias for this project.")
+def workspace_link_cmd(workspace_path: Path, project_dir: Path, slug: str) -> None:
     """Register the current project with a workspace (bidirectional)."""
     proj_resolved = project_dir.expanduser().resolve()
     ws_resolved = workspace_path.expanduser().resolve()
@@ -156,9 +152,7 @@ def workspace_link_cmd(
     # Workspace-side: register project entry.
     add_project(
         ws_resolved,
-        WorkspaceProjectEntry(
-            slug=slug, name=cfg.name, path=ws_relative_back
-        ),
+        WorkspaceProjectEntry(slug=slug, name=cfg.name, path=ws_relative_back),
     )
 
     ws = load_workspace(ws_resolved)
@@ -343,9 +337,7 @@ def _status_workspace(ws_dir: Path, output_format: str) -> None:
         for p in ws.projects
     ]
     if output_format == "json":
-        click.echo(
-            json.dumps({"workspace": ws.slug, "projects": rows}, indent=2)
-        )
+        click.echo(json.dumps({"workspace": ws.slug, "projects": rows}, indent=2))
         return
     click.echo(f"Workspace: {ws.name} ({ws.slug})")
     for r in rows:
@@ -370,9 +362,7 @@ def _status_project(proj_dir: Path, output_format: str) -> None:
     promotion_candidates = [
         n for n in nodes if n.origin == "local" and n.scope == "workspace"
     ]
-    forks = [
-        n for n in nodes if n.origin == "workspace" and n.scope == "local"
-    ]
+    forks = [n for n in nodes if n.origin == "workspace" and n.scope == "local"]
 
     if output_format == "json":
         click.echo(
@@ -413,9 +403,7 @@ def workspace_prune_cmd(workspace_dir: Path, force: bool) -> None:
     if not workspace_exists(resolved):
         raise click.ClickException(f"no workspace.yaml at {resolved}")
     ws = load_workspace(resolved)
-    orphans = [
-        p for p in ws.projects if not (resolved / p.path).resolve().exists()
-    ]
+    orphans = [p for p in ws.projects if not (resolved / p.path).resolve().exists()]
     if not orphans:
         click.echo("no orphans")
         return
@@ -461,9 +449,7 @@ def _git_show_node(ws_dir: Path, sha: str, node_id: str) -> dict:
         text=True,
     )
     if result.returncode != 0:
-        raise FileNotFoundError(
-            f"node {node_id} at sha {sha} not in workspace history"
-        )
+        raise FileNotFoundError(f"node {node_id} at sha {sha} not in workspace history")
     text = result.stdout
     parts = text.split("---", 2)
     if len(parts) < 2:
@@ -501,9 +487,7 @@ def _resolve_workspace(proj_dir: Path) -> Path:
     return ws_resolved
 
 
-def _find_workspace_entry_for_project(
-    ws_dir: Path, proj_dir: Path
-):
+def _find_workspace_entry_for_project(ws_dir: Path, proj_dir: Path):
     """Return the WorkspaceProjectEntry that points at proj_dir, or None."""
     ws = load_workspace(ws_dir)
     for entry in ws.projects:
@@ -525,9 +509,7 @@ def _find_workspace_entry_for_project(
     default=".",
     show_default=True,
 )
-def workspace_copy_cmd(
-    node_ids: tuple[str, ...], project_dir: Path
-) -> None:
+def workspace_copy_cmd(node_ids: tuple[str, ...], project_dir: Path) -> None:
     """Import workspace nodes into this project for the first time.
 
     Each node is stamped with origin=workspace, scope=workspace, and
@@ -571,8 +553,7 @@ def workspace_copy_cmd(
     for node_id, reason in skipped:
         click.echo(f"✗ {node_id}: {reason}")
     click.echo(
-        f"\n{len(copied)} of {len(node_ids)} node(s) copied; "
-        f"workspace_sha={head_sha}."
+        f"\n{len(copied)} of {len(node_ids)} node(s) copied; workspace_sha={head_sha}."
     )
     if skipped and not copied:
         raise click.exceptions.Exit(1)
@@ -604,12 +585,8 @@ EXIT_PUSH_UPSTREAM_DIVERGED = 11
     default=None,
     help="Comma-separated node ids (default: all workspace-origin nodes).",
 )
-@click.option(
-    "--dry-run", is_flag=True, default=False, help="Report without applying."
-)
-def workspace_pull_cmd(
-    project_dir: Path, nodes: str | None, dry_run: bool
-) -> None:
+@click.option("--dry-run", is_flag=True, default=False, help="Report without applying.")
+def workspace_pull_cmd(project_dir: Path, nodes: str | None, dry_run: bool) -> None:
     """Pull workspace node updates into this project.
 
     Fast-forwards and non-overlapping field changes are applied
@@ -617,8 +594,8 @@ def workspace_pull_cmd(
     command exits 10 signalling "merges pending".
     """
     from keel.core.node_store import list_nodes, save_node
-    from keel.core.workspace_sync import MergeStatus, merge_nodes
     from keel.core.workspace_store import update_project_pull_state
+    from keel.core.workspace_sync import MergeStatus, merge_nodes
     from keel.models.node import ConceptNode
 
     proj = project_dir.expanduser().resolve()
@@ -676,9 +653,11 @@ def workspace_pull_cmd(
 
         # FAST_FORWARD or AUTO_MERGED — apply.
         if dry_run:
-            (fast_forwards if result.status is MergeStatus.FAST_FORWARD else auto_merged).append(
-                node.id
-            )
+            (
+                fast_forwards
+                if result.status is MergeStatus.FAST_FORWARD
+                else auto_merged
+            ).append(node.id)
             continue
 
         merged_bookkept = dict(result.merged)  # type: ignore[arg-type]
@@ -692,9 +671,9 @@ def workspace_pull_cmd(
         )
         updated = ConceptNode.model_validate(merged_bookkept)
         save_node(proj, updated, update_cache=False)
-        (fast_forwards if result.status is MergeStatus.FAST_FORWARD else auto_merged).append(
-            node.id
-        )
+        (
+            fast_forwards if result.status is MergeStatus.FAST_FORWARD else auto_merged
+        ).append(node.id)
 
     # Report.
     for n in fast_forwards:
@@ -792,12 +771,8 @@ def workspace_pull_cmd(
     default=None,
     help="Comma-separated node ids (default: all with pending changes).",
 )
-@click.option(
-    "--dry-run", is_flag=True, default=False, help="Report without applying."
-)
-def workspace_push_cmd(
-    project_dir: Path, nodes: str | None, dry_run: bool
-) -> None:
+@click.option("--dry-run", is_flag=True, default=False, help="Report without applying.")
+def workspace_push_cmd(project_dir: Path, nodes: str | None, dry_run: bool) -> None:
     """Propose project node changes upstream to workspace.
 
     Two kinds of nodes participate:
@@ -807,13 +782,10 @@ def workspace_push_cmd(
     Upstream divergence (another agent pushed something since our last
     pull on the same node) causes push to refuse with exit 11.
     """
-    import yaml as _yaml
 
-    from keel.core.node_store import list_nodes, save_node
+    from keel.core.node_store import list_nodes
     from keel.core.paths import workspace_node_path
     from keel.core.workspace_sync import MergeStatus, merge_nodes
-    from keel.core.workspace_store import update_project_push_state
-    from keel.models.node import ConceptNode
 
     proj = project_dir.expanduser().resolve()
     _require_project(proj)
@@ -839,17 +811,13 @@ def workspace_push_cmd(
                 continue
             theirs_dict = theirs_node.model_dump(mode="python")
             try:
-                base_dict = _git_show_node(
-                    ws_dir, node.workspace_sha, node.id
-                )
+                base_dict = _git_show_node(ws_dir, node.workspace_sha, node.id)
             except FileNotFoundError:
                 # Stale workspace_sha — treat as diverged, user must pull/fork.
                 diverged.append(node.id)
                 continue
 
-            result = merge_nodes(
-                base=base_dict, ours=ours_dict, theirs=theirs_dict
-            )
+            result = merge_nodes(base=base_dict, ours=ours_dict, theirs=theirs_dict)
             if result.status is MergeStatus.CONFLICT:
                 diverged.append(node.id)
                 continue
@@ -871,8 +839,7 @@ def workspace_push_cmd(
         for n in diverged:
             click.echo(f"  - {n}")
         click.echo(
-            "\nRun `keel workspace pull` first to merge upstream changes, "
-            "then push."
+            "\nRun `keel workspace pull` first to merge upstream changes, then push."
         )
         raise click.exceptions.Exit(EXIT_PUSH_UPSTREAM_DIVERGED)
 
@@ -881,8 +848,7 @@ def workspace_push_cmd(
         for n in collisions:
             click.echo(f"  - {n}")
         click.echo(
-            "\nRename your local node, or pull+fork if you're intentionally "
-            "overriding."
+            "\nRename your local node, or pull+fork if you're intentionally overriding."
         )
         raise click.exceptions.Exit(1)
 
@@ -914,7 +880,6 @@ def _apply_pushes(
     from keel.core.node_store import save_node
     from keel.core.parser import serialize_frontmatter_body
     from keel.core.paths import workspace_node_path
-    from keel.core.workspace_store import update_project_push_state
     from keel.models.node import ConceptNode
 
     # Write each push to the workspace working tree.
@@ -935,7 +900,6 @@ def _apply_pushes(
 
         # Serialise via the shared parser's convention (frontmatter + body).
         body = canonical.pop("body", "")
-        from keel.core.parser import serialize_frontmatter_body
 
         # Normalise for YAML: datetimes → iso strings, UUIDs → str,
         # anything else that doesn't round-trip through yaml.safe_dump
@@ -950,9 +914,7 @@ def _apply_pushes(
                 clean[k] = str(v)
             else:
                 clean[k] = v
-        dest.write_text(
-            serialize_frontmatter_body(clean, body), encoding="utf-8"
-        )
+        dest.write_text(serialize_frontmatter_body(clean, body), encoding="utf-8")
 
     subprocess.run(["git", "add", "nodes/"], cwd=ws_dir, check=True)
     cfg = load_project_config(proj)
@@ -973,11 +935,14 @@ def _apply_pushes(
     )
     new_sha = subprocess.run(
         ["git", "rev-parse", "--short", "HEAD"],
-        cwd=ws_dir, check=True, capture_output=True, text=True,
+        cwd=ws_dir,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
 
     # Update local bookkeeping on each pushed node.
-    for node_id, action, final_dict in pushes:
+    for _node_id, _action, final_dict in pushes:
         local = dict(final_dict)
         local.update(
             {
@@ -999,9 +964,7 @@ def _apply_pushes(
         ws = load_workspace(ws_dir)
         now = datetime.now(tz=timezone.utc)
         updated = [
-            p.model_copy(
-                update={"last_pushed_sha": new_sha, "last_pushed_at": now}
-            )
+            p.model_copy(update={"last_pushed_sha": new_sha, "last_pushed_at": now})
             if p.slug == entry.slug
             else p
             for p in ws.projects
@@ -1041,9 +1004,7 @@ def workspace_fork_cmd(node_id: str, project_dir: Path) -> None:
     try:
         node = load_node(proj, node_id)
     except FileNotFoundError as exc:
-        raise click.ClickException(
-            f"node '{node_id}' not found in project"
-        ) from exc
+        raise click.ClickException(f"node '{node_id}' not found in project") from exc
 
     if node.origin != "workspace":
         raise click.ClickException(
@@ -1077,9 +1038,7 @@ def workspace_fork_cmd(node_id: str, project_dir: Path) -> None:
     show_default=True,
 )
 @click.pass_context
-def workspace_promote_cmd(
-    ctx: click.Context, node_id: str, project_dir: Path
-) -> None:
+def workspace_promote_cmd(ctx: click.Context, node_id: str, project_dir: Path) -> None:
     """Promote a local node to workspace (scope local → workspace + push).
 
     Shortcut that flips ``scope`` and delegates to push. Refuses if the
@@ -1096,9 +1055,7 @@ def workspace_promote_cmd(
     try:
         node = load_node(proj, node_id)
     except FileNotFoundError as exc:
-        raise click.ClickException(
-            f"node '{node_id}' not found in project"
-        ) from exc
+        raise click.ClickException(f"node '{node_id}' not found in project") from exc
 
     if node.origin != "local":
         raise click.ClickException(
@@ -1166,7 +1123,7 @@ def workspace_merge_resolve_cmd(node_id: str, project_dir: Path) -> None:
 
     try:
         node = load_node(proj, node_id)
-    except Exception as exc:  # noqa: BLE001 — surface any parse/validate error
+    except Exception as exc:
         raise click.ClickException(
             f"node '{node_id}' failed to load after resolve: {exc}. "
             "Brief preserved — fix the node file and retry."
@@ -1190,8 +1147,6 @@ def workspace_merge_resolve_cmd(node_id: str, project_dir: Path) -> None:
 
     remaining = list_pending_briefs(proj)
     if remaining:
-        click.echo(
-            f"\n{len(remaining)} brief(s) still pending: {', '.join(remaining)}"
-        )
+        click.echo(f"\n{len(remaining)} brief(s) still pending: {', '.join(remaining)}")
     else:
         click.echo("\nAll merges resolved. Pull complete.")
