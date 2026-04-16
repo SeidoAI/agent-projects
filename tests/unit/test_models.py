@@ -309,6 +309,50 @@ class TestAgentSession:
         assert restored.engagements[1].context == "lint failure"
 
 
+class TestRuntimeStateExtended:
+    def test_worktree_entry_roundtrip(self) -> None:
+        from keel.models.session import WorktreeEntry
+
+        entry = WorktreeEntry(
+            repo="SeidoAI/keel",
+            clone_path="/home/user/keel",
+            worktree_path="/home/user/keel-wt-api-endpoints",
+            branch="feat/api-endpoints",
+        )
+        assert entry.repo == "SeidoAI/keel"
+        assert entry.branch == "feat/api-endpoints"
+
+    def test_runtime_state_with_worktrees(self) -> None:
+        from keel.models.session import RuntimeState, WorktreeEntry
+
+        rs = RuntimeState(
+            worktrees=[
+                WorktreeEntry(
+                    repo="SeidoAI/keel",
+                    clone_path="/tmp/keel",
+                    worktree_path="/tmp/keel-wt-test",
+                    branch="feat/test",
+                )
+            ],
+            pid=12345,
+            claude_session_id="abc-123",
+            started_at="2026-04-16T10:30:00Z",
+            log_path="/tmp/test.log",
+        )
+        assert len(rs.worktrees) == 1
+        assert rs.pid == 12345
+        assert rs.log_path == "/tmp/test.log"
+
+    def test_runtime_state_defaults_empty(self) -> None:
+        from keel.models.session import RuntimeState
+
+        rs = RuntimeState()
+        assert rs.worktrees == []
+        assert rs.pid is None
+        assert rs.started_at is None
+        assert rs.log_path is None
+
+
 class TestProjectConfig:
     def test_minimal_project(self) -> None:
         p = ProjectConfig(name="test", key_prefix="TST")

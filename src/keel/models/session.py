@@ -33,6 +33,17 @@ class RepoBinding(BaseModel):
     pr_number: int | None = None
 
 
+class WorktreeEntry(BaseModel):
+    """One git worktree created for a session spawn."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    repo: str  # GitHub slug, e.g. "SeidoAI/keel"
+    clone_path: str  # absolute path to the original clone
+    worktree_path: str  # absolute path to the worktree directory
+    branch: str  # branch checked out in the worktree
+
+
 class RuntimeState(BaseModel):
     """Session-wide runtime handles, persisted across container restarts.
 
@@ -45,6 +56,10 @@ class RuntimeState(BaseModel):
     claude_session_id: str | None = None
     langgraph_thread_id: str | None = None
     workspace_volume: str | None = None
+    worktrees: list[WorktreeEntry] = Field(default_factory=list)
+    pid: int | None = None
+    started_at: datetime | str | None = None
+    log_path: str | None = None
 
 
 class SessionOrchestration(BaseModel):

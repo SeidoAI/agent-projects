@@ -4,6 +4,12 @@ values:
   - id: planned
     label: Planned
     color: gray
+  - id: queued
+    label: Queued
+    color: cyan
+  - id: executing
+    label: Executing
+    color: blue
   - id: active
     label: Active
     color: blue
@@ -25,3 +31,9 @@ values:
   - id: failed
     label: Failed
     color: red
+  - id: paused
+    label: Paused
+    color: yellow
+  - id: abandoned
+    label: Abandoned
+    color: gray
