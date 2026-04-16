@@ -27,6 +27,7 @@ from keel.cli.scaffold import brief_cmd, scaffold_cmd
 from keel.cli.session import session_cmd
 from keel.cli.status import status_cmd
 from keel.cli.templates import templates_cmd
+from keel.cli.ui import ui_cmd
 from keel.cli.uuid_cmd import uuid_cmd
 from keel.cli.validate import validate_cmd
 from keel.cli.view import view_cmd
@@ -95,6 +96,7 @@ cli.add_command(templates_cmd)
 cli.add_command(enums_cmd)
 cli.add_command(artifacts_cmd)
 cli.add_command(completion_cmd)
+cli.add_command(ui_cmd)
 cli.add_command(view_cmd)
 cli.add_command(workspace_cmd)
 

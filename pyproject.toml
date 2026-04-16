@@ -6,6 +6,23 @@ requires-python = ">=3.10,<3.14"
 license = { file = "LICENSE" }
 authors = [{ name = "Seido AI Ltd" }]
 dependencies = [
+    # Core (always present, minimal)
+    "pydantic>=2.0,<3.0",
+    "click>=8.1,<9.0",
+    "pyyaml>=6.0,<7.0",
+    "rich>=13.0,<14.0",
+    "jinja2>=3.1,<4.0",
+    # UI
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.30,<1.0",
+    "watchdog>=4.0,<6.0",
+    "websockets>=12.0,<14.0",
+    # Containers (future — import is deferred by the containers module)
+    "docker>=7.0,<8.0",
+]
+
+[project.optional-dependencies]
+projects = [
     "pydantic>=2.0,<3.0",
     "click>=8.1,<9.0",
     "pyyaml>=6.0,<7.0",
