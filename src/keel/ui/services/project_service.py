@@ -68,7 +68,9 @@ def _count_issues(project_dir: Path) -> int:
     issues = project_dir / "issues"
     if not issues.is_dir():
         return 0
-    return sum(1 for p in issues.iterdir() if p.is_dir() and (p / "issue.yaml").is_file())
+    return sum(
+        1 for p in issues.iterdir() if p.is_dir() and (p / "issue.yaml").is_file()
+    )
 
 
 def _count_nodes(project_dir: Path) -> int:

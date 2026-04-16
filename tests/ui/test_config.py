@@ -49,9 +49,7 @@ class TestLoadUserConfig:
     def test_tilde_expanded_in_paths(self, tmp_path: Path):
         f = tmp_path / "config.yaml"
         f.write_text(
-            "project_roots:\n"
-            "  - ~/some/path\n"
-            "default_project: ~/other/path\n",
+            "project_roots:\n  - ~/some/path\ndefault_project: ~/other/path\n",
             encoding="utf-8",
         )
         cfg = load_user_config(f)

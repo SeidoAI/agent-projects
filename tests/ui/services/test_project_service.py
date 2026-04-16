@@ -69,9 +69,7 @@ def _clear_cache():
 
 class TestDiscoverProjects:
     def test_empty_config_no_projects(self, tmp_path: Path):
-        with patch(
-            "keel.ui.services.project_service.Path"
-        ) as mock_path_cls:
+        with patch("keel.ui.services.project_service.Path") as mock_path_cls:
             # Make CWD point to tmp_path (no project.yaml there)
             mock_path_cls.cwd.return_value = tmp_path
             mock_path_cls.home.return_value = tmp_path / "fakehome"
@@ -178,9 +176,7 @@ class TestDiscoverProjects:
         assert len(id1) == 12
 
     def test_counts(self, tmp_path: Path):
-        proj = _make_project(
-            tmp_path / "proj", issues=3, nodes=2, sessions=1
-        )
+        proj = _make_project(tmp_path / "proj", issues=3, nodes=2, sessions=1)
 
         with patch("keel.ui.services.project_service.Path") as mock_path_cls:
             mock_path_cls.cwd.return_value = proj

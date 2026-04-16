@@ -97,9 +97,7 @@ def _make_import_blocker(blocked_module: str):
 
     def _blocker(name, *args, **kwargs):
         if name == "keel.ui.server":
-            exc = ModuleNotFoundError(
-                f"No module named '{blocked_module}'"
-            )
+            exc = ModuleNotFoundError(f"No module named '{blocked_module}'")
             exc.name = blocked_module
             raise exc
         return _real_import(name, *args, **kwargs)
