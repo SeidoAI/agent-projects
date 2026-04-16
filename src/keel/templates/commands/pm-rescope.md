@@ -1,6 +1,6 @@
 ---
 name: pm-rescope
-description: Expand the scope of an existing project with new intent or newly-added planning docs.
+description: Expand an existing project's scope with new intent or planning docs.
 argument-hint: "<free-text new-scope description, optional path to new planning docs>"
 ---
 
@@ -36,4 +36,4 @@ content:
    `rescope: add billing initiative with 8 new issues`).
 
 Rescoping is additive by default. If the user wants to drop work, they
-should use `/pm-close` or explicit `/pm-update` commands.
+should use `/pm-issue-close` or explicit `/pm-edit` commands.

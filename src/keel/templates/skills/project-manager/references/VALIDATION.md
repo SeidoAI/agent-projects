@@ -29,6 +29,12 @@ declaring any work done.
 | `standards/missing` | warning | no | A file references `standards.md` but it doesn't exist |
 | `artifact/missing` | error | no | Completed session missing a required artifact |
 | `fix/lock_timeout` | error | no | Concurrent `--fix` couldn't acquire the project lock |
+| `manifest_schema/produced_by_valid` | error | no | v0.6a — `produced_by` isn't a known agent type |
+| `manifest_schema/owned_by_valid` | error | no | v0.6a — `owned_by` isn't a known agent type |
+| `manifest_schema/phase_ownership_consistent` | warning | no | v0.6a — PM owns an artifact produced at implementing/verifying |
+| `handoff_schema/required_at_queued` | error | no | v0.6a — session in `queued` but `handoff.yaml` missing |
+| `handoff_schema/branch_format` | error | no | v0.6a — `handoff.yaml.branch` violates `<type>/<slug>` convention |
+| `handoff_schema/malformed` | error | no | v0.6a — `handoff.yaml` failed to parse or validate |
 
 ## The one command
 
@@ -208,8 +214,32 @@ If you find yourself stuck (same error recurring), you've probably
 misread the schema. Re-read the relevant `SCHEMA_*.md` and the
 matching example file.
 
+## `keel lint` — heuristic checks (v0.6a+)
+
+Distinct from `keel validate`. Validate is mechanical (schema/refs);
+lint is heuristic (did someone actually do the work at each stage).
+
+```bash
+keel lint scoping              # project-level scoping checks
+keel lint handoff <session-id> # handoff-readiness checks
+keel lint session <session-id> # in-flight session health checks
+```
+
+Exit codes: 0 (info-only), 1 (warning present), 2 (error present).
+
+| Rule | Stage | Severity |
+|---|---|---|
+| `lint/gap_analysis_row_density` | scoping | warning |
+| `lint/issue_body_orphan_concepts` | scoping | warning |
+| `lint/unpushed_promotion_candidates` | scoping | info (warning when workspace linked — v0.6b) |
+| `lint/branch_convention` | handoff | error |
+| `lint/session_stale` | session | warning |
+
+See `BRANCH_NAMING.md` for the branch-convention rule.
+
 ## See also
 
 - `SCHEMA_*.md` — the schemas the validator checks against
 - `ANTI_PATTERNS.md` — common mistakes that trigger errors
 - `REFERENCES.md` — `[[ref]]` resolution rules
+- `BRANCH_NAMING.md` — per-session branch convention (v0.6a+)

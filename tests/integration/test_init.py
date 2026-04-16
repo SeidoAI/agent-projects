@@ -242,18 +242,30 @@ class TestInitBasics:
         assert commands_dir.is_dir(), f"Missing {commands_dir}"
 
         expected = {
+            # v0.6a retained + renamed + new:
             "pm-agenda.md",
-            "pm-plan.md",
-            "pm-scope.md",
-            "pm-update.md",
-            "pm-triage.md",
-            "pm-review.md",
-            "pm-status.md",
+            "pm-edit.md",
             "pm-graph.md",
-            "pm-validate.md",
-            "pm-handoff.md",
+            "pm-issue-close.md",
+            "pm-lint.md",
             "pm-rescope.md",
+            "pm-review.md",
+            "pm-scope.md",
+            "pm-session-check.md",
+            "pm-session-create.md",
+            "pm-session-launch.md",
+            "pm-session-progress.md",
+            "pm-status.md",
+            "pm-triage.md",
+            "pm-validate.md",
+            # v0.6b workspace commands:
+            "pm-project-create.md",
+            "pm-project-sync.md",
+            # Deprecated forwarders (removed in v0.7):
             "pm-close.md",
+            "pm-handoff.md",
+            "pm-plan.md",
+            "pm-update.md",
         }
         actual = {p.name for p in commands_dir.glob("*.md")}
         assert expected == actual, (

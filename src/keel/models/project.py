@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ProjectPhase(str, Enum):
@@ -78,6 +78,26 @@ class OrchestrationConfig(BaseModel):
     auto_merge_on_pass: bool = False
 
 
+class ProjectWorkspacePointer(BaseModel):
+    """Workspace this project is linked to (v0.6b).
+
+    Object form reserves room for future extensions (remote URLs, pinning
+    a workspace SHA). Currently only ``path`` is supported; URL support
+    arrives in a later release.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str | None = None
+    # url: str | None = None  # future
+
+    @model_validator(mode="after")
+    def _at_least_one_target(self) -> "ProjectWorkspacePointer":
+        if self.path is None:  # and self.url is None
+            raise ValueError("workspace pointer requires `path`")
+        return self
+
+
 class ProjectConfig(BaseModel):
     """The project's root config, parsed from `<project>/project.yaml`."""
 
@@ -107,6 +127,9 @@ class ProjectConfig(BaseModel):
     phase: ProjectPhase = ProjectPhase.scoping
 
     created_at: datetime | None = None
+
+    # v0.6b: optional workspace link. Absence means standalone project.
+    workspace: ProjectWorkspacePointer | None = None
 
     # Free-form per-project metadata, never used by the package itself.
     metadata: dict[str, Any] = Field(default_factory=dict)

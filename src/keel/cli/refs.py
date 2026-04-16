@@ -190,7 +190,12 @@ class RefsCheckReport:
     show_default=True,
 )
 def refs_check(project_dir: Path, output_format: str) -> None:
-    """Full scan: dangling refs, orphan nodes/issues, stale content hashes."""
+    """Full scan: dangling refs, orphan nodes/issues, stale content hashes.
+
+    Exits non-zero when integrity errors are found (dangling refs or stale
+    nodes) so callers (CI, pre-commit, verification checklists) can fail
+    fast. Orphan nodes/issues are informational, not errors — they exit 0.
+    """
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
@@ -208,9 +213,12 @@ def refs_check(project_dir: Path, output_format: str) -> None:
                 indent=2,
             )
         )
-        return
+    else:
+        _render_refs_check(report)
 
-    _render_refs_check(report)
+    # Integrity errors fail the command; orphans are informational.
+    if report.dangling or report.stale_nodes:
+        raise click.exceptions.Exit(1)
 
 
 def _collect_refs_check(project_dir: Path) -> RefsCheckReport:

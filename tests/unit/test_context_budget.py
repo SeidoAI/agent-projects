@@ -43,15 +43,18 @@ def _total_lines(directory: Path) -> int:
 
 
 def test_pm_skill_total_size_under_budget() -> None:
-    """The PM skill (SKILL.md + references + examples) must stay under 130KB.
+    """The PM skill (SKILL.md + references + examples) must stay under 145KB.
 
-    v0.2 was ~106KB. Budget allows ~25% growth before alarm.
+    v0.2 was ~106KB. v0.6a added BRANCH_NAMING.md + priority hierarchy
+    + handoff.yaml schema + v0.6a error codes + lint section. Budget
+    bumped to 145KB to accommodate; Plan 2 (v0.6b) will add
+    WORKSPACE_SYNC.md and push further — revisit budget then.
     """
     pm_dir = TEMPLATES_DIR / "skills" / "project-manager"
     total = _total_chars(pm_dir)
-    assert total < 130_000, (
+    assert total < 145_000, (
         f"PM skill is {total:,} chars ({total / 1024:.0f} KB). "
-        f"Budget is 130KB. Consolidate or trim reference docs."
+        f"Budget is 145KB. Consolidate or trim reference docs."
     )
 
 
@@ -74,13 +77,14 @@ def test_pm_skill_md_under_budget() -> None:
 
 
 def test_total_templates_under_budget() -> None:
-    """Everything `keel init` copies must stay under 250KB total.
+    """Everything `keel init` copies must stay under 275KB total.
 
-    v0.2 was ~217KB. Budget allows modest growth.
+    v0.2 was ~217KB. v0.6a adds PM skill docs + slash command split
+    + new CLI wrappers. Budget bumped to 275KB.
     """
     total = _total_chars(TEMPLATES_DIR)
-    assert total < 250_000, (
-        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 250KB."
+    assert total < 275_000, (
+        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 275KB."
     )
 
 

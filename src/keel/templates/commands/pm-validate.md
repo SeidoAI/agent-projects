@@ -1,6 +1,6 @@
 ---
 name: pm-validate
-description: Run the validation gate, interpret errors, propose fixes, and optionally auto-fix.
+description: Run the validation gate and interpret any errors.
 argument-hint: "[--fix to apply auto-fixes]"
 ---
 

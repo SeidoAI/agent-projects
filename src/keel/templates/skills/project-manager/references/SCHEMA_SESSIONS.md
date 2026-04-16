@@ -120,8 +120,54 @@ straight field-level override.
 the session's `id` field. See "Directory layout" above for the full
 structure.
 
+## `handoff.yaml` (v0.6a+)
+
+Written by the PM agent at session launch via `/pm-session-launch`.
+Lives at `sessions/<id>/handoff.yaml`. **Required when the session
+is in `queued` state** (validator rule `handoff_schema/required_at_queued`).
+
+### Fields
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `uuid` | UUID | yes | Unique per handoff record |
+| `session_id` | string | yes | Matches the session's `id` |
+| `handoff_at` | datetime | yes | ISO 8601 UTC |
+| `handed_off_by` | enum | yes | One of `pm`, `execution-agent`, `verification-agent` |
+| `branch` | string | yes | `<type>/<slug>` per `BRANCH_NAMING.md` |
+| `open_questions` | list[string] | no | Things the PM couldn't resolve during scoping |
+| `context_to_preserve` | list[string] | no | Decisions made at handoff the next agent needs |
+| `last_verification_passed_at` | datetime | no | For iterative handoffs |
+| `workspace_context` | object | no | Optional; populated if project has a workspace pointer (v0.6b) |
+
+### Example
+
+```yaml
+---
+uuid: 8b7c6d5e-4f3a-2b1c-9d8e-7f6a5b4c3d2e
+session_id: session-auth-42-setup
+handoff_at: 2026-04-15T14:30:00Z
+handed_off_by: pm
+branch: feat/auth-42-setup
+open_questions:
+  - "Should retries be exponential or fixed?"
+context_to_preserve:
+  - "Bucket naming uses {{env}}-{{service}} convention (decided 2026-04-14)"
+last_verification_passed_at: null
+---
+```
+
+### Who writes what
+
+- `/pm-session-create` writes the initial version with `branch` filled
+  in from `keel session derive-branch` output.
+- `/pm-session-launch` validates readiness and confirms; it does not
+  rewrite the handoff record.
+- Execution agents read `handoff.yaml` first thing on start.
+
 ## See also
 
 - `examples/session-single-issue.yaml`
 - `examples/session-multi-repo.yaml`
 - `CONCEPT_GRAPH.md` if the session touches concept nodes
+- `BRANCH_NAMING.md` for the per-session branch convention

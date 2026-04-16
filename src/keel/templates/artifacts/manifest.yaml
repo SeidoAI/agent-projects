@@ -1,26 +1,38 @@
 # Session artifact manifest — declares what every session must produce.
 #
-# An `approval_gate: true` on any artifact tells the orchestrator to stop
-# the agent after that artifact is written and wait for human approval
-# before re-engaging. For fast-iteration projects, leave all gates false.
+# Each artifact declares:
+# - produced_at: which session phase the file is written in (planning,
+#   implementing, verifying, completion)
+# - produced_by: which agent writes the initial version
+# - owned_by: which agent owns updates (often equals produced_by)
 #
-# Projects can add, remove, or reshape artifacts. The validator checks
-# that every `required: true` artifact exists for sessions in `completed`
-# status. Sessions can override this manifest via `artifact_overrides` in
-# their session YAML.
+# The validator enforces stage-aware requirements: task-checklist.md
+# is not required until the session reaches `implementing` since the
+# execution agent writes it.
+#
+# An `approval_gate: true` on any artifact tells the orchestrator to
+# stop the agent after that artifact is written and wait for human
+# approval before re-engaging.
+#
+# Projects can add, remove, or reshape artifacts. Sessions can override
+# this manifest via `artifact_overrides` in their session YAML.
 
 artifacts:
   - name: plan
     file: plan.md
     template: plan.md.j2
     produced_at: planning
+    produced_by: pm
+    owned_by: pm
     required: true
     approval_gate: false
 
   - name: task-checklist
     file: task-checklist.md
     template: task-checklist.md.j2
-    produced_at: planning
+    produced_at: implementing
+    produced_by: execution-agent
+    owned_by: execution-agent
     required: true
     approval_gate: false
 
@@ -28,6 +40,8 @@ artifacts:
     file: verification-checklist.md
     template: verification-checklist.md.j2
     produced_at: planning
+    produced_by: pm
+    owned_by: pm
     required: true
     approval_gate: false
 
@@ -35,6 +49,8 @@ artifacts:
     file: recommended-testing-plan.md
     template: recommended-testing-plan.md.j2
     produced_at: completion
+    produced_by: execution-agent
+    owned_by: execution-agent
     required: true
     approval_gate: false
 
@@ -42,5 +58,7 @@ artifacts:
     file: post-completion-comments.md
     template: post-completion-comments.md.j2
     produced_at: completion
+    produced_by: execution-agent
+    owned_by: execution-agent
     required: true
     approval_gate: false

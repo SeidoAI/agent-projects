@@ -91,6 +91,17 @@ SESSION_FILENAME = "session.yaml"
 SESSION_PLAN = "plan.md"
 SESSION_ARTIFACTS_SUBDIR = "artifacts"
 
+# Handoff record written at session launch (v0.6a): sessions/<id>/handoff.yaml.
+HANDOFF_FILENAME = "handoff.yaml"
+
+# Workspace-level constants (v0.6b).
+# A workspace is a separate git repo containing canonical shared nodes
+# for N member projects. See
+# docs/superpowers/specs/2026-04-15-keel-workspace-design.md.
+WORKSPACE_YAML = "workspace.yaml"
+WORKSPACE_NODES_DIR = "nodes"  # same name as in-project nodes/, at workspace root
+MERGE_BRIEFS_DIR = ".keel/merge-briefs"
+
 # Issues are directories: `issues/<KEY>/issue.yaml` plus `comments/`,
 # `developer.md`, `verified.md` alongside. Enforced by `keel.core.store`
 # since Phase 4.
@@ -165,6 +176,11 @@ def session_artifacts_dir(project_dir: Path, session_id: str) -> Path:
     return session_dir(project_dir, session_id) / SESSION_ARTIFACTS_SUBDIR
 
 
+def handoff_path(project_dir: Path, session_id: str) -> Path:
+    """Path to sessions/<session_id>/handoff.yaml (v0.6a)."""
+    return session_dir(project_dir, session_id) / HANDOFF_FILENAME
+
+
 def graph_cache_path(project_dir: Path) -> Path:
     return project_dir / GRAPH_CACHE
 
@@ -179,3 +195,47 @@ def plans_artifacts_dir(project_dir: Path) -> Path:
 
 def templates_artifacts_manifest_path(project_dir: Path) -> Path:
     return project_dir / TEMPLATES_ARTIFACTS_MANIFEST
+
+
+# ---------------------------------------------------------------------------
+# Workspace path builders (v0.6b)
+# ---------------------------------------------------------------------------
+
+
+def workspace_yaml_path(workspace_dir: Path) -> Path:
+    """Path to workspace.yaml at the workspace root."""
+    return workspace_dir / WORKSPACE_YAML
+
+
+def workspace_nodes_dir(workspace_dir: Path) -> Path:
+    """Path to the workspace's shared nodes/ directory."""
+    return workspace_dir / WORKSPACE_NODES_DIR
+
+
+def workspace_node_path(workspace_dir: Path, node_id: str) -> Path:
+    """Path to a specific workspace node YAML file."""
+    return workspace_nodes_dir(workspace_dir) / f"{node_id}.yaml"
+
+
+def workspace_lock_path(workspace_dir: Path) -> Path:
+    """Path to the workspace-level lock file.
+
+    Reuses ``PROJECT_LOCK`` filename — the lock helper works on any
+    directory, and workspaces follow the same locking convention.
+    """
+    return workspace_dir / PROJECT_LOCK
+
+
+def merge_briefs_dir(project_dir: Path) -> Path:
+    """Path to a project's merge-briefs directory.
+
+    Briefs live in .keel/merge-briefs/ (hidden) so they don't clutter
+    the project tree. ``keel workspace pull`` writes briefs here when
+    a 3-way merge produces conflicts; ``merge-resolve`` removes them.
+    """
+    return project_dir / MERGE_BRIEFS_DIR
+
+
+def merge_brief_path(project_dir: Path, node_id: str) -> Path:
+    """Path to a specific merge brief file for a node."""
+    return merge_briefs_dir(project_dir) / f"{node_id}.yaml"

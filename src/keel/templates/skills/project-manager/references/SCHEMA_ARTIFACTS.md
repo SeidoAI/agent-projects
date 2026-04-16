@@ -15,13 +15,17 @@ artifacts:
     file: plan.md
     template: plan.md.j2
     produced_at: planning
+    produced_by: pm
+    owned_by: pm
     required: true
     approval_gate: false
 
   - name: task-checklist
     file: task-checklist.md
     template: task-checklist.md.j2
-    produced_at: planning
+    produced_at: implementing
+    produced_by: execution-agent
+    owned_by: execution-agent
     required: true
     approval_gate: false
 
@@ -29,6 +33,8 @@ artifacts:
     file: verification-checklist.md
     template: verification-checklist.md.j2
     produced_at: planning
+    produced_by: pm
+    owned_by: pm
     required: true
     approval_gate: false
 
@@ -36,6 +42,8 @@ artifacts:
     file: recommended-testing-plan.md
     template: recommended-testing-plan.md.j2
     produced_at: completion
+    produced_by: execution-agent
+    owned_by: execution-agent
     required: true
     approval_gate: false
 
@@ -43,6 +51,8 @@ artifacts:
     file: post-completion-comments.md
     template: post-completion-comments.md.j2
     produced_at: completion
+    produced_by: execution-agent
+    owned_by: execution-agent
     required: true
     approval_gate: false
 ```
@@ -54,8 +64,14 @@ artifacts:
 - `file` — the actual filename under `sessions/<id>/artifacts/`.
 - `template` — the Jinja template in `templates/artifacts/` the agent
   renders from.
-- `produced_at` — when in the session lifecycle the artifact is written
-  (`planning` or `completion`, or a project-defined phase).
+- `produced_at` — when in the session lifecycle the artifact is written.
+  Valid phases: `planning`, `implementing`, `verifying`, `completion`
+  (or a project-defined phase).
+- `produced_by` — which agent writes the initial version. Values come
+  from `templates/enums/agent_types.yaml`: `pm`, `execution-agent`, or
+  `verification-agent`.
+- `owned_by` — which agent owns updates to the artifact (often equals
+  `produced_by`). Same enum as `produced_by`.
 - `required` — if `true`, the validator errors if this artifact is
   missing for a `completed` session.
 - `approval_gate` — if `true`, after writing this artifact the agent
@@ -73,7 +89,9 @@ artifacts:
 2. **`task-checklist.md`** — a living markdown table the agent updates
    as work progresses. Columns: task, status (`pending`, `in_progress`,
    `done`, `blocked`, `skipped`), comments. Humans can glance at it to
-   see where the agent is.
+   see where the agent is. `produced_at: implementing` and
+   `owned_by: execution-agent` — the PM agent reading this doc does not
+   produce this file; the execution agent writes and updates it.
 
 3. **`verification-checklist.md`** — generated at planning time, ticked
    off at the end. The final gate the agent walks through before
@@ -109,6 +127,8 @@ artifact_overrides:
   - name: architecture-diff
     file: architecture-diff.md
     produced_at: completion
+    produced_by: execution-agent
+    owned_by: execution-agent
     required: true
 ```
 

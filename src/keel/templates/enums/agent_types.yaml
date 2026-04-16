@@ -1,0 +1,12 @@
+# Agent types that can own or produce artifacts.
+# Referenced by manifest.yaml `produced_by` and `owned_by` fields.
+values:
+  - id: pm
+    label: PM Agent
+    description: Project manager — scopes, plans, closes, reviews.
+  - id: execution-agent
+    label: Execution Agent
+    description: Backend/frontend coder — implements during session.
+  - id: verification-agent
+    label: Verification Agent
+    description: Runs verification plans and confirms acceptance.

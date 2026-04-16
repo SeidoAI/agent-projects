@@ -1,6 +1,6 @@
 ---
 name: pm-status
-description: Show a PM-flavoured summary of the project with recommendations.
+description: Summarize project health — status counts, concerning items, next action.
 argument-hint: "[optional focus area]"
 ---
 

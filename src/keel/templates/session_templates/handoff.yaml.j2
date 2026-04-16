@@ -1,0 +1,16 @@
+---
+uuid: {{ uuid }}
+session_id: {{ session_id }}
+handoff_at: {{ handoff_at }}
+handed_off_by: pm
+branch: {{ branch }}
+open_questions: {{ open_questions | default([]) | tojson }}
+context_to_preserve: {{ context_to_preserve | default([]) | tojson }}
+last_verification_passed_at: null
+{% if workspace_context %}
+workspace_context:
+  workspace_nodes_touched: {{ workspace_context.workspace_nodes_touched | tojson }}
+  workspace_sha_at_handoff: {{ workspace_context.workspace_sha_at_handoff }}
+  stale_nodes: {{ workspace_context.stale_nodes | tojson }}
+{% endif %}
+---

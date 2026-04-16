@@ -18,19 +18,46 @@ selects the workflow to execute:
 | Slash command | Workflow | Use when |
 |---|---|---|
 | `/pm-scope` | `references/WORKFLOWS_INITIAL_SCOPING.md` | Starting a new project from raw planning docs |
-| `/pm-update` | `references/WORKFLOWS_INCREMENTAL_UPDATE.md` | Making a surgical change to existing entities |
+| `/pm-edit` | `references/WORKFLOWS_INCREMENTAL_UPDATE.md` | Making a surgical change to existing entities |
 | `/pm-triage` | `references/WORKFLOWS_TRIAGE.md` | Processing inbound suggestions (comments, agent messages, bug reports) |
 | `/pm-review` | `references/WORKFLOWS_REVIEW.md` | Reviewing a PR to the project repo |
-| `/pm-status` | read-only wrapper | Summarizing where the project stands with PM-flavoured recommendations |
+| `/pm-status` | read-only wrapper | Summarizing project health, concerning items, next action |
+| `/pm-agenda` | read-only wrapper | Listing in-flight work and the next actionable item |
 | `/pm-graph` | read-only wrapper | Analysing the dependency graph for critical path, parallelizable work, cycles |
 | `/pm-validate` | read-only wrapper | Running the validation gate and interpreting errors |
-| `/pm-handoff` | specialization | Creating a session and handing it off to a coding agent |
+| `/pm-lint` | read-only wrapper | Running stage-aware heuristic checks (scoping, handoff, session) |
+| `/pm-session-create` | specialization | Scaffolding a session for an issue |
+| `/pm-session-launch` | specialization | Transitioning an existing session from planned → queued |
+| `/pm-session-check` | read-only wrapper | Reporting launch-readiness for a session |
+| `/pm-session-progress` | read-only wrapper | Aggregating in-flight session status |
 | `/pm-rescope` | `WORKFLOWS_INITIAL_SCOPING.md` (expand mode) | Adding new scope to an existing project |
-| `/pm-close` | `WORKFLOWS_INCREMENTAL_UPDATE.md` (close mode) | Marking an issue done + writing a closing comment |
+| `/pm-issue-close` | `WORKFLOWS_INCREMENTAL_UPDATE.md` (close mode) | Marking an issue done + writing a closing comment |
 
 If you are invoked without a slash command (e.g. the user just typed
 "scope this project" in prose), infer which workflow to use from the
 request and execute it.
+
+## Priority of sources
+
+When the manifest, a command doc, a template, and a reference doc
+disagree about what you should do:
+
+1. **`templates/artifacts/manifest.yaml`** is canonical for artifact
+   ownership (`produced_by` / `owned_by`). If the manifest says an
+   artifact is owned by `execution-agent`, you — the PM — do NOT
+   create it.
+2. **Reference docs** (`SCHEMA_*.md`, `VALIDATION.md`,
+   `WORKFLOWS_*.md`, `BRANCH_NAMING.md`) are canonical for schema
+   shapes, phase-gate rules, and naming conventions.
+3. **Command docs** (`.claude/commands/*.md`) describe mechanics —
+   what to run, in what order. They do NOT override the manifest or
+   reference docs when they conflict.
+4. **Templates** describe shape, not responsibility.
+
+If a command doc instructs you to produce an artifact the manifest
+says someone else owns, follow the manifest. File a comment on the
+issue or a note in the session describing the conflict so it gets
+fixed upstream.
 
 ## Critical: front-load your context first
 

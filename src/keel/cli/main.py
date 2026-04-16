@@ -17,6 +17,7 @@ from keel.cli.completion import completion_cmd
 from keel.cli.enums import enums_cmd
 from keel.cli.graph import graph_cmd
 from keel.cli.init import init_cmd
+from keel.cli.lint import lint_cmd
 from keel.cli.next_key import next_key_cmd
 from keel.cli.node import node_cmd
 from keel.cli.plan import plan_cmd
@@ -29,6 +30,7 @@ from keel.cli.templates import templates_cmd
 from keel.cli.uuid_cmd import uuid_cmd
 from keel.cli.validate import validate_cmd
 from keel.cli.view import view_cmd
+from keel.cli.workspace import workspace_cmd
 
 # Verbose count → logging level. -v = INFO, -vv = DEBUG, default = WARNING.
 LOG_LEVELS = {0: logging.WARNING, 1: logging.INFO, 2: logging.DEBUG}
@@ -82,6 +84,7 @@ cli.add_command(next_key_cmd)
 cli.add_command(plan_cmd)
 cli.add_command(uuid_cmd)
 cli.add_command(validate_cmd)
+cli.add_command(lint_cmd)
 cli.add_command(status_cmd)
 cli.add_command(graph_cmd)
 cli.add_command(refresh_cmd)
@@ -93,6 +96,7 @@ cli.add_command(enums_cmd)
 cli.add_command(artifacts_cmd)
 cli.add_command(completion_cmd)
 cli.add_command(view_cmd)
+cli.add_command(workspace_cmd)
 
 
 if __name__ == "__main__":

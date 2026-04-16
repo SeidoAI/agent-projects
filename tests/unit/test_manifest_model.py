@@ -1,0 +1,86 @@
+"""ArtifactManifest model and its ownership fields."""
+
+import pytest
+from pydantic import ValidationError
+
+from keel.models.manifest import ArtifactEntry, ArtifactManifest
+
+
+class TestArtifactEntry:
+    def test_parses_all_fields(self):
+        entry = ArtifactEntry(
+            name="plan",
+            file="plan.md",
+            template="plan.md.j2",
+            produced_at="planning",
+            produced_by="pm",
+            owned_by="pm",
+            required=True,
+            approval_gate=False,
+        )
+        assert entry.produced_by == "pm"
+        assert entry.owned_by == "pm"
+
+    def test_rejects_unknown_produced_by(self):
+        with pytest.raises(ValidationError):
+            ArtifactEntry(
+                name="plan",
+                file="plan.md",
+                template="plan.md.j2",
+                produced_at="planning",
+                produced_by="wizard",
+                owned_by="pm",
+                required=True,
+            )
+
+    def test_rejects_unknown_owned_by(self):
+        with pytest.raises(ValidationError):
+            ArtifactEntry(
+                name="plan",
+                file="plan.md",
+                template="plan.md.j2",
+                produced_at="planning",
+                produced_by="pm",
+                owned_by="wizard",
+                required=True,
+            )
+
+    def test_defaults_owned_by_to_produced_by_when_absent(self):
+        entry = ArtifactEntry(
+            name="plan",
+            file="plan.md",
+            template="plan.md.j2",
+            produced_at="planning",
+            produced_by="pm",
+            required=True,
+        )
+        assert entry.owned_by == "pm"
+
+
+class TestArtifactManifest:
+    def test_parses_full_manifest(self):
+        manifest = ArtifactManifest(
+            artifacts=[
+                ArtifactEntry(
+                    name="plan",
+                    file="plan.md",
+                    template="plan.md.j2",
+                    produced_at="planning",
+                    produced_by="pm",
+                    owned_by="pm",
+                    required=True,
+                ),
+                ArtifactEntry(
+                    name="task-checklist",
+                    file="task-checklist.md",
+                    template="task-checklist.md.j2",
+                    produced_at="implementing",
+                    produced_by="execution-agent",
+                    owned_by="execution-agent",
+                    required=True,
+                ),
+            ]
+        )
+        assert len(manifest.artifacts) == 2
+        assert manifest.artifacts[0].owned_by == "pm"
+        assert manifest.artifacts[1].produced_at == "implementing"

@@ -1,6 +1,6 @@
 ---
 name: pm-agenda
-description: Show an interpreted summary of everything in flight with recommendations.
+description: List in-flight work and the next actionable item.
 argument-hint: "[optional: --by status|executor|priority] [optional focus area]"
 ---
 

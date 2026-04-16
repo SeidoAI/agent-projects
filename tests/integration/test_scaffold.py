@@ -151,7 +151,7 @@ class TestScaffoldText:
         assert "(no skill examples shipped yet" not in result.output
         # Manifest entries visible
         assert "plan.md (planning, required)" in result.output
-        assert "task-checklist.md (planning, required)" in result.output
+        assert "task-checklist.md (implementing, required)" in result.output
         # Template file paths visible
         assert "issue_templates/default.yaml.j2" in result.output
         # Step 10 skill examples visible
