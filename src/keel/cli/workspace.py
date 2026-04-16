@@ -140,20 +140,25 @@ def workspace_link_cmd(workspace_path: Path, project_dir: Path, slug: str) -> No
     except ValueError:
         ws_relative_back = str(proj_resolved)
 
-    # Project-side: write workspace pointer.
     from keel.core.store import save_project
     from keel.models.project import ProjectWorkspacePointer
 
-    cfg_new = cfg.model_copy(
-        update={"workspace": ProjectWorkspacePointer(path=pointer_path)}
-    )
-    save_project(proj_resolved, cfg_new)
-
-    # Workspace-side: register project entry.
+    # Write workspace-side FIRST. If it fails (e.g. duplicate slug,
+    # lock timeout, write error) the project-side pointer hasn't been
+    # touched yet — no one-sided link to clean up.
     add_project(
         ws_resolved,
         WorkspaceProjectEntry(slug=slug, name=cfg.name, path=ws_relative_back),
     )
+
+    # Project-side: write workspace pointer. If THIS fails (unlikely —
+    # it's a local file write), we have a workspace entry without a
+    # project pointer, which is the safer half-state: `workspace list`
+    # will show it and `workspace prune` can clean it up.
+    cfg_new = cfg.model_copy(
+        update={"workspace": ProjectWorkspacePointer(path=pointer_path)}
+    )
+    save_project(proj_resolved, cfg_new)
 
     ws = load_workspace(ws_resolved)
     click.echo(f"✓ Linked {cfg.name} ↔ workspace {ws.slug}")
@@ -709,6 +714,11 @@ def workspace_pull_cmd(project_dir: Path, nodes: str | None, dry_run: bool) -> N
 
     for node_id, result in conflicts:
         base_dict, ours_dict, theirs_dict = conflict_context[node_id]
+
+        if dry_run:
+            # Dry-run: report the conflict but write nothing to disk.
+            continue
+
         brief = build_merge_brief(
             node_id=node_id,
             merge_type=MergeType.PULL,
@@ -719,9 +729,6 @@ def workspace_pull_cmd(project_dir: Path, nodes: str | None, dry_run: bool) -> N
             auto_merged_fields=result.auto_merged_fields,  # type: ignore[attr-defined]
         )
         save_merge_brief(proj, brief)
-
-        if dry_run:
-            continue
 
         # Draft merge starting point: apply auto-merged fields, take ours
         # for conflicting fields, keep workspace_sha unchanged until the

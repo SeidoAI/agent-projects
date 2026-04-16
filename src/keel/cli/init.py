@@ -396,62 +396,117 @@ def _link_to_workspace(
     project_name: str,
     copy_nodes: str | None,
 ) -> None:
-    """Run `keel workspace link` + optional `keel workspace copy` after init.
+    """Link the newly-init'd project to a workspace + optionally copy nodes.
 
-    Uses subprocess to reuse the same code paths as direct CLI invocation —
-    preserves the bidirectional handshake and all validation logic.
+    Uses the internal Python API directly (no subprocess / no ``uv``
+    dependency) so this works in any install environment.
     """
-    import subprocess as _subprocess
+    import os
+
+    from keel.core.store import load_project as _load_project
+    from keel.core.store import save_project as _save_project
+    from keel.core.workspace_store import (
+        add_project as _ws_add_project,
+    )
+    from keel.core.workspace_store import (
+        workspace_exists as _ws_exists,
+    )
+    from keel.models.project import ProjectWorkspacePointer
+    from keel.models.workspace import WorkspaceProjectEntry
 
     slug = key_prefix.lower()
 
-    link_result = _subprocess.run(
-        [
-            "uv",
-            "run",
-            "keel",
-            "workspace",
-            "link",
-            str(workspace_path),
-            "--project-dir",
-            str(target_dir),
-            "--slug",
-            slug,
-        ],
-        capture_output=True,
-        text=True,
-    )
-    if link_result.returncode != 0:
-        raise InitError(
-            f"Failed to link to workspace at {workspace_path}:\n{link_result.stderr}"
+    if not _ws_exists(workspace_path):
+        raise InitError(f"No workspace.yaml at {workspace_path}")
+
+    # Compute relative paths from each side.
+    try:
+        pointer_path = os.path.relpath(workspace_path, target_dir)
+    except ValueError:
+        pointer_path = str(workspace_path)
+    try:
+        ws_relative_back = os.path.relpath(target_dir, workspace_path)
+    except ValueError:
+        ws_relative_back = str(target_dir)
+
+    # Write workspace-side FIRST so that if it fails (e.g. duplicate
+    # slug) the project-side pointer hasn't been written yet — avoiding
+    # a one-sided link.
+    try:
+        _ws_add_project(
+            workspace_path,
+            WorkspaceProjectEntry(
+                slug=slug,
+                name=project_name,
+                path=ws_relative_back,
+            ),
         )
+    except ValueError as exc:
+        raise InitError(f"Failed to register in workspace: {exc}") from exc
+
+    cfg = _load_project(target_dir)
+    cfg_new = cfg.model_copy(
+        update={"workspace": ProjectWorkspacePointer(path=pointer_path)}
+    )
+    _save_project(target_dir, cfg_new)
 
     console.print(
         f"[dim]✓ Linked {project_name} to workspace at {workspace_path}[/dim]"
     )
 
     if copy_nodes:
+        from datetime import datetime, timezone
+
+        from keel.core.node_store import node_exists, save_node
+
         node_ids = [nid.strip() for nid in copy_nodes.split(",") if nid.strip()]
-        copy_result = _subprocess.run(
-            [
-                "uv",
-                "run",
-                "keel",
-                "workspace",
-                "copy",
-                *node_ids,
-                "--project-dir",
-                str(target_dir),
-            ],
-            capture_output=True,
-            text=True,
-        )
-        if copy_result.returncode != 0:
-            console.print(
-                f"[yellow]Warning: failed to copy nodes: {copy_result.stderr}[/yellow]"
-            )
-        else:
-            console.print(f"[dim]✓ Copied {len(node_ids)} node(s) from workspace[/dim]")
+        head_sha = _git_head_short(workspace_path)
+        copied = 0
+        for nid in node_ids:
+            if node_exists(target_dir, nid):
+                console.print(
+                    f"[yellow]⚠ {nid}: already exists locally, skipped[/yellow]"
+                )
+                continue
+            try:
+                from keel.core.parser import parse_frontmatter_body
+                from keel.core.paths import workspace_node_path
+                from keel.models.node import ConceptNode
+
+                ws_node_path = workspace_node_path(workspace_path, nid)
+                if not ws_node_path.is_file():
+                    console.print(f"[yellow]⚠ {nid}: not found in workspace[/yellow]")
+                    continue
+                text = ws_node_path.read_text(encoding="utf-8")
+                fm, _body = parse_frontmatter_body(text)
+                canonical = ConceptNode.model_validate(fm)
+                local_copy = canonical.model_copy(
+                    update={
+                        "origin": "workspace",
+                        "scope": "workspace",
+                        "workspace_sha": head_sha,
+                        "workspace_pulled_at": datetime.now(tz=timezone.utc),
+                    }
+                )
+                save_node(target_dir, local_copy, update_cache=False)
+                copied += 1
+            except Exception as exc:
+                console.print(f"[yellow]⚠ {nid}: copy failed: {exc}[/yellow]")
+        if copied:
+            console.print(f"[dim]✓ Copied {copied} node(s) from workspace[/dim]")
+
+
+def _git_head_short(repo_dir: Path) -> str:
+    """Return short SHA of HEAD in a git repo."""
+    import subprocess as _subprocess
+
+    return _subprocess.run(
+        ["git", "rev-parse", "--short", "HEAD"],
+        cwd=repo_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
 
 
 @click.command(name="init")
