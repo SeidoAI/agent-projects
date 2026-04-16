@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@theme {
+  /* Greys — slate scale */
+  --color-background: oklch(0.12 0 0);
+  --color-foreground: oklch(0.96 0 0);
+  --color-muted: oklch(0.2 0 0);
+  --color-muted-foreground: oklch(0.68 0 0);
+  --color-border: oklch(0.22 0 0);
+  --color-card: oklch(0.15 0 0);
+  --color-card-foreground: oklch(0.96 0 0);
+
+  /* Accent — blue for primary actions */
+  --color-primary: oklch(0.62 0.18 255);
+  --color-primary-foreground: oklch(0.98 0 0);
+
+  /* Secondary — muted for non-primary actions */
+  --color-secondary: oklch(0.2 0 0);
+  --color-secondary-foreground: oklch(0.96 0 0);
+
+  /* Destructive — red for danger actions */
+  --color-destructive: oklch(0.55 0.2 25);
+  --color-destructive-foreground: oklch(0.98 0 0);
+
+  /* Accent — hover/focus backgrounds */
+  --color-accent: oklch(0.2 0 0);
+  --color-accent-foreground: oklch(0.96 0 0);
+
+  /* Popover — same as card */
+  --color-popover: oklch(0.15 0 0);
+  --color-popover-foreground: oklch(0.96 0 0);
+
+  /* Input border + focus ring */
+  --color-input: oklch(0.22 0 0);
+  --color-ring: oklch(0.62 0.18 255);
+
+  /* Radius */
+  --radius: 0.5rem;
+
+  /* Status colours — map to issue_status enum */
+  --color-status-backlog: oklch(0.22 0 0);
+  --color-status-todo: oklch(0.55 0.15 255);
+  --color-status-in-progress: oklch(0.7 0.18 80);
+  --color-status-verifying: oklch(0.7 0.15 140);
+  --color-status-reviewing: oklch(0.7 0.15 140);
+  --color-status-testing: oklch(0.7 0.15 140);
+  --color-status-ready: oklch(0.7 0.18 140);
+  --color-status-updating: oklch(0.7 0.18 60);
+  --color-status-done: oklch(0.55 0.2 140);
+  --color-status-canceled: oklch(0.45 0 0);
+
+  /* Node types (for concept graph) */
+  --color-node-endpoint: oklch(0.65 0.17 250);
+  --color-node-model: oklch(0.7 0.17 180);
+  --color-node-decision: oklch(0.7 0.2 45);
+  --color-node-contract: oklch(0.7 0.15 310);
+  --color-node-config: oklch(0.65 0.1 100);
+  --color-node-schema: oklch(0.7 0.14 200);
+  --color-node-service: oklch(0.65 0.15 160);
+  --color-node-custom: oklch(0.55 0 0);
+
+  /* Phase badge — reflects project.phase */
+  --color-phase-scoping: oklch(0.62 0.15 250);
+  --color-phase-scoped: oklch(0.6 0.18 140);
+  --color-phase-executing: oklch(0.65 0.2 60);
+  --color-phase-reviewing: oklch(0.65 0.15 315);
+}
+
+html {
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
