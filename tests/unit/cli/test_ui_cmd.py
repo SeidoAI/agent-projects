@@ -56,39 +56,53 @@ class TestNoProjects:
         assert "keel init" in result.output
 
 
-class TestStubBehaviour:
-    def test_project_dir_flag_exits_cleanly(self, tmp_path: Path):
-        proj = tmp_path / "proj"
-        proj.mkdir()
-        (proj / "project.yaml").write_text(
-            "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
-        )
-        result = runner.invoke(cli, ["ui", "--project-dir", str(proj)])
-        assert result.exit_code == 0
-        assert "not yet implemented" in result.output
+class TestServerLaunch:
+    """Verify that the CLI wires through to ``start_server`` correctly."""
 
-    def test_port_flag_accepted(self, tmp_path: Path):
+    def test_project_dir_flag_calls_start_server(self, tmp_path: Path):
         proj = tmp_path / "proj"
         proj.mkdir()
         (proj / "project.yaml").write_text(
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        result = runner.invoke(
-            cli, ["ui", "--project-dir", str(proj), "--port", "9999"]
-        )
+        with patch("keel.ui.server.start_server") as mock_start:
+            result = runner.invoke(cli, ["ui", "--project-dir", str(proj)])
         assert result.exit_code == 0
+        mock_start.assert_called_once()
+        kwargs = mock_start.call_args.kwargs
+        assert kwargs["host"] == "127.0.0.1"
+        assert kwargs["port"] == 8000
+        assert kwargs["dev_mode"] is False
+        assert kwargs["open_browser"] is True
 
-    def test_no_browser_and_dev_flags_accepted(self, tmp_path: Path):
+    def test_port_flag_forwarded(self, tmp_path: Path):
         proj = tmp_path / "proj"
         proj.mkdir()
         (proj / "project.yaml").write_text(
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        result = runner.invoke(
-            cli,
-            ["ui", "--project-dir", str(proj), "--no-browser", "--dev"],
-        )
+        with patch("keel.ui.server.start_server") as mock_start:
+            result = runner.invoke(
+                cli, ["ui", "--project-dir", str(proj), "--port", "9999"]
+            )
         assert result.exit_code == 0
+        assert mock_start.call_args.kwargs["port"] == 9999
+
+    def test_no_browser_and_dev_flags_forwarded(self, tmp_path: Path):
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        (proj / "project.yaml").write_text(
+            "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
+        )
+        with patch("keel.ui.server.start_server") as mock_start:
+            result = runner.invoke(
+                cli,
+                ["ui", "--project-dir", str(proj), "--no-browser", "--dev"],
+            )
+        assert result.exit_code == 0
+        kwargs = mock_start.call_args.kwargs
+        assert kwargs["dev_mode"] is True
+        assert kwargs["open_browser"] is False
 
 
 def _make_import_blocker(blocked_module: str):
