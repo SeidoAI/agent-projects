@@ -60,7 +60,7 @@ def reset_project_cache() -> None:
 
 
 async def get_project(
-    project_id: str = PathParam(..., pattern=r"^[a-z0-9]+$"),
+    project_id: str = PathParam(..., pattern=r"^[a-f0-9]{12}$"),
 ) -> ProjectContext:
     """Resolve a project from the URL path parameter.
 

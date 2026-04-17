@@ -12,6 +12,8 @@ router = APIRouter(
     tags=["orchestration"],
 )
 
+# Replace these 501 stubs when implementing the real endpoints.
+
 
 @router.get("/pattern")
 async def get_orchestration_pattern(project_id: str) -> None:

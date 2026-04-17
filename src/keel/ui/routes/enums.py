@@ -11,6 +11,8 @@ router = APIRouter(
     prefix="/api/projects/{project_id}/enums", tags=["enums"]
 )
 
+# Replace these 501 stubs when implementing the real endpoints.
+
 
 @router.get("/{name}")
 async def get_enum(project_id: str, name: str) -> None:

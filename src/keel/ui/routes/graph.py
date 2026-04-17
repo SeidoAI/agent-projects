@@ -11,6 +11,8 @@ router = APIRouter(
     prefix="/api/projects/{project_id}/graph", tags=["graph"]
 )
 
+# Replace these 501 stubs when implementing the real endpoints.
+
 
 @router.get("/deps")
 async def get_dependency_graph(project_id: str) -> None:

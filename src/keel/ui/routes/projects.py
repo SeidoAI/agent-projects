@@ -9,6 +9,8 @@ from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
+# Replace these 501 stubs when implementing the real endpoints.
+
 
 @router.get("")
 async def list_projects() -> None:

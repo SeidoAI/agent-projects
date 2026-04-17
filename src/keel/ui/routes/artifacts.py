@@ -11,6 +11,8 @@ router = APIRouter(
     prefix="/api/projects/{project_id}", tags=["artifacts"]
 )
 
+# Replace these 501 stubs when implementing the real endpoints.
+
 
 @router.get("/artifact-manifest")
 async def get_artifact_manifest(project_id: str) -> None:

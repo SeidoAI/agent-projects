@@ -9,6 +9,8 @@ from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/api/actions", tags=["actions"])
 
+# Replace these 501 stubs when implementing the real endpoints.
+
 
 @router.post("/validate")
 async def validate() -> None:

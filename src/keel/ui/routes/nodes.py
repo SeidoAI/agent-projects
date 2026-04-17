@@ -11,6 +11,8 @@ router = APIRouter(
     prefix="/api/projects/{project_id}/nodes", tags=["nodes"]
 )
 
+# Replace these 501 stubs when implementing the real endpoints.
+
 
 @router.get("")
 async def list_nodes(project_id: str) -> None:

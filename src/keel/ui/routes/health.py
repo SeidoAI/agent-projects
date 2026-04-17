@@ -1,4 +1,8 @@
-"""Health-check endpoint."""
+"""Health-check endpoint.
+
+NOTE: This endpoint was added outside the KUI-12 spec (which listed 14
+routers, not 15). A formal issue should be created to document it.
+"""
 
 from __future__ import annotations
 

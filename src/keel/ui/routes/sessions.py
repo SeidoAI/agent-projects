@@ -11,6 +11,8 @@ router = APIRouter(
     prefix="/api/projects/{project_id}/sessions", tags=["sessions"]
 )
 
+# Replace these 501 stubs when implementing the real endpoints.
+
 
 @router.get("")
 async def list_sessions(project_id: str) -> None:
