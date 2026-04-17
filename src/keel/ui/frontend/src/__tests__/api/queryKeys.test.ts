@@ -1,5 +1,5 @@
-import { isPrefix, queryKeys, staleTime } from "@/lib/api/queryKeys";
 import { describe, expect, it } from "vitest";
+import { isPrefix, queryKeys, staleTime } from "@/lib/api/queryKeys";
 
 describe("queryKeys", () => {
   it("returns stable tuples for the same inputs", () => {

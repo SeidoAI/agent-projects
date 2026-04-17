@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
 import { NavLink, useParams } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { PhaseBadge } from "./PhaseBadge";
 import { ValidationStatusIndicator } from "./ValidationStatusIndicator";
 
@@ -28,12 +28,11 @@ export function TopBar() {
         <PhaseBadge />
         <ValidationStatusIndicator />
       </div>
-      <nav className="flex gap-1 px-4 pb-0" role="tablist">
+      <nav className="flex gap-1 px-4 pb-0">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
-            role="tab"
             className={({ isActive }) =>
               cn(
                 "border-b-2 px-3 py-2 text-sm transition-colors",
