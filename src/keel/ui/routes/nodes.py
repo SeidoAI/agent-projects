@@ -1,0 +1,20 @@
+"""Concept-node listing and detail routes.
+
+Endpoints filled by their respective route issues.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, HTTPException
+
+router = APIRouter(
+    prefix="/api/projects/{project_id}/nodes", tags=["nodes"]
+)
+
+# Replace these 501 stubs when implementing the real endpoints.
+
+
+@router.get("")
+async def list_nodes(project_id: str) -> None:
+    """List concept nodes for a project."""
+    raise HTTPException(status_code=501, detail="Not yet implemented")
