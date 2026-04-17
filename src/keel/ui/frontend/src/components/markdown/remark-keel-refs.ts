@@ -1,6 +1,6 @@
 import type { Link, PhrasingContent, Root, Text } from "mdast";
 import type { Plugin } from "unified";
-import { visit } from "unist-util-visit";
+import { SKIP, visit } from "unist-util-visit";
 
 export interface Reference {
   token: string;
@@ -50,7 +50,7 @@ const remarkKeelRefs: Plugin<[RemarkKeelRefsOptions], Root> = (options) => {
 
         const ref = refMap.get(token);
         if (ref?.resolves_as === "dangling" || ref?.is_stale) {
-          const resolveStatus = ref.is_stale ? "stale" : "dangling";
+          const resolveStatus = ref.resolves_as === "dangling" ? "dangling" : "stale";
           link.data = {
             hProperties: { "data-resolves": resolveStatus },
           };
@@ -65,6 +65,7 @@ const remarkKeelRefs: Plugin<[RemarkKeelRefsOptions], Root> = (options) => {
       }
 
       parent.children.splice(index, 1, ...children);
+      return [SKIP, index + children.length];
     });
   };
 };

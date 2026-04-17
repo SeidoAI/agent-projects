@@ -1,10 +1,11 @@
 import { Check, Copy } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import { Link } from "react-router-dom";
 import rehypeHighlight from "rehype-highlight";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import type { PluggableList } from "unified";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -36,11 +37,15 @@ function CopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setCopied(false), 1500);
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // clipboard permission denied or insecure context
+    }
   }, [code]);
 
   return (
@@ -57,11 +62,20 @@ function CopyButton({ code }: { code: string }) {
 }
 
 export function MarkdownBody({ content, projectId, compact, refs }: MarkdownBodyProps) {
+  const remarkPlugins = useMemo<PluggableList>(
+    () => [remarkGfm, [remarkKeelRefs, { projectId, refs }]],
+    [projectId, refs],
+  );
+  const rehypePlugins = useMemo<PluggableList>(
+    () => [rehypeHighlight, [rehypeSanitize, keelSanitizeSchema]],
+    [],
+  );
+
   return (
     <div className={cn("prose prose-invert max-w-none", compact && "prose-sm")}>
       <Markdown
-        remarkPlugins={[remarkGfm, [remarkKeelRefs, { projectId, refs }]]}
-        rehypePlugins={[rehypeHighlight, [rehypeSanitize, keelSanitizeSchema]]}
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
         components={{
           a({ href, children, ...props }) {
             const resolves = (props as Record<string, unknown>)["data-resolves"] as

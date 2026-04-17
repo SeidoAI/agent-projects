@@ -18,11 +18,7 @@ export const keelSanitizeSchema: Schema = {
   ...defaultSchema,
   attributes: {
     ...defaultSchema.attributes,
-    a: [
-      ...(defaultSchema.attributes?.a ?? []),
-      "dataResolves",
-      ["data-resolves", "stale", "dangling"],
-    ],
+    a: [...(defaultSchema.attributes?.a ?? []), ["data-resolves", "stale", "dangling"]],
     code: ["className"],
     span: ["className"],
   },

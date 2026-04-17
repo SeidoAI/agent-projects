@@ -1,6 +1,6 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Reference } from "@/components/MarkdownBody";
 import { MarkdownBody } from "@/components/MarkdownBody";
 
@@ -95,6 +95,13 @@ describe("MarkdownBody", () => {
       const link = screen.getByRole("link", { name: "old-node" });
       expect(link).toHaveAttribute("data-resolves", "stale");
     });
+
+    it("prefers dangling over stale when both flags are set", () => {
+      const refs: Reference[] = [{ token: "both-node", resolves_as: "dangling", is_stale: true }];
+      renderMarkdown("See [[both-node]].", { refs });
+      const link = screen.getByRole("link", { name: "both-node" });
+      expect(link).toHaveAttribute("data-resolves", "dangling");
+    });
   });
 
   describe("sanitisation", () => {
@@ -158,6 +165,40 @@ describe("MarkdownBody", () => {
     it("renders a copy button on code blocks", () => {
       renderMarkdown("```js\nconsole.log('hi')\n```");
       expect(screen.getByRole("button", { name: "Copy code" })).toBeInTheDocument();
+    });
+
+    it("copies code text to clipboard on click", async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText },
+      });
+
+      renderMarkdown("```js\nhello\n```");
+      fireEvent.click(screen.getByRole("button", { name: "Copy code" }));
+
+      await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+      expect(writeText.mock.calls[0]?.[0]).toContain("hello");
+    });
+
+    it("handles clipboard write rejection gracefully", async () => {
+      const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText },
+      });
+      const unhandledHandler = vi.fn();
+      window.addEventListener("unhandledrejection", unhandledHandler);
+
+      renderMarkdown("```js\nhello\n```");
+      fireEvent.click(screen.getByRole("button", { name: "Copy code" }));
+
+      await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+      // Give the microtask queue a chance to settle an unhandled rejection.
+      await new Promise((r) => setTimeout(r, 0));
+      window.removeEventListener("unhandledrejection", unhandledHandler);
+
+      expect(unhandledHandler).not.toHaveBeenCalled();
     });
   });
 
