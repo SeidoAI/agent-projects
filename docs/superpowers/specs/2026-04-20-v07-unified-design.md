@@ -1,97 +1,168 @@
 # Tripwire v0.7 — unified design
 
-**Status**: approved design
+**Status**: approved design (revised 2026-04-20 after configurability audit)
 **Date**: 2026-04-20
 **Supersedes**:
 - `2026-04-16-v07-pm-monitor.md`
 - `2026-04-17-v07-issue-developer-notes.md`
 
-**Summary**: Major release. Renames the project from `keel` to `tripwire`
-(v0.7a), then ships the full PM session lifecycle (monitor, review,
-complete), per-issue artifact enforcement, spawn refinements, CI
-infrastructure, and vocabulary alignment (all v0.7b).
+**Summary**: Major release. Renames `keel` → `tripwire` (v0.7a), then
+ships a configurability pass, full PM session lifecycle (monitor, review,
+complete), per-issue artifact enforcement, canonical spawn configuration,
+CI infrastructure, and vocabulary alignment — all v0.7b.
 
 ---
 
 ## 1. Context
 
 After v0.6c we can spawn local sessions in worktrees, compute dependency
-agendas, and track session lifecycle. But the PM workflow is incomplete:
+agendas, and track session lifecycle. Gaps remaining:
 
-- PM goes idle after spawn; no structured way to monitor executing agents.
-- No tool to review PR diffs against issue specs.
-- No end-of-lifecycle command (close issues, reconcile nodes, clean up).
-- Spawn invocation leaves quality on the table (no `--effort max`,
-  no `--model opus`, no cost cap, no session naming for resume).
-- Every PR review has flagged missing `developer.md` / `verified.md` —
-  the DoD checklist asks for them, but nothing enforces them.
-- Session phase vocabulary (`implementing`/`verifying`/`completion`)
-  and issue status vocabulary (`in_progress`/`in_review`/`done`) mean
-  the same things but use different words.
-- Neither the tripwire repo nor the projects it manages have any CI.
-- The name `keel` is overloaded in the Python ecosystem and collides
-  with multiple adjacent libraries.
+- PM goes idle after spawn; no structured way to monitor agents.
+- No tool reviewing PR diffs against issue specs.
+- No end-of-lifecycle command (close issues, reconcile nodes, cleanup).
+- Spawn invocation hardcodes flags + prompt in Python.
+- Every PR review flags missing `developer.md` / `verified.md`; nothing
+  enforces them.
+- Session phase vocabulary and issue status vocabulary mean the same
+  things using different words.
+- No CI for tripwire itself or for projects it manages.
+- `keel` name is overloaded in the Python ecosystem.
+- A drift audit surfaced multiple items that should be YAML-configurable
+  per the original vision but got hardcoded: `ArtifactPhase`, `AgentType`,
+  branch type prefixes, spawn invocation, slash command bodies.
 
-v0.7 closes all of this.
-
-## 2. Scope summary
-
-Eight feature areas. v0.7a is the rename (prerequisite). v0.7b is
-everything else, released together.
-
-| § | Feature | Phase |
-|---|---|---|
-| 3 | Rename `keel` → `tripwire` | v0.7a |
-| 4 | Vocabulary alignment (ArtifactPhase ↔ IssueStatus) | v0.7b Phase 1 |
-| 5 | Per-issue artifacts (developer.md, verified.md enforced) | v0.7b Phase 2 |
-| 6 | Spawn refinements (Claude Code flags, spawn_config) | v0.7b Phase 3 |
-| 7 | Session monitor (`/pm-session-monitor`) | v0.7b Phase 4 |
-| 8 | Session review (`/pm-session-review`) | v0.7b Phase 5 |
-| 9 | Session complete (`/pm-session-complete`) | v0.7b Phase 6 |
-| 10 | CI + PyPI publishing + project workflow templates | v0.7b Phases 7-8 |
-
-**Non-goals for v0.7:**
-- Real verification agent (PM acts as verifier, writes `verified.md`)
-- Agent messaging MCP (monitor uses stream-json only)
-- Container-aware monitoring
-- Auto-remediation by default (read-only automation; per-command
-  overrides via slash args)
-- Multi-project workspace monitor
-- Per-issue `artifact_overrides` field on issue.yaml
-- Grandfather clauses or legacy vocabulary aliases (clean cut)
+v0.7 closes all of this and re-asserts the configurability principle.
 
 ---
 
-## 3. v0.7a — Rename to `tripwire`
+## 2. Design principles
 
-### 3.1 Rationale
+These principles apply to every feature in v0.7 and are the standard
+v0.8+ work measures against. They belong in the README too.
 
-Core mechanism: inject post-validation warnings into the agent's most
-recent context (LLMs over-weight recency). That's a tripwire.
+### 2.1 Config over convention
 
-The current name `keel` is overloaded with adjacent libraries (AI agents
-routinely hallucinate keel-named packages). Renaming now, before any
-PyPI publish, is cheap because downstream = only our 3 test projects.
+Every domain concept users might want to customize — statuses, phases,
+agent types, branch conventions, artifact requirements, spawn flags,
+slash command bodies — lives in YAML, not Python. Python code consumes
+the YAML; it doesn't enumerate the values.
 
-### 3.2 Changes
+**What counts as a "domain concept":** anything a reasonable project
+might want to change to fit its workflow. Status values, branch type
+prefixes, artifact manifests, spawn invocation, prompt templates,
+agent personas.
+
+**What stays in Python:** the schema (what *shape* a domain concept
+takes), validation mechanics, CLI plumbing, store logic.
+
+**Override hierarchy (universal):**
+1. Session-level YAML (highest; `session.yaml.<field>`)
+2. Project-level YAML (`project.yaml` or `<project>/enums/`, `<project>/.tripwire/`)
+3. Tripwire-shipped defaults (lowest; `src/tripwire/templates/...`)
+
+### 2.2 Slash command wrapper pattern
+
+Every feature ships in two layers:
+
+- **CLI command** (`tripwire <verb>`): deterministic. Does the
+  mechanical work. Enforces rules. Exits with a code. No LLM required.
+- **Slash command wrapper** (`/pm-<verb>`): workflow harness. Orchestrates
+  CLI calls, injects LLM judgment at decision points, produces
+  PM-level outputs (comments, summaries, next-action recommendations).
+
+Rationale: systemise the deterministic parts so they're reproducible and
+testable; preserve LLM intelligence for the judgment-heavy parts. The
+CLI is the source of truth; the slash command layers interpretation on
+top. Every new feature declares both layers.
+
+### 2.3 Single-agent session constraint
+
+One agent per session. Agents cannot spawn sub-agents via the Agent
+tool or `/batch`. The PM decomposes work into sessions; sessions don't
+re-decompose at runtime.
+
+Enforced at spawn time via `--disallowedTools Agent`. Measured quality
+degradation when this constraint is relaxed (context loss, weaker
+synthesis, cost multiplication, invisible to PM monitor).
+
+### 2.4 Clean cut on breaking changes
+
+No grandfather clauses, no legacy aliases, no dual-mode parsers. When
+a field, vocabulary, or convention changes, every YAML in the
+codebase changes in one migration PR. Pre-1.0 means we own every
+downstream project; there is no legitimate legacy data to preserve.
+
+### 2.5 Tripwire mechanism — post-validation context injection
+
+The core mechanism that gives the project its name. When an agent
+deviates (quality drop, convention violation, scope creep), tripwire
+doesn't block — it injects a warning into the agent's most recent
+context. LLMs over-weight recency; agents read the warning first when
+they resume work. This is how tripwire enforces standards without
+halting autonomy.
+
+### 2.6 Non-principles (explicitly not claims)
+
+- Not "zero Python hardcoding." Schema, validation mechanics, and CLI
+  plumbing live in Python.
+- Not "every workflow configurable." The shipped workflows are opinions.
+  Projects can override slash command bodies if they need to diverge.
+- Not "backwards compatible." See §2.4.
+
+---
+
+## 3. Scope summary
+
+| § | Feature | Phase |
+|---|---|---|
+| 4 | Rename `keel` → `tripwire` | v0.7a |
+| 5 | Configurability pass (externalize hardcoded items) | v0.7b Phase 0 |
+| 6 | Vocabulary alignment + new `verified` status | v0.7b Phase 1 |
+| 7 | Per-issue artifacts | v0.7b Phase 2 |
+| 8 | Canonical spawn configuration | v0.7b Phase 3 |
+| 9 | Session monitor | v0.7b Phase 4 |
+| 10 | Session review | v0.7b Phase 5 |
+| 11 | Session complete | v0.7b Phase 6 |
+| 12 | CI + PyPI + project workflow templates | v0.7b Phase 7-8 |
+
+**Non-goals for v0.7:**
+- Real verification agent (PM fills the verified role)
+- Agent messaging MCP (monitor uses stream-json only)
+- Container-aware monitoring
+- Auto-remediation by default
+- Multi-project workspace monitor
+- Grandfather / legacy vocabulary aliases
+
+---
+
+## 4. v0.7a — Rename to `tripwire`
+
+### 4.1 Rationale
+
+The current name `keel` collides with multiple adjacent Python packages;
+AI agents routinely hallucinate keel-named libraries. Renaming before
+any PyPI publish is cheap (downstream = only 3 test projects).
+
+The new name encodes the core mechanism (§2.5).
+
+### 4.2 Changes
 
 | Layer | Before | After |
 |---|---|---|
 | Package name | `keel` | `tripwire` |
-| CLI commands | `keel <subcommand>` | `tripwire <subcommand>` AND `tw <subcommand>` (alias) |
-| Import path | `from keel.core import ...` | `from tripwire.core import ...` |
-| Repo name | `SeidoAI/keel` | `SeidoAI/tripwire` (GitHub redirects preserved) |
-| Config field | `project.yaml.keel_version` | `project.yaml.tripwire_version` |
+| CLI commands | `keel <subcommand>` | `tripwire <subcommand>` + `tw` alias |
+| Import path | `keel.core.*` | `tripwire.core.*` |
+| Repo name | `SeidoAI/keel` | `SeidoAI/tripwire` |
+| Config field | `project.yaml.keel_version` | `tripwire_version` |
 | Lock file | `.keel.lock` | `.tripwire.lock` |
 | Hidden dir | `.keel/merge-briefs/` | `.tripwire/merge-briefs/` |
+| Project override dir | n/a (didn't exist) | `.tripwire/commands/`, `.tripwire/spawn/` |
 | Log dir | `~/.keel/logs/` | `~/.tripwire/logs/` |
-| Workspace field | `keel_version` on `Workspace` | `tripwire_version` |
-| Agent/PM skill refs | "keel" in prose | "tripwire" |
-| Slash commands | `/pm-*` (unaffected) | `/pm-*` (unaffected) |
+| Workspace field | `keel_version` | `tripwire_version` |
+| Brand in docs | "keel" | "tripwire" |
 
-### 3.3 CLI entry points
-
-`pyproject.toml` declares both console scripts:
+### 4.3 CLI entry points
 
 ```toml
 [project.scripts]
@@ -99,95 +170,211 @@ tripwire = "tripwire.cli.main:cli"
 tw = "tripwire.cli.main:cli"
 ```
 
-`tripwire` is canonical in all docs. `tw` is the ergonomic alias
-(matches `gh`, `uv`, `rg`, `cc` patterns).
+`tripwire` canonical in docs; `tw` is the ergonomic alias matching the
+`gh` / `uv` / `rg` pattern.
 
-### 3.4 Test projects
+### 4.4 PyPI name
 
-All three (`kb-pivot`, `graph-ui-v2`, `project-keel-ui-init`) get a
-migration PR that updates `project.yaml` (field rename) and any
-docs/comments mentioning `keel`. The `project-keel-ui-init` directory
-itself is not renamed — users can rename their projects independently.
-
-### 3.5 Open risk
-
-PyPI `tripwire` availability — checked as free at time of drafting
-but must be re-confirmed during Phase 7. Fallback: `tripwire-pm`.
+Check `tripwire` availability at the start of Phase 8. Fallback:
+`tripwire-pm`. The Python package name stays `tripwire` regardless.
 
 ---
 
-## 4. Vocabulary alignment (v0.7b Phase 1)
+## 5. Phase 0 — Configurability pass
 
-### 4.1 The rename
+### 5.1 The problem
 
-`ArtifactPhase` values align with `IssueStatus` values:
+Drift audit (2026-04-20) found these items hardcoded in ways that
+violate §2.1:
 
+| Item | Current location | New YAML home |
+|---|---|---|
+| `ArtifactPhase` | Python `Literal` in `models/manifest.py:16` | `src/tripwire/templates/enums/artifact_phase.yaml` + project override |
+| `AgentType` | Python `Literal` in `models/manifest.py:15` | `src/tripwire/templates/enums/agent_type.yaml` + project override |
+| Branch type prefixes | `ALLOWED_TYPES` tuple in `branch_naming.py:18` | `src/tripwire/templates/enums/branch_type.yaml` + project override |
+| Spawn invocation (flags + prompt template) | Python string in `session.py::_launch_claude` | `src/tripwire/templates/spawn/defaults.yaml` (§8) |
+| Project-level artifact manifest override | Only session-level overrides exist | `project.yaml.artifact_manifest_overrides` + new `issue_artifact_manifest_overrides` |
+| Slash command bodies | Keel-shipped templates only | Projects override at `<project>/.tripwire/commands/<name>.md` |
+
+### 5.2 Pattern: Python schema, YAML values
+
+For each item above, the approach is the same:
+
+1. **Python** declares the *shape* of the concept via a Pydantic model.
+   The model's fields are `str`, not `Literal`. Validation happens at
+   load time.
+2. **Tripwire templates** ship a default YAML populated with tripwire's
+   opinions.
+3. **Project config** can override at `<project>/enums/<name>.yaml`
+   (for enum-like values) or via specific fields in `project.yaml`
+   (for structured overrides).
+4. **Loader** (one per concept) reads project first, falls back to
+   tripwire default. Loader returns the typed values; validators
+   consume them.
+
+This mirrors the existing pattern already used for `IssueStatus`,
+`SessionStatus`, and status transitions — which is why those didn't
+drift.
+
+### 5.3 Detailed migration — `ArtifactPhase`
+
+Canonical example; all other migrations follow the same shape.
+
+**Before:**
 ```python
-# before
 ArtifactPhase = Literal["planning", "implementing", "verifying", "completion"]
-
-# after
-ArtifactPhase = Literal["planning", "in_progress", "in_review", "done"]
 ```
 
-`planning` stays — there's no issue analog (issues skip planning; the
-PM plans them into existence once per session).
+**After:**
 
-### 4.2 Clean cut (no aliases)
-
-Every manifest YAML, session YAML, fixture, skill doc, and reference
-gets rewritten in one migration pass. No legacy alias layer at load
-time. Rationale: we have three test projects, the rename is mechanical,
-adding transitional plumbing is more code to remove later.
-
-Files touched:
-- `src/tripwire/models/manifest.py` — `ArtifactPhase` literal
-- `src/tripwire/templates/artifacts/manifest.yaml` — every `produced_at`
-- `src/tripwire/core/validator.py` — phase references in messages
-- `src/tripwire/templates/skills/**/*.md` — vocabulary in skill docs
-- All session YAMLs in test fixtures and test projects
-- `docs/**.md`
-
-### 4.3 Layer 2: enum-coherence test
-
-Prevents regression at CI time:
-
+Python (`models/manifest.py`):
 ```python
-SESSION_ONLY_PHASES: frozenset[str] = frozenset({"planning"})
-
-def test_artifact_phases_align_with_issue_status():
-    overlap_required = set(ArtifactPhase) - SESSION_ONLY_PHASES
-    assert overlap_required.issubset(set(IssueStatus))
+# ArtifactPhase is loaded from enums/artifact_phase.yaml.
+# Default: {planning, in_progress, in_review, verified, done}
+# (see §6 for the new `verified` phase).
+# Models use str; loader validates against enum at runtime.
+class ArtifactEntry(BaseModel):
+    produced_at: str
+    # ... validated against loaded ArtifactPhase at manifest load
 ```
 
-Fails if anyone adds a new phase that doesn't match an issue status,
-without explicitly marking it session-only.
+YAML (`src/tripwire/templates/enums/artifact_phase.yaml`):
+```yaml
+name: ArtifactPhase
+description: Stages at which artifacts are produced
+values:
+  - id: planning
+    label: Planning
+    description: PM scoping and plan writing
+  - id: in_progress
+    label: In progress
+    description: Execution agent implementing
+  - id: in_review
+    label: In review
+    description: PM reviewing PR
+  - id: verified
+    label: Verified
+    description: QA agent verifying tests + acceptance criteria
+  - id: done
+    label: Done
+    description: Complete and merged
+```
 
-### 4.4 Layer 3: coherence validator
+Loader: reuses existing `core/enum_loader.py` machinery. No new code.
 
-New validator check: session↔issue status consistency.
+**Project override:** write `<project>/enums/artifact_phase.yaml` with
+a different value set. Validator catches manifest entries referencing
+unknown phases.
+
+### 5.4 Detailed migration — spawn invocation
+
+See §8 (spawn configuration) — the full migration covers prompt
+template, flags, system prompt append, and per-session/project
+override precedence.
+
+### 5.5 Detailed migration — slash command bodies
+
+**Before:** `src/tripwire/templates/commands/pm-*.md` ships tripwire's
+version only. Projects cannot override.
+
+**After:** Loader looks in this order:
+1. `<project>/.tripwire/commands/<name>.md`
+2. `src/tripwire/templates/commands/<name>.md`
+
+A project wanting a different `/pm-scope` workflow copies the shipped
+version to `.tripwire/commands/pm-scope.md` and edits.
+
+### 5.6 What's NOT externalized in v0.7
+
+Deferred to v0.8+ (mentioning to set expectations):
+- Validator check implementations (each is a Python function; YAML
+  DSL for validation is out of scope)
+- Core CLI command structure (which subcommands exist)
+- Agent / coordination patterns (these are CLAUDE.md guidance for
+  the agent ecosystem, not tripwire config)
+
+---
+
+## 6. Phase 1 — Vocabulary alignment + verified stage
+
+### 6.1 New issue status order
+
+```
+backlog → todo → in_progress → in_review → verified → done
+```
+
+| Status | Meaning | Who drives | Artifact required at entry |
+|---|---|---|---|
+| `backlog` | Captured but not triaged | - | - |
+| `todo` | Triaged, ready for pickup | PM | - |
+| `in_progress` | Execution agent working | Execution agent | - |
+| `in_review` | PR opened, PM reviewing code/project PR | PM agent | `developer.md` |
+| `verified` | PR merged, QA agent ran acceptance tests | QA agent (v0.8+; PM fills in v0.7) | `verified.md` |
+| `done` | Closed — concept nodes reconciled, followups logged | PM | - |
+
+**Why split `in_review` and `verified`:** code review (PM) and acceptance
+testing (QA) are distinct activities. A PR can pass PM review but fail
+acceptance testing. Until a real QA agent ships, the PM fills the
+verified role and writes `verified.md`. The status distinction stays
+because it'll matter when the QA agent lands.
+
+### 6.2 Phase vocabulary alignment
+
+`ArtifactPhase` values (loaded from YAML per §5.3) map 1:1 with
+`IssueStatus`, except for `planning` (session-only):
+
+| ArtifactPhase | IssueStatus analog |
+|---|---|
+| `planning` | (session-only, no analog) |
+| `in_progress` | `in_progress` |
+| `in_review` | `in_review` |
+| `verified` | `verified` |
+| `done` | `done` |
+
+Old phase names (`implementing`, `verifying`, `completion`) are gone —
+clean cut per §2.4.
+
+### 6.3 Layer-2 coherence test
+
+A unit test asserts `set(ArtifactPhase enum) - {"planning"}` is a
+subset of `set(IssueStatus enum)`. Both values are loaded from the
+tripwire-shipped default YAML (not project overrides — the shipped
+defaults must stay aligned; projects can diverge if they want).
+
+Test fails if anyone adds a phase that doesn't match an issue status
+without explicitly adding it to `SESSION_ONLY_PHASES = {"planning"}`.
+
+### 6.4 Layer-3 coherence validator
+
+Validator check runs on every `tripwire validate`. Session↔issue
+alignment:
 
 | Session status | Allowed issue statuses | Violation |
 |---|---|---|
 | `planning` | `backlog`, `todo` | warn on later |
-| `in_progress` | `todo`, `in_progress`, `in_review` | warn on `done` |
-| `in_review` | `in_review`, `done` | **error** on `in_progress` or earlier |
-| `done` | `done` | **error** on anything else |
+| `in_progress` | `todo`, `in_progress`, `in_review` | warn on later |
+| `in_review` | `in_review`, `verified`, `done` | error on earlier |
+| `verified` | `verified`, `done` | error on earlier |
+| `done` | `done` | error on anything else |
 
 Codes:
-- `coherence/issue_status_lags_session` (warning — real slippage happens)
-- `coherence/issue_status_ahead_of_session` (error — genuine bug)
+- `coherence/issue_status_lags_session` (warning)
+- `coherence/issue_status_ahead_of_session` (error)
 
-This is the check that turns vocabulary alignment from cosmetic to
-load-bearing. Runs as part of every `tripwire validate`.
+### 6.5 Migration
+
+All session YAMLs across 3 test projects: status values remap per
+§6.2. Old `implementing` → `in_progress`, `verifying` → `in_review`,
+`completion` → `done`. No issue currently uses `verified`; new
+issues produced after this phase can populate it.
 
 ---
 
-## 5. Per-issue artifacts (v0.7b Phase 2)
+## 7. Phase 2 — Per-issue artifacts
 
-### 5.1 Manifest
+### 7.1 Manifest
 
-New file: `src/tripwire/templates/issue_artifacts/manifest.yaml`:
+Shipped at `src/tripwire/templates/issue_artifacts/manifest.yaml`:
 
 ```yaml
 artifacts:
@@ -197,7 +384,7 @@ artifacts:
     produced_by: execution-agent
     owned_by: execution-agent
     required: true
-    required_at_status: in_review
+    required_at_status: in_review   # written before PM review
 
   - name: verified
     file: verified.md
@@ -205,15 +392,13 @@ artifacts:
     produced_by: verification-agent
     owned_by: verification-agent
     required: true
-    required_at_status: done
+    required_at_status: verified    # written by QA agent (PM in v0.7)
 ```
 
-No `grandfather_before` field. Clean cut per §2.
+Project overrides at `project.yaml.issue_artifact_manifest_overrides`
+(list of entries appended/replacing shipped entries by `name`).
 
-### 5.2 Schema
-
-Sibling class to `ArtifactEntry` (don't mix session-phase and
-issue-status semantics on one model):
+### 7.2 Schema
 
 ```python
 class IssueArtifactEntry(BaseModel):
@@ -221,728 +406,475 @@ class IssueArtifactEntry(BaseModel):
     name: str
     file: str
     template: str
-    produced_by: AgentType
-    owned_by: AgentType | None = None
+    produced_by: str  # validated against agent_type.yaml at load time
+    owned_by: str | None = None
     required: bool = True
-    required_at_status: IssueStatus = "done"
-
-    @model_validator(mode="after")
-    def _default_owned_by_to_produced_by(self) -> IssueArtifactEntry:
-        if self.owned_by is None:
-            object.__setattr__(self, "owned_by", self.produced_by)
-        return self
-
-
-class IssueArtifactManifest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    artifacts: list[IssueArtifactEntry] = Field(default_factory=list)
+    required_at_status: str  # validated against issue_status.yaml at load time
 ```
 
-### 5.3 Validator
+All stringly-typed; loaders validate against the project's active enums.
 
-New check: `check_issue_artifact_presence`. For each issue, for each
-required artifact, if `issue.status ≥ required_at_status` and the
-file doesn't exist, emit `issue_artifact/missing` (error).
+### 7.3 Validator: `check_issue_artifact_presence`
 
-Status ordering helper: `backlog < todo < in_progress < in_review < done`.
+For each issue, for each required entry: if `issue.status ≥
+required_at_status`, the file must exist. Emits
+`issue_artifact/missing` (error).
 
-Status-transition guards:
-- `in_progress → in_review` blocked without `developer.md`
-- `in_review → done` blocked without `verified.md`
+Status ordering derived from `project.yaml.status_transitions` + the
+loaded `IssueStatus` enum (no hardcoded order).
 
-### 5.4 CLI
+### 7.4 Status transition guards
 
-New command group `tripwire issue artifact`:
+- `in_progress → in_review`: blocked without `developer.md`
+- `in_review → verified`: blocked without `verified.md`
+- `verified → done`: no artifact gate (done means cleanup complete)
 
-```bash
+### 7.5 CLI
+
+```
 tripwire issue artifact init <issue-key> <artifact-name> [--force] [--produced-by AGENT]
 tripwire issue artifact list <issue-key> [--format text|json]
 tripwire issue artifact verify <issue-key>
 ```
 
-`init` renders the template into `issues/<key>/<file>`. Refuses to
-overwrite without `--force`. `--produced-by` override exists for the
-PM-as-verifier path until a real verifier ships.
+### 7.6 Slash command wrapper
 
-### 5.5 Templates
+`/pm-issue-artifact` (new): wraps the CLI with PM judgment on what
+content to populate in the artifact. For `verified.md` this runs a
+structured review against acceptance criteria; for `developer.md`
+this would be the agent at completion time.
 
-Two new Jinja templates in `src/tripwire/templates/issue_artifacts/`:
+### 7.7 Migration — backfill
 
-**`developer.md.j2`** — sections: What I built, Key decisions, Files
-touched, Tests added, Stop-and-ask points triggered, Followups.
+Every issue at `in_review` or later gets `developer.md` backfilled
+with a placeholder stub. Every issue at `verified` or `done` gets
+`verified.md` backfilled with a stub (attribution: `pm-agent`,
+verdict: `approved`).
 
-**`verified.md.j2`** — sections: Verified by, Verified at, Verdict
-(approved | approved-with-followups | rejected), Acceptance criteria
-(checkboxes with evidence), Deviations found, Follow-up issues created.
-
-### 5.6 Issue template update
-
-`default.yaml.j2` DoD checklist points at the CLI instead of literal
-paths:
-
-```markdown
-## Definition of Done
-- [ ] Implementation complete
-- [ ] Tests added/updated
-- [ ] Completion comment added
-- [ ] developer.md ({{ id }}) — see `tripwire issue artifact list {{ id }}`
-- [ ] verified.md ({{ id }}) — see `tripwire issue artifact list {{ id }}`
-- [ ] Concept nodes created/updated for new artifacts
-```
-
-### 5.7 Migration — backfill existing issues
-
-Every issue in every test project at status `in_review` or `done`
-gets `developer.md` backfilled. Every issue at `done` gets `verified.md`
-backfilled.
-
-**Backfill content:** stub with a honest placeholder, not retroactive
-reviews. Template:
-
-```markdown
-# Developer notes — <KEY>
-
-## Backfill notice
-
-This artifact was created retroactively during the v0.7 migration.
-The issue was closed before per-issue artifacts were enforced.
-See PR <number> for implementation details.
-```
-
-Same pattern for `verified.md`. Attribution: `pm-agent`.
-
-### 5.8 Reopen behavior
-
-If an issue transitions `done → in_progress`, existing `developer.md`
-and `verified.md` persist. The next pass appends `## Re-engagement
-YYYY-MM-DD` sections rather than overwriting.
+Stub template includes a "This artifact was created retroactively
+during v0.7 migration. See PR <number>." paragraph.
 
 ---
 
-## 6. Spawn refinements (v0.7b Phase 3)
+## 8. Phase 3 — Canonical spawn configuration
 
-### 6.1 Corrected spawn invocation
+### 8.1 Canonical YAML
 
-Amends v0.6c spawn. The `claude -p` invocation becomes:
+Ships at `src/tripwire/templates/spawn/defaults.yaml`:
 
-```bash
-nohup claude -p "$(cat <plan-path>)
+```yaml
+# Default spawn configuration. Projects override via
+# project.yaml.spawn_defaults. Sessions override via
+# session.yaml.spawn_config. Precedence: session > project > tripwire default.
 
-You are the <agent> agent for session <session-id>.
-Execute the plan. Stop at stop-and-ask points.
-Open a PR titled '<type>(<session-slug>): <summary>' when done." \
-  --name "<session-id>" \
-  --effort max \
-  --model opus \
-  --fallback-model sonnet \
-  --permission-mode bypassPermissions \
-  --disallowedTools "Agent" \
-  --max-turns 200 \
-  --max-budget-usd 50 \
-  --output-format stream-json \
-  --append-system-prompt "tripwire session: <session-id>; project: <project-slug>
-If context is getting heavy, use /compact to free space.
-Do not use the Agent tool — you are a single-agent session.
-Do not use /batch — the work is already decomposed in your plan." \
-  > <log-path> 2>&1 &
+invocation:
+  command: claude
+  args:
+    - "-p"
+    - "{{ prompt }}"
+    - "--name"
+    - "{{ session_id }}"
+    - "--effort"
+    - "{{ effort }}"
+    - "--model"
+    - "{{ model }}"
+    - "--fallback-model"
+    - "{{ fallback_model }}"
+    - "--permission-mode"
+    - "{{ permission_mode }}"
+    - "--disallowedTools"
+    - "{{ disallowed_tools | join(',') }}"
+    - "--max-turns"
+    - "{{ max_turns }}"
+    - "--max-budget-usd"
+    - "{{ max_budget_usd }}"
+    - "--output-format"
+    - "{{ output_format }}"
+    - "--append-system-prompt"
+    - "{{ system_prompt_append }}"
+  background: true                        # nohup & redirect
+  log_path_template: "~/.tripwire/logs/{{ project_slug }}/{{ session_id }}-{{ timestamp }}.log"
+
+config:
+  model: opus
+  fallback_model: sonnet
+  effort: max
+  permission_mode: bypassPermissions
+  disallowed_tools: [Agent]
+  max_turns: 200
+  max_budget_usd: 50
+  output_format: stream-json
+
+# Jinja template. Rendered at spawn time with `plan`, `session_id`,
+# `session_name`, `agent`, `project_slug` in scope. Projects can
+# override this to change the instructions given to spawned agents.
+prompt_template: |
+  {{ plan }}
+
+  You are the {{ agent }} agent for session {{ session_id }}.
+  Execute the plan. Stop at stop-and-ask points.
+  Open a PR titled '{{ branch_type }}({{ session_slug }}): {{ session_name }}' when done.
+
+system_prompt_append: |
+  tripwire session: {{ session_id }}; project: {{ project_slug }}
+  If context is getting heavy, use /compact to free space.
+  Do not use the Agent tool — you are a single-agent session.
+  Do not use /batch — the work is already decomposed in your plan.
 ```
 
-### 6.2 Flag rationale
+### 8.2 Precedence
 
-| Flag | Purpose |
-|---|---|
-| `--name <session-id>` | Align Claude session name with tripwire session. Enables resume-by-name. |
-| `--effort max` | Autonomous agents should use strongest reasoning available. |
-| `--model opus` | Complex implementation work; per-session override available. |
-| `--fallback-model sonnet` | Resilience against overload. |
-| `--permission-mode bypassPermissions` | Autonomous agents can't answer permission prompts. |
-| `--disallowedTools "Agent"` | Single-agent constraint — no subagent spawning. |
-| `--max-turns 200` | Safety cap. |
-| `--max-budget-usd 50` | Hard cost ceiling. |
-| `--output-format stream-json` | Real-time event stream (enables monitor). |
-| `--append-system-prompt` | Session + project context + self-care instructions. |
+1. `session.yaml.spawn_config` (highest)
+2. `project.yaml.spawn_defaults`
+3. `<project>/.tripwire/spawn/defaults.yaml` (project-wide override)
+4. `src/tripwire/templates/spawn/defaults.yaml` (tripwire default)
 
-### 6.3 `spawn_config` schema
+Merge is deep: each level can override specific keys (e.g., just
+`model`) without re-specifying everything.
 
-`session.yaml` gains an optional `spawn_config` block:
+### 8.3 Python side
+
+`tripwire.core.spawn_config.load(project_dir, session) -> ResolvedSpawnConfig`
+returns a fully-merged, rendered configuration. `session.py` consumes
+it:
+
+```python
+resolved = load_spawn_config(project_dir, session)
+args = resolved.render_args(plan=plan, session_id=session.id, ...)
+subprocess.Popen(args, ...)
+```
+
+No Python code assembles the invocation by string concatenation. No
+hardcoded flags.
+
+### 8.4 Per-session override
+
+`session.yaml.spawn_config` is optional but canonical in shape:
 
 ```yaml
 spawn_config:
-  model: opus                   # default: opus, override per session
-  fallback_model: sonnet        # default: sonnet, override
-  effort: max                   # default: max, override
-  max_turns: 200                # default: 200, override
-  max_budget_usd: 50            # default: 50, override
-  permission_mode: bypassPermissions  # default, NOT overridable in v0.7
-  disallowed_tools: ["Agent"]   # default, NOT overridable in v0.7
-  exclude_dynamic_system_prompt_sections: true  # default, NOT overridable
+  config:
+    model: sonnet          # lightweight session
+    max_budget_usd: 10
+  # prompt_template and system_prompt_append inherited from project/default
 ```
 
-Precedence: CLI flag > session `spawn_config` > `project.yaml.spawn_defaults`
-> hardcoded default.
+### 8.5 Resume by name
 
-### 6.4 Resume by name
+Uses `--resume <session-id>` (matching `--name` from spawn). Survives
+reboots; independent of PID. `--fork-session` used on re-engagement
+after failed attempts to preserve conversation history with a new
+engagement ID.
 
-Replaces v0.6c PID-based resume. `tripwire session spawn <id> --resume`:
+### 8.6 Slash command wrapper
 
-```bash
-claude -p "Continue where you left off." \
-  --resume "<session-id>" \
-  --effort max \
-  --output-format stream-json \
-  >> <log-path> 2>&1 &
-```
-
-Survives machine reboots; doesn't depend on parent process. The
-`--fork-session` flag is used when re-engaging after a failed attempt
-to create a clean engagement record while preserving conversation history.
-
-### 6.5 Single-agent constraint (formerly Feature E)
-
-The constraint: one agent per session, always.
-
-**Why:** Testing shows execution-quality degradation when agents spawn
-subagents (context loss, weaker synthesis, cost multiplication, invisible
-to monitor).
-
-**Enforcement:** `--disallowedTools "Agent"` in every spawn invocation.
-Agents can still use direct tools (Bash, Read, Edit, Write, Glob, Grep);
-they just can't delegate via the Agent tool or `/batch`.
-
-**What `/batch` is for (not tripwire sessions):** ad-hoc work with no
-pre-scoped plan. Tripwire sessions are pre-decomposed by the PM; letting
-the agent re-decompose ignores that work and produces worse results.
+`/pm-session-spawn` (already exists from v0.6c) now consumes the
+canonical config. No user-visible change for common paths; advanced
+users can customize prompt/flags per project without modifying
+tripwire source.
 
 ---
 
-## 7. Session monitor (v0.7b Phase 4)
+## 9. Phase 4 — Session monitor
 
-### 7.1 Interface
+Unchanged from the prior revision. Brief recap:
 
-**Slash command:**
-```
-/pm-session-monitor [session-id ...] [auto-remediate stuck|ci-failure|...]
-```
+- CLI: `tripwire session monitor` (one-shot snapshot)
+- Slash: `/pm-session-monitor` (self-paced loop via `/loop` dynamic)
+- Primary data source: stream-json log (enabled by §8 config)
+- Fallback: git + gh polling
+- Auto-actions: read-only by default; slash-command natural-language args
+  elevate to targeted auto-remediation
+- Commits status snapshots to project repo per tick
 
-- No args: monitor all `in_progress` sessions.
-- With session ids: monitor only those.
-- Natural-language auto-remediate args (parsed in slash command body)
-  elevate behavior from read-only default to targeted auto-actions.
-
-**CLI:**
-```
-tripwire session monitor [session-id ...] [--format text|json]
-```
-
-One-shot snapshot. The slash command wraps this in a `/loop` dynamic-mode
-self-paced loop.
-
-### 7.2 Data sources
-
-**Primary: stream-json log tailing.** Reads the log written by the
-refined spawn (§6) via `tail -f`. Each line is a JSON event:
-
-```json
-{"type":"assistant","message":{"content":"..."},"turn":1}
-{"type":"tool_use","tool":"Edit","input":{"file_path":"..."},"turn":2}
-{"type":"tool_result","output":"...","turn":2}
-{"type":"usage","total_tokens":15234,"cost_usd":0.42,"turn":2}
-```
-
-**Fallback: git + GitHub polling.** When the log isn't available:
-
-| Signal | Source |
-|---|---|
-| New commits | `git -C <wt> log --oneline -5` |
-| PR opened | `gh pr list --head <branch>` |
-| CI status | `gh pr checks <pr-number>` |
-| Agent process alive | `kill -0 <pid>` |
-| PR review comments | `gh pr view <number> --comments` |
-
-### 7.3 Auto-actions (read-only default)
-
-Default behavior is read-only automation — no mutating actions without
-explicit opt-in via slash command args.
-
-| Event | Default action | Opt-in auto-remediation |
-|---|---|---|
-| Agent committed progress | Log progress in monitor output | — |
-| PR opened | Auto-run `/pm-session-review` (§8) | — |
-| CI failed | Alert; summarize failure | `/pm-session-monitor auto-remediate ci-failure` → attach `/autofix-pr` |
-| Agent process died | Alert; mark session `failed` | `/pm-session-monitor auto-remediate stuck` → re-engage with `--resume` |
-| Agent stuck (no events N min) | Alert | Same opt-in |
-| Cost threshold approaching | Alert | — |
-| All sessions completed | Alert; suggest next launches | — |
-
-Action scope is controlled per-invocation via natural-language args in
-the slash command body. No separate flag-taxonomy.
-
-### 7.4 Self-pacing
-
-`/loop` dynamic mode. Cadence adapts:
-- Active commits flowing: 60–90s between ticks
-- Waiting for CI: 120–270s
-- Idle (no commits 10+ min): 600–1200s
-- Event detected: immediate tick, then resume cadence
-
-### 7.5 Monitor commits progress
-
-Every tick, monitor commits a status snapshot to the project repo
-(batched per tick, not per event). One commit message summarizes all
-detected events. This creates an audit trail in the project history.
-
-### 7.6 Human stepping in
-
-Commits to a session branch by the human are attributed to the session
-in the monitor's output. Monitor doesn't distinguish "agent committed"
-from "human committed on behalf of agent" — both count as session
-progress.
+Events monitored: commits, PR open, CI status, process alive, stuck
+detection, cost threshold, session complete.
 
 ---
 
-## 8. Session review (v0.7b Phase 5)
+## 10. Phase 5 — Session review
 
-### 8.1 Interface
+### 10.1 Interface
 
-**Slash command:**
-```
-/pm-session-review <session-id> [--pr <number>]
-```
+- CLI: `tripwire session review <session-id> [--pr <number>]`
+- Slash: `/pm-session-review <session-id>`
 
-**CLI:**
-```
-tripwire session review <session-id> [--pr <number>] [--format text|json]
-```
+Local PM execution only (no GitHub Action counterpart in v0.7).
 
-Local execution only (PM session). No GitHub Action counterpart in v0.7.
+### 10.2 Checks
 
-### 8.2 What it checks
+- Per-issue acceptance criteria verification (read issue.yaml, map to
+  PR diff, flag unverified)
+- Deviation detection (unspec'd files, dependencies, layout)
+- Plan adherence (each plan.md step has evidence)
+- Stop-and-ask audit (triggered conditions the agent didn't halt on)
 
-**Per-issue acceptance criteria verification:**
-For each issue in `session.yaml.issues[]`:
-1. Read `issues/<key>/issue.yaml` — extract acceptance criteria
-2. Read the PR diff — map changed files to the issue's Repo scope
-3. For each criterion: evidence in the diff that it's met?
-4. Flag unverified criteria
+### 10.3 Output channels
 
-**Deviation detection:**
-1. Files touched vs issue Repo scope — flag unspec'd files
-2. Dependencies added vs what issues call for — flag extras
-3. Directory layout vs Repo scope paths — flag divergence
+1. PM session output (text or JSON)
+2. PR comments — primary PM↔PR channel. Summary comment + inline
+   file:line comments for findings.
+3. `verified.md` side-effect per §10.4
 
-**Plan adherence:**
-1. For each plan.md step: matching files/changes in the diff?
-2. Flag steps with no evidence
+### 10.4 verified.md side-effect
 
-**Stop-and-ask audit:**
-1. Read Execution constraints for "stop and ask" clauses
-2. Check if triggered conditions are visible without the agent having stopped
+For each issue in the session:
 
-### 8.3 Output channels
+- If `issues/<key>/verified.md` doesn't exist: write from review output,
+  attribution `pm-agent`.
+- If exists with non-PM attribution (future QA agent): read-only; factor
+  existing content into review output.
+- If exists with `pm-agent` attribution: append `## Re-review <date>`
+  section (preserve history).
 
-1. **PM session output** — structured summary (text or JSON).
-2. **PR comments** — primary PM ↔ PR channel. The review posts a summary
-   comment on the PR with findings. Per-finding inline comments at the
-   specific file:line.
-3. **`verified.md` side-effect** — for each issue covered by the session:
-   - If `issues/<key>/verified.md` doesn't exist: write it from the review
-     output, attribution `pm-agent`.
-   - If exists and attributed to a non-PM agent (future verifier agent):
-     read-only, skip write, factor existing content into the summary.
-   - If exists and attributed to `pm-agent`: append a `## Re-review <date>`
-     section (preserves history).
+### 10.5 Exit codes (blocking)
 
-### 8.4 Blocking on errors
-
-Exit codes:
-- `0` — approved, no blocking issues
-- `1` — approved with notes (deviations but acceptance criteria met)
-- `2` — unverified acceptance criteria or plan divergence (blocking)
-
-A `/pm-session-complete` run refuses to transition a session to
-`completed` if the most recent review returned exit 2 (unless
-`--force-review` is passed).
-
-The review itself does NOT block the PR merge via GitHub Actions in
-v0.7 — it's local PM tooling. The merge-block comes via the PM
-refusing to call `/pm-session-complete` until errors are resolved.
+- 0: approved
+- 1: approved with notes (warnings only)
+- 2: unverified criteria or plan divergence (blocks subsequent
+  `/pm-session-complete` unless `--force-review`)
 
 ---
 
-## 9. Session complete (v0.7b Phase 6)
+## 11. Phase 6 — Session complete
 
-### 9.1 Interface
+### 11.1 Interface
 
-**CLI:**
-```
-tripwire session complete <session-id> [--skip-artifact-check]
-                                         [--skip-worktree-cleanup]
-                                         [--force]
-                                         [--force-review]
-                                         [--dry-run]
-```
+- CLI: `tripwire session complete <session-id> [flags]`
+- Slash: `/pm-session-complete <session-id> [closing-note]`
 
-**Slash command:**
-```
-/pm-session-complete <session-id> [closing-note]
-```
+### 11.2 CLI behavior (mechanical)
 
-### 9.2 CLI behavior
-
-1. Verify status is `in_progress` or `in_review` (refuse otherwise;
+1. Verify status is `in_review` or `verified` (refuse otherwise;
    `--force` overrides).
-2. Verify PR merged. Refuse with `complete/pr_not_merged` unless
-   `--force`.
-3. Verify per-issue artifacts present for every issue in session
-   (developer.md at `in_review`, verified.md at `done`). Refuse if
-   missing (Phase 2 enforcement; no override).
-4. Verify most recent session review didn't return exit 2. Refuse
-   unless `--force-review`.
-5. Compute concept-node reconciliation diffs (see §9.3).
-6. Transition `session.yaml.status` → `done`.
-7. Update `engagements[]` with `ended_at` and `outcome`.
+2. Verify PR merged (refuse with `complete/pr_not_merged` unless
+   `--force`).
+3. Verify per-issue artifacts present (§7.3 enforcement; no override).
+4. Verify most recent session review exit code ≤ 1 (refuse unless
+   `--force-review`).
+5. Compute concept-node reconciliation diffs (advisory — CLI does not
+   apply).
+6. Transition session.status → `done`.
+7. Update engagements with `ended_at` / `outcome`.
 8. Worktree cleanup (unless `--skip-worktree-cleanup`).
-9. Print: issues to close, sessions unblocked, worktrees removed.
+9. Report: issues to close, sessions unblocked, worktrees removed,
+   node diffs to review.
 
-### 9.3 Slash command behavior
+### 11.3 Slash command behavior (PM judgment)
 
-Wraps CLI. The slash command body instructs the PM agent to:
-
-1. Run `tripwire session complete <id> --skip-worktree-cleanup --dry-run`
-   to preview.
-2. If PR not already reviewed: run `/pm-session-review <id>`. Handle
-   errors before proceeding.
-3. **Node reconciliation** (PM-reviewed, not auto-applied):
-   - CLI computes proposed diffs for each node referenced by the
-     issues in the session, comparing node descriptions against the PR
-     diff.
-   - PM agent reads each diff, decides whether to apply (possibly
-     editing the proposed text).
-   - Approved diffs are written.
-   - `tripwire refs reverse <node-id>` logs downstream sessions
-     affected by each updated node.
-4. Close each issue → `done` with completion comment.
-5. Run `tripwire validate --strict` (catches coherence violations
-   from §4.4 Layer 3).
-6. Remove worktrees.
-7. Commit: `complete: <session-id> (ISSUE-KEYS...)`.
-8. Report: issues closed, nodes updated (with downstream impact),
-   sessions unblocked, recommended next launches.
-
-### 9.4 Error cases
-
-| Code | Trigger | Fix hint |
-|---|---|---|
-| `complete/not_active` | wrong status | Check session status |
-| `complete/missing_artifacts` | per-issue artifacts absent | Run `tripwire issue artifact init` |
-| `complete/issue_not_closeable` | issue can't transition to done | Check status_transitions |
-| `complete/worktree_dirty` | uncommitted changes | Commit/stash or `--skip-worktree-cleanup` |
-| `complete/pr_not_merged` | PR exists but unmerged | Merge first or `--force` |
-| `complete/review_blocking` | last review returned exit 2 | Fix review findings or `--force-review` |
-| `complete/node_recon_unapproved` | PM didn't approve all proposed node diffs | Apply or dismiss each |
+1. Run `tripwire session complete <id> --dry-run` to preview.
+2. Run `/pm-session-review` if not already run at current HEAD.
+3. For each node with a diff from step 5 above, PM agent reads the
+   proposed change, decides whether to apply (may edit wording), commits.
+4. `tripwire refs reverse <node-id>` logs downstream sessions affected.
+5. Close each issue → `done` with completion comment.
+6. Transition issues: agents move to `verified` (via `tripwire issue
+   status set <key> verified` → emits acceptance test run), then `done`.
+7. `tripwire validate --strict` (Layer 3 coherence catches slippage).
+8. Remove worktrees.
+9. Commit: `complete: <session-id> (ISSUE-KEYS...)`.
+10. Report summary.
 
 ---
 
-## 10. CI + PyPI + project templates (v0.7b Phases 7–8)
+## 12. Phase 7-8 — CI + PyPI + project templates
 
-### 10.1 Tripwire-tool CI
+### 12.1 Tripwire-tool CI (Phase 7)
 
-New file: `tripwire/.github/workflows/ci.yml`. Runs on every PR to
-tripwire and every push to `main`.
+`.github/workflows/ci.yml` in tripwire repo. On every PR and push to
+main:
+- uv sync
+- ruff check
+- ruff format --check
+- pytest -q
 
-Steps (minimal, single Python version):
-- checkout
-- install uv
-- `uv sync`
-- `uv run ruff check`
-- `uv run ruff format --check`
-- `uv run pytest tests/ -q`
+Python 3.13, ubuntu-latest. Target: <3 min.
 
-Python: 3.13. OS: ubuntu-latest. Target: under 3 minutes per run.
+### 12.2 PyPI publish (Phase 8)
 
-Matrix across Python versions and OSes is explicitly out of scope
-(YAGNI until we have a reason).
+`.github/workflows/publish.yml`. On tag push matching `v*`:
+- uv build
+- uv publish (token from `PYPI_API_TOKEN` secret)
 
-### 10.2 PyPI publishing
+Release = PR bumping `pyproject.toml version` + tag push. First
+release: `v0.7.0` under `tripwire` (or `tripwire-pm` fallback).
 
-New file: `tripwire/.github/workflows/publish.yml`. Triggers on
-`push` of tags matching `v*`.
+### 12.3 Project CI template
 
-Steps:
-- checkout
-- install uv
-- `uv build`
-- `uv publish --token $PYPI_API_TOKEN`
-
-Secret: `PYPI_API_TOKEN` added to repo secrets (Seido account).
-
-Version source of truth: `pyproject.toml` `[project].version`. Tag
-push means the release workflow trusts the tag matches pyproject —
-we bump pyproject first, then tag.
-
-**Release process:**
-1. PR that bumps `pyproject.toml` version and updates changelog
-2. Merge PR
-3. `git tag v0.7.0` and `git push --tags`
-4. Publish workflow runs, uploads to PyPI
-
-First published version is `v0.7.0` under the `tripwire` name.
-
-### 10.3 Project CI workflow template
-
-New template: `src/tripwire/templates/project/.github/workflows/tripwire.yml.j2`.
-Jinja-rendered by `tripwire init` into `.github/workflows/tripwire.yml`
-in every new project.
-
-Workflow content:
+Shipped at `src/tripwire/templates/project/.github/workflows/tripwire.yml.j2`.
+Rendered by `tripwire init` into `<project>/.github/workflows/tripwire.yml`:
 
 ```yaml
 name: Tripwire checks
-on:
-  pull_request:
-  push:
-    branches: [main, master]
-
+on: [pull_request, push]
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
-      - name: Install tripwire
-        run: uv tool install tripwire=={% raw %}{{ tripwire_version }}{% endraw %}
-      - name: Validate
-        run: tripwire validate --strict --format=json
-      - name: Lint scoping
-        run: tripwire lint scoping
-      - name: Lint handoff
-        run: tripwire lint handoff
-      - name: Lint session
-        run: tripwire lint session
-      - name: Brief (smoke test)
-        run: tripwire brief --format=json > /dev/null
+      - run: uv tool install tripwire=={{ tripwire_version }}
+      - run: tripwire validate --strict --format=json
+      - run: tripwire lint scoping
+      - run: tripwire lint handoff
+      - run: tripwire lint session
+      - run: tripwire brief --format=json > /dev/null
 ```
 
-Renders with `tripwire_version` from `project.yaml`.
+Pinned version reads from `project.yaml.tripwire_version`.
 
-### 10.4 `tripwire ci install` command
+### 12.4 `tripwire ci install`
 
-For existing projects to adopt CI without re-running `tripwire init`.
+For existing projects. Renders the template, refuses if file exists
+unless `--force`.
 
-```
-tripwire ci install [--force] [--project-dir PATH]
-```
+### 12.5 `tripwire init` defaults to CI
 
-- Reads `project.yaml.tripwire_version`.
-- Renders the template into `.github/workflows/tripwire.yml`.
-- Refuses if the file exists unless `--force`.
+Adds `.github/workflows/tripwire.yml` by default. `--skip-ci` opts out.
 
-### 10.5 `tripwire init` — CI by default
+### 12.6 Version bump workflow
 
-`tripwire init` creates `.github/workflows/tripwire.yml` by default.
-Opt out via `--skip-ci`.
-
-Adds `.github` to the `CREATED_DIRS` constant for coverage in init
-tests.
-
-### 10.6 Version pinning philosophy
-
-Projects pin to an exact tripwire version. Bumping is a deliberate PR:
-
-1. Edit `project.yaml.tripwire_version` to new version.
-2. Run `tripwire ci install --force` to re-render the workflow with
-   the new version.
-3. Commit both changes as one PR.
-4. CI on that PR runs the new tripwire version against the project.
-
-This ensures version bumps are visible, reviewable, and atomic.
+1. Edit `project.yaml.tripwire_version` → new version
+2. `tripwire ci install --force`
+3. Commit both changes in one PR
+4. CI on that PR runs the new tripwire version
 
 ---
 
-## 11. Cross-feature integration
+## 13. Cross-feature integration
 
-### 11.1 Monitor → Review
+### 13.1 Monitor → Review
 
-When monitor (§7) detects a PR opened on a session's branch, it
-auto-runs `/pm-session-review` (§8) with read-only auto-actions default
-(Q7=B). Review posts findings as PR comments. If exit 2, monitor flags
-as blocking in its output.
+Monitor detects PR open → auto-runs `/pm-session-review` (read-only
+default). Findings post to PR comments. Exit 2 surfaces as blocking
+in monitor output.
 
-### 11.2 Review → verified.md
+### 13.2 Review → verified.md
 
-`/pm-session-review` writes `verified.md` per §8.3 — single path for
-producing the artifact in v0.7. Flexible handling when artifact already
-exists (future verifier agent path).
+Review writes `verified.md` via the side-effect path (§10.4). Single
+path for producing the artifact in v0.7.
 
-### 11.3 Complete → Review + Artifacts + Node recon
+### 13.3 Complete → Review + Artifacts + Node recon
 
-`/pm-session-complete` (§9.3) orchestrates:
-1. `/pm-session-review` if not already run (writes verified.md)
-2. Per-issue artifact presence check (§5.3) — enforces both developer.md
-   and verified.md
-3. Node reconciliation (PM-reviewed, Q10=B)
-4. Issue close loop
-5. Coherence validator (§4.4) catches any session↔issue drift
+Complete orchestrates review (if needed), per-issue artifact
+enforcement, PM-reviewed node reconciliation, issue close loop, and
+coherence validation (§6.4).
 
-### 11.4 Spawn → Monitor
+### 13.4 Spawn → Monitor
 
-`--output-format stream-json` (§6.1) enables monitor's primary data
-source (§7.2). `--name <session-id>` enables resume-by-name.
-`--max-budget-usd` surfaces cost events monitor threshold-checks.
+stream-json output (§8 config) is the monitor's primary data source.
+--name enables resume-by-name.
 
-### 11.5 CI → Per-issue artifacts + Coherence
+### 13.5 CI → Per-issue artifacts + Coherence
 
-Project CI (§10.3) runs `tripwire validate --strict` which includes:
-- `check_issue_artifact_presence` (§5.3) — missing developer/verified
-  blocks merge
-- Coherence validator (§4.4) — session↔issue mismatch blocks merge
+Project CI runs `tripwire validate --strict`, which enforces §7.3 and
+§6.4. Merge gate.
 
-CI is where Phase 2 and Phase 1 enforcement actually bites.
+### 13.6 Configurability (§5) → everything
 
-### 11.6 Vocabulary → everywhere
-
-Phase 1 (§4) lands first. All subsequent phases reference the new
-vocabulary. No mid-phase flip.
+Every phase after Phase 0 consumes YAML-loaded configuration, never
+Python literals. A project customizing its workflow edits YAML.
 
 ---
 
-## 12. Migration & backcompat
+## 14. Release sequencing
 
-Clean cut everywhere. No grandfather clauses, no legacy aliases.
+### 14.1 v0.7a — Rename
 
-### 12.1 Migration PR checklist
+Single branch, single merge. ~1-2 hours agent work.
 
-Landed as part of v0.7a rename and v0.7b Phase 1:
+### 14.2 v0.7b — Features
 
-- All `keel` references → `tripwire`
-- All `ArtifactPhase` YAML values remapped (`implementing` →
-  `in_progress`, `verifying` → `in_review`, `completion` → `done`)
-- All session YAMLs across 3 test projects updated
-- All skill docs, reference docs, spec docs updated
-- `project.yaml.keel_version` field → `tripwire_version` in 3 test
-  projects
-- `.keel/` → `.tripwire/` hidden dirs (if any exist)
-- `.keel.lock` → `.tripwire.lock`
-- Per-issue artifact backfill (developer.md, verified.md) with
-  placeholder stubs (§5.7)
+Single branch (`feature/v0.7b`), 8 phases, each mergeable independently:
 
-### 12.2 Existing PRs on keel
-
-PRs #5 and #6 (frontend-markdown, backend-server-scaffold) are
-currently open. Strategy:
-- Land v0.7a rename first on main
-- Those PRs rebase onto the renamed main and adjust imports/config
-  names
-- They're small PRs; the rebase is mechanical
-
----
-
-## 13. Release sequencing
-
-### 13.1 v0.7a (rename)
-
-Single branch, single merge. Estimated 1-2 hours of agent work.
-
-Steps:
-1. Update `pyproject.toml` name, scripts
-2. Rename `src/keel` → `src/tripwire`
-3. Rename GitHub repo (done in UI; redirects preserved)
-4. Update every import path (src + tests)
-5. Update every reference in templates, skill docs, spec docs
-6. Rename config fields in models + migration for existing project
-   YAMLs
-7. Update three test projects' `project.yaml`
-8. Full test suite clean, full lint clean
-9. PR, review, merge
-10. Tag `v0.7a` (pre-release)
-
-### 13.2 v0.7b (features)
-
-Single branch (`feature/v0.7b`), 8 phases, each mergeable
-independently:
-
-| Phase | Feature | Approx effort |
+| Phase | Feature | Depends on |
 |---|---|---|
-| 1 | Vocabulary alignment (§4) | 3.5 days spec / ~1 hr agent |
-| 2 | Per-issue artifacts (§5) | 7.5 days spec / ~2 hr agent |
-| 3 | Spawn refinements (§6) | 2.5 days spec / ~45 min agent |
-| 4 | Session monitor (§7) | 7 days spec / ~2 hr agent |
-| 5 | Session review (§8) | 7 days spec / ~2 hr agent |
-| 6 | Session complete (§9) | 4 days spec / ~1 hr agent |
-| 7 | Tripwire-tool CI (§10.1) | 0.5 days / ~15 min |
-| 8 | PyPI + project templates (§10.2-5) | 3 days / ~1 hr |
-
-Spec total: ~35 days. With AI agents: measured in hours.
-
-Release ordering: Phase 1 first (prerequisite), then all others in
-parallel where possible. Suggested order above.
+| 0 | Configurability pass | v0.7a |
+| 1 | Vocabulary + verified | Phase 0 (so enums are YAML) |
+| 2 | Per-issue artifacts | Phase 1 |
+| 3 | Canonical spawn config | Phase 0 |
+| 4 | Session monitor | Phase 3 |
+| 5 | Session review | Phase 2 |
+| 6 | Session complete | Phase 5 |
+| 7 | Tripwire-tool CI | independent |
+| 8 | PyPI + project CI | Phase 7 |
 
 ---
 
-## 14. Error code summary
+## 15. README updates
 
-New error codes introduced by v0.7:
+Phase 0 includes updating the tripwire README to establish §2 as
+foundational. Specifically:
+
+- Add "Design principles" section pulling in §2.1–§2.5 verbatim.
+- Add "How tripwire is configured" subsection pointing to the enum
+  override mechanism, spawn config, slash command overrides.
+- Add "Slash command wrapper pattern" subsection with the
+  `tripwire <verb>` + `/pm-<verb>` duality as a core idea.
+- Update examples to reflect the `tripwire` / `tw` CLI.
+
+---
+
+## 16. Error code summary
 
 | Code | Feature | Severity |
 |---|---|---|
-| `coherence/issue_status_lags_session` | §4 | warning |
-| `coherence/issue_status_ahead_of_session` | §4 | error |
-| `issue_artifact/missing` | §5 | error |
-| `issue_artifact/wrong_status` | §5 | error (transition guard) |
-| `complete/not_active` | §9 | error |
-| `complete/missing_artifacts` | §9 | error |
-| `complete/issue_not_closeable` | §9 | error |
-| `complete/worktree_dirty` | §9 | error |
-| `complete/pr_not_merged` | §9 | error |
-| `complete/review_blocking` | §9 | error |
-| `complete/node_recon_unapproved` | §9 | error |
-| `monitor/log_missing` | §7 | warning (falls back to polling) |
-| `monitor/session_not_executing` | §7 | error |
-| `review/unverified_criteria` | §8 | error (exit 2) |
-| `review/plan_deviation` | §8 | error (exit 2) |
-| `review/unspec_files` | §8 | warning |
-| `ci/workflow_exists` | §10 | error (without `--force`) |
+| `coherence/issue_status_lags_session` | §6.4 | warning |
+| `coherence/issue_status_ahead_of_session` | §6.4 | error |
+| `issue_artifact/missing` | §7.3 | error |
+| `issue_artifact/wrong_status` | §7.4 | error |
+| `complete/not_active` | §11 | error |
+| `complete/missing_artifacts` | §11 | error |
+| `complete/issue_not_closeable` | §11 | error |
+| `complete/worktree_dirty` | §11 | error |
+| `complete/pr_not_merged` | §11 | error |
+| `complete/review_blocking` | §11 | error |
+| `monitor/log_missing` | §9 | warning |
+| `monitor/session_not_executing` | §9 | error |
+| `review/unverified_criteria` | §10 | error (exit 2) |
+| `review/plan_deviation` | §10 | error (exit 2) |
+| `review/unspec_files` | §10 | warning |
+| `ci/workflow_exists` | §12 | error (without --force) |
+| `spawn/config_invalid` | §8 | error |
+| `enum/unknown_value` | §5 | error (generic) |
 
 ---
 
-## 15. Testing
+## 17. Testing
 
-See draft specs for detailed test matrices. Consolidated counts:
+Consolidated test counts, detail in draft specs:
 
 | Feature | New tests |
 |---|---|
-| Vocabulary alignment | ~10 |
+| Configurability pass | ~12 (enum loader per concept, precedence, schema validation) |
+| Vocabulary + verified | ~10 |
 | Per-issue artifacts | ~15 |
-| Spawn refinements | ~8 |
-| Session monitor | ~12 |
-| Session review | ~10 |
-| Session complete | ~10 |
-| CI + PyPI + templates | ~6 |
-| Rename (v0.7a) | smoke tests + full suite continues passing |
-
-All tests pass on every PR via tripwire-tool CI (§10.1).
+| Spawn config | ~10 (precedence, rendering, flag assembly) |
+| Monitor | ~12 |
+| Review | ~10 |
+| Complete | ~10 |
+| CI + PyPI | ~6 |
+| Rename (v0.7a) | smoke tests pass |
 
 ---
 
-## 16. Open items to resolve at implementation time
+## 18. Open items for implementation
 
-- PyPI `tripwire` availability check — if taken, fallback to
-  `tripwire-pm`. Decision made when Phase 7 starts.
-- `--exclude-dynamic-system-prompt-sections` — audit against current
-  `claude --help` version before including in spawn invocation. If
-  not present, drop from the spec.
-- `project.yaml.spawn_defaults` field — scoped as a schema addition
-  but fine detail (which keys) deferred to Phase 3 implementation.
-- Stream-json event types that the monitor ignores vs hard-parses —
-  fine detail for Phase 4.
+- PyPI `tripwire` availability check at start of Phase 8.
+- `--exclude-dynamic-system-prompt-sections` audit against current
+  Claude Code CLI version before inclusion in spawn defaults.
+- Specific keys of `project.yaml.spawn_defaults` and
+  `project.yaml.issue_artifact_manifest_overrides` — fine detail for
+  Phase 0 and 2 implementation.
+- Stream-json event classification (which types to hard-parse vs treat
+  as info) — fine detail for Phase 4.
 
 ---
 
-## 17. Cross-references
+## 19. Cross-references
 
 - `2026-04-16-v07-pm-monitor.md` — superseded by this document
-- `2026-04-17-v07-issue-developer-notes.md` — superseded by this document
-- `2026-04-16-session-spawn-agenda-worktrees-design.md` — v0.6c
-  (previous release); §6 amends the spawn invocation
-- `docs/tripwire-containers.md` — container runtime (post-v0.7)
-- Claude Code CLI reference (v2.1.110+) — flag inventory
+- `2026-04-17-v07-issue-developer-notes.md` — superseded
+- `2026-04-16-session-spawn-agenda-worktrees-design.md` — v0.6c;
+  §8 amends the spawn invocation
+- Claude Code CLI reference (v2.1.110+)
