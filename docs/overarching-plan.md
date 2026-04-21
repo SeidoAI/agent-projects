@@ -2,33 +2,33 @@
 
 ## Vision
 
-A single Python package — `keel` — that replaces Linear + Notion + manual agent orchestration with a fully autonomous, git-native agent development platform. Three modules within one package:
+A single Python package — `tripwire` — that replaces Linear + Notion + manual agent orchestration with a fully autonomous, git-native agent development platform. Three modules within one package:
 
 | Module | What it does | Install |
 |--------|-------------|---------|
-| **keel.core** + **keel.cli** | Data layer: issues, concept graph, dependencies, status — all as files in git. CLI for validation, status, and atomic operations. | `pip install keel` (or `pip install keel[projects]` for minimal) |
-| **keel.ui** | Visibility layer: web dashboard for projects, issues, graph, live agent status | Included in `pip install keel` |
-| **keel.containers** | Execution layer: containerised Claude Code agents with strict egress, repo isolation | Included in `pip install keel` |
+| **tripwire.core** + **tripwire.cli** | Data layer: issues, concept graph, dependencies, status — all as files in git. CLI for validation, status, and atomic operations. | `pip install tripwire` (or `pip install tripwire[projects]` for minimal) |
+| **tripwire.ui** | Visibility layer: web dashboard for projects, issues, graph, live agent status | Included in `pip install tripwire` |
+| **tripwire.containers** | Execution layer: containerised Claude Code agents with strict egress, repo isolation | Included in `pip install tripwire` |
 
 ```
-pip install keel              # everything (projects + UI + containers)
-pip install keel[projects]    # minimal: CLI, validator, skills only
+pip install tripwire              # everything (projects + UI + containers)
+pip install tripwire[projects]    # minimal: CLI, validator, skills only
 ```
 
-**The primary user of `keel` is Claude Code with the project-manager skill loaded.** Humans interact with the system *through* the agent, not directly via the CLI. The CLI is intentionally minimal — read commands, validation, and atomic operations only — because agents create issues, nodes, and sessions by writing files directly via their `Write` tool, not by invoking CLI mutation commands. The PM skill (shipped in `templates/skills/project-manager/` and copied to the project repo on init) is the linchpin: it teaches agents how to work with the file layout, schemas, references, and the validation gate.
+**The primary user of `tripwire` is Claude Code with the project-manager skill loaded.** Humans interact with the system *through* the agent, not directly via the CLI. The CLI is intentionally minimal — read commands, validation, and atomic operations only — because agents create issues, nodes, and sessions by writing files directly via their `Write` tool, not by invoking CLI mutation commands. The PM skill (shipped in `templates/skills/project-manager/` and copied to the project repo on init) is the linchpin: it teaches agents how to work with the file layout, schemas, references, and the validation gate.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                       keel                                  │
-│  pip install keel — one package, three modules              │
+│                       tripwire                                  │
+│  pip install tripwire — one package, three modules              │
 │                                                             │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │ keel.ui — React 19 · React Flow · Kanban · Dashboard │   │
-│  │ keel ui — starts FastAPI + serves bundled frontend    │   │
+│  │ tripwire.ui — React 19 · React Flow · Kanban · Dashboard │   │
+│  │ tripwire ui — starts FastAPI + serves bundled frontend    │   │
 │  └──────────────────────────────────────────────────────┘   │
 │          reads from ↓                    reads from ↓       │
 │  ┌────────────────────┐  ┌──────────────────────────────┐   │
-│  │ keel.core + cli    │  │ keel.containers              │   │
+│  │ tripwire.core + cli    │  │ tripwire.containers              │   │
 │  │ Git-native PM data │  │ Docker execution envs        │   │
 │  │ Issues · Nodes     │  │ Claude Code · Egress         │   │
 │  │ Graph · Validator  │  │ Re-engagement · Orchestration│   │
@@ -45,17 +45,17 @@ This is the central design principle that informs everything else in this docume
 
 **The project repo is the single source of truth for everything customisable** — skills, agent definitions, orchestration patterns, templates, enums, artifact specs, standards, and project config. If an agent reads it, it lives in the project repo.
 
-**`keel` ships defaults that get COPIED into the project repo on init.** The package contains canonical reference templates under `templates/` (skills, agent definitions, enums, orchestration patterns, artifact templates, etc.). `keel init` copies the entire `templates/` tree into the new project. After init, the project owns them — they are version-controlled in git, edited freely, and the package is no longer their source of truth.
+**`tripwire` ships defaults that get COPIED into the project repo on init.** The package contains canonical reference templates under `templates/` (skills, agent definitions, enums, orchestration patterns, artifact templates, etc.). `tripwire init` copies the entire `templates/` tree into the new project. After init, the project owns them — they are version-controlled in git, edited freely, and the package is no longer their source of truth.
 
-**`keel.containers` is a thin runtime that READS from the project repo.** It ships no skills, no templates, no defaults of its own. When a container launches, it clones the project repo, mounts the relevant skills from `<project>/.claude/skills/`, reads the orchestration pattern from `<project>/orchestration/`, reads enums from `<project>/enums/`, and reads artifact templates from `<project>/templates/artifacts/`. The runtime executes whatever the project repo says.
+**`tripwire.containers` is a thin runtime that READS from the project repo.** It ships no skills, no templates, no defaults of its own. When a container launches, it clones the project repo, mounts the relevant skills from `<project>/.claude/skills/`, reads the orchestration pattern from `<project>/orchestration/`, reads enums from `<project>/enums/`, and reads artifact templates from `<project>/templates/artifacts/`. The runtime executes whatever the project repo says.
 
-**`keel.ui` reads from the project repo for everything customisable** — issue templates, enums (for status colors, type icons), artifact manifests (for which artifact viewers to show), orchestration patterns (for which approval gates exist).
+**`tripwire.ui` reads from the project repo for everything customisable** — issue templates, enums (for status colors, type icons), artifact manifests (for which artifact viewers to show), orchestration patterns (for which approval gates exist).
 
 **Everything is auditable.** Because the project repo is git, every customisation — every change to a skill, every new orchestration pattern, every enum tweak — is a commit. Two projects can run completely different agent configurations side-by-side, each fully under their own version control.
 
-This principle is what makes the system pluggable: the execution runtime (`keel.containers`) stays small and stable; the configuration (the project repo) is open for any team to customise without forking the runtime.
+This principle is what makes the system pluggable: the execution runtime (`tripwire.containers`) stays small and stable; the configuration (the project repo) is open for any team to customise without forking the runtime.
 
-**The PM skill is the linchpin for agent-driven workflows.** Because the primary user of `keel` is Claude Code with the PM skill loaded (not a human typing CLI commands), the quality of the skill — its workflow references, schema documentation, examples, and anti-patterns — determines whether the whole system works. The skill ships from `keel/templates/skills/project-manager/` as a reference, gets copied into `<project>/.claude/skills/project-manager/` on init, and is then owned and customisable per project. Detailed skill design lives in `docs/keel-plan.md`.
+**The PM skill is the linchpin for agent-driven workflows.** Because the primary user of `tripwire` is Claude Code with the PM skill loaded (not a human typing CLI commands), the quality of the skill — its workflow references, schema documentation, examples, and anti-patterns — determines whether the whole system works. The skill ships from `keel/templates/skills/project-manager/` as a reference, gets copied into `<project>/.claude/skills/project-manager/` on init, and is then owned and customisable per project. Detailed skill design lives in `docs/keel-plan.md`.
 
 ---
 
@@ -64,9 +64,9 @@ This principle is what makes the system pluggable: the execution runtime (`keel.
 All three modules live in one package and import each other directly —
 no subprocess calls or HTTP between them.
 
-### 1. keel.core → keel.containers
+### 1. tripwire.core → tripwire.containers
 
-The project repo defines **what** work to do. `keel.containers` reads it to know **how** to execute.
+The project repo defines **what** work to do. `tripwire.containers` reads it to know **how** to execute.
 
 - `sessions/<id>/session.yaml` defines which issues, which repo, which agent type
 - `project.yaml` defines repos (with GitHub slugs for cloning), base branches
@@ -75,7 +75,7 @@ The project repo defines **what** work to do. `keel.containers` reads it to know
 
 Agent definitions live in `agents/` directory — see "Agent Definitions" section below for the full schema. Sessions reference agents by ID.
 
-### 2. keel.containers → keel.core
+### 2. tripwire.containers → tripwire.core
 
 Agents write back to the project repo via git (PRs):
 - Status transitions (issue status updated in YAML)
@@ -85,17 +85,17 @@ Agents write back to the project repo via git (PRs):
 
 All changes happen via PRs to the project repo — the PM agent reviews them.
 
-### 3. keel.core + keel.containers → keel.ui
+### 3. tripwire.core + tripwire.containers → tripwire.ui
 
 The UI reads from two sources:
 
-**From the filesystem (via keel.core):**
+**From the filesystem (via tripwire.core):**
 - Issue list, statuses, priorities, dependencies
 - Concept graph nodes and edges
 - Agent session definitions
 - Project config, phase, validation status
 
-**From keel.containers runtime:**
+**From tripwire.containers runtime:**
 - Which containers are running right now
 - Which issue each container is working on
 - Container health, logs, resource usage
@@ -103,7 +103,7 @@ The UI reads from two sources:
 
 ---
 
-## Agent Definitions (lives in keel)
+## Agent Definitions (lives in tripwire)
 
 Agents are defined in the project repo under `agents/`. This is distinct from sessions (which assign issues to agents) — agent definitions describe **what kind of agent** something is, what runtime it uses, and what permissions it has.
 
@@ -222,7 +222,7 @@ resources:
 tools:
   - git
   - gh
-  - keel                     # PM agent uses the project CLI
+  - tripwire                     # PM agent uses the project CLI
 
 context:
   skills:
@@ -232,7 +232,7 @@ context:
 
 # PM-specific: orchestration capabilities
 orchestration:
-  can_launch_agents: true             # can trigger keel-containers launch
+  can_launch_agents: true             # can trigger tripwire-containers launch
   max_concurrent_agents: 4            # limit on how many agents PM can spin up
   auto_launch_on_status:              # auto-launch rules
     - trigger: "issue moved to todo"
@@ -250,7 +250,7 @@ multi_ticket: false                   # PM handles the whole project, not indivi
 
 ### Key design decisions
 
-**Why agent definitions live in the project repo (not in keel-containers):**
+**Why agent definitions live in the project repo (not in tripwire-containers):**
 - They are project-specific — different projects may have different agent configs
 - They are versioned in git — changes to permissions are auditable
 - The PM agent can read them to know what agents are available for dispatching
@@ -273,7 +273,7 @@ multi_ticket: false                   # PM handles the whole project, not indivi
 
 **PM agent orchestration — how it deploys other agents:**
 - The PM agent can run from a container OR from a local Claude Code session (just load the skill)
-- When containerised, the PM has access to `keel-containers` CLI
+- When containerised, the PM has access to `tripwire-containers` CLI
 - The `orchestration` section defines what the PM is allowed to launch
 - `max_concurrent_agents` prevents runaway agent spawning
 - `auto_launch_on_status` defines event-driven automation (what triggers agent launches)
@@ -412,7 +412,7 @@ The UI is the human's primary interface for the entire platform. Key control flo
 **Launch agents from UI:**
 1. Human selects issues on the Kanban board
 2. Clicks "Launch Agent" → UI shows available agent definitions that match (by repo, executor type)
-3. Human picks agent + confirms → backend calls `keel-containers launch`
+3. Human picks agent + confirms → backend calls `tripwire-containers launch`
 4. Container starts, iTerm tab opens, agent monitor shows live status
 
 **PM agent auto-orchestration (visible in UI):**
@@ -427,7 +427,7 @@ The UI is the human's primary interface for the entire platform. Key control flo
 - Open iTerm to any container
 - Approve/reject PRs (calls `gh pr merge` or `gh pr close`)
 - Edit issue status (drag-and-drop on Kanban)
-- Launch validation (`keel validate`)
+- Launch validation (`tripwire validate`)
 - View and approve PM agent plans
 - Delete branches, cleanup containers
 
@@ -485,7 +485,7 @@ Writes re-engagement entry to session YAML:
   - updates session status → re_engaged
     │
     ▼
-Calls: keel-containers launch <session-id>
+Calls: tripwire-containers launch <session-id>
     │
     ▼
 Container starts with SAME Docker volume (workspace preserved)
@@ -514,7 +514,7 @@ Agent resumes with full prior context + new re-engagement prompt:
 | Merge conflict | `merge_conflict` | `waiting_for_ci` | Conflicting files, which branch |
 | Dependency conflict | `dependency_conflict` | any waiting state | Upstream change details |
 
-Full implementation details (entrypoint scripts, GitHub Actions workflows, context formatting) in `docs/keel-containers.md`.
+Full implementation details (entrypoint scripts, GitHub Actions workflows, context formatting) in `docs/tripwire-containers.md`.
 
 ---
 
@@ -582,9 +582,9 @@ events:
 
 ### Where the runtime lives
 
-**Critical**: the orchestration *runtime* lives in `keel-containers/core/orchestration.py`, not in `keel`. The patterns and hooks live in the project repo. The runtime reads them on every event.
+**Critical**: the orchestration *runtime* lives in `tripwire-containers/core/orchestration.py`, not in `tripwire`. The patterns and hooks live in the project repo. The runtime reads them on every event.
 
-This is exactly the same shape as the rest of the system: the project repo is the configuration; `keel-containers` is the engine that executes that configuration. The orchestrator reacts to events from the file watcher on the project repo, WebSocket messages from running containers, GitHub webhook polling, and MCP messages from agents.
+This is exactly the same shape as the rest of the system: the project repo is the configuration; `tripwire-containers` is the engine that executes that configuration. The orchestrator reacts to events from the file watcher on the project repo, WebSocket messages from running containers, GitHub webhook polling, and MCP messages from agents.
 
 ### PM agent vs deterministic orchestrator
 
@@ -706,15 +706,15 @@ Fallback for non-MCP agents: `/usr/local/bin/agent-msg` shell script (curl wrapp
 | `fyi` | Found something interesting, not blocking | `informational` | Keep working |
 | `status` | Heartbeat update of agent state + 2-sentence summary (every ~5 min of active work and on every state transition) | `informational` | Keep working |
 
-Status messages have a structured body: `{ state, summary }` where `state` is from the customisable `agent_state` enum (default values: `investigating`, `planning`, `awaiting_plan_approval`, `implementing`, `testing`, `debugging`, `refactoring`, `documenting`, `self_verifying`, `blocked`, `handed_off`, `done`). The orchestrator updates `session.current_state` from the latest status message; the UI surfaces it as a live badge on each session card. See `keel-containers.md` for the full schema.
+Status messages have a structured body: `{ state, summary }` where `state` is from the customisable `agent_state` enum (default values: `investigating`, `planning`, `awaiting_plan_approval`, `implementing`, `testing`, `debugging`, `refactoring`, `documenting`, `self_verifying`, `blocked`, `handed_off`, `done`). The orchestrator updates `session.current_state` from the latest status message; the UI surfaces it as a live badge on each session card. See `tripwire-containers.md` for the full schema.
 
 ### Response flow and re-engagement
 
 When human responds to a blocking message:
 1. Human types response in UI → `POST /api/messages/:id/respond`
 2. UI backend stores response in SQLite
-3. UI backend calls `keel session re-engage <id> --trigger human_response --context "..."`
-4. `keel-containers launch <id>` restarts the container
+3. UI backend calls `tripwire session re-engage <id> --trigger human_response --context "..."`
+4. `tripwire-containers launch <id>` restarts the container
 5. Agent resumes, calls `check_messages` MCP tool, reads the response
 
 New re-engagement triggers:
@@ -756,11 +756,11 @@ Messages live in SQLite for real-time delivery. When a session completes or fail
     body: "Go with Option A."
 ```
 
-Full implementation details (MCP server code, skill protocol, UI components) in `docs/keel-containers.md` and `docs/keel-ui.md`.
+Full implementation details (MCP server code, skill protocol, UI components) in `docs/tripwire-containers.md` and `docs/tripwire-ui.md`.
 
 ---
 
-## Project 1: keel (Data Layer)
+## Project 1: tripwire (Data Layer)
 
 **Status:** Detailed plan exists at `docs/keel-plan.md`
 
@@ -773,11 +773,11 @@ Full implementation details (MCP server code, skill protocol, UI components) in 
 - `sessions/` — agent session definitions (dependency-based parallelism)
 - `.claude/skills/project-manager/` — PM agent skill for generated repos
 
-**CLI:** `keel init`, `issue`, `node`, `refs`, `status`, `graph`, `session`
+**CLI:** `tripwire init`, `issue`, `node`, `refs`, `status`, `graph`, `session`
 
 ---
 
-## Project 2: keel-containers (Execution Layer)
+## Project 2: tripwire-containers (Execution Layer)
 
 ### The problems this solves
 
@@ -789,7 +789,7 @@ From the notes:
 
 ### What it does
 
-`keel-containers` is a Python CLI that:
+`tripwire-containers` is a Python CLI that:
 1. **Launches Docker containers** with Claude Code + a repo clone + skills + MCP servers
 2. **Enforces strict egress** via Docker network policies (iptables/firewall rules)
 3. **Reports container status** via a lightweight status file or API
@@ -835,7 +835,7 @@ From the notes:
 ### Container lifecycle
 
 ```
-keel-containers launch <session-id>
+tripwire-containers launch <session-id>
   1. Read session from project repo: sessions/<session-id>.yaml
   2. Read agent definition from project repo: agents/<agent-id>.yaml
   3. Configure git identity (agent's GitHub username + email + scoped token)
@@ -844,14 +844,14 @@ keel-containers launch <session-id>
   6. Mount merged docs (union of agent + issue + session docs) read-only
      into /workspace/docs/
   7. Mount skills from <project>/.claude/skills/ into the container workspace
-     (the project repo is the source of truth — keel-containers ships none)
+     (the project repo is the source of truth — tripwire-containers ships none)
   8. Inject API keys (ANTHROPIC_API_KEY, scoped GITHUB_TOKEN — from host env)
   9. Configure egress firewall (Docker network rules from agent permissions)
   10. Select runtime entrypoint:
       - claude-code: start Claude Code with issue as prompt
       - langgraph: start LangGraph server with issue as input
       - custom: run user-provided entrypoint script
-  11. Write container metadata to ~/.keel-containers/active/<session-id>.json
+  11. Write container metadata to ~/.tripwire-containers/active/<session-id>.json
 ```
 
 ### Egress enforcement
@@ -940,7 +940,7 @@ def open_iterm_tab(container_id: str, session_name: str):
 
 For multiple agents, open a split layout:
 ```
-keel-containers launch-batch <session-id> [<session-id> ...] --terminal
+tripwire-containers launch-batch <session-id> [<session-id> ...] --terminal
 # Opens a tab per agent in the batch using the configured terminal launcher
 # Each tab is docker exec -it <container> bash
 ```
@@ -948,47 +948,47 @@ keel-containers launch-batch <session-id> [<session-id> ...] --terminal
 ### CLI commands
 
 ```
-keel-containers launch <session-id>
+tripwire-containers launch <session-id>
   --project-dir TEXT   Path to project repo [default: .]
   --detach             Run in background
   --dry-run            Show what would happen without launching
 
-keel-containers launch-batch <session-id> [<session-id> ...]
+tripwire-containers launch-batch <session-id> [<session-id> ...]
   --project-dir TEXT   Path to project repo
   --terminal           Open a tab per agent using the configured launcher
   --max-parallel INT   Limit concurrent containers [default: unlimited]
 
-keel-containers list
+tripwire-containers list
   --format TEXT        table/json [default: table]
   # Shows: session-id, issue, status, container-id, uptime, resource usage
 
-keel-containers status <session-id>
+tripwire-containers status <session-id>
   # Detailed status of one container: logs tail, resource usage, Claude Code state
 
-keel-containers logs <session-id>
+tripwire-containers logs <session-id>
   --follow             Stream logs
   --tail INT           Last N lines [default: 50]
 
-keel-containers stop <session-id>
+tripwire-containers stop <session-id>
   # Gracefully stop a container
 
-keel-containers stop-all
+tripwire-containers stop-all
   # Stop all running agent containers
 
-keel-containers attach <session-id>
+tripwire-containers attach <session-id>
   # Docker exec into the container (interactive bash)
 
-keel-containers terminal <session-id>
+tripwire-containers terminal <session-id>
   # Open a terminal tab for an already-running container, using the configured launcher
 
-keel-containers terminal-all
+tripwire-containers terminal-all
   # Open terminal tabs for all running containers
 
-keel-containers cleanup
+tripwire-containers cleanup
   # Remove stopped containers and dangling images
 ```
 
-The terminal launcher is configurable via `~/.keel-containers/config.yaml` and supports `iterm`, `terminal` (Terminal.app), `ghostty`, `alacritty`, `kitty`, `wezterm`, `tmux`, or `none` (no terminal spawning — run all detached). For batch launches, `keel-containers launch-batch <session-ids> --terminal` opens a tab per agent using whichever launcher is configured.
+The terminal launcher is configurable via `~/.tripwire-containers/config.yaml` and supports `iterm`, `terminal` (Terminal.app), `ghostty`, `alacritty`, `kitty`, `wezterm`, `tmux`, or `none` (no terminal spawning — run all detached). For batch launches, `tripwire-containers launch-batch <session-ids> --terminal` opens a tab per agent using whichever launcher is configured.
 
 ### Container images
 
@@ -1004,7 +1004,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 RUN (curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
     dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg) && \
     apt-get update && apt-get install -y gh
-RUN pip install keel
+RUN pip install tripwire
 RUN mkdir -p /workspace/{repo,project,config,docs}
 WORKDIR /workspace/repo
 ```
@@ -1027,12 +1027,12 @@ COPY entrypoint-langgraph.sh /usr/local/bin/
 ENTRYPOINT ["entrypoint-langgraph.sh"]
 ```
 
-`keel-containers` selects the right image based on the agent definition's `runtime` field.
+`tripwire-containers` selects the right image based on the agent definition's `runtime` field.
 
 ### Package structure
 
 ```
-keel-containers/
+tripwire-containers/
 ├── pyproject.toml
 ├── src/
 │   └── keel_containers/
@@ -1061,7 +1061,7 @@ keel-containers/
 
 ---
 
-## Project 3: keel-ui (Visibility Layer)
+## Project 3: tripwire-ui (Visibility Layer)
 
 ### The problems this solves
 
@@ -1086,12 +1086,12 @@ Match existing Seido frontend patterns:
 
 The UI is a **local development tool** (not a deployed web app). It runs on localhost and reads from:
 1. **Git** (project repo on disk) — for issues, nodes, sessions, project config
-2. **keel-containers status API** — for live container state
+2. **tripwire-containers status API** — for live container state
 3. **GitHub API** — for PR status, CI checks
 
 ```
 ┌──────────────────────────────────┐
-│   keel-ui (React)      │
+│   tripwire-ui (React)      │
 │   localhost:3000                  │
 │                                  │
 │   ├── Project Switcher           │
@@ -1120,8 +1120,8 @@ The UI is a **local development tool** (not a deployed web app). It runs on loca
 │  GET /api/nodes                  │
 │  GET /api/graph                  │
 │  GET /api/sessions               │
-│  GET /api/containers             │  ← reads from keel-containers status
-│  POST /api/containers/launch     │  ← calls keel-containers CLI
+│  GET /api/containers             │  ← reads from tripwire-containers status
+│  POST /api/containers/launch     │  ← calls tripwire-containers CLI
 │  POST /api/actions/approve       │  ← git operations
 │  GET /api/github/prs             │  ← gh CLI wrapper
 │  WS /api/containers/stream       │  ← live container status updates
@@ -1145,7 +1145,7 @@ Why a backend API instead of reading git directly from the frontend:
 - Columns = statuses from project.yaml (configurable)
 - Cards = issues, showing: key, title, priority badge, executor badge, agent name
 - Cards colored by staleness (red border if referencing stale nodes)
-- Drag-and-drop to change status (calls `keel issue update`)
+- Drag-and-drop to change status (calls `tripwire issue update`)
 - Filter by: executor, label, parent epic, assignee
 - Active agent indicator on cards (green dot if a container is working on this issue)
 
@@ -1170,7 +1170,7 @@ Why a backend API instead of reading git directly from the frontend:
 - Status indicators: running, completed, failed, blocked
 - Session dependency visualization: which sessions are active, which are complete
 - Per-container actions:
-  - "Open in iTerm" button (calls `keel-containers iterm`)
+  - "Open in iTerm" button (calls `tripwire-containers iterm`)
   - "View logs" (streams container logs)
   - "Stop" button
 - History of completed sessions
@@ -1178,15 +1178,15 @@ Why a backend API instead of reading git directly from the frontend:
 **6. Actions Panel**
 - Quick actions that would otherwise require terminal:
   - Delete branch + cleanup (`gh` + `git`)
-  - Launch agent session (`keel-containers launch`)
+  - Launch agent session (`tripwire-containers launch`)
   - Approve plan (merge PR via `gh pr merge`)
-  - Run validation (`keel validate`)
-  - Rebuild graph index (`keel refs rebuild`)
+  - Run validation (`tripwire validate`)
+  - Rebuild graph index (`tripwire refs rebuild`)
 
 ### Package structure
 
 ```
-keel-ui/
+tripwire-ui/
 ├── package.json
 ├── vite.config.ts
 ├── tsconfig.json
@@ -1233,21 +1233,21 @@ keel-ui/
 ## Build Order and Dependencies
 
 ```
-Phase 1: keel (data layer)
+Phase 1: tripwire (data layer)
   ├── Python package: models, parser, store, validator, graph, CLI
   ├── Templates: project scaffold, PM agent skill, issue templates
-  └── Deliverable: `pip install keel` works, `keel init` generates projects
+  └── Deliverable: `pip install tripwire` works, `tripwire init` generates projects
 
-Phase 2: keel-containers (execution layer)  ← depends on keel
+Phase 2: tripwire-containers (execution layer)  ← depends on tripwire
   ├── Base Docker image with Claude Code + tools
   ├── Python package: container lifecycle, egress, workspace setup, CLI
   ├── iTerm2 integration
-  └── Deliverable: `keel-containers launch <session>` runs an autonomous agent
+  └── Deliverable: `tripwire-containers launch <session>` runs an autonomous agent
 
-Phase 3: keel-ui (visibility layer)  ← depends on both
+Phase 3: tripwire-ui (visibility layer)  ← depends on both
   ├── Backend API (FastAPI, wraps git + docker + github)
   ├── React frontend (kanban, graph, agent monitor)
-  └── Deliverable: `keel-ui` starts local dashboard
+  └── Deliverable: `tripwire-ui` starts local dashboard
 
 Each phase is independently useful:
   - Phase 1 alone: manage projects via CLI + git
@@ -1266,21 +1266,21 @@ All three projects live in the same directory:
 ├── docs/
 │   ├── overarching-plan.md          # This document (high-level)
 │   ├── keel-plan.md       # Detailed plan for keel
-│   ├── keel-ui.md         # Detailed plan for UI (to be written)
-│   └── keel-containers.md          # Detailed plan for containers (to be written)
+│   ├── tripwire-ui.md         # Detailed plan for UI (to be written)
+│   └── tripwire-containers.md          # Detailed plan for containers (to be written)
 │
-├── keel/                   # Python package: data layer
+├── tripwire/                   # Python package: data layer
 │   ├── pyproject.toml
-│   ├── src/keel/
+│   ├── src/tripwire/
 │   └── tests/
 │
-├── keel-containers/                # Python package: execution layer
+├── tripwire-containers/                # Python package: execution layer
 │   ├── pyproject.toml
 │   ├── src/keel_containers/
 │   ├── docker/
 │   └── tests/
 │
-└── keel-ui/               # React + Python: visibility layer
+└── tripwire-ui/               # React + Python: visibility layer
     ├── package.json                 # Frontend
     ├── src/                         # React app
     ├── backend/                     # FastAPI backend
@@ -1295,10 +1295,10 @@ All three projects live in the same directory:
 
 1. **Container runtime**: Any Docker-compatible runtime (Docker Desktop, OrbStack, Colima, Podman). We code against the `docker` CLI which is identical across all runtimes — zero overhead to support all of them. Recommend OrbStack for macOS (lighter than Docker Desktop).
 2. **Remote execution**: Local Docker only for Phase 2. Cloud execution (Cloud Run, remote Docker) is a future extension.
-3. **UI backend → keel**: Import `keel` as a Python library directly. Faster, type-safe, no subprocess overhead. The UI backend depends on `keel` as a pip dependency.
+3. **UI backend → tripwire**: Import `tripwire` as a Python library directly. Faster, type-safe, no subprocess overhead. The UI backend depends on `tripwire` as a pip dependency.
 4. **Auth for UI**: None — local dev tool, bind to localhost only.
 5. **Project discovery**: UI scans a configured root directory for projects (any directory containing `project.yaml`).
 6. **Multi-repo sessions**: All repos in a session are equal (no primary). The agent treats them symmetrically — branches and PRs in any of them. Sessions declare a `repos:` array, not a single `repo:` field.
-7. **Orchestration**: Hybrid YAML rules + Python hook scripts. Declarative YAML covers the simple event → action flows, hooks are an escape hatch for complex logic. Rules live in `<project>/orchestration/`, runtime in `keel-containers`.
+7. **Orchestration**: Hybrid YAML rules + Python hook scripts. Declarative YAML covers the simple event → action flows, hooks are an escape hatch for complex logic. Rules live in `<project>/orchestration/`, runtime in `tripwire-containers`.
 8. **Customisation tiers**: Project → Session. Just 2 levels for orchestration overrides. No agent-tier or issue-tier overrides — keeps the mental model simple.
-9. **Source of truth**: the project repo. `keel` ships defaults that get copied into the project on init; `keel-containers` is a thin runtime that reads from the project repo and ships no skills, no templates, no defaults of its own.
+9. **Source of truth**: the project repo. `tripwire` ships defaults that get copied into the project on init; `tripwire-containers` is a thin runtime that reads from the project repo and ships no skills, no templates, no defaults of its own.

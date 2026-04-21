@@ -5,7 +5,7 @@ See `docs/similar-tools.md` for the full analysis behind each.
 
 ## Future (revisit with evidence)
 
-### F3: `keel timeline` — Fossil-style interleaved log
+### F3: `tripwire timeline` — Fossil-style interleaved log
 Chronological interleaving of git commits + issue/node/session
 changes. Needs git-diff correlation work. Ship when corpus scale
 justifies it.
@@ -24,7 +24,7 @@ Full container delegation with execution/verification skills loaded
 per-container. Depends on `keel.containers` infrastructure. See
 SKILL.md delegation model section for the design intent.
 
-### `keel plan` full workflow intent abstraction (F15 v2)
+### `tripwire plan` full workflow intent abstraction (F15 v2)
 Refactor all PM workflows to separate intent from I/O via a
 WorkflowIntent dataclass. Allows plan/apply for any workflow, not
 just brief. Revisit when multiple workflows need dry-run support.

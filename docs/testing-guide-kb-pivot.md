@@ -27,10 +27,10 @@ uv tool install --force --editable .
 Verify:
 
 ```bash
-keel --version
+tripwire --version
 # → keel, version 0.1.0
 
-keel --help
+tripwire --help
 # Should list: agenda, brief, completion, enums, graph, init, next-key,
 #   node, plan, refresh, refs, scaffold, status, templates, validate, view
 ```
@@ -57,7 +57,7 @@ or start from a clean state.
 Before committing to init, preview the structure.
 
 ```bash
-keel plan --name kb-pivot --format text
+tripwire plan --name kb-pivot --format text
 ```
 
 **What to check:**
@@ -71,10 +71,10 @@ keel plan --name kb-pivot --format text
 Now try JSON format (this is what `/pm-plan` would consume):
 
 ```bash
-keel plan --name kb-pivot --format json | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{d[\"total_files\"]} files, {d[\"total_dirs\"]} dirs')"
+tripwire plan --name kb-pivot --format json | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{d[\"total_files\"]} files, {d[\"total_dirs\"]} dirs')"
 ```
 
-**Feature tested:** F15 (`keel plan` preview).
+**Feature tested:** F15 (`tripwire plan` preview).
 
 ---
 
@@ -82,7 +82,7 @@ keel plan --name kb-pivot --format json | python3 -c "import sys,json; d=json.lo
 
 ```bash
 cd ~/Code/seido/projects/project-kb-pivot
-keel init . --name kb-pivot --key-prefix KBP --no-git
+tripwire init . --name kb-pivot --key-prefix KBP --no-git
 ```
 
 `--no-git` because the repo already has git. If init complains
@@ -102,7 +102,7 @@ about existing files, add `--force`.
 Verify the project is valid:
 
 ```bash
-keel validate --strict --format=json
+tripwire validate --strict --format=json
 ```
 
 **Expected:** exit 0 (a fresh project with no issues should pass).
@@ -112,7 +112,7 @@ keel validate --strict --format=json
 ## Phase 3: Front-load context (F14 — workflow enum)
 
 ```bash
-keel brief
+tripwire brief
 ```
 
 **What to check:**
@@ -151,7 +151,7 @@ Then invoke the scoping slash command:
 
 ### F8 — Failing-first scaffold
 - [ ] After creating initial issues/nodes, the agent runs
-  `keel validate --strict --format=json`
+  `tripwire validate --strict --format=json`
 - [ ] Validation FAILS initially (by design) — look for `ref/dangling`
   errors from `[[__PLACEHOLDER__]]` refs or unfilled fields
 - [ ] The agent iterates: fix errors → re-validate → fix → re-validate
@@ -178,11 +178,11 @@ When the agent runs validate, check the output:
 - [ ] JSON output has a `categories` object with per-category counts
 
 ### F12 — Backlinks
-- [ ] At some point the agent runs `keel refs reverse <node-id>` before
+- [ ] At some point the agent runs `tripwire refs reverse <node-id>` before
   modifying a concept node (as instructed by SKILL.md)
 
 ### F13 — JSON graph as working memory
-- [ ] The agent runs `keel graph --format=json` to understand the
+- [ ] The agent runs `tripwire graph --format=json` to understand the
   project structure
 
 ---
@@ -195,7 +195,7 @@ created.
 ### Agenda (F2)
 
 ```bash
-keel agenda --by status
+tripwire agenda --by status
 ```
 
 **What to check:**
@@ -207,7 +207,7 @@ keel agenda --by status
 Try JSON:
 
 ```bash
-keel agenda --by executor --format json | python3 -c "
+tripwire agenda --by executor --format json | python3 -c "
 import sys,json
 d = json.load(sys.stdin)
 print(f'{d[\"total_issues\"]} issues across {len(d[\"groups\"])} executors')
@@ -219,7 +219,7 @@ for g in d['groups']:
 Try filtering:
 
 ```bash
-keel agenda --by status --filter "status:todo"
+tripwire agenda --by status --filter "status:todo"
 ```
 
 ### Graph navigation (F10)
@@ -228,7 +228,7 @@ Pick an issue or node ID from the agenda output and explore:
 
 ```bash
 # What does this issue depend on?
-keel graph --type concept --upstream KBP-1 --format json | python3 -c "
+tripwire graph --type concept --upstream KBP-1 --format json | python3 -c "
 import sys,json
 d = json.load(sys.stdin)
 print(f'Upstream of KBP-1: {len(d[\"nodes\"])} nodes, {len(d[\"edges\"])} edges')
@@ -237,7 +237,7 @@ for n in d['nodes']:
 "
 
 # What depends on this node?
-keel graph --type concept --downstream <some-node-id> --format json
+tripwire graph --type concept --downstream <some-node-id> --format json
 ```
 
 **What to check:**
@@ -250,32 +250,32 @@ keel graph --type concept --downstream <some-node-id> --format json
 
 ```bash
 # Validate only one issue and its downstream
-keel validate --strict --format=json --select KBP-1+
+tripwire validate --strict --format=json --select KBP-1+
 ```
 
 **What to check:**
 - [ ] Only findings related to KBP-1 and its referrers appear
 - [ ] Exit code reflects only the selected subset
-- [ ] Much fewer findings than full `keel validate`
+- [ ] Much fewer findings than full `tripwire validate`
 
 Try upstream:
 
 ```bash
-keel validate --strict --format=json --select +KBP-1
+tripwire validate --strict --format=json --select +KBP-1
 ```
 
 ### Status dashboard
 
 ```bash
-keel status
-keel status --format json
+tripwire status
+tripwire status --format json
 ```
 
 ### Reference inspection
 
 ```bash
-keel refs list --format json
-keel refs reverse <some-node-id>
+tripwire refs list --format json
+tripwire refs reverse <some-node-id>
 ```
 
 **Feature tested:** F12 — see what references a given node.
@@ -283,14 +283,14 @@ keel refs reverse <some-node-id>
 ### Refresh the cache (F18)
 
 ```bash
-keel refresh
+tripwire refresh
 # → "graph cache already up-to-date" (if nothing changed)
 ```
 
 Edit an issue file manually (change a status), then:
 
 ```bash
-keel refresh
+tripwire refresh
 # → "graph cache rebuilt"
 ```
 
@@ -299,7 +299,7 @@ keel refresh
 ## Phase 6: Visual inspection (F19)
 
 ```bash
-keel view --port 7777 --open
+tripwire view --port 7777 --open
 ```
 
 **What to check:**
@@ -311,7 +311,7 @@ keel view --port 7777 --open
 - [ ] Dark theme, clean layout
 - [ ] Ctrl+C in terminal stops the server cleanly
 
-**Feature tested:** F19 (`keel view` — human brief-in surface).
+**Feature tested:** F19 (`tripwire view` — human brief-in surface).
 
 ---
 
@@ -324,10 +324,10 @@ Back in Claude Code:
 ```
 
 **What to observe:**
-- [ ] Agent runs `keel brief` first
+- [ ] Agent runs `tripwire brief` first
 - [ ] Agent modifies the issue file directly
-- [ ] Agent runs `keel validate --strict --format=json` after
-- [ ] Agent checks `keel refs reverse KBP-1` if the issue is
+- [ ] Agent runs `tripwire validate --strict --format=json` after
+- [ ] Agent checks `tripwire refs reverse KBP-1` if the issue is
   heavily referenced (per the red-flag table instruction)
 
 Then try:
@@ -337,7 +337,7 @@ Then try:
 ```
 
 **What to check:**
-- [ ] The `/pm-agenda` slash command runs `keel agenda --format=json`
+- [ ] The `/pm-agenda` slash command runs `tripwire agenda --format=json`
   internally
 - [ ] Produces an interpreted natural-language summary — not just
   raw data
@@ -352,25 +352,25 @@ Test each interpretive slash command:
 ```
 /pm-status
 ```
-- [ ] Runs `keel status --format=json`, interprets with recommendations
+- [ ] Runs `tripwire status --format=json`, interprets with recommendations
 
 ```
 /pm-graph
 ```
-- [ ] Runs `keel graph --format=json`, analyses critical path and
+- [ ] Runs `tripwire graph --format=json`, analyses critical path and
   parallelizable work
 
 ```
 /pm-validate
 ```
-- [ ] Runs `keel validate --strict --format=json`, interprets errors
+- [ ] Runs `tripwire validate --strict --format=json`, interprets errors
   and proposes fixes
 
 ---
 
 ## Phase 9: Commit and review
 
-If everything looks good, commit the keel artifacts:
+If everything looks good, commit the tripwire artifacts:
 
 ```bash
 cd ~/Code/seido/projects/project-kb-pivot
@@ -378,7 +378,7 @@ git add project.yaml enums/ .claude/ sessions/ issues/ graph/ \
   templates/ orchestration/ planning/ standards.md agents/ \
   issue_templates/ comment_templates/ session_templates/
 git status  # review what's staged
-git commit -m "feat: initialize keel project management for kb-pivot"
+git commit -m "feat: initialize tripwire project management for kb-pivot"
 ```
 
 ---
@@ -389,7 +389,7 @@ After completing the flow, check off each v0.1 feature:
 
 | # | Feature | How to verify | Pass? |
 |---|---|---|---|
-| F2 | `keel agenda` | Phase 5 — grouped output, filtering, JSON | |
+| F2 | `tripwire agenda` | Phase 5 — grouped output, filtering, JSON | |
 | F4 | README durability framing | Read the README (not testable in-flow) | |
 | F5 | Bite-sized plan template | Phase 4 — observe agent plan format | |
 | F6 | PM delegation model | Phase 4 — agent stays PM, doesn't code | |
@@ -401,9 +401,9 @@ After completing the flow, check off each v0.1 feature:
 | F12 | Backlinks documented | Phase 5 — `refs reverse` usage | |
 | F13 | JSON graph documented | Phase 5 — `graph --format=json` usage | |
 | F14 | Default workflow enum | Phase 3 — `ISSUE WORKFLOW` in brief | |
-| F15 | `keel plan` preview | Phase 1 — dry-run output | |
-| F18 | `keel refresh` | Phase 5 — cache rebuild | |
-| F19 | `keel view` HTML | Phase 6 — visual inspection | |
+| F15 | `tripwire plan` preview | Phase 1 — dry-run output | |
+| F18 | `tripwire refresh` | Phase 5 — cache rebuild | |
+| F19 | `tripwire view` HTML | Phase 6 — visual inspection | |
 
 ---
 
