@@ -4,7 +4,7 @@
 This module implements the engine: load every entity, run every check in the
 catalogue, optionally apply auto-fixes, and emit a structured report.
 
-The check catalogue (matches `docs/keel-plan.md` "The Validation
+The check catalogue (matches `docs/tripwire-plan.md` "The Validation
 Gate" section):
 
 1. Schema checks — file parses, matches Pydantic model, has required fields

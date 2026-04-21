@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="img/keel_full_black_bg.svg">
-    <source media="(prefers-color-scheme: light)" srcset="img/keel_full_white_bg.svg">
-    <img src="img/keel_full_transparent.svg" alt="Tripwire" width="520">
+    <source media="(prefers-color-scheme: dark)" srcset="img/tripwire_full_black_bg.svg">
+    <source media="(prefers-color-scheme: light)" srcset="img/tripwire_full_white_bg.svg">
+    <img src="img/tripwire_full_transparent.svg" alt="Tripwire" width="520">
   </picture>
 </p>
 
@@ -159,7 +159,7 @@ Four principles. Each one is a deliberate choice.
 
 **4. Validation is the gate.** Every agent loop ends with `tripwire validate --strict --format=json`. The same command rebuilds the graph cache incrementally. The loop is: write files → validate → fix → validate → commit.
 
-**Why in-repo.** Project artifacts — decisions, contracts, issue history — have long tails. You need to know why a decision was made three years from now. External SaaS trackers lose that history when companies migrate tools, pivot pricing, or shut down. Keel issues are git commits: readable with `cat` in 20 years, diffable with `git log`, portable with `git clone`. The project's history is as durable as its code.
+**Why in-repo.** Project artifacts — decisions, contracts, issue history — have long tails. You need to know why a decision was made three years from now. External SaaS trackers lose that history when companies migrate tools, pivot pricing, or shut down. Tripwire issues are git commits: readable with `cat` in 20 years, diffable with `git log`, portable with `git clone`. The project's history is as durable as its code.
 
 ## Slash commands
 
@@ -320,7 +320,7 @@ The agent produced 20 issues and declared done. When asked "what did
 you miss?", it found 7 more issues and 4 missing concept nodes. The
 capability was there — the workflow just never said "review your work."
 
-Keel's scoping workflow now has a gap analysis step: after validation
+Tripwire's scoping workflow now has a gap analysis step: after validation
 passes, the agent rereads the planning docs and maps every deliverable
 to an issue. Gaps become visible in a `scoping-verification.md`
 artifact.
@@ -401,7 +401,7 @@ methodology is versioned in-tree with the project. Fork a project,
 fork the methodology. Evolve it in a PR, review it like code.
 
 Across every adjacent tool we studied (Linear, dbt, Terraform,
-Obsidian, Fossil, superpowers, TDD), Keel is the only one that ships
+Obsidian, Fossil, superpowers, TDD), Tripwire is the only one that ships
 methodology alongside state, versioned together.
 
 </details>
@@ -412,13 +412,13 @@ methodology alongside state, versioned together.
 
 **v0.2.** 502 tests pass. The validation gate is stable. The PM skill (33 reference files, 13 canonical examples) and 12 `/pm-*` slash commands ship into every initialised project. v0.2 added self-healing workflow loops, gap analysis, agent psychology defenses, JSON-first CLI defaults, and RFC 4122 UUID generation. APIs may change before v1.
 
-**Not in v0:** web UI, managed cloud version, the agent execution runtime itself. Those are tracked in `docs/agent-containers.md` and `docs/keel-ui.md`.
+**Not in v0:** web UI, managed cloud version, the agent execution runtime itself. Those are tracked in `docs/agent-containers.md` and `docs/tripwire-ui.md`.
 
 ## Docs
 
-- Design: `docs/keel-plan.md`
+- Design: `docs/tripwire-plan.md`
 - Agent execution runtime: `docs/agent-containers.md`
-- Web dashboard: `docs/keel-ui.md`
+- Web dashboard: `docs/tripwire-ui.md`
 - Platform plan: `docs/overarching-plan.md`
 
 ## License

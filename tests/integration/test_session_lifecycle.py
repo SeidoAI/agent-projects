@@ -18,7 +18,7 @@ import subprocess
 from pathlib import Path
 
 
-def _run_keel(cwd: Path, *args: str) -> subprocess.CompletedProcess:
+def _run_tripwire(cwd: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["uv", "run", "tripwire", *args],
         cwd=cwd,
@@ -38,7 +38,7 @@ def test_full_session_lifecycle(save_test_issue, tmp_path_project):
     )
 
     # Allocate a session key via the CLI.
-    alloc = _run_keel(tmp_path_project, "next-key", "--type", "session")
+    alloc = _run_tripwire(tmp_path_project, "next-key", "--type", "session")
     assert alloc.returncode == 0, alloc.stdout + alloc.stderr
     session_id = alloc.stdout.strip()
 
@@ -67,14 +67,14 @@ repos: []
     # Derive the branch name. Session keys from `tripwire next-key --type
     # session` look like 'TST-S1' (uppercase); derive lowercases the
     # slug to match branch convention.
-    derive = _run_keel(tmp_path_project, "session", "derive-branch", session_id)
+    derive = _run_tripwire(tmp_path_project, "session", "derive-branch", session_id)
     assert derive.returncode == 0, derive.stdout + derive.stderr
     branch = derive.stdout.strip()
     slug = session_id.removeprefix("session-").lower()
     assert branch == f"feat/{slug}", branch
 
     # session check should FAIL: handoff.yaml missing.
-    check_missing = _run_keel(tmp_path_project, "session", "check", session_id)
+    check_missing = _run_tripwire(tmp_path_project, "session", "check", session_id)
     assert check_missing.returncode != 0
     assert "handoff.yaml" in check_missing.stdout.lower()
 
@@ -95,13 +95,13 @@ last_verification_passed_at: null
     )
 
     # session check should PASS now.
-    check_ok = _run_keel(tmp_path_project, "session", "check", session_id)
+    check_ok = _run_tripwire(tmp_path_project, "session", "check", session_id)
     assert check_ok.returncode == 0, check_ok.stdout + check_ok.stderr
     assert "launch-ready" in check_ok.stdout.lower()
 
     # tripwire validate should pass (session is in planned status, handoff
     # isn't required yet, but schema is valid).
-    validate = _run_keel(tmp_path_project, "validate", "--strict")
+    validate = _run_tripwire(tmp_path_project, "validate", "--strict")
     # We don't insist on exit 0 because the freshly-scaffolded project
     # may have phase/heuristic findings unrelated to our session work.
     # What we do insist on: no handoff_schema/* findings in the output.

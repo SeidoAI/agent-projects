@@ -31,7 +31,7 @@ logger = logging.getLogger("tripwire.ui.server")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Startup/shutdown lifecycle for the Keel UI app.
+    """Startup/shutdown lifecycle for the Tripwire UI app.
 
     Startup: initialise shared state on ``app.state``.
     Shutdown: cancel any background tasks attached to ``app.state``.
@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.event_queue = asyncio.Queue()
     app.state.hub = None  # WebSocket hub — wired by KUI-37
     app.state.observer = None  # File-watcher observer — wired by KUI-36
-    logger.info("Keel UI started")
+    logger.info("Tripwire UI started")
 
     yield
 
@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.observer.stop()
     if app.state.hub is not None:
         await app.state.hub.shutdown()
-    logger.info("Keel UI shutting down")
+    logger.info("Tripwire UI shutting down")
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ def create_app(*, dev_mode: bool = False) -> FastAPI:
         handles it via its proxy config).
     """
     app = FastAPI(
-        title="Keel UI",
+        title="Tripwire UI",
         version=tripwire.__version__,
         lifespan=lifespan,
     )
