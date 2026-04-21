@@ -121,7 +121,7 @@ def test_command_name_matches_filename(command_name: str) -> None:
 
 
 @pytest.mark.parametrize("command_name", EXPECTED_COMMANDS)
-def test_command_body_references_keel_not_agent_project(command_name: str) -> None:
+def test_command_body_references_tripwire_not_agent_project(command_name: str) -> None:
     """Every command body must use `tripwire <cmd>`, not `agent-project <cmd>`."""
     path = COMMANDS_DIR / f"{command_name}.md"
     _, body = _parse_frontmatter(path)
