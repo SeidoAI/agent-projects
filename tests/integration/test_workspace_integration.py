@@ -16,7 +16,7 @@ from pathlib import Path
 # ============================================================================
 
 
-def _run_keel(
+def _run_tripwire(
     cwd: Path, *args: str, check: bool = False
 ) -> subprocess.CompletedProcess:
     return subprocess.run(
@@ -61,7 +61,7 @@ def _bootstrap_workspace_with_node(
     description: str = "v1",
 ) -> Path:
     ws_dir = tmp_path / ws_name
-    r = _run_keel(
+    r = _run_tripwire(
         tmp_path,
         "workspace",
         "init",
@@ -105,7 +105,7 @@ class TestCreateAndLinkTwoProjects:
 
         for name, slug in [("proj-a", "pa"), ("proj-b", "pb")]:
             proj_dir = tmp_path / name
-            r = _run_keel(
+            r = _run_tripwire(
                 tmp_path,
                 "init",
                 "--name",
@@ -119,7 +119,7 @@ class TestCreateAndLinkTwoProjects:
             )
             assert r.returncode == 0, r.stdout + r.stderr
 
-        r = _run_keel(tmp_path, "workspace", "list", "--workspace-dir", str(ws_dir))
+        r = _run_tripwire(tmp_path, "workspace", "list", "--workspace-dir", str(ws_dir))
         assert "pa" in r.stdout
         assert "pb" in r.stdout
 
@@ -135,7 +135,7 @@ class TestSyncHappyPath:
 
         for name, slug in [("proj-a", "PA"), ("proj-b", "PB")]:
             proj_dir = tmp_path / name
-            r = _run_keel(
+            r = _run_tripwire(
                 tmp_path,
                 "init",
                 "--name",
@@ -161,11 +161,11 @@ class TestSyncHappyPath:
         node_a_path.write_text(text, encoding="utf-8")
 
         # Project A pushes.
-        r = _run_keel(proj_a, "workspace", "push")
+        r = _run_tripwire(proj_a, "workspace", "push")
         assert r.returncode == 0, r.stdout + r.stderr
 
         # Project B pulls.
-        r = _run_keel(proj_b, "workspace", "pull")
+        r = _run_tripwire(proj_b, "workspace", "pull")
         assert r.returncode == 0, r.stdout + r.stderr
 
         node_b_text = (proj_b / "nodes" / "auth-system.yaml").read_text(
@@ -189,7 +189,7 @@ class TestSyncConflict:
             ("proj-a", "PA", proj_a),
             ("proj-b", "PB", proj_b),
         ]:
-            r = _run_keel(
+            r = _run_tripwire(
                 tmp_path,
                 "init",
                 "--name",
@@ -211,7 +211,7 @@ class TestSyncConflict:
             path_a.read_text().replace("description: base", "description: A-text"),
             encoding="utf-8",
         )
-        _run_keel(proj_a, "workspace", "push", check=True)
+        _run_tripwire(proj_a, "workspace", "push", check=True)
 
         # Project B edits description differently (without pulling first).
         path_b = proj_b / "nodes" / "auth-system.yaml"
@@ -221,7 +221,7 @@ class TestSyncConflict:
         )
 
         # Project B pulls — should surface a conflict brief.
-        r = _run_keel(proj_b, "workspace", "pull")
+        r = _run_tripwire(proj_b, "workspace", "pull")
         assert r.returncode == 10, r.stdout + r.stderr
         brief_path = proj_b / ".tripwire" / "merge-briefs" / "auth-system.yaml"
         assert brief_path.is_file()
@@ -235,7 +235,7 @@ class TestSyncConflict:
         )
 
         # Finalize.
-        r = _run_keel(proj_b, "workspace", "merge-resolve", "auth-system")
+        r = _run_tripwire(proj_b, "workspace", "merge-resolve", "auth-system")
         assert r.returncode == 0, r.stdout + r.stderr
         assert not brief_path.exists()
 
@@ -249,7 +249,7 @@ class TestStandaloneProjectUnchanged:
     def test_no_workspace_field_validates(self, tmp_path):
         """Project with no workspace pointer passes tripwire validate."""
         proj = tmp_path / "standalone"
-        r = _run_keel(
+        r = _run_tripwire(
             tmp_path,
             "init",
             "--name",
@@ -261,7 +261,7 @@ class TestStandaloneProjectUnchanged:
         )
         assert r.returncode == 0
 
-        r = _run_keel(proj, "validate", "--strict")
+        r = _run_tripwire(proj, "validate", "--strict")
         # validate may emit quality-consistency warnings etc. — we only
         # care that it doesn't emit workspace/handoff-related errors.
         # exit 0 (clean) or 1 (warnings) both acceptable; exit 2 is not.
@@ -291,7 +291,7 @@ class TestConcurrentPushes:
             name = f"proj-{i}"
             slug = f"P{i}"
             proj_dir = tmp_path / name
-            r = _run_keel(
+            r = _run_tripwire(
                 tmp_path,
                 "init",
                 "--name",
@@ -329,7 +329,7 @@ tags: []
         results: list[subprocess.CompletedProcess] = [None] * 5  # type: ignore[list-item]
 
         def _do_push(i: int):
-            results[i] = _run_keel(proj_dirs[i], "workspace", "push")
+            results[i] = _run_tripwire(proj_dirs[i], "workspace", "push")
 
         threads = [threading.Thread(target=_do_push, args=(i,)) for i in range(5)]
         for t in threads:

@@ -11,12 +11,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-import yaml as _yaml
-
 from tripwire.core.handoff_store import handoff_exists, load_handoff
 from tripwire.core.session_store import load_session
 from tripwire.core.store import load_issue
-from tripwire.models.manifest import ArtifactManifest
 
 
 @dataclass
@@ -47,11 +44,10 @@ def check_readiness(
     items: list[ReadinessItem] = []
 
     # 1. Required planning artifacts (per manifest).
-    manifest_path = project_dir / "templates" / "artifacts" / "manifest.yaml"
-    if manifest_path.exists():
-        manifest = ArtifactManifest.model_validate(
-            _yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-        )
+    from tripwire.core.manifest_loader import load_artifact_manifest
+
+    manifest, _ = load_artifact_manifest(project_dir)
+    if manifest is not None:
         sess_dir = project_dir / "sessions" / session_id
         for entry in manifest.artifacts:
             if entry.produced_at != "planning" or entry.owned_by != "pm":

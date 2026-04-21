@@ -649,6 +649,8 @@ def init_cmd(
     # rare exception.
     do_git = not no_git
 
+    from tripwire import __version__ as _tripwire_version
+
     context = {
         "project_name": name,
         "key_prefix": key_prefix,
@@ -656,6 +658,7 @@ def init_cmd(
         "description": description,
         "repos": repos_list,
         "created_at": datetime.now().replace(microsecond=0).isoformat(),
+        "tripwire_version": _tripwire_version,
     }
 
     # ------------------------------------------------------------------

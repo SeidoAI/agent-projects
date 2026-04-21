@@ -1,0 +1,42 @@
+# Default spawn configuration. Projects override via
+# project.yaml.spawn_defaults or <project>/.tripwire/spawn/defaults.yaml.
+# Sessions override via session.yaml.spawn_config.
+# Precedence: session > project > tripwire default.
+
+invocation:
+  command: claude
+  background: true
+  log_path_template: "~/.tripwire/logs/{project_slug}/{session_id}-{timestamp}.log"
+
+config:
+  model: opus
+  fallback_model: sonnet
+  effort: max
+  permission_mode: bypassPermissions
+  disallowed_tools: [Agent]
+  max_turns: 200
+  max_budget_usd: 50
+  output_format: stream-json
+
+prompt_template: |
+  {plan}
+
+  You are the {agent} agent for session {session_id}.
+  Execute the plan. Stop at stop-and-ask points.
+  Open a PR titled '{branch_type}({session_id}): {session_name}' when done.
+
+  Before you end the session: ask honestly — did you learn anything future
+  agents in this area would benefit from inheriting? Not "what did I do"
+  (that's developer.md) but "what insight would I want the next agent
+  working near this to start from?" If yes, propose it in insights.yaml
+  as a node addition or update. For new_node proposals, set `type:` to
+  one of the project's active node_type enum values (e.g. `decision`,
+  `contract`, `pattern`). If nothing qualifies — if every insight is
+  either obvious, already in a node, or specific to this session —
+  leave the file absent. Do not force it.
+
+system_prompt_append: |
+  tripwire session: {session_id}; project: {project_slug}
+  If context is getting heavy, use /compact to free space.
+  Do not use the Agent tool — you are a single-agent session.
+  Do not use /batch — the work is already decomposed in your plan.

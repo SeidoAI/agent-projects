@@ -22,15 +22,13 @@ repos:
 {%- endif %}
 
 # Issue lifecycle statuses. These must match an entry in enums/issue_status.yaml.
+# Default 6-stage flow: backlog → todo → in_progress → in_review → verified → done.
 statuses:
   - backlog
   - todo
   - in_progress
-  - verifying
-  - reviewing
-  - testing
-  - ready
-  - updating
+  - in_review
+  - verified
   - done
   - canceled
 
@@ -39,12 +37,9 @@ statuses:
 status_transitions:
   backlog: [todo, canceled]
   todo: [in_progress, backlog, canceled]
-  in_progress: [verifying, todo, canceled]
-  verifying: [reviewing, in_progress]
-  reviewing: [testing, in_progress]
-  testing: [ready, reviewing]
-  ready: [updating]
-  updating: [done]
+  in_progress: [in_review, todo, canceled]
+  in_review: [verified, in_progress]
+  verified: [done, in_review]
   done: []
   canceled: [backlog]
 
@@ -86,3 +81,7 @@ next_session_number: 1
 phase: scoping
 
 created_at: "{{ created_at }}"
+
+# Pinned tripwire version — read by `tripwire ci install` to pin the
+# generated `.github/workflows/tripwire.yml` workflow.
+tripwire_version: "{{ tripwire_version }}"

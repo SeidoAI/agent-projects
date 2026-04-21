@@ -1,24 +1,52 @@
-"""Message routes (v2 stub — 501 Not Implemented)."""
+"""Message routes (v2 stub — 501 Not Implemented).
+
+Every endpoint returns 501 via the shared ``raise_v2_not_implemented``
+helper. DTOs are declared on :mod:`tripwire.ui.services.message_service`
+so OpenAPI lists realistic shapes for frontend type generation.
+
+See [[dec-v2-stubs-not-deferred]].
+"""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
+
+from tripwire.ui.routes._v2_stub import raise_v2_not_implemented
+from tripwire.ui.services.message_service import (
+    Message,
+    MessageCreate,
+    MessageRespond,
+    UnreadCount,
+)
 
 router = APIRouter(prefix="/api/messages", tags=["messages (v2)"])
 
-_V2 = HTTPException(status_code=501, detail="Not implemented in v1")
+_DETAIL = (
+    "messages feature requires tripwire.containers agent-messaging "
+    "(v2 — not yet implemented)"
+)
 
 
-@router.post("")
-async def create_message() -> None:
-    raise _V2
+@router.post("", response_model=Message)
+async def create_message(body: MessageCreate) -> Message:
+    raise_v2_not_implemented(_DETAIL)
 
 
-@router.get("")
-async def list_messages() -> None:
-    raise _V2
+@router.get("", response_model=list[Message])
+async def list_messages(session_id: str) -> list[Message]:
+    raise_v2_not_implemented(_DETAIL)
 
 
-@router.get("/unread")
-async def list_unread() -> None:
-    raise _V2
+@router.get("/pending", response_model=list[Message])
+async def list_pending_messages(session_id: str) -> list[Message]:
+    raise_v2_not_implemented(_DETAIL)
+
+
+@router.post("/{message_id}/respond", response_model=Message)
+async def respond_to_message(message_id: str, body: MessageRespond) -> Message:
+    raise_v2_not_implemented(_DETAIL)
+
+
+@router.get("/unread", response_model=UnreadCount)
+async def get_unread_count() -> UnreadCount:
+    raise_v2_not_implemented(_DETAIL)

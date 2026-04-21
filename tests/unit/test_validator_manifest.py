@@ -24,7 +24,7 @@ def test_validator_rejects_invalid_produced_by(tmp_project_manifest):
 
 def test_validator_warns_on_phase_ownership_inconsistent(tmp_project_manifest):
     """manifest_schema/phase_ownership_consistent warns when PM owns an
-    artifact produced during implementing phase."""
+    artifact produced during in_progress phase."""
     from tripwire.core.validator import validate_project
 
     proj = tmp_project_manifest(
@@ -33,7 +33,7 @@ def test_validator_warns_on_phase_ownership_inconsistent(tmp_project_manifest):
                 "name": "plan",
                 "file": "plan.md",
                 "template": "plan.md.j2",
-                "produced_at": "implementing",
+                "produced_at": "in_progress",
                 "produced_by": "pm",
                 "owned_by": "pm",
                 "required": True,

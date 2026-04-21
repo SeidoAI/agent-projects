@@ -35,9 +35,10 @@ the agent will try to enforce.
 
 - Sessions in `completed` status must have all required artifacts from
   `templates/artifacts/manifest.yaml`. The validator enforces this.
-- `plan.md`, `task-checklist.md`, `verification-checklist.md` are written
-  at planning. `recommended-testing-plan.md` and `post-completion-comments.md`
-  are written at completion.
+- `plan.md` and `verification-checklist.md` are written during the planning
+  phase. `task-checklist.md` is written as the session enters `in_progress`.
+  `recommended-testing-plan.md` and `post-completion-comments.md` are
+  written as the session reaches `done`.
 
 ## Commits and PRs
 

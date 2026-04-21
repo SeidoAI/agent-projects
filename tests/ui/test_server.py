@@ -20,7 +20,7 @@ class TestCreateApp:
         import tripwire
 
         app = create_app(dev_mode=True)
-        assert app.title == "Keel UI"
+        assert app.title == "Tripwire UI"
         assert app.version == tripwire.__version__
 
     def test_openapi_json_available(self):
@@ -45,15 +45,28 @@ class TestLifespan:
         with TestClient(app):
             assert isinstance(app.state.event_queue, asyncio.Queue)
 
-    def test_hub_placeholder_set(self):
-        app = create_app(dev_mode=True)
-        with TestClient(app):
-            assert app.state.hub is None
+    def test_hub_initialised(self):
+        from tripwire.ui.ws.hub import WebSocketHub
 
-    def test_observer_placeholder_set(self):
         app = create_app(dev_mode=True)
         with TestClient(app):
-            assert app.state.observer is None
+            assert isinstance(app.state.hub, WebSocketHub)
+
+    def test_observer_initialised(self):
+        from watchdog.observers.api import BaseObserver
+
+        app = create_app(dev_mode=True)
+        with TestClient(app):
+            assert isinstance(app.state.observer, BaseObserver)
+            assert app.state.observer.is_alive()
+
+    def test_background_tasks_scheduled(self):
+        app = create_app(dev_mode=True)
+        with TestClient(app):
+            assert app.state.broadcaster_task is not None
+            assert not app.state.broadcaster_task.done()
+            assert app.state.heartbeat_task is not None
+            assert not app.state.heartbeat_task.done()
 
     def test_lifespan_enters_and_exits_cleanly(self):
         app = create_app(dev_mode=True)

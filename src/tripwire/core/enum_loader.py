@@ -114,8 +114,30 @@ def _load_enum_yaml(path: Path, enum_name: str) -> LoadedEnum:
     )
 
 
+def _package_template_enum_path(enum_name: str) -> Path:
+    """Path to the enum YAML shipped inside the tripwire package."""
+    import tripwire
+
+    return Path(tripwire.__file__).parent / "templates" / "enums" / f"{enum_name}.yaml"
+
+
 def _default_enum(enum_name: str) -> LoadedEnum | None:
-    """Build a LoadedEnum from a packaged StrEnum default."""
+    """Load the packaged default for an enum.
+
+    Prefers the shipped YAML at `src/tripwire/templates/enums/<name>.yaml`
+    (richer than StrEnum: carries labels, colors, descriptions). Falls back
+    to the in-code StrEnum if no template ships.
+    """
+    pkg_path = _package_template_enum_path(enum_name)
+    if pkg_path.is_file():
+        loaded = _load_enum_yaml(pkg_path, enum_name)
+        return LoadedEnum(
+            name=loaded.name,
+            description=loaded.description,
+            values=loaded.values,
+            source="default",
+        )
+
     cls = DEFAULT_ENUMS.get(enum_name)
     if cls is None:
         return None
@@ -128,6 +150,35 @@ def _default_enum(enum_name: str) -> LoadedEnum | None:
         description=cls.__doc__,
         values=values,
         source="default",
+    )
+
+
+def load_enum(project_dir: Path, enum_name: str) -> list[str]:
+    """Load one enum's value IDs, preferring project override over packaged default.
+
+    Lookup order:
+      1. `<project_dir>/enums/<enum_name>.yaml` (project override)
+      2. `src/tripwire/templates/enums/<enum_name>.yaml` (packaged default)
+      3. `DEFAULT_ENUMS[enum_name]` (StrEnum fallback, for enums without a YAML
+         template — e.g. legacy enums)
+
+    Raises FileNotFoundError if none of the above exist.
+    """
+    project_path = project_dir / ENUMS_DIRNAME / f"{enum_name}.yaml"
+    if project_path.is_file():
+        return list(_load_enum_yaml(project_path, enum_name).value_ids())
+
+    pkg_path = _package_template_enum_path(enum_name)
+    if pkg_path.is_file():
+        return list(_load_enum_yaml(pkg_path, enum_name).value_ids())
+
+    default = _default_enum(enum_name)
+    if default is not None:
+        return list(default.value_ids())
+
+    raise FileNotFoundError(
+        f"No enum definition found for {enum_name!r} (looked in project override, "
+        f"packaged template, and StrEnum defaults)."
     )
 
 

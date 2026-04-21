@@ -8,7 +8,7 @@ export interface Reference {
   is_stale?: boolean;
 }
 
-export interface RemarkKeelRefsOptions {
+export interface RemarkTripwireRefsOptions {
   projectId: string;
   refs?: Reference[];
 }
@@ -16,7 +16,7 @@ export interface RemarkKeelRefsOptions {
 const REF_RE = /\[\[([a-z0-9][a-z0-9-]*|[A-Z][A-Z0-9]*-\d+)\]\]/g;
 const ISSUE_KEY_RE = /^[A-Z][A-Z0-9]*-\d+$/;
 
-const remarkTripwireRefs: Plugin<[RemarkKeelRefsOptions], Root> = (options) => {
+const remarkTripwireRefs: Plugin<[RemarkTripwireRefsOptions], Root> = (options) => {
   const { projectId, refs } = options;
   const refMap = new Map(refs?.map((r) => [r.token, r]));
 

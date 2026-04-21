@@ -1,4 +1,4 @@
-"""`tripwire ui` — start the Keel dashboard.
+"""`tripwire ui` — start the Tripwire dashboard.
 
 Heavy imports (FastAPI, uvicorn) happen inside the command body so that
 ``tripwire --help`` works even on a minimal ``tripwire[projects]`` install.
