@@ -1,11 +1,16 @@
 import { createContext, useContext } from "react";
 import { Navigate, Outlet, useParams } from "react-router-dom";
+import {
+  type UseProjectWebSocketStatus,
+  useProjectWebSocket,
+} from "@/lib/realtime/useProjectWebSocket";
 import { AgentStatusBar } from "./AgentStatusBar";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
 interface ProjectShellContextValue {
   projectId: string;
+  wsStatus: UseProjectWebSocketStatus;
 }
 
 const ProjectShellContext = createContext<ProjectShellContextValue | null>(null);
@@ -19,9 +24,14 @@ export function useProjectShell(): ProjectShellContextValue {
 export function ProjectShell() {
   const { projectId } = useParams();
   if (!projectId) return <Navigate to="/projects" replace />;
+  return <ProjectShellInner projectId={projectId} />;
+}
+
+function ProjectShellInner({ projectId }: { projectId: string }) {
+  const { status } = useProjectWebSocket(projectId);
 
   return (
-    <ProjectShellContext.Provider value={{ projectId }}>
+    <ProjectShellContext.Provider value={{ projectId, wsStatus: status }}>
       <div className="flex h-screen flex-col">
         <TopBar />
         <div className="flex min-h-0 flex-1">
