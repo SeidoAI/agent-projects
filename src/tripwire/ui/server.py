@@ -12,7 +12,7 @@ import logging
 import threading
 import webbrowser
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -33,23 +33,67 @@ logger = logging.getLogger("tripwire.ui.server")
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Startup/shutdown lifecycle for the Keel UI app.
 
-    Startup: initialise shared state on ``app.state``.
-    Shutdown: cancel any background tasks attached to ``app.state``.
+    Startup: build the shared event queue, :class:`WebSocketHub`, file-watcher
+    :class:`~watchdog.observers.Observer`, and background tasks
+    (``broadcast_events`` + ``heartbeat_loop``), stashing handles on
+    ``app.state`` for dependency access and clean shutdown.
+
+    Shutdown: cancel the tasks (awaiting their cancellation), stop + join the
+    observer, close every live WebSocket.
     """
-    # Startup
-    app.state.event_queue = asyncio.Queue()
-    app.state.hub = None  # WebSocket hub — wired by KUI-37
-    app.state.observer = None  # File-watcher observer — wired by KUI-36
+    # Imports live here so unit tests that patch any of these modules see the
+    # patched version at app-startup time.
+    from tripwire.ui.file_watcher import start_watching
+    from tripwire.ui.services.project_service import _project_id
+    from tripwire.ui.ws.hub import (
+        WebSocketHub,
+        broadcast_events,
+        heartbeat_loop,
+    )
+
+    # Startup ---------------------------------------------------------------
+    event_queue: asyncio.Queue = asyncio.Queue()
+    hub = WebSocketHub()
+
+    project_dirs: list[Path] = list(getattr(app.state, "project_dirs", []) or [])
+    project_tuples: list[tuple[str, Path]] = [
+        (_project_id(Path(p).resolve()), Path(p)) for p in project_dirs
+    ]
+    loop = asyncio.get_running_loop()
+    observer = start_watching(project_tuples, event_queue, loop)
+
+    broadcaster = asyncio.create_task(
+        broadcast_events(event_queue, hub), name="tripwire.ui.broadcaster"
+    )
+    heartbeat = asyncio.create_task(
+        heartbeat_loop(hub), name="tripwire.ui.heartbeat"
+    )
+
+    app.state.event_queue = event_queue
+    app.state.hub = hub
+    app.state.observer = observer
+    app.state.broadcaster_task = broadcaster
+    app.state.heartbeat_task = heartbeat
+
     logger.info("Keel UI started")
 
-    yield
+    try:
+        yield
+    finally:
+        # Shutdown ----------------------------------------------------------
+        logger.info("Keel UI shutting down")
 
-    # Shutdown — stop background services if wired (KUI-36/37 will set these)
-    if app.state.observer is not None:
-        app.state.observer.stop()
-    if app.state.hub is not None:
-        await app.state.hub.shutdown()
-    logger.info("Keel UI shutting down")
+        for task in (broadcaster, heartbeat):
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+        observer.stop()
+        # ``observer.join`` is blocking — offload so the event loop stays
+        # responsive during shutdown.
+        await asyncio.to_thread(observer.join)
+
+        await hub.close_all()
 
 
 # ---------------------------------------------------------------------------
