@@ -1,6 +1,7 @@
 import { NavLink, useParams } from "react-router-dom";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AgentStatusBar } from "@/features/shell/AgentStatusBar";
 import { PhaseBadge } from "@/features/shell/PhaseBadge";
 import { ValidationStatus } from "@/features/shell/ValidationStatus";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,9 @@ export function TopBar() {
           <span className="text-sm font-semibold text-foreground">Project {projectId}</span>
           <PhaseBadge />
           <ValidationStatus />
+          <div className="ml-auto">
+            <AgentStatusBar />
+          </div>
         </div>
         <nav className="flex gap-1 px-4 pb-0">
           {navItems.map((item) => (

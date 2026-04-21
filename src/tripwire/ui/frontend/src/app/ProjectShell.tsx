@@ -4,7 +4,6 @@ import {
   type UseProjectWebSocketStatus,
   useProjectWebSocket,
 } from "@/lib/realtime/useProjectWebSocket";
-import { AgentStatusBar } from "./AgentStatusBar";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
@@ -40,7 +39,6 @@ function ProjectShellInner({ projectId }: { projectId: string }) {
             <Outlet />
           </main>
         </div>
-        <AgentStatusBar />
       </div>
     </ProjectShellContext.Provider>
   );

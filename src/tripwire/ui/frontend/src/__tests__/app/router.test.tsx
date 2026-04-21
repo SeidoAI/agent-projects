@@ -73,10 +73,9 @@ describe("Router", () => {
     expect(screen.getByRole("heading", { name: "Agents" })).toBeDefined();
   });
 
-  it("renders AgentStatusBar in shell", () => {
+  it("renders AgentStatusBar in the top bar", () => {
     renderRoute("/p/proj-1/board");
     expect(screen.getByText("0 agents running")).toBeDefined();
-    expect(screen.getByText("file watcher: connected")).toBeDefined();
   });
 
   it("renders nav tabs in TopBar", () => {
