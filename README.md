@@ -22,6 +22,56 @@ real software projects without drifting from the code.
 
 ---
 
+## Design principles
+
+### 1. The graph is the synchronization layer that makes drift impossible
+
+AI-driven work across issue trackers, docs, code comments, PR
+descriptions, and ADRs produces redundant descriptions of the same
+concept. Every copy drifts. Tripwire's concept graph is the single
+source of truth for every domain concept the project models — issues,
+PRs, code comments, READMEs, cross-repo workspace nodes reference
+nodes by pointer (`[[node-id]]`). There is one place to update and
+no alternative location for the same information to live.
+
+### 2. Deviation is expected; tripwires catch what prevention can't
+
+Agents drift during execution. Prevention cripples autonomy; tolerance
+produces wrong PRs. Tripwire designs for the failure: validators emit
+warnings into the agent's most recent context so they have a higher
+probability of being addressed before the agent proceeds. Tripwires
+are sensors, not locks — lightweight enough to preserve autonomy,
+explicit enough to redirect cleanly.
+
+### 3. Config over convention, with opinions
+
+Tripwire ships opinionated defaults in YAML — how sessions should
+spawn, what artifacts are required, what statuses mean, what the agent
+spawn prompt should say. Projects override where they legitimately
+differ. Tripwire is *not* configurable about validation-as-a-gate,
+artifacts-as-evidence, single-agent-sessions, or the graph-as-canon
+— softening those breaks the mechanism.
+
+### 4. Work compounds; sessions are knowledge-producing events
+
+A session's deliverable is the PR **plus** the updated concept nodes,
+developer notes, and verified notes. A session that ships code without
+updating what the project knows about itself has made the project
+worse — the next agent inherits more confusion, not less. Status
+advancement is gated on artifact production because artifacts are
+where the knowledge lives.
+
+### 5. Decomposition is a first-class product
+
+Execution quality is bounded by framing quality. PM work — scoping,
+plan writing, session layout, acceptance criteria, dependency DAGs —
+is the highest-leverage work in the project, and the decomposition
+itself is a deliverable that deserves quality, review, and iteration.
+This is why tripwire has more PM-facing features than execution-facing
+ones.
+
+---
+
 ## Quickstart
 
 ```bash
