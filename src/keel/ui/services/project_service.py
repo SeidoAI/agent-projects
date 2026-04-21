@@ -200,6 +200,18 @@ def get_project_dir(project_id: str) -> Path | None:
     return _project_index.get(project_id)
 
 
+def seed_project_index(project_dirs: list[Path]) -> None:
+    """Populate the project index from an explicit list of directories.
+
+    Used by ``start_server`` when the CLI's ``--project-dir`` flag bypasses
+    ``discover_projects()``, which is the normal path that populates the index.
+    """
+    global _project_index
+    for d in project_dirs:
+        resolved = d.resolve()
+        _project_index[_project_id(resolved)] = resolved
+
+
 def reload_project_index() -> None:
     """Clear the discovery cache so the next call rescans."""
     global _discovery_cache, _project_index
