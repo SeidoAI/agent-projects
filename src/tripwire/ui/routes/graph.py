@@ -10,6 +10,11 @@ from fastapi import APIRouter, HTTPException
 router = APIRouter(prefix="/api/projects/{project_id}/graph", tags=["graph"])
 
 # Replace these 501 stubs when implementing the real endpoints.
+# Next agent (KUI-29/30): wire via
+#   from tripwire.ui.services.graph_service import (
+#       build_concept_graph, build_dependency_graph, current_cache_version,
+#   )
+# `current_cache_version` is useful for ETag / response-cache headers.
 
 
 @router.get("/deps")

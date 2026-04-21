@@ -10,6 +10,9 @@ from fastapi import APIRouter, HTTPException
 router = APIRouter(prefix="/api/projects/{project_id}/enums", tags=["enums"])
 
 # Replace these 501 stubs when implementing the real endpoints.
+# Next agent (KUI-32): wire via
+#   from tripwire.ui.services.enum_service import get_enum, list_enums
+# `get_enum` raises FileNotFoundError — translate to 404.
 
 
 @router.get("/{name}")

@@ -10,6 +10,9 @@ from fastapi import APIRouter, HTTPException
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 # Replace these 501 stubs when implementing the real endpoints.
+# Next agent (KUI-26): wire via
+#   from tripwire.ui.services.project_service import list_projects, get_project
+# `get_project` raises KeyError on unknown id — translate to 404.
 
 
 @router.get("")

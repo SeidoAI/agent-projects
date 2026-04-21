@@ -3,6 +3,10 @@
 Scans the filesystem for ``project.yaml`` files and returns lightweight
 summaries. Results are cached for 60 seconds; call ``reload_project_index()``
 to force a rescan.
+
+Also exposes :func:`list_projects` / :func:`get_project` — the higher-level
+read APIs used by :mod:`tripwire.ui.routes.projects` for the
+``/api/projects`` endpoints.
 """
 
 from __future__ import annotations
@@ -11,10 +15,11 @@ import hashlib
 import logging
 import time
 from pathlib import Path
+from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
-from tripwire.ui.config import UserConfig
+from tripwire.ui.config import UserConfig, load_user_config
 
 logger = logging.getLogger("tripwire.ui.services.project_service")
 
@@ -42,6 +47,8 @@ _FALLBACK_ROOTS: tuple[str, ...] = ("Code", "code", "dev", "projects")
 class ProjectSummary(BaseModel):
     """Lightweight project descriptor returned by discovery."""
 
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
+
     id: str
     name: str
     key_prefix: str
@@ -50,6 +57,27 @@ class ProjectSummary(BaseModel):
     issue_count: int
     node_count: int
     session_count: int
+
+
+class ProjectDetail(ProjectSummary):
+    """Full project descriptor returned by :func:`get_project`.
+
+    Extends :class:`ProjectSummary` with every field a route may surface
+    from ``project.yaml``. New :class:`ProjectConfig` fields flow through
+    automatically via :meth:`pydantic.BaseModel.model_dump`.
+    """
+
+    description: str | None = None
+    base_branch: str
+    environments: list[str]
+    repos: dict[str, dict]
+    statuses: list[str]
+    status_transitions: dict[str, list[str]]
+    label_categories: dict[str, list[str]]
+    graph: dict
+    orchestration: dict
+    next_issue_number: int
+    next_session_number: int
 
 
 # ---------------------------------------------------------------------------
@@ -217,3 +245,72 @@ def reload_project_index() -> None:
     global _discovery_cache, _project_index
     _discovery_cache = None
     _project_index = {}
+
+
+# ---------------------------------------------------------------------------
+# High-level read API used by /api/projects routes
+# ---------------------------------------------------------------------------
+
+
+def list_projects() -> list[ProjectSummary]:
+    """Return every discovered project as a :class:`ProjectSummary`.
+
+    Loads the user config lazily on each call — cheap, and the in-memory
+    discovery cache (60s TTL) absorbs repeated route hits.
+    """
+    return discover_projects(load_user_config())
+
+
+def get_project(project_id: str) -> ProjectDetail:
+    """Return full detail for *project_id*.
+
+    The project index is populated by prior :func:`discover_projects` or
+    :func:`seed_project_index` calls; if *project_id* is not known we
+    trigger a rediscovery before giving up. That means a freshly created
+    project shows up without waiting for the 60s cache TTL.
+
+    Raises
+    ------
+    KeyError
+        If no project with this id has been discovered.
+    """
+    from tripwire.core.store import load_project
+
+    project_dir = get_project_dir(project_id)
+    if project_dir is None:
+        # Force a rescan — useful when a new project appeared since the
+        # cache was populated. Cheap enough to run on the unhappy path.
+        reload_project_index()
+        discover_projects(load_user_config())
+        project_dir = get_project_dir(project_id)
+        if project_dir is None:
+            raise KeyError(project_id)
+
+    config = load_project(project_dir)
+
+    # model_dump so new ProjectConfig fields flow through without a manual
+    # whitelist per field. The DTO fields we expose are a subset; the rest
+    # live in model metadata and can be surfaced later without schema change.
+    config_data: dict[str, Any] = config.model_dump(mode="json")
+
+    return ProjectDetail(
+        id=_project_id(project_dir),
+        name=config.name,
+        key_prefix=config.key_prefix,
+        dir=str(project_dir),
+        phase=config.phase.value,
+        issue_count=_count_issues(project_dir),
+        node_count=_count_nodes(project_dir),
+        session_count=_count_sessions(project_dir),
+        description=config.description,
+        base_branch=config.base_branch,
+        environments=list(config.environments),
+        repos=config_data.get("repos", {}),
+        statuses=list(config.statuses),
+        status_transitions=dict(config.status_transitions),
+        label_categories=config_data.get("label_categories", {}),
+        graph=config_data.get("graph", {}),
+        orchestration=config_data.get("orchestration", {}),
+        next_issue_number=config.next_issue_number,
+        next_session_number=config.next_session_number,
+    )

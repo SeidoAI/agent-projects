@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from pathlib import Path
@@ -11,10 +12,15 @@ import pytest
 
 from tripwire.ui.config import UserConfig
 from tripwire.ui.services.project_service import (
+    ProjectDetail,
+    ProjectSummary,
     _project_id,
     discover_projects,
+    get_project,
     get_project_dir,
+    list_projects,
     reload_project_index,
+    seed_project_index,
 )
 
 
@@ -263,3 +269,149 @@ class TestProjectIndex:
         pid = results[0].id
         reload_project_index()
         assert get_project_dir(pid) is None
+
+
+# ============================================================================
+# KUI-14 — list_projects / get_project
+# ============================================================================
+
+
+def _make_rich_project(root: Path, name: str = "rich", key_prefix: str = "RCH") -> Path:
+    """Create a project with a fully populated project.yaml for detail tests."""
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "project.yaml").write_text(
+        "name: " + name + "\n"
+        "key_prefix: " + key_prefix + "\n"
+        "description: rich fixture\n"
+        "base_branch: main\n"
+        "environments:\n  - dev\n  - prod\n"
+        "repos:\n  SeidoAI/web:\n    local: /tmp/web\n"
+        "statuses:\n  - todo\n  - done\n"
+        "status_transitions:\n  todo: [done]\n  done: []\n"
+        "label_categories:\n"
+        "  executor: [ai, human]\n"
+        "  verifier: [required, optional]\n"
+        "  domain: [backend, frontend]\n"
+        "  agent: [backend-coder]\n"
+        "graph:\n  node_types: [model, decision]\n  auto_index: true\n"
+        "orchestration:\n  default_pattern: default\n  plan_approval_required: true\n"
+        "  auto_merge_on_pass: false\n"
+        "next_issue_number: 42\n"
+        "next_session_number: 7\n"
+        "phase: executing\n",
+        encoding="utf-8",
+    )
+    for sub in ("issues", "nodes", "sessions"):
+        (root / sub).mkdir(exist_ok=True)
+    return root
+
+
+class TestListProjects:
+    def test_returns_summaries_from_user_config(self, tmp_path: Path):
+        _make_project(tmp_path / "projects" / "p", name="p1", key_prefix="P1")
+
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
+            mock_path_cls.cwd.return_value = tmp_path / "empty"
+            mock_path_cls.home.return_value = tmp_path / "fakehome"
+            mock_path_cls.side_effect = Path
+            with patch(
+                "tripwire.ui.services.project_service.load_user_config",
+                return_value=UserConfig(project_roots=[tmp_path / "projects"]),
+            ):
+                result = list_projects()
+
+        assert len(result) == 1
+        assert isinstance(result[0], ProjectSummary)
+        assert result[0].name == "p1"
+
+    def test_empty_when_none_discovered(self, tmp_path: Path):
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
+            mock_path_cls.cwd.return_value = tmp_path / "empty"
+            mock_path_cls.home.return_value = tmp_path / "fakehome"
+            mock_path_cls.side_effect = Path
+            with patch(
+                "tripwire.ui.services.project_service.load_user_config",
+                return_value=UserConfig(),
+            ):
+                assert list_projects() == []
+
+
+class TestGetProject:
+    def test_returns_detail_for_known_id(self, tmp_path: Path):
+        proj = _make_rich_project(tmp_path / "proj")
+        seed_project_index([proj])
+
+        pid = _project_id(proj.resolve())
+        detail = get_project(pid)
+
+        assert isinstance(detail, ProjectDetail)
+        assert detail.id == pid
+        assert detail.name == "rich"
+        assert detail.key_prefix == "RCH"
+        assert detail.dir == str(proj.resolve())
+        assert detail.phase == "executing"
+        assert detail.description == "rich fixture"
+        assert detail.base_branch == "main"
+        assert detail.environments == ["dev", "prod"]
+        assert detail.repos == {"SeidoAI/web": {"local": "/tmp/web"}}
+        assert detail.statuses == ["todo", "done"]
+        assert detail.status_transitions == {"todo": ["done"], "done": []}
+        assert detail.label_categories["executor"] == ["ai", "human"]
+        assert detail.graph["node_types"] == ["model", "decision"]
+        assert detail.orchestration["default_pattern"] == "default"
+        assert detail.orchestration["plan_approval_required"] is True
+        assert detail.next_issue_number == 42
+        assert detail.next_session_number == 7
+
+    def test_raises_keyerror_for_unknown(self, tmp_path: Path):
+        # Mock discovery path so rediscovery still finds nothing.
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
+            mock_path_cls.cwd.return_value = tmp_path / "empty"
+            mock_path_cls.home.return_value = tmp_path / "fakehome"
+            mock_path_cls.side_effect = Path
+            with patch(
+                "tripwire.ui.services.project_service.load_user_config",
+                return_value=UserConfig(),
+            ):
+                with pytest.raises(KeyError):
+                    get_project("deadbeefcafe")
+
+    def test_rediscovery_on_miss(self, tmp_path: Path):
+        proj = _make_rich_project(tmp_path / "proj")
+        reload_project_index()
+
+        pid = _project_id(proj.resolve())
+
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
+            mock_path_cls.cwd.return_value = proj
+            mock_path_cls.home.return_value = tmp_path / "fakehome"
+            mock_path_cls.side_effect = Path
+            with patch(
+                "tripwire.ui.services.project_service.load_user_config",
+                return_value=UserConfig(),
+            ):
+                detail = get_project(pid)
+
+        assert detail.id == pid
+
+    def test_dto_round_trips_via_json(self, tmp_path: Path):
+        proj = _make_rich_project(tmp_path / "proj")
+        seed_project_index([proj])
+
+        detail = get_project(_project_id(proj.resolve()))
+        encoded = json.loads(detail.model_dump_json())
+        rebuilt = ProjectDetail.model_validate(encoded)
+        assert rebuilt == detail
+
+    def test_counts_are_populated(self, tmp_path: Path):
+        proj = _make_project(
+            tmp_path / "proj",
+            issues=2,
+            nodes=1,
+            sessions=3,
+        )
+        seed_project_index([proj])
+        detail = get_project(_project_id(proj.resolve()))
+        assert detail.issue_count == 2
+        assert detail.node_count == 1
+        assert detail.session_count == 3

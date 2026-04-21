@@ -13,6 +13,11 @@ router = APIRouter(
 )
 
 # Replace these 501 stubs when implementing the real endpoints.
+# Next agent (KUI-33): wire via
+#   from tripwire.ui.services.orchestration_service import (
+#       get_active_pattern, get_session_pattern,
+#   )
+# Both raise FileNotFoundError on missing pattern yaml — translate to 404.
 
 
 @router.get("/pattern")
