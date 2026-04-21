@@ -154,9 +154,13 @@ def classify(
     ):
         return _event(project_id, "session", parts[1], action, rel_posix)
 
-    # sessions/<id>/<name>.md   (plan, task-checklist, etc. at session root)
+    # sessions/<id>/<name>.md   (plan, task-checklist, etc. at session root).
+    # entity_id is "<session>/<name>" per the [[file-watcher]] node so the
+    # frontend can invalidate per-artifact queries, not the whole session.
     if len(parts) == 3 and parts[0] == "sessions" and suffix == ".md":
-        return _event(project_id, "artifact", parts[1], action, rel_posix)
+        return _event(
+            project_id, "artifact", f"{parts[1]}/{stem}", action, rel_posix
+        )
 
     # sessions/<id>/artifacts/<name>.md
     if (
@@ -165,7 +169,9 @@ def classify(
         and parts[2] == "artifacts"
         and suffix == ".md"
     ):
-        return _event(project_id, "artifact", parts[1], action, rel_posix)
+        return _event(
+            project_id, "artifact", f"{parts[1]}/{stem}", action, rel_posix
+        )
 
     # plans/artifacts/<name>.md
     if (
@@ -315,6 +321,9 @@ class ProjectFileHandler(FileSystemEventHandler):
 
         classified = classify(self.project_id, self.project_dir, path, action)
         if classified is None:
+            # Per KUI-36 execution constraint: unclassified paths log-and-skip,
+            # never raise.
+            logger.debug("unclassified fs event: %s (action=%s)", path, action)
             return
 
         key = (self.project_id, classified.entity_type, classified.entity_id)

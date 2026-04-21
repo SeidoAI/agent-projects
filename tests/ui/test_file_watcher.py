@@ -61,7 +61,8 @@ class TestClassify:
         ev = classify("p", tmp_path, path, "modified")
         assert ev is not None
         assert ev.entity_type == "artifact"
-        assert ev.entity_id == "backend-realtime"
+        # entity_id per [[file-watcher]] node: <session>/<name>.
+        assert ev.entity_id == "backend-realtime/plan"
 
     def test_session_artifacts_subdir_is_artifact(self, tmp_path: Path):
         path = (
@@ -74,7 +75,7 @@ class TestClassify:
         ev = classify("p", tmp_path, path, "modified")
         assert ev is not None
         assert ev.entity_type == "artifact"
-        assert ev.entity_id == "backend-realtime"
+        assert ev.entity_id == "backend-realtime/task-checklist"
 
     def test_plans_artifact(self, tmp_path: Path):
         path = tmp_path / "plans" / "artifacts" / "ws-scoping.md"
