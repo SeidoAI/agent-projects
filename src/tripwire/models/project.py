@@ -12,6 +12,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from tripwire.models.manifest import ArtifactEntry
+
 
 class ProjectPhase(str, Enum):
     """Workflow phases for phase-aware validation.
@@ -130,6 +132,16 @@ class ProjectConfig(BaseModel):
 
     # v0.6b: optional workspace link. Absence means standalone project.
     workspace: ProjectWorkspacePointer | None = None
+
+    # v0.7b: per-project artifact manifest overrides layered on top of
+    # templates/artifacts/manifest.yaml. Useful for adding project-specific
+    # artifacts (e.g. "security-review-doc") without forking the manifest.
+    artifact_manifest_overrides: list[ArtifactEntry] = Field(default_factory=list)
+
+    # v0.7b: per-issue artifact manifest overrides. Phase 2 tightens the
+    # element type to IssueArtifactEntry; using list[dict] here keeps Phase 0
+    # unblocked and parses freely.
+    issue_artifact_manifest_overrides: list[dict] = Field(default_factory=list)
 
     # Free-form per-project metadata, never used by the package itself.
     metadata: dict[str, Any] = Field(default_factory=dict)
