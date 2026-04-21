@@ -80,9 +80,12 @@ class TestRegisterRoutes:
         app = create_app(dev_mode=True)
         client = TestClient(app)
 
+        # ``?session_id=`` and ``?repo=`` are required query params on their
+        # respective endpoints (see [[api-rest-contract]] v2 section); without
+        # them FastAPI correctly returns 422 before the 501 helper fires.
         for path in [
-            "/api/messages",
-            "/api/github/prs",
+            "/api/messages?session_id=s1",
+            "/api/github/prs?repo=owner/x",
             "/api/containers",
         ]:
             r = client.get(path)
