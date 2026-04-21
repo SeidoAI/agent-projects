@@ -100,6 +100,43 @@ git checkout main
 git branch -D <pr-branch>
 ```
 
+### 8. Post-merge node reconciliation
+
+After a PR merges with implementation that diverged from the body of
+one or more concept nodes, the PM updates the node bodies to match
+delivered behaviour. This is a recurring task — execution agents
+prefer divergence-and-document over re-implement-to-match-spec, and
+that's usually the right call. The PM closes the loop.
+
+The trigger is the agent's PR comment from their self-review (Lens 3
+typically): *"`[[file-watcher]]` references path X but I shipped Y."*
+or *"`[[websocket-hub]]` describes a 2-missed-pings SLA but I
+implemented prune-on-send-failure."*
+
+For each surfaced divergence:
+
+1. `tripwire refs reverse <node-id>` — see who else references the
+   node so you know what may need cascading updates.
+2. Read the node file. Read the relevant section of the agent's
+   delivered code (the PR's diff line ranges).
+3. **Default: update the node body to match shipped behaviour.** It's
+   the cheaper and almost-always-correct call. Re-implementing the
+   code to match the original node body makes sense only if the
+   shipped behaviour is actually wrong (rare).
+4. If shipped behaviour is wrong, file a follow-up issue describing
+   the desired behaviour and link it from the node body's "see also";
+   leave the node body unchanged for now.
+5. **`source.content_hash`** only needs bumping if the underlying
+   `source` file (the one the node points at) actually changed.
+   Body-only edits do not require a content_hash bump.
+6. Validate (`tripwire validate --strict`) and commit. Convention:
+   `reconcile: <node-list> after <pr-id>` — e.g.
+   `reconcile: [[file-watcher]], [[websocket-hub]] after #10`.
+
+Example commit messages from past reconciles:
+- `reconcile: update concept nodes to match delivered implementation`
+- `reconcile: [[node-service]] body after #9`
+
 ## Red flags — review-specific rationalizations
 
 | Agent thought | Reality |
