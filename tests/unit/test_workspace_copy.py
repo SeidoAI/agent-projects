@@ -58,7 +58,7 @@ def workspace_with_node():
                 slug="seido",
                 description="",
                 schema_version=1,
-                keel_version="0.6.0",
+                tripwire_version="0.6.0",
                 created_at=now,
                 updated_at=now,
             ),

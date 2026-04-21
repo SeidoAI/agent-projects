@@ -210,7 +210,7 @@ def fresh_workspace():
                 slug=slug,
                 description="",
                 schema_version=1,
-                keel_version="0.6.0",
+                tripwire_version="0.6.0",
                 created_at=now,
                 updated_at=now,
             ),

@@ -40,7 +40,7 @@ class Workspace(BaseModel):
     slug: str
     description: str = ""
     schema_version: int = 1
-    keel_version: str = "0.6.0"
+    tripwire_version: str = "0.6.0"
     created_at: datetime
     updated_at: datetime
     projects: list[WorkspaceProjectEntry] = Field(default_factory=list)

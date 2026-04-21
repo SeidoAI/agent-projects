@@ -27,7 +27,7 @@ from uuid import uuid4
 
 import click
 
-from tripwire import __version__ as KEEL_VERSION
+from tripwire import __version__ as TRIPWIRE_VERSION
 from tripwire.cli._utils import require_project as _require_project
 from tripwire.core.paths import workspace_nodes_dir
 from tripwire.core.store import load_project as load_project_config
@@ -83,7 +83,7 @@ def workspace_init_cmd(
         slug=slug,
         description=description,
         schema_version=1,
-        keel_version=KEEL_VERSION,
+        tripwire_version=TRIPWIRE_VERSION,
         created_at=now,
         updated_at=now,
     )
