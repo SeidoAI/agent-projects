@@ -4,7 +4,7 @@
 
 This is the execution layer of the agent development platform, living
 at `src/keel/containers/` within the keel package. Installed as part
-of `pip install tripwire`. See `overarching-plan.md` for how it fits with
+of `pip install tripwire-pm`. See `overarching-plan.md` for how it fits with
 `keel.core` (data) and `keel.ui` (visibility).
 
 Core responsibility: launch containerised agents that work autonomously, with strict egress, persisted state, and automated re-engagement when feedback arrives.

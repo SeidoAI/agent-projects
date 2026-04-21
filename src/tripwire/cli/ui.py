@@ -55,8 +55,8 @@ def ui_cmd(
             click.echo(
                 "The UI requires the full tripwire install.\n"
                 "Run:\n"
-                "  pip install tripwire\n"
-                "(You appear to have tripwire[projects] "
+                "  pip install tripwire-pm\n"
+                "(You appear to have tripwire-pm[projects] "
                 "— a minimal install without web deps.)"
             )
             sys.exit(1)

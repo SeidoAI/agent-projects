@@ -75,7 +75,7 @@ ones.
 ## Quickstart
 
 ```bash
-pip install tripwire
+pip install tripwire-pm
 tripwire init my-project
 cd my-project
 claude
@@ -105,7 +105,7 @@ non-obvious. Pass `--key-prefix`, `--base-branch`, or `--repos` to override.
 For CI pipelines or agents that only need the CLI (no web dashboard):
 
 ```bash
-pip install tripwire[projects]
+pip install "tripwire-pm[projects]"
 ```
 
 ## What it does

@@ -32,7 +32,7 @@ class TestGracefulDegradation:
             result = runner.invoke(cli, ["ui"])
         assert result.exit_code == 1
         assert "full tripwire install" in result.output
-        assert "pip install tripwire" in result.output
+        assert "pip install tripwire-pm" in result.output
 
     def test_missing_uvicorn_prints_helpful_message(self):
         with patch(

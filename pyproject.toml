@@ -1,5 +1,9 @@
 [project]
-name = "tripwire"
+# Distribution name differs from the import/CLI name because PyPI prohibits
+# `tripwire` at the admin level (likely trademark-adjacent to the
+# Tripwire/Fortra security product). Users install as `pip install tripwire-pm`;
+# the CLI command (`tripwire`, `tw`) and `import tripwire` are unchanged.
+name = "tripwire-pm"
 version = "0.7.0"
 description = "Git-native project management with concept graph for AI agents"
 requires-python = ">=3.10,<3.14"

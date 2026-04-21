@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install tripwire
-        run: uv tool install tripwire=={{ tripwire_version }}
+        run: uv tool install tripwire-pm=={{ tripwire_version }}
       - name: Validate (strict)
         run: tripwire validate --strict --format=json
       - name: Lint scoping

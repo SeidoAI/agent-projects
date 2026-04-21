@@ -37,7 +37,7 @@ and WebSocket events are defined but stubbed.
 ### For new users — zero config
 
 ```bash
-pip install tripwire          # installs everything including UI
+pip install tripwire-pm       # installs everything including UI
 tripwire ui                   # starts dashboard, opens browser
 ```
 
@@ -53,8 +53,8 @@ What happens:
 6. Multiple → project switcher
 7. None → "No projects found" with instructions to run `tripwire init`
 
-If tripwire was installed with `pip install tripwire[projects]` (minimal),
-`tripwire ui` prints: "UI requires the full tripwire install. Run: pip install tripwire"
+If tripwire was installed with `pip install "tripwire-pm[projects]"` (minimal),
+`tripwire ui` prints: "UI requires the full tripwire install. Run: pip install tripwire-pm"
 
 ### Configuration (optional)
 

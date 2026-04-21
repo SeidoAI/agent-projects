@@ -65,9 +65,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     broadcaster = asyncio.create_task(
         broadcast_events(event_queue, hub), name="tripwire.ui.broadcaster"
     )
-    heartbeat = asyncio.create_task(
-        heartbeat_loop(hub), name="tripwire.ui.heartbeat"
-    )
+    heartbeat = asyncio.create_task(heartbeat_loop(hub), name="tripwire.ui.heartbeat")
 
     app.state.event_queue = event_queue
     app.state.hub = hub
@@ -135,7 +133,7 @@ def _mount_static(app: FastAPI, *, dev_mode: bool) -> None:
     if not (static_dir / "index.html").exists():
         logger.warning(
             "Frontend statics not found at %s — "
-            "`pip install tripwire` ships the bundle, or run the Vite dev server.",
+            "`pip install tripwire-pm` ships the bundle, or run the Vite dev server.",
             static_dir,
         )
         return

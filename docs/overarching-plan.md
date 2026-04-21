@@ -6,13 +6,13 @@ A single Python package — `keel` — that replaces Linear + Notion + manual ag
 
 | Module | What it does | Install |
 |--------|-------------|---------|
-| **keel.core** + **keel.cli** | Data layer: issues, concept graph, dependencies, status — all as files in git. CLI for validation, status, and atomic operations. | `pip install tripwire` (or `pip install tripwire[projects]` for minimal) |
-| **keel.ui** | Visibility layer: web dashboard for projects, issues, graph, live agent status | Included in `pip install tripwire` |
-| **keel.containers** | Execution layer: containerised Claude Code agents with strict egress, repo isolation | Included in `pip install tripwire` |
+| **keel.core** + **keel.cli** | Data layer: issues, concept graph, dependencies, status — all as files in git. CLI for validation, status, and atomic operations. | `pip install tripwire-pm` (or `pip install "tripwire-pm[projects]"` for minimal) |
+| **keel.ui** | Visibility layer: web dashboard for projects, issues, graph, live agent status | Included in `pip install tripwire-pm` |
+| **keel.containers** | Execution layer: containerised Claude Code agents with strict egress, repo isolation | Included in `pip install tripwire-pm` |
 
 ```
-pip install tripwire              # everything (projects + UI + containers)
-pip install tripwire[projects]    # minimal: CLI, validator, skills only
+pip install tripwire-pm              # everything (projects + UI + containers)
+pip install "tripwire-pm[projects]"    # minimal: CLI, validator, skills only
 ```
 
 **The primary user of `keel` is Claude Code with the project-manager skill loaded.** Humans interact with the system *through* the agent, not directly via the CLI. The CLI is intentionally minimal — read commands, validation, and atomic operations only — because agents create issues, nodes, and sessions by writing files directly via their `Write` tool, not by invoking CLI mutation commands. The PM skill (shipped in `templates/skills/project-manager/` and copied to the project repo on init) is the linchpin: it teaches agents how to work with the file layout, schemas, references, and the validation gate.
@@ -20,7 +20,7 @@ pip install tripwire[projects]    # minimal: CLI, validator, skills only
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                       keel                                  │
-│  pip install tripwire — one package, three modules              │
+│  pip install tripwire-pm — one package, three modules              │
 │                                                             │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │ keel.ui — React 19 · React Flow · Kanban · Dashboard │   │
@@ -1004,7 +1004,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 RUN (curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
     dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg) && \
     apt-get update && apt-get install -y gh
-RUN pip install tripwire
+RUN pip install tripwire-pm
 RUN mkdir -p /workspace/{repo,project,config,docs}
 WORKDIR /workspace/repo
 ```
@@ -1236,7 +1236,7 @@ keel-ui/
 Phase 1: keel (data layer)
   ├── Python package: models, parser, store, validator, graph, CLI
   ├── Templates: project scaffold, PM agent skill, issue templates
-  └── Deliverable: `pip install tripwire` works, `tripwire init` generates projects
+  └── Deliverable: `pip install tripwire-pm` works, `tripwire init` generates projects
 
 Phase 2: keel-containers (execution layer)  ← depends on keel
   ├── Base Docker image with Claude Code + tools

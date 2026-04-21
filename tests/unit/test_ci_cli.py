@@ -20,7 +20,7 @@ def test_ci_install_writes_workflow(tmp_path_project: Path):
     wf = tmp_path_project / ".github" / "workflows" / "tripwire.yml"
     assert wf.is_file()
     text = wf.read_text(encoding="utf-8")
-    assert "tripwire==0.7.0" in text
+    assert "tripwire-pm==0.7.0" in text
     assert "actions/checkout@v4" in text
 
 
@@ -35,7 +35,7 @@ def test_ci_install_falls_back_to_installed_version(tmp_path_project: Path):
     # fallback version is the installed tripwire
     from tripwire import __version__
 
-    assert f"tripwire=={__version__}" in text
+    assert f"tripwire-pm=={__version__}" in text
 
 
 def test_ci_install_refuses_overwrite(tmp_path_project: Path):
@@ -72,7 +72,7 @@ def test_ci_install_force_overwrites(tmp_path_project: Path):
     assert result.exit_code == 0, result.output
     wf = wf_dir / "tripwire.yml"
     text = wf.read_text(encoding="utf-8")
-    assert "tripwire==0.7.0" in text
+    assert "tripwire-pm==0.7.0" in text
     assert "# existing" not in text
 
 
@@ -95,4 +95,4 @@ def test_ci_install_version_override_wins(tmp_path_project: Path):
     )
     assert result.exit_code == 0, result.output
     wf = tmp_path_project / ".github" / "workflows" / "tripwire.yml"
-    assert "tripwire==0.99.0" in wf.read_text(encoding="utf-8")
+    assert "tripwire-pm==0.99.0" in wf.read_text(encoding="utf-8")
