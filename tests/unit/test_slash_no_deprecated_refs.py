@@ -8,14 +8,14 @@ the old names anywhere in their prose.
 from pathlib import Path
 
 COMMANDS_DIR = (
-    Path(__file__).parent.parent.parent / "src" / "keel" / "templates" / "commands"
+    Path(__file__).parent.parent.parent / "src" / "tripwire" / "templates" / "commands"
 )
 
 FORWARDER_FILES = {"pm-handoff.md", "pm-close.md", "pm-update.md", "pm-plan.md"}
 
 # Regular commands should not reference these removed verbs.
 FORBIDDEN_IN_REGULAR = {
-    "keel workspace new-project",  # replaced by keel init --workspace (v0.6b)
+    "tripwire workspace new-project",  # replaced by tripwire init --workspace (v0.6b)
     "/pm-handoff",
     "/pm-close",
     "/pm-update",
@@ -40,7 +40,7 @@ def test_forwarders_mention_replacement():
         "pm-handoff.md": ("pm-session-create", "pm-session-launch"),
         "pm-close.md": ("pm-issue-close",),
         "pm-update.md": ("pm-edit",),
-        "pm-plan.md": ("keel plan",),
+        "pm-plan.md": ("tripwire plan",),
     }
     for name, expected in replacements.items():
         path = COMMANDS_DIR / name
