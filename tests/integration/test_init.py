@@ -269,6 +269,8 @@ class TestInitBasics:
             "pm-session-monitor.md",
             # v0.7b session review:
             "pm-session-review.md",
+            # v0.7b session complete:
+            "pm-session-complete.md",
             # Deprecated forwarders (removed in v0.7):
             "pm-close.md",
             "pm-handoff.md",

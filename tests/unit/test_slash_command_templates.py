@@ -52,6 +52,8 @@ EXPECTED_COMMANDS: tuple[str, ...] = (
     "pm-session-monitor",
     # v0.7b session review:
     "pm-session-review",
+    # v0.7b session complete:
+    "pm-session-complete",
     # Deprecated forwarders (still shipped, removed in v0.7):
     "pm-close",
     "pm-handoff",

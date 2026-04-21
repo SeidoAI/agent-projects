@@ -940,6 +940,68 @@ session_cmd.add_command(artifacts_list, name="artifacts")
 
 
 # ----------------------------------------------------------------------------
+# `tripwire session complete` — close-out orchestration
+# ----------------------------------------------------------------------------
+
+
+@session_cmd.command("complete")
+@click.argument("session_id")
+@click.option("--project-dir", type=click.Path(path_type=Path), default=".")
+@click.option("--dry-run", is_flag=True, default=False)
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Bypass all gates (use sparingly).",
+)
+@click.option("--skip-artifact-check", is_flag=True, default=False)
+@click.option("--skip-worktree-cleanup", is_flag=True, default=False)
+@click.option("--skip-pr-merge-check", is_flag=True, default=False)
+def session_complete_cmd(
+    session_id: str,
+    project_dir: Path,
+    dry_run: bool,
+    force: bool,
+    skip_artifact_check: bool,
+    skip_worktree_cleanup: bool,
+    skip_pr_merge_check: bool,
+) -> None:
+    """Complete a session: verify gates, close issues, cleanup."""
+    from tripwire.core.session_complete import (
+        CompleteError,
+        complete_session,
+    )
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+
+    try:
+        result = complete_session(
+            resolved,
+            session_id,
+            dry_run=dry_run,
+            force=force,
+            skip_artifact_check=skip_artifact_check,
+            skip_worktree_cleanup=skip_worktree_cleanup,
+            skip_pr_merge_check=skip_pr_merge_check,
+        )
+    except CompleteError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if dry_run:
+        click.echo(f"Dry run: session {session_id} can be completed.")
+        if result.node_diffs:
+            click.echo(f"  Node diffs to review: {len(result.node_diffs)}")
+        return
+
+    click.echo(f"Session {session_id} → done")
+    for iss in result.issues_closed:
+        click.echo(f"  closed: {iss}")
+    for wt in result.worktrees_removed:
+        click.echo(f"  removed worktree: {wt}")
+
+
+# ----------------------------------------------------------------------------
 # `tripwire session review` — PR diff vs. issue specs
 # ----------------------------------------------------------------------------
 

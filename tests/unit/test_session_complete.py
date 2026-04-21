@@ -88,9 +88,7 @@ def test_complete_closes_issues_and_transitions_session(
     assert session.status == "done"
 
 
-def test_complete_force_bypasses_gates(
-    tmp_path_project: Path, save_test_session
-):
+def test_complete_force_bypasses_gates(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1", status="planned")
     result = complete_session(
         tmp_path_project,
