@@ -91,17 +91,30 @@ def test_build_claude_args_shape():
         defaults,
         prompt="Do the thing.",
         system_append="extras",
+        session_id="my-session",
         claude_session_id="abc-123",
         resume=False,
     )
     assert args[0] == "claude"
     assert "-p" in args
     assert "Do the thing." in args
+    # Both session identifiers present with their respective flags.
+    assert "--name" in args
+    assert "my-session" in args
     assert "--session-id" in args
     assert "abc-123" in args
+    # All spec §8.1 flags emitted.
+    assert "--effort" in args
+    assert "--max-budget-usd" in args
+    assert "50" in args  # default max_budget_usd
     assert "--model" in args
+    assert "--fallback-model" in args
+    assert "--permission-mode" in args
     assert "--disallowedTools" in args
     assert "Agent" in args
+    assert "--max-turns" in args
+    assert "--output-format" in args
+    assert "--append-system-prompt" in args
     assert "--resume" not in args
 
 
@@ -113,6 +126,7 @@ def test_build_claude_args_with_resume():
         defaults,
         prompt="x",
         system_append="y",
+        session_id="s1",
         claude_session_id="abc",
         resume=True,
     )

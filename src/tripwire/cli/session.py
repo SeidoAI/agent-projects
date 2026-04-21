@@ -442,6 +442,7 @@ def _launch_claude(
         resolved,
         prompt=prompt,
         system_append=system_append,
+        session_id=session.id,
         claude_session_id=claude_session_id,
         resume=resume,
     )

@@ -92,22 +92,32 @@ def build_claude_args(
     *,
     prompt: str,
     system_append: str,
+    session_id: str,
     claude_session_id: str,
     resume: bool = False,
 ) -> list[str]:
     """Build the claude CLI argv from the resolved spawn config.
 
-    `claude_session_id` is claude's internal session identifier (UUID),
-    used by `claude -p --session-id` for conversation resumption — distinct
-    from the tripwire session_id which names the tripwire lifecycle unit.
+    The two session identifiers are distinct:
+    - ``session_id`` — tripwire's human-readable session slug, passed as
+      ``--name`` (display label in claude's prompt box, /resume picker,
+      and terminal title).
+    - ``claude_session_id`` — claude's internal UUID identifier, passed
+      as ``--session-id`` (required for ``--resume`` to work).
+
+    Flag set matches ``claude --help`` output and spec §8.1.
     """
     cfg = defaults.config
     args = [
         defaults.invocation.command,
         "-p",
         prompt,
+        "--name",
+        session_id,
         "--session-id",
         claude_session_id,
+        "--effort",
+        cfg.effort,
         "--model",
         cfg.model,
         "--fallback-model",
@@ -118,6 +128,8 @@ def build_claude_args(
         ",".join(cfg.disallowed_tools),
         "--max-turns",
         str(cfg.max_turns),
+        "--max-budget-usd",
+        str(cfg.max_budget_usd),
         "--output-format",
         cfg.output_format,
         "--append-system-prompt",
