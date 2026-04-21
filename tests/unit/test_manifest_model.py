@@ -1,7 +1,10 @@
-"""ArtifactManifest model and its ownership fields."""
+"""ArtifactManifest model and its ownership fields.
 
-import pytest
-from pydantic import ValidationError
+As of v0.7b, `produced_at` / `produced_by` / `owned_by` are plain strings
+on the model. Enum validation now happens at manifest-load time via
+`tripwire.core.manifest_loader.load_artifact_manifest`. See
+`test_manifest_loader.py` for those assertions.
+"""
 
 from tripwire.models.manifest import ArtifactEntry, ArtifactManifest
 
@@ -21,29 +24,18 @@ class TestArtifactEntry:
         assert entry.produced_by == "pm"
         assert entry.owned_by == "pm"
 
-    def test_rejects_unknown_produced_by(self):
-        with pytest.raises(ValidationError):
-            ArtifactEntry(
-                name="plan",
-                file="plan.md",
-                template="plan.md.j2",
-                produced_at="planning",
-                produced_by="wizard",
-                owned_by="pm",
-                required=True,
-            )
-
-    def test_rejects_unknown_owned_by(self):
-        with pytest.raises(ValidationError):
-            ArtifactEntry(
-                name="plan",
-                file="plan.md",
-                template="plan.md.j2",
-                produced_at="planning",
-                produced_by="pm",
-                owned_by="wizard",
-                required=True,
-            )
+    def test_accepts_unknown_strings_at_model_level(self):
+        """Model is permissive; enum validation is loader-level."""
+        entry = ArtifactEntry(
+            name="plan",
+            file="plan.md",
+            template="plan.md.j2",
+            produced_at="custom_phase",
+            produced_by="wizard",
+            owned_by="wizard",
+            required=True,
+        )
+        assert entry.produced_by == "wizard"
 
     def test_defaults_owned_by_to_produced_by_when_absent(self):
         entry = ArtifactEntry(
@@ -74,7 +66,7 @@ class TestArtifactManifest:
                     name="task-checklist",
                     file="task-checklist.md",
                     template="task-checklist.md.j2",
-                    produced_at="implementing",
+                    produced_at="in_progress",
                     produced_by="execution-agent",
                     owned_by="execution-agent",
                     required=True,
@@ -83,4 +75,4 @@ class TestArtifactManifest:
         )
         assert len(manifest.artifacts) == 2
         assert manifest.artifacts[0].owned_by == "pm"
-        assert manifest.artifacts[1].produced_at == "implementing"
+        assert manifest.artifacts[1].produced_at == "in_progress"

@@ -1,7 +1,7 @@
 """Status transition validation.
 
 Each project's `project.yaml` declares which status transitions are valid
-(e.g. `todo → in_progress`, `in_progress → verifying`). The validator uses
+(e.g. `todo → in_progress`, `in_progress → in_review`). The validator uses
 this module to check that every issue's current status is reachable from
 the canonical starting state and that any proposed transition is allowed.
 """

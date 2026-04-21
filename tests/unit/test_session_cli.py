@@ -172,7 +172,7 @@ class TestSessionProgress:
             tmp_path_project,
             session_id="session-one",
             issues=["TMP-1"],
-            status="implementing",
+            status="executing",
         )
         save_test_session(
             tmp_path_project,
@@ -197,7 +197,7 @@ class TestSessionProgress:
             tmp_path_project,
             session_id="session-x",
             issues=["TMP-1"],
-            status="implementing",
+            status="executing",
         )
         checklist = tmp_path_project / "sessions" / "session-x" / "task-checklist.md"
         checklist.write_text(

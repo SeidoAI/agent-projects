@@ -14,17 +14,21 @@ COMMANDS_DIR = (
 )
 
 ALLOWED_NAMES = {
-    # Entity-scoped (7)
+    # Entity-scoped
     "pm-issue-close",
+    "pm-issue-artifact",  # v0.7b — per-issue artifacts
     "pm-session-create",
     "pm-session-queue",
     "pm-session-spawn",  # v0.6c
     "pm-session-check",
     "pm-session-progress",
     "pm-session-agenda",  # v0.6c
+    "pm-session-monitor",  # v0.7b
+    "pm-session-review",  # v0.7b
+    "pm-session-complete",  # v0.7b
     "pm-project-create",  # v0.6b
     "pm-project-sync",  # v0.6b
-    # Non-entity verbs (7)
+    # Non-entity verbs
     "pm-scope",
     "pm-rescope",
     "pm-triage",
@@ -32,7 +36,7 @@ ALLOWED_NAMES = {
     "pm-review",
     "pm-validate",
     "pm-lint",
-    # Interpretive (3)
+    # Interpretive
     "pm-status",
     "pm-agenda",
     "pm-graph",
@@ -83,9 +87,12 @@ def test_every_command_is_in_allowlist():
     actual = {p.stem for p in COMMANDS_DIR.glob("pm-*.md")}
     unknown = actual - ALLOWED_NAMES
     assert not unknown, f"unknown commands not in v0.6a allowlist: {unknown}"
-    # v0.6a doesn't ship pm-project-* yet — they arrive in v0.6b.
-    expected_in_v0_6a = ALLOWED_NAMES - {"pm-project-create", "pm-project-sync"}
-    missing = expected_in_v0_6a - actual
+    # v0.6a doesn't ship pm-project-* (v0.6b) or pm-issue-artifact (v0.7b).
+    expected_on_disk = ALLOWED_NAMES - {
+        "pm-project-create",
+        "pm-project-sync",
+    }
+    missing = expected_on_disk - actual
     assert not missing, f"expected commands missing from disk: {missing}"
 
 

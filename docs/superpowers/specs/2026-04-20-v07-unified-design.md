@@ -587,6 +587,7 @@ additions or updates based on what it learned.
 proposals:
   - kind: new_node
     id: pg-vacuum-tuning
+    type: decision
     name: PostgreSQL VACUUM tuning for high-write workloads
     body: |
       During <session-id> we found the default autovacuum settings
@@ -609,6 +610,9 @@ proposals:
 Fields:
 - `kind`: `new_node` or `update_node`
 - `id`: existing node id (update) or proposed new id (new_node)
+- `type`: node type (new_node only; required). Validated against the active
+  `node_type` enum at load time.
+- `name`: human-readable title (new_node only; required)
 - `body` or `delta`: full body (new_node) or described change (update_node)
 - `related`: other node ids this connects to (new_node only)
 - `rationale`: why this deserves to be durable
@@ -641,9 +645,9 @@ useful signal for tuning agent prompts over time.
 **CLI**:
 
 ```
-tripwire issue insights list <session-id> [--format text|json]
-tripwire issue insights apply <session-id> --proposal <id>
-tripwire issue insights reject <session-id> --proposal <id> [--reason TEXT]
+tripwire session insights list <session-id> [--format text|json]
+tripwire session insights apply <session-id> --proposal <id>
+tripwire session insights reject <session-id> --proposal <id> [--reason TEXT]
 ```
 
 `apply` writes the node (new) or node update (existing), with
@@ -685,6 +689,8 @@ invocation:
     - "{{ prompt }}"
     - "--name"
     - "{{ session_id }}"
+    - "--session-id"
+    - "{{ claude_session_id }}"
     - "--effort"
     - "{{ effort }}"
     - "--model"
@@ -717,8 +723,9 @@ config:
   output_format: stream-json
 
 # Jinja template. Rendered at spawn time with `plan`, `session_id`,
-# `session_name`, `agent`, `project_slug` in scope. Projects can
-# override this to change the instructions given to spawned agents.
+# `claude_session_id` (UUID for --resume), `session_name`, `agent`,
+# `project_slug`, `branch_type` in scope. Projects can override this
+# to change the instructions given to spawned agents.
 prompt_template: |
   {{ plan }}
 

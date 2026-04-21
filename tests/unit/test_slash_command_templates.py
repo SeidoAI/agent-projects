@@ -46,6 +46,14 @@ EXPECTED_COMMANDS: tuple[str, ...] = (
     # v0.6b workspace commands:
     "pm-project-create",
     "pm-project-sync",
+    # v0.7b per-issue artifact command:
+    "pm-issue-artifact",
+    # v0.7b session monitor:
+    "pm-session-monitor",
+    # v0.7b session review:
+    "pm-session-review",
+    # v0.7b session complete:
+    "pm-session-complete",
     # Deprecated forwarders (still shipped, removed in v0.7):
     "pm-close",
     "pm-handoff",
@@ -113,7 +121,7 @@ def test_command_name_matches_filename(command_name: str) -> None:
 
 
 @pytest.mark.parametrize("command_name", EXPECTED_COMMANDS)
-def test_command_body_references_keel_not_agent_project(command_name: str) -> None:
+def test_command_body_references_tripwire_not_agent_project(command_name: str) -> None:
     """Every command body must use `tripwire <cmd>`, not `agent-project <cmd>`."""
     path = COMMANDS_DIR / f"{command_name}.md"
     _, body = _parse_frontmatter(path)

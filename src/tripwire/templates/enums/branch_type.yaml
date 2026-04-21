@@ -1,0 +1,21 @@
+name: BranchType
+description: Allowed branch type prefixes (conventional commits style)
+values:
+  - id: feat
+    label: Feature
+    description: New user-facing capability
+  - id: fix
+    label: Fix
+    description: Bug fix
+  - id: refactor
+    label: Refactor
+    description: Non-functional code changes
+  - id: docs
+    label: Docs
+    description: Documentation only
+  - id: chore
+    label: Chore
+    description: Tooling / maintenance
+  - id: test
+    label: Test
+    description: Test-only changes

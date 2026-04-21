@@ -15,14 +15,16 @@ from enum import StrEnum
 
 
 class IssueStatus(StrEnum):
+    """Canonical issue states (v0.7b 6-stage flow).
+
+    See `templates/enums/issue_status.yaml` for the authoritative definition.
+    """
+
     BACKLOG = "backlog"
     TODO = "todo"
     IN_PROGRESS = "in_progress"
-    VERIFYING = "verifying"
-    REVIEWING = "reviewing"
-    TESTING = "testing"
-    READY = "ready"
-    UPDATING = "updating"
+    IN_REVIEW = "in_review"
+    VERIFIED = "verified"
     DONE = "done"
     CANCELED = "canceled"
 
@@ -67,14 +69,22 @@ class NodeStatus(StrEnum):
 
 
 class SessionStatus(StrEnum):
+    """Canonical session states — see `templates/enums/session_status.yaml`."""
+
     PLANNED = "planned"
+    QUEUED = "queued"
+    EXECUTING = "executing"
     ACTIVE = "active"
     WAITING_FOR_CI = "waiting_for_ci"
     WAITING_FOR_REVIEW = "waiting_for_review"
     WAITING_FOR_DEPLOY = "waiting_for_deploy"
     RE_ENGAGED = "re_engaged"
+    IN_REVIEW = "in_review"
+    VERIFIED = "verified"
     COMPLETED = "completed"
     FAILED = "failed"
+    PAUSED = "paused"
+    ABANDONED = "abandoned"
 
 
 class ReEngagementTrigger(StrEnum):

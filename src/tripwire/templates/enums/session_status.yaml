@@ -27,6 +27,14 @@ values:
   - id: re_engaged
     label: Re-engaged
     color: orange
+  # in_review: session PR opened, PM reviewing (v0.7b)
+  - id: in_review
+    label: In Review
+    color: purple
+  # verified: PR verified (PM fills the QA role until a QA agent ships) (v0.7b)
+  - id: verified
+    label: Verified
+    color: green
   - id: completed
     label: Completed
     color: green

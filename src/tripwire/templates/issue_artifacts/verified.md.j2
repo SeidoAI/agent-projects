@@ -1,0 +1,25 @@
+# Verification notes — {{ issue.id }}
+
+**Verified by**: {{ verified_by | default("pm-agent") }}
+**Verified at**: {{ verified_at | default("") }}
+**Verdict**: {{ verdict | default("approved") }}
+
+## Acceptance criteria
+
+{% for criterion in criteria -%}
+- [ ] {{ criterion }} — manual verification needed
+{% else -%}
+_No acceptance criteria parsed from the issue body._
+{% endfor %}
+## Deviations found
+
+{% if deviations -%}
+{% for f in deviations -%}
+- `{{ f }}` (outside declared scope)
+{% endfor %}
+{% else -%}
+_None._
+{% endif %}
+## Follow-up issues created
+
+_None yet — add as findings surface._

@@ -30,7 +30,7 @@ class TestGapAnalysisRowDensity:
 
 
 class TestSessionStale:
-    def test_flags_long_in_implementing(
+    def test_flags_long_in_executing(
         self, save_test_issue, save_test_session, tmp_path_project
     ):
         save_test_issue(tmp_path_project, key="TMP-1", kind="feat", title="Setup")
@@ -38,7 +38,7 @@ class TestSessionStale:
             tmp_path_project,
             session_id="session-setup",
             issues=["TMP-1"],
-            status="implementing",
+            status="executing",
             updated_at=datetime.now(tz=timezone.utc) - timedelta(days=5),
         )
         linter = Linter(project_dir=tmp_path_project, session_id="session-setup")
@@ -53,7 +53,7 @@ class TestSessionStale:
             tmp_path_project,
             session_id="session-setup",
             issues=["TMP-1"],
-            status="implementing",
+            status="executing",
             updated_at=datetime.now(tz=timezone.utc),
         )
         linter = Linter(project_dir=tmp_path_project, session_id="session-setup")

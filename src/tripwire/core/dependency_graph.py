@@ -217,11 +217,8 @@ _STATUS_COLORS = {
     "backlog": "#cccccc",
     "todo": "#9cb3ff",
     "in_progress": "#ffd866",
-    "verifying": "#ffa94d",
-    "reviewing": "#c792ea",
-    "testing": "#78dce8",
-    "ready": "#a9dc76",
-    "updating": "#ff6188",
+    "in_review": "#c792ea",
+    "verified": "#a9dc76",
     "done": "#7bed9f",
     "canceled": "#777777",
 }

@@ -782,7 +782,7 @@ class TestArtifacts:
                         {
                             "name": "post-completion-comments",
                             "file": "post-completion-comments.md",
-                            "produced_at": "completion",
+                            "produced_at": "done",
                             "required": True,
                         },
                     ]

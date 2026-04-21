@@ -1,8 +1,10 @@
-"""lint/session_stale — warn when a session has been in the
-``implementing`` state for longer than the threshold.
+"""lint/session_stale — warn when a session has been in a working
+state for longer than the threshold.
 
-Used to surface sessions that may be stuck or abandoned. Only runs
-for session-stage lint (requires a session_id in context).
+"Working state" is any of {executing, active} — sessions where an
+agent is actively assigned to the work. Used to surface sessions
+that may be stuck or abandoned. Only runs for session-stage lint
+(requires a session_id in context).
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from tripwire.core.linter import LintFinding, register_rule
 from tripwire.core.session_store import load_session
 
 STALE_DAYS = 3
+_WORKING_STATES = {"executing", "active"}
 
 
 @register_rule(stage="session", code="lint/session_stale", severity="warning")
@@ -20,7 +23,7 @@ def _check(ctx):
     if ctx.session_id is None:
         return
     session = load_session(ctx.project_dir, ctx.session_id)
-    if session.status != "implementing":
+    if session.status not in _WORKING_STATES:
         return
     if session.updated_at is None:
         return
@@ -33,7 +36,7 @@ def _check(ctx):
             code="lint/session_stale",
             severity="warning",
             message=(
-                f"session {session.id} has been in implementing for "
+                f"session {session.id} has been in {session.status} for "
                 f"{age.days} days (threshold {STALE_DAYS})."
             ),
             file=f"sessions/{session.id}/session.yaml",

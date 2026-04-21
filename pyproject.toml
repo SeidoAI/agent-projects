@@ -1,6 +1,6 @@
 [project]
 name = "tripwire"
-version = "0.6.0"
+version = "0.7.0"
 description = "Git-native project management with concept graph for AI agents"
 requires-python = ">=3.10,<3.14"
 license = { file = "LICENSE" }

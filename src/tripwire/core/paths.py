@@ -239,3 +239,45 @@ def merge_briefs_dir(project_dir: Path) -> Path:
 def merge_brief_path(project_dir: Path, node_id: str) -> Path:
     """Path to a specific merge brief file for a node."""
     return merge_briefs_dir(project_dir) / f"{node_id}.yaml"
+
+
+# ---------------------------------------------------------------------------
+# Project override locations (v0.7b)
+# ---------------------------------------------------------------------------
+#
+# A project can customise slash commands and spawn config by dropping files
+# into its `.tripwire/` directory. Override > packaged default.
+
+TRIPWIRE_DIR = ".tripwire"
+TRIPWIRE_COMMANDS_SUBDIR = ".tripwire/commands"
+TRIPWIRE_SPAWN_SUBDIR = ".tripwire/spawn"
+
+
+def tripwire_dir(project_dir: Path) -> Path:
+    """Per-project override root: `<project>/.tripwire/`."""
+    return project_dir / TRIPWIRE_DIR
+
+
+def project_commands_dir(project_dir: Path) -> Path:
+    return project_dir / TRIPWIRE_COMMANDS_SUBDIR
+
+
+def project_spawn_dir(project_dir: Path) -> Path:
+    return project_dir / TRIPWIRE_SPAWN_SUBDIR
+
+
+def resolve_command_path(project_dir: Path, command_name: str) -> Path:
+    """Resolve a slash command file, preferring project override.
+
+    Lookup order:
+      1. `<project>/.tripwire/commands/<command>.md`
+      2. `src/tripwire/templates/commands/<command>.md` (packaged default)
+    """
+    override = project_commands_dir(project_dir) / f"{command_name}.md"
+    if override.is_file():
+        return override
+    import tripwire
+
+    return (
+        Path(tripwire.__file__).parent / "templates" / "commands" / f"{command_name}.md"
+    )

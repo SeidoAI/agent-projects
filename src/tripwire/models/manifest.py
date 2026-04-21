@@ -2,18 +2,17 @@
 
 Manifests declare what every session must produce — per artifact: where
 the file lives, which phase it's written in, who produces it, who owns
-it. v0.6a adds the ownership fields so the validator can enforce
-stage-aware requirements.
+it.
+
+`produced_at` / `produced_by` / `owned_by` are plain strings on the model.
+They are validated at manifest-load time against the active
+`artifact_phase.yaml` and `agent_type.yaml` enums (project override or
+packaged default). See `tripwire.core.manifest_loader.load_artifact_manifest`.
 """
 
 from __future__ import annotations
 
-from typing import Literal
-
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-
-AgentType = Literal["pm", "execution-agent", "verification-agent"]
-ArtifactPhase = Literal["planning", "implementing", "verifying", "completion"]
 
 
 class ArtifactEntry(BaseModel):
@@ -22,9 +21,9 @@ class ArtifactEntry(BaseModel):
     name: str
     file: str
     template: str
-    produced_at: ArtifactPhase
-    produced_by: AgentType = "pm"
-    owned_by: AgentType | None = None
+    produced_at: str
+    produced_by: str = "pm"
+    owned_by: str | None = None
     required: bool = True
     approval_gate: bool = False
 

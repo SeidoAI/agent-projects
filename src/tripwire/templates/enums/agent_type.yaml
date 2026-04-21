@@ -1,0 +1,15 @@
+name: AgentType
+description: Agent roles that produce or own artifacts
+values:
+  - id: pm
+    label: PM agent
+    description: Project manager — scopes, reviews, completes sessions
+  - id: execution-agent
+    label: Execution agent
+    description: Implements issues; writes developer.md
+  - id: verification-agent
+    label: Verification agent
+    description: Verifies acceptance criteria; writes verified.md
+  - id: human
+    label: Human
+    description: Direct human author (used for retroactive attribution)

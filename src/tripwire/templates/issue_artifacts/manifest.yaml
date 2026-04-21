@@ -1,0 +1,25 @@
+# Per-issue artifact manifest — developer and verified notes attached to each issue.
+#
+# - developer.md: required when the issue reaches `in_review`. The execution
+#   agent writes it as it wraps up work and opens the PR.
+# - verified.md:   required when the issue reaches `verified`. The verification
+#   agent writes it after running acceptance tests (PM fills this role in v0.7).
+#
+# Projects can extend or override via project.yaml.issue_artifact_manifest_overrides.
+
+artifacts:
+  - name: developer
+    file: developer.md
+    template: developer.md.j2
+    produced_by: execution-agent
+    owned_by: execution-agent
+    required: true
+    required_at_status: in_review
+
+  - name: verified
+    file: verified.md
+    template: verified.md.j2
+    produced_by: verification-agent
+    owned_by: verification-agent
+    required: true
+    required_at_status: verified

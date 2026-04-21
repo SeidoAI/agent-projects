@@ -36,7 +36,7 @@ def _check(ctx):
     branch = frontmatter.get("branch")
     if not isinstance(branch, str):
         return
-    if not is_valid_branch_name(branch):
+    if not is_valid_branch_name(branch, project_dir=ctx.project_dir):
         yield LintFinding(
             code="lint/branch_convention",
             severity="error",
