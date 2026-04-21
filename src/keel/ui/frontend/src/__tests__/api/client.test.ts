@@ -1,5 +1,5 @@
-import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api/client";
 import { describe, expect, it, vi } from "vitest";
+import { ApiError, apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api/client";
 
 function mockFetch(response: Partial<Response> & { json?: () => Promise<unknown> }) {
   const res = {

@@ -1,9 +1,9 @@
+import { cleanup, render, screen } from "@testing-library/react";
+import { createMemoryRouter, Navigate, RouterProvider } from "react-router-dom";
+import { afterEach, describe, expect, it } from "vitest";
 import { Placeholder } from "@/app/Placeholder";
 import { ProjectShell } from "@/app/ProjectShell";
 import { V2Placeholder } from "@/app/V2Placeholder";
-import { cleanup, render, screen } from "@testing-library/react";
-import { Navigate, RouterProvider, createMemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
 
 afterEach(cleanup);
 

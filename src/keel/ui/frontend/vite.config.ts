@@ -9,7 +9,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     passWithNoTests: true,
-    setupFiles: [],
+    setupFiles: ["./src/__tests__/setup.ts"],
   },
   build: {
     outDir: "../static",
