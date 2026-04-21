@@ -46,6 +46,8 @@ EXPECTED_COMMANDS: tuple[str, ...] = (
     # v0.6b workspace commands:
     "pm-project-create",
     "pm-project-sync",
+    # v0.7b per-issue artifact command:
+    "pm-issue-artifact",
     # Deprecated forwarders (still shipped, removed in v0.7):
     "pm-close",
     "pm-handoff",
