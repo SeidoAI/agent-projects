@@ -15,14 +15,16 @@ from enum import StrEnum
 
 
 class IssueStatus(StrEnum):
+    """Canonical issue states (v0.7b 6-stage flow).
+
+    See `templates/enums/issue_status.yaml` for the authoritative definition.
+    """
+
     BACKLOG = "backlog"
     TODO = "todo"
     IN_PROGRESS = "in_progress"
-    VERIFYING = "verifying"
-    REVIEWING = "reviewing"
-    TESTING = "testing"
-    READY = "ready"
-    UPDATING = "updating"
+    IN_REVIEW = "in_review"
+    VERIFIED = "verified"
     DONE = "done"
     CANCELED = "canceled"
 
