@@ -72,9 +72,7 @@ def _coerce_value_entry(entry: object, source: Path) -> EnumValue | None:
         return EnumValue(value=entry, label=_default_label(entry), color=None)
 
     if not isinstance(entry, dict):
-        logger.debug(
-            "enum_service: unexpected value entry in %s: %r", source, entry
-        )
+        logger.debug("enum_service: unexpected value entry in %s: %r", source, entry)
         return None
 
     # Structured form — accept `value` or legacy `id` as the key.
@@ -124,7 +122,9 @@ def _parse_enum_yaml(path: Path, name: str) -> EnumDescriptor:
 
     # Flat list at the top-level — treat every item as a value.
     if isinstance(raw, list):
-        values = [v for v in (_coerce_value_entry(e, path) for e in raw) if v is not None]
+        values = [
+            v for v in (_coerce_value_entry(e, path) for e in raw) if v is not None
+        ]
         return EnumDescriptor(name=name, values=values)
 
     if not isinstance(raw, dict):
@@ -143,9 +143,7 @@ def _parse_enum_yaml(path: Path, name: str) -> EnumDescriptor:
         )
 
     values = [
-        v
-        for v in (_coerce_value_entry(e, path) for e in raw_values)
-        if v is not None
+        v for v in (_coerce_value_entry(e, path) for e in raw_values) if v is not None
     ]
     return EnumDescriptor(name=declared_name, values=values)
 

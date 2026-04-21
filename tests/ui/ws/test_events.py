@@ -49,9 +49,7 @@ class TestFileChangedEvent:
             path="nodes/n.yaml",
         )
         # 2026-04-21T12:34:56.789Z
-        assert re.match(
-            r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$", ev.timestamp
-        )
+        assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$", ev.timestamp)
 
     def test_to_json_has_all_fields(self):
         ev = FileChangedEvent(

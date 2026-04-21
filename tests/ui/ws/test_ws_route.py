@@ -33,8 +33,7 @@ def ui_project(tmp_path: Path) -> tuple[Path, str]:
     project = tmp_path / "proj"
     project.mkdir()
     (project / "project.yaml").write_text(
-        "name: t\nkey_prefix: T\n"
-        "next_issue_number: 1\nnext_session_number: 1\n"
+        "name: t\nkey_prefix: T\nnext_issue_number: 1\nnext_session_number: 1\n"
     )
     (project / "issues" / "T-1").mkdir(parents=True)
     (project / "nodes").mkdir()
@@ -64,9 +63,7 @@ class TestConnectionHandshake:
     def test_unknown_project_closes_with_4404(self, app_and_client):
         _app, client = app_and_client
         with pytest.raises(WebSocketDisconnect) as exc_info:
-            with client.websocket_connect(
-                "/api/ws?project=000000000000"
-            ) as ws:
+            with client.websocket_connect("/api/ws?project=000000000000") as ws:
                 ws.receive_json()  # force dispatch
         assert exc_info.value.code == 4404
 
@@ -114,18 +111,14 @@ class TestConnectionHandshake:
 
 
 class TestEventDelivery:
-    def test_file_change_reaches_connected_client(
-        self, app_and_client, ui_project
-    ):
+    def test_file_change_reaches_connected_client(self, app_and_client, ui_project):
         project, pid = ui_project
         _app, client = app_and_client
 
         with client.websocket_connect(f"/api/ws?project={pid}") as ws:
             # Let the observer settle before touching the filesystem.
             time.sleep(0.15)
-            (project / "issues" / "T-1" / "issue.yaml").write_text(
-                "title: t"
-            )
+            (project / "issues" / "T-1" / "issue.yaml").write_text("title: t")
 
             event = _poll_event(
                 ws,
@@ -165,9 +158,7 @@ class TestEventDelivery:
             # The server just swallows pong messages. Trigger a real event
             # to prove the connection is still live after the pong.
             time.sleep(0.15)
-            (project / "issues" / "T-1" / "issue.yaml").write_text(
-                "title: t"
-            )
+            (project / "issues" / "T-1" / "issue.yaml").write_text("title: t")
             event = _poll_event(
                 ws,
                 "file_changed",
@@ -183,15 +174,11 @@ class TestEventDelivery:
 
 
 class TestValidationEvent:
-    def test_validate_endpoint_broadcasts_to_clients(
-        self, app_and_client, ui_project
-    ):
+    def test_validate_endpoint_broadcasts_to_clients(self, app_and_client, ui_project):
         _project, pid = ui_project
         _app, client = app_and_client
         with client.websocket_connect(f"/api/ws?project={pid}") as ws:
-            r = client.post(
-                "/api/actions/validate", json={"project_id": pid}
-            )
+            r = client.post("/api/actions/validate", json={"project_id": pid})
             assert r.status_code == 200
             body = r.json()
             assert body["type"] == "validation_completed"
@@ -210,9 +197,7 @@ class TestValidationEvent:
 
     def test_validate_unknown_project_404(self, app_and_client):
         _app, client = app_and_client
-        r = client.post(
-            "/api/actions/validate", json={"project_id": "000000000000"}
-        )
+        r = client.post("/api/actions/validate", json={"project_id": "000000000000"})
         assert r.status_code == 404
 
 

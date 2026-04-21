@@ -142,9 +142,7 @@ class TestShouldIgnore:
         assert _should_ignore(tmp_path / "issues" / "x.yaml~", tmp_path)
 
     def test_emacs_lock_file(self, tmp_path: Path):
-        assert _should_ignore(
-            tmp_path / "issues" / ".#x.yaml", tmp_path
-        )
+        assert _should_ignore(tmp_path / "issues" / ".#x.yaml", tmp_path)
 
     def test_lock_file(self, tmp_path: Path):
         assert _should_ignore(tmp_path / ".tripwire.lock", tmp_path)
@@ -263,9 +261,7 @@ class TestProjectFileHandler:
         handler = ProjectFileHandler(
             "p", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
-        handler.on_any_event(
-            DirCreatedEvent(str(project / "issues" / "KUI-2"))
-        )
+        handler.on_any_event(DirCreatedEvent(str(project / "issues" / "KUI-2")))
         time.sleep(0.05)
         assert q.qsize() == 0
 
@@ -275,18 +271,12 @@ class TestProjectFileHandler:
         handler = ProjectFileHandler(
             "p", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
-        handler.on_any_event(
-            FileModifiedEvent(str(project / ".git" / "HEAD"))
-        )
-        handler.on_any_event(
-            FileModifiedEvent(str(project / "graph" / "index.yaml"))
-        )
+        handler.on_any_event(FileModifiedEvent(str(project / ".git" / "HEAD")))
+        handler.on_any_event(FileModifiedEvent(str(project / "graph" / "index.yaml")))
         time.sleep(0.05)
         assert q.qsize() == 0
 
-    def test_classifies_and_enqueues_issue_modify(
-        self, tmp_path: Path, loop_in_thread
-    ):
+    def test_classifies_and_enqueues_issue_modify(self, tmp_path: Path, loop_in_thread):
         project = self._mkproj(tmp_path)
         q: asyncio.Queue = asyncio.Queue()
         handler = ProjectFileHandler(
@@ -304,9 +294,7 @@ class TestProjectFileHandler:
         assert event.action == "modified"
         assert event.project_id == "pid"
 
-    def test_burst_collapses_single_event(
-        self, tmp_path: Path, loop_in_thread
-    ):
+    def test_burst_collapses_single_event(self, tmp_path: Path, loop_in_thread):
         project = self._mkproj(tmp_path)
         q: asyncio.Queue = asyncio.Queue()
         handler = ProjectFileHandler(
@@ -324,9 +312,7 @@ class TestProjectFileHandler:
         handler = ProjectFileHandler(
             "p", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
-        handler.on_any_event(
-            FileDeletedEvent(str(project / "nodes" / "foo.yaml"))
-        )
+        handler.on_any_event(FileDeletedEvent(str(project / "nodes" / "foo.yaml")))
         time.sleep(0.05)
         fut = asyncio.run_coroutine_threadsafe(q.get(), loop_in_thread)
         event = fut.result(timeout=1)
@@ -362,9 +348,7 @@ class TestProjectFileHandler:
         handler = ProjectFileHandler(
             "p", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
-        handler.on_any_event(
-            FileCreatedEvent(str(project / "nodes" / "new.yaml"))
-        )
+        handler.on_any_event(FileCreatedEvent(str(project / "nodes" / "new.yaml")))
         time.sleep(0.05)
         fut = asyncio.run_coroutine_threadsafe(q.get(), loop_in_thread)
         event = fut.result(timeout=1)

@@ -32,18 +32,14 @@ class TestPmReviewRoutes501:
             "tripwire.ui.dependencies._resolve_project_dir",
             return_value=project_dir,
         ):
-            assert_v2_envelope(
-                client.get("/api/projects/abc123abc123/pm-reviews")
-            )
+            assert_v2_envelope(client.get("/api/projects/abc123abc123/pm-reviews"))
 
     def test_get_review(self, client, project_dir):
         with patch(
             "tripwire.ui.dependencies._resolve_project_dir",
             return_value=project_dir,
         ):
-            assert_v2_envelope(
-                client.get("/api/projects/abc123abc123/pm-reviews/42")
-            )
+            assert_v2_envelope(client.get("/api/projects/abc123abc123/pm-reviews/42"))
 
     def test_run_review(self, client, project_dir):
         with patch(

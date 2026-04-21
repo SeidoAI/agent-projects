@@ -89,9 +89,7 @@ class TestGetActivePattern:
 
 
 class TestGetSessionPattern:
-    def test_no_overrides(
-        self, tmp_path_project: Path, save_test_session
-    ):
+    def test_no_overrides(self, tmp_path_project: Path, save_test_session):
         _write_pattern(
             tmp_path_project,
             "default",
@@ -103,9 +101,7 @@ class TestGetSessionPattern:
         assert pattern.auto_merge_on_pass is False
         assert pattern.overrides_applied is None
 
-    def test_flat_override_applied(
-        self, tmp_path_project: Path, save_test_session
-    ):
+    def test_flat_override_applied(self, tmp_path_project: Path, save_test_session):
         _write_pattern(
             tmp_path_project,
             "default",
@@ -129,10 +125,7 @@ class TestGetSessionPattern:
         _write_pattern(
             tmp_path_project,
             "default",
-            "name: default\n"
-            "limits:\n"
-            "  max_retries: 3\n"
-            "  timeout: 60\n",
+            "name: default\nlimits:\n  max_retries: 3\n  timeout: 60\n",
         )
         save_test_session(
             tmp_path_project,

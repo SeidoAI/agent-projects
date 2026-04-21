@@ -75,10 +75,7 @@ class TestListEnums:
         _write_enum(
             tmp_path_project,
             "kind",
-            "values:\n"
-            "  - id: feat\n"
-            "  - id: fix\n"
-            "    label: Bug Fix\n",
+            "values:\n  - id: feat\n  - id: fix\n    label: Bug Fix\n",
         )
         enum = list_enums(tmp_path_project)["kind"]
         assert enum.values[0] == EnumValue(value="feat", label="Feat")
@@ -129,9 +126,7 @@ class TestGetEnum:
         _write_enum(
             tmp_path_project,
             "priority",
-            "values:\n"
-            "  - value: high\n"
-            "    description: Do first\n",
+            "values:\n  - value: high\n    description: Do first\n",
         )
         enum = get_enum(tmp_path_project, "priority")
         assert enum.values[0].description == "Do first"
@@ -149,13 +144,9 @@ class TestGetEnum:
         _write_enum(
             tmp_path_project,
             "test",
-            "values:\n"
-            "  - value: a\n"
-            "    unknown_field: surprise\n",
+            "values:\n  - value: a\n    unknown_field: surprise\n",
         )
-        with caplog.at_level(
-            logging.DEBUG, logger="tripwire.ui.services.enum_service"
-        ):
+        with caplog.at_level(logging.DEBUG, logger="tripwire.ui.services.enum_service"):
             enum = get_enum(tmp_path_project, "test")
         assert enum.values[0].value == "a"
         # The unknown field is not on the DTO; only standard fields are exposed.

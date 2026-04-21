@@ -88,9 +88,7 @@ _TASK_CHECKLIST_FILENAME = "task-checklist.md"
 # Match a Markdown table row with a status cell.
 # Example: `| #1 | Do thing | done |` → status = "done"
 # Also accepts checkbox-style bullets: `- [x] done thing`.
-_TABLE_ROW_RE = re.compile(
-    r"^\s*\|\s*(?P<cols>.*?)\s*\|?\s*$"
-)
+_TABLE_ROW_RE = re.compile(r"^\s*\|\s*(?P<cols>.*?)\s*\|?\s*$")
 _BULLET_ROW_RE = re.compile(r"^\s*[-*]\s*\[(?P<mark>[ xX])\]\s+")
 
 
@@ -256,9 +254,7 @@ def _iter_session_dirs(project_dir: Path) -> list[Path]:
     if not sessions_root.is_dir():
         return []
     return sorted(
-        p
-        for p in sessions_root.iterdir()
-        if p.is_dir() and not p.name.startswith(".")
+        p for p in sessions_root.iterdir() if p.is_dir() and not p.name.startswith(".")
     )
 
 

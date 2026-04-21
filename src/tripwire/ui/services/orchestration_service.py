@@ -31,7 +31,9 @@ logger = logging.getLogger("tripwire.ui.services.orchestration_service")
 class HookDescriptor(BaseModel):
     """One hook declared in an orchestration pattern. Empty placeholder in v1."""
 
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="allow")
+    model_config = ConfigDict(
+        populate_by_name=True, str_strip_whitespace=True, extra="allow"
+    )
 
     name: str | None = None
     path: str | None = None
@@ -41,7 +43,9 @@ class HookDescriptor(BaseModel):
 class RuleDescriptor(BaseModel):
     """One rule declared in an orchestration pattern."""
 
-    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True, extra="allow")
+    model_config = ConfigDict(
+        populate_by_name=True, str_strip_whitespace=True, extra="allow"
+    )
 
     event: str | None = None
     condition: str | None = None
@@ -126,7 +130,9 @@ def _shape_pattern(
         for h in hooks_raw
     ]
     rules = [
-        RuleDescriptor.model_validate(r if isinstance(r, dict) else {"description": str(r)})
+        RuleDescriptor.model_validate(
+            r if isinstance(r, dict) else {"description": str(r)}
+        )
         for r in rules_raw
     ]
 
@@ -149,19 +155,14 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
     """
     out = copy.deepcopy(base)
     for key, value in override.items():
-        if (
-            isinstance(value, dict)
-            and isinstance(out.get(key), dict)
-        ):
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
             out[key] = _deep_merge(out[key], value)
         else:
             out[key] = copy.deepcopy(value)
     return out
 
 
-def _overridden_keys(
-    base: dict[str, Any], override: dict[str, Any]
-) -> list[str]:
+def _overridden_keys(base: dict[str, Any], override: dict[str, Any]) -> list[str]:
     """Return keys whose resolved value differs from the base."""
     changed: list[str] = []
     for key in override:
@@ -190,9 +191,7 @@ def get_active_pattern(project_dir: Path) -> OrchestrationPattern:
     return _shape_pattern(pattern_name, path, data, overrides_applied=None)
 
 
-def get_session_pattern(
-    project_dir: Path, session_id: str
-) -> OrchestrationPattern:
+def get_session_pattern(project_dir: Path, session_id: str) -> OrchestrationPattern:
     """Return the effective pattern for *session_id*.
 
     Starts from the project's active pattern. If the session has an

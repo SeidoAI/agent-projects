@@ -164,14 +164,10 @@ class TestBroadcast:
         hub = WebSocketHub()
         sockets = [FakeWebSocket() for _ in range(20)]
 
-        await asyncio.gather(
-            *(hub.connect(ws, "p") for ws in sockets)
-        )
+        await asyncio.gather(*(hub.connect(ws, "p") for ws in sockets))
         assert hub.connection_count("p") == 20
 
-        await asyncio.gather(
-            *(hub.disconnect(ws, "p") for ws in sockets[:10])
-        )
+        await asyncio.gather(*(hub.disconnect(ws, "p") for ws in sockets[:10]))
         assert hub.connection_count("p") == 10
 
         # Broadcast still works and only reaches the survivors.

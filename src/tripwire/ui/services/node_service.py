@@ -258,9 +258,7 @@ def get_node(project_dir: Path, node_id: str) -> NodeDetail:
 
     cache = _load_cache_ensuring_fresh(project_dir)
     stale_set: set[str] = set(cache.stale_nodes) if cache is not None else set()
-    ref_count = (
-        len(cache.referenced_by.get(node_id, [])) if cache is not None else 0
-    )
+    ref_count = len(cache.referenced_by.get(node_id, [])) if cache is not None else 0
 
     source: NodeSource | None = None
     if node.source is not None:

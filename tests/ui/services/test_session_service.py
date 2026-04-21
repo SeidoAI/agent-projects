@@ -69,9 +69,7 @@ class TestListSessions:
         result = list_sessions(tmp_path_project, status="active")
         assert [s.id for s in result] == ["b"]
 
-    def test_skips_hidden_dirs(
-        self, tmp_path_project: Path, save_test_session
-    ):
+    def test_skips_hidden_dirs(self, tmp_path_project: Path, save_test_session):
         save_test_session(tmp_path_project, "real")
         # Create a .hidden session-shaped dir — should be ignored
         hidden = paths.sessions_dir(tmp_path_project) / ".hidden"
@@ -93,9 +91,7 @@ class TestListSessions:
         # Create a broken session.yaml (invalid frontmatter)
         bad_dir = paths.sessions_dir(tmp_path_project) / "bad"
         bad_dir.mkdir()
-        (bad_dir / paths.SESSION_FILENAME).write_text(
-            "this is not valid frontmatter\n"
-        )
+        (bad_dir / paths.SESSION_FILENAME).write_text("this is not valid frontmatter\n")
 
         with caplog.at_level(
             logging.WARNING, logger="tripwire.ui.services.session_service"
@@ -120,9 +116,9 @@ class TestListSessions:
         paths.session_artifacts_dir(tmp_path_project, "s1").mkdir(
             parents=True, exist_ok=True
         )
-        (paths.session_artifacts_dir(tmp_path_project, "s1") / "task-checklist.md").write_text(
-            checklist
-        )
+        (
+            paths.session_artifacts_dir(tmp_path_project, "s1") / "task-checklist.md"
+        ).write_text(checklist)
 
         [summary] = list_sessions(tmp_path_project)
         assert summary.task_progress.done == 1
@@ -135,9 +131,7 @@ class TestListSessions:
 
 
 class TestGetSession:
-    def test_returns_detail(
-        self, tmp_path_project: Path, save_test_session
-    ):
+    def test_returns_detail(self, tmp_path_project: Path, save_test_session):
         save_test_session(tmp_path_project, "s1", plan=True)
         detail = get_session(tmp_path_project, "s1")
 
@@ -172,9 +166,7 @@ class TestGetSession:
         detail = get_session(tmp_path_project, "s1")
         assert detail.artifact_status["plan"] == "missing"
 
-    def test_engagements_empty_in_v1(
-        self, tmp_path_project: Path, save_test_session
-    ):
+    def test_engagements_empty_in_v1(self, tmp_path_project: Path, save_test_session):
         save_test_session(tmp_path_project, "s1")
         detail = get_session(tmp_path_project, "s1")
         assert detail.engagements == []
@@ -199,9 +191,7 @@ class TestGetSession:
         # engagements so the UI can show the number without knowing shape.
         assert detail.re_engagement_count == 1
 
-    def test_re_engagement_count(
-        self, tmp_path_project: Path, save_test_session
-    ):
+    def test_re_engagement_count(self, tmp_path_project: Path, save_test_session):
         # Three engagements → two re-engagements (the first is the initial launch)
         engagements = [
             {
@@ -217,9 +207,7 @@ class TestGetSession:
                 "trigger": "verifier_rejection",
             },
         ]
-        save_test_session(
-            tmp_path_project, "s1", engagements=engagements
-        )
+        save_test_session(tmp_path_project, "s1", engagements=engagements)
         [summary] = list_sessions(tmp_path_project)
         assert summary.re_engagement_count == 2
 

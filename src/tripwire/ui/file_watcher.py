@@ -147,20 +147,14 @@ def classify(
         return _event(project_id, "node", stem, action, rel_posix)
 
     # sessions/<id>/session.yaml
-    if (
-        len(parts) == 3
-        and parts[0] == "sessions"
-        and parts[2] == "session.yaml"
-    ):
+    if len(parts) == 3 and parts[0] == "sessions" and parts[2] == "session.yaml":
         return _event(project_id, "session", parts[1], action, rel_posix)
 
     # sessions/<id>/<name>.md   (plan, task-checklist, etc. at session root).
     # entity_id is "<session>/<name>" per the [[file-watcher]] node so the
     # frontend can invalidate per-artifact queries, not the whole session.
     if len(parts) == 3 and parts[0] == "sessions" and suffix == ".md":
-        return _event(
-            project_id, "artifact", f"{parts[1]}/{stem}", action, rel_posix
-        )
+        return _event(project_id, "artifact", f"{parts[1]}/{stem}", action, rel_posix)
 
     # sessions/<id>/artifacts/<name>.md
     if (
@@ -169,9 +163,7 @@ def classify(
         and parts[2] == "artifacts"
         and suffix == ".md"
     ):
-        return _event(
-            project_id, "artifact", f"{parts[1]}/{stem}", action, rel_posix
-        )
+        return _event(project_id, "artifact", f"{parts[1]}/{stem}", action, rel_posix)
 
     # plans/artifacts/<name>.md
     if (
@@ -240,9 +232,7 @@ class Debouncer:
             if existing is not None:
                 existing.cancel()
             self._pending[key] = value
-            timer = threading.Timer(
-                self._window, self._fire, args=(key, callback)
-            )
+            timer = threading.Timer(self._window, self._fire, args=(key, callback))
             timer.daemon = True
             self._timers[key] = timer
             timer.start()
@@ -365,9 +355,7 @@ def start_watching(
     for project_id, raw_dir in project_dirs:
         project_dir = Path(raw_dir).resolve()
         if not project_dir.is_dir():
-            logger.warning(
-                "skipping watcher for %s — not a directory", project_dir
-            )
+            logger.warning("skipping watcher for %s — not a directory", project_dir)
             continue
         handler = ProjectFileHandler(
             project_id=project_id,

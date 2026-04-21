@@ -786,7 +786,7 @@ wheels = [
 ]
 
 [[package]]
-name = "tripwire"
+name = "tripwire-pm"
 version = "0.7.0"
 source = { editable = "." }
 dependencies = [

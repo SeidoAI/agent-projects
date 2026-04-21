@@ -70,9 +70,7 @@ class TestListIssues:
         save_test_issue(tmp_path_project, "TST-1", labels=["domain/backend"])
         save_test_issue(tmp_path_project, "TST-2", labels=["domain/frontend"])
 
-        result = list_issues(
-            tmp_path_project, IssueFilters(label="domain/frontend")
-        )
+        result = list_issues(tmp_path_project, IssueFilters(label="domain/frontend"))
         assert [s.id for s in result] == ["TST-2"]
 
     def test_filter_by_parent(self, tmp_path_project, save_test_issue):
@@ -84,12 +82,8 @@ class TestListIssues:
         assert [s.id for s in result] == ["TST-2"]
 
     def test_filters_combine_with_and(self, tmp_path_project, save_test_issue):
-        save_test_issue(
-            tmp_path_project, "TST-1", status="todo", executor="ai"
-        )
-        save_test_issue(
-            tmp_path_project, "TST-2", status="todo", executor="human"
-        )
+        save_test_issue(tmp_path_project, "TST-1", status="todo", executor="ai")
+        save_test_issue(tmp_path_project, "TST-2", status="todo", executor="human")
 
         result = list_issues(
             tmp_path_project,
@@ -97,9 +91,7 @@ class TestListIssues:
         )
         assert [s.id for s in result] == ["TST-1"]
 
-    def test_is_epic_true_when_epic_label(
-        self, tmp_path_project, save_test_issue
-    ):
+    def test_is_epic_true_when_epic_label(self, tmp_path_project, save_test_issue):
         save_test_issue(
             tmp_path_project, "TST-1", labels=["type/epic", "domain/backend"]
         )
@@ -109,31 +101,21 @@ class TestListIssues:
         assert by_id["TST-1"].is_epic is True
         assert by_id["TST-2"].is_epic is False
 
-    def test_is_blocked_by_upstream_status(
-        self, tmp_path_project, save_test_issue
-    ):
+    def test_is_blocked_by_upstream_status(self, tmp_path_project, save_test_issue):
         # TST-1 is in progress → TST-2 blocked_by=[TST-1] is blocked
         save_test_issue(tmp_path_project, "TST-1", status="todo")
-        save_test_issue(
-            tmp_path_project, "TST-2", status="todo", blocked_by=["TST-1"]
-        )
+        save_test_issue(tmp_path_project, "TST-2", status="todo", blocked_by=["TST-1"])
         # TST-3 is blocked_by a done issue → not blocked
         save_test_issue(tmp_path_project, "TST-4", status="done")
-        save_test_issue(
-            tmp_path_project, "TST-3", status="todo", blocked_by=["TST-4"]
-        )
+        save_test_issue(tmp_path_project, "TST-3", status="todo", blocked_by=["TST-4"])
 
         by_id = {s.id: s for s in list_issues(tmp_path_project)}
         assert by_id["TST-2"].is_blocked is True
         assert by_id["TST-3"].is_blocked is False
         assert by_id["TST-1"].is_blocked is False  # no blockers at all
 
-    def test_is_blocked_when_blocker_missing(
-        self, tmp_path_project, save_test_issue
-    ):
-        save_test_issue(
-            tmp_path_project, "TST-1", status="todo", blocked_by=["TST-99"]
-        )
+    def test_is_blocked_when_blocker_missing(self, tmp_path_project, save_test_issue):
+        save_test_issue(tmp_path_project, "TST-1", status="todo", blocked_by=["TST-99"])
         by_id = {s.id: s for s in list_issues(tmp_path_project)}
         assert by_id["TST-1"].is_blocked is True
 
@@ -200,9 +182,7 @@ class TestGetIssue:
         by_ref = {r.ref: r for r in detail.refs}
         assert by_ref["user-model"].is_stale is True
 
-    def test_refs_deduplicated(
-        self, tmp_path_project, save_test_issue, save_test_node
-    ):
+    def test_refs_deduplicated(self, tmp_path_project, save_test_issue, save_test_node):
         save_test_node(tmp_path_project, "user-model")
         save_test_issue(tmp_path_project, "TST-1", body=_BODY_WITH_REFS)
 
@@ -214,9 +194,7 @@ class TestGetIssue:
         with pytest.raises(FileNotFoundError):
             get_issue(tmp_path_project, "TST-404")
 
-    def test_epic_detection_in_detail(
-        self, tmp_path_project, save_test_issue
-    ):
+    def test_epic_detection_in_detail(self, tmp_path_project, save_test_issue):
         save_test_issue(tmp_path_project, "TST-1", labels=["type/epic"])
         detail = get_issue(tmp_path_project, "TST-1")
         assert detail.is_epic is True

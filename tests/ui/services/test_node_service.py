@@ -27,9 +27,7 @@ class TestListNodes:
     def test_empty_when_no_nodes(self, tmp_path_project: Path):
         assert list_nodes(tmp_path_project) == []
 
-    def test_returns_all_by_default(
-        self, tmp_path_project: Path, save_test_node
-    ):
+    def test_returns_all_by_default(self, tmp_path_project: Path, save_test_node):
         save_test_node(tmp_path_project, "alpha", type="model")
         save_test_node(tmp_path_project, "beta", type="decision")
 
@@ -66,16 +64,12 @@ class TestListNodes:
         by_id = {n.id: n for n in list_nodes(tmp_path_project)}
         assert by_id["user-model"].ref_count == 2
 
-    def test_ref_count_zero_when_no_cache(
-        self, tmp_path_project: Path, save_test_node
-    ):
+    def test_ref_count_zero_when_no_cache(self, tmp_path_project: Path, save_test_node):
         save_test_node(tmp_path_project, "alpha")
         result = list_nodes(tmp_path_project)
         assert result[0].ref_count == 0
 
-    def test_stale_filter_true(
-        self, tmp_path_project: Path, save_test_node
-    ):
+    def test_stale_filter_true(self, tmp_path_project: Path, save_test_node):
         save_test_node(tmp_path_project, "alpha")
         save_test_node(tmp_path_project, "beta")
 
@@ -132,9 +126,7 @@ class TestGetNode:
         assert detail.is_stale is False
         assert detail.source is None
 
-    def test_returns_source_when_present(
-        self, tmp_path_project: Path, save_test_node
-    ):
+    def test_returns_source_when_present(self, tmp_path_project: Path, save_test_node):
         save_test_node(
             tmp_path_project,
             "user-model",
@@ -152,9 +144,7 @@ class TestGetNode:
         assert detail.source.path == "src/user.py"
         assert detail.source.lines == (1, 10)
 
-    def test_is_stale_from_cache(
-        self, tmp_path_project: Path, save_test_node
-    ):
+    def test_is_stale_from_cache(self, tmp_path_project: Path, save_test_node):
         save_test_node(tmp_path_project, "alpha")
 
         from tripwire.core import graph_cache
@@ -176,9 +166,7 @@ class TestGetNode:
         with pytest.raises(FileNotFoundError):
             get_node(tmp_path_project, "ghost")
 
-    def test_round_trips_via_json(
-        self, tmp_path_project: Path, save_test_node
-    ):
+    def test_round_trips_via_json(self, tmp_path_project: Path, save_test_node):
         save_test_node(
             tmp_path_project,
             "user-model",
@@ -263,13 +251,9 @@ class TestCheckAllFreshness:
         )
 
         report = check_all_freshness(project_dir)
-        assert any(
-            e.id == "user-model" and e.status == "current" for e in report.nodes
-        )
+        assert any(e.id == "user-model" and e.status == "current" for e in report.nodes)
 
-    def test_skips_nodes_without_source(
-        self, tmp_path_project: Path, save_test_node
-    ):
+    def test_skips_nodes_without_source(self, tmp_path_project: Path, save_test_node):
         save_test_node(tmp_path_project, "planned-node")
         report = check_all_freshness(tmp_path_project)
         assert report.nodes == []
@@ -294,9 +278,7 @@ class TestReverseRefs:
         result = reverse_refs(tmp_path_project, "user-model")
         assert isinstance(result, ReverseRefsResult)
         assert result.node_id == "user-model"
-        assert any(
-            r.id == "TST-1" and r.kind == "issue" for r in result.referrers
-        )
+        assert any(r.id == "TST-1" and r.kind == "issue" for r in result.referrers)
 
     def test_rebuilds_cache_lazily_when_absent(
         self, tmp_path_project: Path, save_test_node, save_test_issue

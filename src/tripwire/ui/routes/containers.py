@@ -24,9 +24,7 @@ from tripwire.ui.services.container_service import (
 
 router = APIRouter(prefix="/api/containers", tags=["containers (v2)"])
 
-_DETAIL = (
-    "containers feature requires tripwire.containers (v2 — not yet implemented)"
-)
+_DETAIL = "containers feature requires tripwire.containers (v2 — not yet implemented)"
 
 
 @router.get("", response_model=list[ContainerInfo])

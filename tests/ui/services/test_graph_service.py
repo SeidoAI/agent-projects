@@ -28,9 +28,7 @@ class TestBuildDependencyGraph:
         assert g.meta.kind == "deps"
         assert g.meta.node_count == 0
 
-    def test_basic_blocked_by_graph(
-        self, tmp_path_project: Path, save_test_issue
-    ):
+    def test_basic_blocked_by_graph(self, tmp_path_project: Path, save_test_issue):
         save_test_issue(tmp_path_project, "TST-1")
         save_test_issue(tmp_path_project, "TST-2", blocked_by=["TST-1"])
         save_test_issue(tmp_path_project, "TST-3", blocked_by=["TST-2"])
@@ -54,9 +52,7 @@ class TestBuildDependencyGraph:
             assert n.position is not None
             assert n.data["label"]
 
-    def test_deterministic_positions(
-        self, tmp_path_project: Path, save_test_issue
-    ):
+    def test_deterministic_positions(self, tmp_path_project: Path, save_test_issue):
         save_test_issue(tmp_path_project, "TST-1")
         save_test_issue(tmp_path_project, "TST-2", blocked_by=["TST-1"])
 
@@ -67,48 +63,34 @@ class TestBuildDependencyGraph:
         pos2 = {n.id: (n.position.x, n.position.y) for n in g2.nodes}
         assert pos1 == pos2
 
-    def test_focus_upstream_restricts(
-        self, tmp_path_project: Path, save_test_issue
-    ):
+    def test_focus_upstream_restricts(self, tmp_path_project: Path, save_test_issue):
         save_test_issue(tmp_path_project, "TST-1")
         save_test_issue(tmp_path_project, "TST-2", blocked_by=["TST-1"])
         save_test_issue(tmp_path_project, "TST-3", blocked_by=["TST-2"])
         save_test_issue(tmp_path_project, "TST-4")  # unrelated
 
         # Upstream of TST-2 = {TST-2, TST-1}
-        g = build_dependency_graph(
-            tmp_path_project, focus="TST-2", upstream=True
-        )
+        g = build_dependency_graph(tmp_path_project, focus="TST-2", upstream=True)
         ids = {n.id for n in g.nodes}
         assert ids == {"TST-1", "TST-2"}
 
-    def test_focus_downstream_restricts(
-        self, tmp_path_project: Path, save_test_issue
-    ):
+    def test_focus_downstream_restricts(self, tmp_path_project: Path, save_test_issue):
         save_test_issue(tmp_path_project, "TST-1")
         save_test_issue(tmp_path_project, "TST-2", blocked_by=["TST-1"])
         save_test_issue(tmp_path_project, "TST-3", blocked_by=["TST-2"])
 
         # Downstream of TST-2 = {TST-2, TST-3}
-        g = build_dependency_graph(
-            tmp_path_project, focus="TST-2", downstream=True
-        )
+        g = build_dependency_graph(tmp_path_project, focus="TST-2", downstream=True)
         ids = {n.id for n in g.nodes}
         assert ids == {"TST-2", "TST-3"}
 
-    def test_focus_unknown_returns_empty(
-        self, tmp_path_project: Path, save_test_issue
-    ):
+    def test_focus_unknown_returns_empty(self, tmp_path_project: Path, save_test_issue):
         save_test_issue(tmp_path_project, "TST-1")
-        g = build_dependency_graph(
-            tmp_path_project, focus="TST-99", upstream=True
-        )
+        g = build_dependency_graph(tmp_path_project, focus="TST-99", upstream=True)
         # Selector raises ValueError internally → empty focus set → no nodes.
         assert g.nodes == []
 
-    def test_edges_have_stable_ids(
-        self, tmp_path_project: Path, save_test_issue
-    ):
+    def test_edges_have_stable_ids(self, tmp_path_project: Path, save_test_issue):
         save_test_issue(tmp_path_project, "TST-1")
         save_test_issue(tmp_path_project, "TST-2", blocked_by=["TST-1"])
 
@@ -145,9 +127,7 @@ class TestBuildConceptGraph:
     ):
         save_test_node(tmp_path_project, "user-model")
         save_test_issue(tmp_path_project, "TST-1")
-        save_test_issue(
-            tmp_path_project, "TST-2", blocked_by=["TST-1"], parent="TST-1"
-        )
+        save_test_issue(tmp_path_project, "TST-2", blocked_by=["TST-1"], parent="TST-1")
 
         g = build_concept_graph(tmp_path_project)
         relations = {e.relation for e in g.edges}
@@ -176,9 +156,7 @@ class TestBuildConceptGraph:
         save_test_node(tmp_path_project, "user-model")
         save_test_issue(tmp_path_project, "TST-1")  # references user-model
 
-        g = build_concept_graph(
-            tmp_path_project, focus="TST-1", upstream=True
-        )
+        g = build_concept_graph(tmp_path_project, focus="TST-1", upstream=True)
         ids = {n.id for n in g.nodes}
         # Upstream of TST-1 includes TST-1 and what it references.
         assert "TST-1" in ids

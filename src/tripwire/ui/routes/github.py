@@ -20,9 +20,7 @@ from tripwire.ui.services.github_service import (
 
 router = APIRouter(prefix="/api/github", tags=["github (v2)"])
 
-_DETAIL = (
-    "github integration requires the v2 gh-CLI wrapper (not yet implemented)"
-)
+_DETAIL = "github integration requires the v2 gh-CLI wrapper (not yet implemented)"
 
 
 @router.get("/prs", response_model=list[PRSummary])
