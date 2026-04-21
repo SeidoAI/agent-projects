@@ -265,6 +265,8 @@ class TestInitBasics:
             "pm-project-sync.md",
             # v0.7b per-issue artifact command:
             "pm-issue-artifact.md",
+            # v0.7b session monitor:
+            "pm-session-monitor.md",
             # Deprecated forwarders (removed in v0.7):
             "pm-close.md",
             "pm-handoff.md",

@@ -48,6 +48,8 @@ EXPECTED_COMMANDS: tuple[str, ...] = (
     "pm-project-sync",
     # v0.7b per-issue artifact command:
     "pm-issue-artifact",
+    # v0.7b session monitor:
+    "pm-session-monitor",
     # Deprecated forwarders (still shipped, removed in v0.7):
     "pm-close",
     "pm-handoff",

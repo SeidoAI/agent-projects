@@ -9,9 +9,7 @@ import pytest
 from tripwire.core.session_monitor import detect_stuck, take_snapshot
 
 
-def test_snapshot_from_log(
-    tmp_path: Path, tmp_path_project: Path, save_test_session
-):
+def test_snapshot_from_log(tmp_path: Path, tmp_path_project: Path, save_test_session):
     log = tmp_path / "session.log"
     log.write_text(
         '{"type":"assistant","message":"I will start","turn":1}\n'

@@ -93,9 +93,7 @@ def _populate_from_log(snap: MonitorSnapshot, log: Path) -> None:
     snap.stuck = detect_stuck(log, threshold_minutes=10)
 
 
-def _populate_from_polling(
-    snap: MonitorSnapshot, project_dir: Path, session
-) -> None:
+def _populate_from_polling(snap: MonitorSnapshot, project_dir: Path, session) -> None:
     """Fall back to git/gh when no claude log is available."""
     wt = None
     for entry in session.runtime_state.worktrees:

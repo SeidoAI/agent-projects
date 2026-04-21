@@ -48,20 +48,14 @@ def parse_event(line: str) -> StreamEvent | None:
         kind=kind,
         turn=data.get("turn"),
         tool=data.get("tool"),
-        content=(
-            data.get("content")
-            or data.get("message")
-            or data.get("output")
-        ),
+        content=(data.get("content") or data.get("message") or data.get("output")),
         total_tokens=data.get("total_tokens"),
         cost_usd=data.get("cost_usd"),
         raw=data,
     )
 
 
-def tail_events(
-    log_path: Path, poll_interval: float = 0.5
-) -> Iterator[StreamEvent]:
+def tail_events(log_path: Path, poll_interval: float = 0.5) -> Iterator[StreamEvent]:
     """Yield StreamEvents as they're appended to the log (tail -f semantics)."""
     log = Path(log_path)
     with log.open("r", encoding="utf-8") as f:

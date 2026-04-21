@@ -4,10 +4,7 @@ from tripwire.core.stream_json import parse_event
 
 
 def test_parse_tool_use_event():
-    line = (
-        '{"type":"tool_use","tool":"Edit",'
-        '"input":{"file_path":"x.py"},"turn":2}'
-    )
+    line = '{"type":"tool_use","tool":"Edit","input":{"file_path":"x.py"},"turn":2}'
     event = parse_event(line)
     assert event is not None
     assert event.kind == "tool_use"

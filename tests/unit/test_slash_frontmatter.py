@@ -23,6 +23,7 @@ ALLOWED_NAMES = {
     "pm-session-check",
     "pm-session-progress",
     "pm-session-agenda",  # v0.6c
+    "pm-session-monitor",  # v0.7b
     "pm-project-create",  # v0.6b
     "pm-project-sync",  # v0.6b
     # Non-entity verbs
