@@ -14,7 +14,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from tripwire.core.branch_naming import is_valid_branch_name
+from tripwire.core.branch_naming import is_valid_branch_shape
 
 HandedOffBy = Literal["pm", "execution-agent", "verification-agent"]
 
@@ -48,6 +48,8 @@ class SessionHandoff(BaseModel):
     @field_validator("branch")
     @classmethod
     def _validate_branch(cls, v: str) -> str:
-        if not is_valid_branch_name(v):
+        # Shape-only check at model level — the project-aware type-list check
+        # runs in the validator / lint rule where project_dir is known.
+        if not is_valid_branch_shape(v):
             raise ValueError(f"branch '{v}' does not match <type>/<slug> convention")
         return v

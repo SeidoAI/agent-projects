@@ -263,6 +263,14 @@ class TestInitBasics:
             # v0.6b workspace commands:
             "pm-project-create.md",
             "pm-project-sync.md",
+            # v0.7b per-issue artifact command:
+            "pm-issue-artifact.md",
+            # v0.7b session monitor:
+            "pm-session-monitor.md",
+            # v0.7b session review:
+            "pm-session-review.md",
+            # v0.7b session complete:
+            "pm-session-complete.md",
             # Deprecated forwarders (removed in v0.7):
             "pm-close.md",
             "pm-handoff.md",

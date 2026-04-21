@@ -77,14 +77,15 @@ def test_pm_skill_md_under_budget() -> None:
 
 
 def test_total_templates_under_budget() -> None:
-    """Everything `tripwire init` copies must stay under 275KB total.
+    """Everything `tripwire init` copies must stay under 285KB total.
 
-    v0.2 was ~217KB. v0.6a adds PM skill docs + slash command split
-    + new CLI wrappers. Budget bumped to 275KB.
+    v0.2 was ~217KB. v0.6a bumped to 275KB. v0.7b adds spawn/defaults.yaml,
+    issue_artifacts/{manifest,developer,verified}, and /pm-issue-artifact;
+    budget bumped to 285KB.
     """
     total = _total_chars(TEMPLATES_DIR)
-    assert total < 275_000, (
-        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 275KB."
+    assert total < 285_000, (
+        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 285KB."
     )
 
 

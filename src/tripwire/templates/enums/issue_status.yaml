@@ -1,33 +1,31 @@
 name: IssueStatus
-description: Issue lifecycle states
+description: Issue lifecycle states (v0.7b 6-stage flow)
 values:
   - id: backlog
     label: Backlog
     color: gray
+    description: Captured but not triaged
   - id: todo
     label: To Do
     color: blue
+    description: Triaged, ready for pickup
   - id: in_progress
     label: In Progress
     color: yellow
-  - id: verifying
-    label: Verifying
-    color: orange
-  - id: reviewing
-    label: Reviewing
+    description: Execution agent working
+  - id: in_review
+    label: In Review
     color: purple
-  - id: testing
-    label: Testing
-    color: cyan
-  - id: ready
-    label: Ready
-    color: lime
-  - id: updating
-    label: Updating
-    color: pink
+    description: PR opened, PM reviewing code/project
+  - id: verified
+    label: Verified
+    color: green
+    description: PR merged, acceptance tests passed (QA/PM)
   - id: done
     label: Done
-    color: green
+    color: lime
+    description: Closed — concept nodes reconciled, followups logged
   - id: canceled
     label: Canceled
     color: red
+    description: Won't do

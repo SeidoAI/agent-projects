@@ -43,12 +43,9 @@ class TestReachableStatuses:
             {
                 "backlog": ["todo", "canceled"],
                 "todo": ["in_progress", "backlog", "canceled"],
-                "in_progress": ["verifying", "todo", "canceled"],
-                "verifying": ["reviewing", "in_progress"],
-                "reviewing": ["testing", "in_progress"],
-                "testing": ["ready", "reviewing"],
-                "ready": ["updating"],
-                "updating": ["done"],
+                "in_progress": ["in_review", "todo", "canceled"],
+                "in_review": ["verified", "in_progress"],
+                "verified": ["done", "in_review"],
                 "done": [],
                 "canceled": ["backlog"],
             }

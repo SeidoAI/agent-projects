@@ -246,12 +246,12 @@ class TestAgentSession:
                     base_branch="test",
                 ),
             ],
-            current_state="implementing",
+            current_state="in_progress",
         )
         assert len(s.repos) == 2
         assert s.repos[0].pr_number == 42
         assert s.repos[1].branch is None
-        assert s.current_state == "implementing"
+        assert s.current_state == "in_progress"
 
     def test_session_orchestration_override(self) -> None:
         s = AgentSession(
@@ -276,7 +276,7 @@ class TestAgentSession:
                     name="architecture-diff",
                     file="architecture-diff.md",
                     template="architecture-diff.md.j2",
-                    produced_at="completion",
+                    produced_at="done",
                     required=True,
                 )
             ],

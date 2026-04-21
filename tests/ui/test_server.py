@@ -20,7 +20,7 @@ class TestCreateApp:
         import tripwire
 
         app = create_app(dev_mode=True)
-        assert app.title == "Keel UI"
+        assert app.title == "Tripwire UI"
         assert app.version == tripwire.__version__
 
     def test_openapi_json_available(self):

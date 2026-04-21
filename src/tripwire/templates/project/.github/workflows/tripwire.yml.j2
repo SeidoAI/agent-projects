@@ -1,0 +1,27 @@
+name: Tripwire checks
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.13"
+      - name: Install tripwire
+        run: uv tool install tripwire=={{ tripwire_version }}
+      - name: Validate (strict)
+        run: tripwire validate --strict --format=json
+      - name: Lint scoping
+        run: tripwire lint scoping
+      - name: Lint handoff
+        run: tripwire lint handoff
+      - name: Lint session
+        run: tripwire lint session
+      - name: Brief (smoke test)
+        run: tripwire brief --format=json > /dev/null

@@ -315,7 +315,7 @@ def _render_text(data: ScaffoldData) -> str:
     """Render the scaffold data as human-readable text.
 
     The output shape matches the spec's example in the "scaffold-for-creation"
-    section of `docs/keel-plan.md` — the same output an agent reads
+    section of `docs/tripwire-plan.md` — the same output an agent reads
     when it runs this command as its first tool call.
     """
     lines: list[str] = []

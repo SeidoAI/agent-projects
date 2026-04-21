@@ -38,7 +38,7 @@ file + field + message).
 
 ### 4. Run the full check catalogue
 The validator runs all 14 checks from
-`docs/keel-plan.md` "The Validation Gate" section. Focus
+`docs/tripwire-plan.md` "The Validation Gate" section. Focus
 especially on:
 
 - **Schema validation** — every YAML file parses and matches its model
