@@ -1,4 +1,4 @@
-"""keel refs check: ref-integrity subcommand.
+"""tripwire refs check: ref-integrity subcommand.
 
 v0.6a: refs check already existed from v0.5 refactor, but now exits
 non-zero on integrity errors (dangling refs, stale nodes).
@@ -6,7 +6,7 @@ non-zero on integrity errors (dangling refs, stale nodes).
 
 from click.testing import CliRunner
 
-from keel.cli.refs import refs_cmd
+from tripwire.cli.refs import refs_cmd
 
 
 def test_refs_check_exits_zero_on_clean_project(tmp_path_project):

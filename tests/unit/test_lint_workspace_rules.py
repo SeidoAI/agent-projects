@@ -6,10 +6,10 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from keel.cli.workspace import workspace_cmd
-from keel.core import lint_rules  # noqa: F401 — registers rules
-from keel.core.linter import Linter
-from keel.core.paths import merge_briefs_dir, workspace_nodes_dir
+from tripwire.cli.workspace import workspace_cmd
+from tripwire.core import lint_rules  # noqa: F401 — registers rules
+from tripwire.core.linter import Linter
+from tripwire.core.paths import merge_briefs_dir, workspace_nodes_dir
 
 
 def _git_commit_all(repo: Path, message: str = "init") -> str:

@@ -1,4 +1,4 @@
-"""Unit tests for `keel refresh`."""
+"""Unit tests for `tripwire refresh`."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from keel.core.graph_cache import ensure_fresh, load_index
+from tripwire.core.graph_cache import ensure_fresh, load_index
 
 
 def write_project_yaml(project_dir: Path) -> None:
@@ -53,7 +53,7 @@ class TestRefreshCommand:
         # Add an issue file — makes cache stale
         import uuid
 
-        from keel.core.parser import serialize_frontmatter_body
+        from tripwire.core.parser import serialize_frontmatter_body
 
         fm = {
             "uuid": str(uuid.uuid4()),

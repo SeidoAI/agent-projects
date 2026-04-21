@@ -1,4 +1,4 @@
-"""keel workspace push — trivial cases (no upstream divergence)."""
+"""tripwire workspace push — trivial cases (no upstream divergence)."""
 
 import subprocess
 from pathlib import Path
@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from keel.cli.workspace import workspace_cmd
-from keel.core.paths import workspace_nodes_dir
+from tripwire.cli.workspace import workspace_cmd
+from tripwire.core.paths import workspace_nodes_dir
 
 
 def _git_commit_all(repo: Path, message: str) -> str:
@@ -84,7 +84,7 @@ class TestWorkspacePushTrivial:
         )
 
         # Modify node locally.
-        from keel.core.node_store import load_node, save_node
+        from tripwire.core.node_store import load_node, save_node
 
         node = load_node(proj_dir, "auth-system")
         save_node(
@@ -128,7 +128,7 @@ class TestWorkspacePushTrivial:
         assert (workspace_nodes_dir(ws_dir) / "webhook-handler.yaml").is_file()
 
         # Project copy should now be origin=workspace with a workspace_sha stamp.
-        from keel.core.node_store import load_node
+        from tripwire.core.node_store import load_node
 
         node = load_node(proj_dir, "webhook-handler")
         assert node.origin == "workspace"

@@ -9,12 +9,12 @@ Covers:
 
 from __future__ import annotations
 
-from keel.core.dependency_graph import (
+from tripwire.core.dependency_graph import (
     build_dependency_graph,
     to_dot,
     to_mermaid,
 )
-from keel.models import Issue
+from tripwire.models import Issue
 
 
 def make_issue(key: str, blocked_by: list[str] | None = None, **kw: object) -> Issue:

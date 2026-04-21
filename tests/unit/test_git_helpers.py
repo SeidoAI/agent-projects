@@ -3,7 +3,7 @@
 import subprocess
 from pathlib import Path
 
-from keel.core.git_helpers import (
+from tripwire.core.git_helpers import (
     branch_exists,
     worktree_add,
     worktree_is_dirty,
@@ -57,10 +57,10 @@ class TestBranchExists:
 
 class TestWorktreePathForSession:
     def test_path_convention(self, tmp_path):
-        clone = tmp_path / "projects" / "keel"
+        clone = tmp_path / "projects" / "tripwire"
         clone.mkdir(parents=True)
         result = worktree_path_for_session(clone, "api-endpoints")
-        assert result == clone.resolve().parent / "keel-wt-api-endpoints"
+        assert result == clone.resolve().parent / "tripwire-wt-api-endpoints"
 
     def test_name_suffix(self, tmp_path):
         clone = tmp_path / "myrepo"

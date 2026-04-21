@@ -3,7 +3,7 @@
 ## Context
 
 Command-and-control centre for the agent development platform. Local
-development tool (localhost only). Part of the `keel` package — lives
+development tool (localhost only). Part of the `tripwire` package — lives
 at `src/keel/ui/` alongside `keel.core` and `keel.cli`.
 
 **Tech stack**: React 19, TypeScript 5.8, Vite 7, Tailwind CSS v4,
@@ -12,7 +12,7 @@ Backend: FastAPI (Python), imported directly from `keel.core`.
 
 **Source-of-truth principle**: All customisable data — enums, templates,
 orchestration patterns, artifact manifests, skills — comes from the
-project repo, not from the keel package. The UI is purely a visualizer
+project repo, not from the tripwire package. The UI is purely a visualizer
 and command surface; it never owns config.
 
 ---
@@ -37,8 +37,8 @@ and WebSocket events are defined but stubbed.
 ### For new users — zero config
 
 ```bash
-pip install keel          # installs everything including UI
-keel ui                   # starts dashboard, opens browser
+pip install tripwire          # installs everything including UI
+tripwire ui                   # starts dashboard, opens browser
 ```
 
 What happens:
@@ -47,19 +47,19 @@ What happens:
 3. Browser opens automatically
 4. Auto-discovers projects — scans for `project.yaml` in:
    - Current directory
-   - `~/.keel/config.yaml` configured roots (if file exists)
+   - `~/.tripwire/config.yaml` configured roots (if file exists)
    - Common locations: `~/Code/**/project.yaml` (shallow, max 2 levels)
 5. One project found → go straight to it
 6. Multiple → project switcher
-7. None → "No projects found" with instructions to run `keel init`
+7. None → "No projects found" with instructions to run `tripwire init`
 
-If keel was installed with `pip install keel[projects]` (minimal),
-`keel ui` prints: "UI requires the full keel install. Run: pip install keel"
+If tripwire was installed with `pip install tripwire[projects]` (minimal),
+`tripwire ui` prints: "UI requires the full tripwire install. Run: pip install tripwire"
 
 ### Configuration (optional)
 
 ```yaml
-# ~/.keel/config.yaml
+# ~/.tripwire/config.yaml
 project_roots:
   - ~/Code/seido/projects
   - ~/Code/other-org/projects
@@ -71,7 +71,7 @@ open_browser: true
 ### CLI
 
 ```
-keel ui
+tripwire ui
   --project-dir TEXT    Open directly to this project [default: auto-discover]
   --port INT            Port [default: 8000]
   --no-browser          Don't auto-open browser
@@ -81,10 +81,10 @@ keel ui
 ### For UI developers
 
 ```bash
-cd src/keel/ui/frontend   # React source (within the keel repo)
+cd src/keel/ui/frontend   # React source (within the tripwire repo)
 npm install && npm run dev        # Vite :3000, proxies /api → :8000
 # Separate terminal:
-keel ui --dev             # FastAPI backend on :8000 with auto-reload
+tripwire ui --dev             # FastAPI backend on :8000 with auto-reload
 ```
 
 ### Packaging
@@ -110,7 +110,7 @@ if not dev_mode:
 - **keel.core** imported directly (same package)
 - **Docker CLI** via subprocess for container management (v2)
 - **`gh` CLI** via subprocess for GitHub API (v2)
-- **SQLite** for message storage (`~/.keel/messages.db`) (v2)
+- **SQLite** for message storage (`~/.tripwire/messages.db`) (v2)
 - **watchdog** for filesystem monitoring
 - **uvicorn** as ASGI server
 
@@ -120,7 +120,7 @@ if not dev_mode:
 src/keel/ui/
 ├── __init__.py
 ├── server.py                  # FastAPI app, lifespan, static file serving
-├── config.py                  # Load ~/.keel/config.yaml
+├── config.py                  # Load ~/.tripwire/config.yaml
 ├── dependencies.py            # FastAPI Depends() — project context, services
 │
 ├── routes/
@@ -193,7 +193,7 @@ async def list_issues(project: ProjectContext = Depends(get_project)):
 - `get_stats(id)` → `docker stats <id> --no-stream --format json`
 - `get_logs(id, tail)` → `docker logs <id> --tail N`
 - `stop(id)` → `docker stop <id>`
-- `launch(session_id, project_dir)` → delegates to `keel-containers launch`
+- `launch(session_id, project_dir)` → delegates to `tripwire-containers launch`
 
 **GitHubService** — `gh` CLI via subprocess:
 - `list_prs(repo, head?)` → `gh pr list --repo R --json ...`
@@ -492,7 +492,7 @@ POST /api/containers/:id/terminal          → open a terminal tab via the confi
 POST /api/containers/cleanup               → remove stopped
 ```
 
-The backend uses the terminal launcher configured in `~/.keel-containers/config.yaml` (`iterm`, `terminal`, `ghostty`, `alacritty`, `kitty`, `wezterm`, `tmux`, `none`, or a fully custom command). Because this is a localhost dev tool, the launcher runs on the same machine as the user.
+The backend uses the terminal launcher configured in `~/.tripwire-containers/config.yaml` (`iterm`, `terminal`, `ghostty`, `alacritty`, `kitty`, `wezterm`, `tmux`, `none`, or a fully custom command). Because this is a localhost dev tool, the launcher runs on the same machine as the user.
 
 ### Messages
 ```
@@ -729,14 +729,14 @@ A user can manually trigger a review via `POST /api/projects/:id/pm-reviews/:pr-
 
 ### Message storage
 
-- SQLite at `~/.keel/messages.db` (hot store)
+- SQLite at `~/.tripwire/messages.db` (hot store)
 - On session complete: finalize to `sessions/<id>/messages.yaml` in project repo (permanent audit trail)
 
 ---
 
 ## 10. Package Structure
 
-The UI lives within the keel monorepo. The Python backend is at
+The UI lives within the tripwire monorepo. The Python backend is at
 `src/keel/ui/`. The React frontend source is at `src/keel/ui/frontend/`
 and builds to `src/keel/ui/static/` (git-ignored).
 
@@ -744,7 +744,7 @@ and builds to `src/keel/ui/static/` (git-ignored).
 src/keel/ui/
 ├── __init__.py
 ├── server.py                          # FastAPI app, lifespan, static serving
-├── config.py                          # Load ~/.keel/config.yaml
+├── config.py                          # Load ~/.tripwire/config.yaml
 ├── dependencies.py                    # FastAPI Depends() — project context
 │
 ├── routes/                            # one file per resource

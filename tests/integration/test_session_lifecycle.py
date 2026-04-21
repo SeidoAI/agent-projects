@@ -3,10 +3,10 @@
 Exercises the new primitives end-to-end through the CLI:
 - scaffold a session manually (simulating what /pm-session-create does)
 - derive the canonical branch name
-- keel session check surfaces the missing handoff.yaml
+- tripwire session check surfaces the missing handoff.yaml
 - add handoff.yaml (simulating /pm-session-create stamp)
-- keel session check passes
-- keel validate --strict passes (handoff required at queued, so we
+- tripwire session check passes
+- tripwire validate --strict passes (handoff required at queued, so we
   keep status=planned — launching would be a write operation the CLI
   doesn't do yet in v0.6a; /pm-session-queue's work lives in the
   slash-command body)
@@ -20,7 +20,7 @@ from pathlib import Path
 
 def _run_keel(cwd: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        ["uv", "run", "keel", *args],
+        ["uv", "run", "tripwire", *args],
         cwd=cwd,
         capture_output=True,
         text=True,
@@ -64,7 +64,7 @@ repos: []
         "# Verification\n", encoding="utf-8"
     )
 
-    # Derive the branch name. Session keys from `keel next-key --type
+    # Derive the branch name. Session keys from `tripwire next-key --type
     # session` look like 'TST-S1' (uppercase); derive lowercases the
     # slug to match branch convention.
     derive = _run_keel(tmp_path_project, "session", "derive-branch", session_id)
@@ -99,7 +99,7 @@ last_verification_passed_at: null
     assert check_ok.returncode == 0, check_ok.stdout + check_ok.stderr
     assert "launch-ready" in check_ok.stdout.lower()
 
-    # keel validate should pass (session is in planned status, handoff
+    # tripwire validate should pass (session is in planned status, handoff
     # isn't required yet, but schema is valid).
     validate = _run_keel(tmp_path_project, "validate", "--strict")
     # We don't insist on exit 0 because the freshly-scaffolded project

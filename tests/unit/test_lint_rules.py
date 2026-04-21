@@ -1,9 +1,9 @@
-"""Per-rule tests for keel lint project-only rules (v0.6a)."""
+"""Per-rule tests for tripwire lint project-only rules (v0.6a)."""
 
 from datetime import datetime, timedelta, timezone
 
-from keel.core import lint_rules  # noqa: F401 — registers rules
-from keel.core.linter import Linter
+from tripwire.core import lint_rules  # noqa: F401 — registers rules
+from tripwire.core.linter import Linter
 
 
 class TestGapAnalysisRowDensity:

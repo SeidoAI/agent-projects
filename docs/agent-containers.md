@@ -4,7 +4,7 @@
 
 This is the execution layer of the agent development platform, living
 at `src/keel/containers/` within the keel package. Installed as part
-of `pip install keel`. See `overarching-plan.md` for how it fits with
+of `pip install tripwire`. See `overarching-plan.md` for how it fits with
 `keel.core` (data) and `keel.ui` (visibility).
 
 Core responsibility: launch containerised agents that work autonomously, with strict egress, persisted state, and automated re-engagement when feedback arrives.
@@ -268,7 +268,7 @@ jobs:
         if: steps.parse.outputs.is_agent == 'true'
         run: |
           # Find the session for this issue key in the project repo
-          # Call keel session re-engage
+          # Call tripwire session re-engage
           # Call keel-containers launch to restart the agent
 
           # For now, post to PR as a structured comment
@@ -327,7 +327,7 @@ jobs:
         run: |
           echo "Re-engaging agent for ${{ steps.parse.outputs.issue_key }}"
           echo "Review: ${{ steps.review.outputs.body }}"
-          # keel session re-engage <session-id> --trigger human_review_changes --context "..."
+          # tripwire session re-engage <session-id> --trigger human_review_changes --context "..."
           # keel-containers launch <session-id>
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -345,7 +345,7 @@ Event: CI failure on agent branch
     1. Read CI failure output from GitHub API
     2. Find session for this issue key
     3. Write re-engagement context file
-    4. Call: keel session re-engage <id> --trigger ci_failure --context-file <path>
+    4. Call: tripwire session re-engage <id> --trigger ci_failure --context-file <path>
     5. Call: keel-containers launch <id>
     6. Update session status: re_engaged
 
@@ -355,7 +355,7 @@ Event: Verifier submits "request-changes" review
     2. Read verified.md if created (FAIL result)
     3. Find session for this issue key
     4. Write re-engagement context with failed criteria
-    5. Call: keel session re-engage <id> --trigger verifier_rejection --context-file <path>
+    5. Call: tripwire session re-engage <id> --trigger verifier_rejection --context-file <path>
     6. Call: keel-containers launch <id>
 
 Event: Human submits "request-changes" review
@@ -363,7 +363,7 @@ Event: Human submits "request-changes" review
     1. Read review comments from GitHub API
     2. Find session for this issue key
     3. Write re-engagement context with review comments
-    4. Call: keel session re-engage <id> --trigger human_review_changes --context-file <path>
+    4. Call: tripwire session re-engage <id> --trigger human_review_changes --context-file <path>
     5. Call: keel-containers launch <id>
 
 Event: Deploy to test fails
@@ -372,7 +372,7 @@ Event: Deploy to test fails
     2. Find all sessions whose PRs were in this deploy
     3. For each: write re-engagement context, re-engage, re-launch
 
-Event: keel node check finds stale nodes
+Event: tripwire node check finds stale nodes
   PM action:
     1. Find sessions referencing stale nodes (via graph index)
     2. For active/waiting sessions: write stale_reference context
@@ -479,7 +479,7 @@ docker volume rm vol-api-endpoints-core  # only after session marked completed
 
 `keel-containers` ships **no skills**. Every skill an agent reads comes from the project repo's `.claude/skills/` directory at container launch time. There is no "packaged default skill" baked into the runtime image.
 
-How skills get into the project repo: the `keel` package ships them as defaults under `templates/skills/`. `keel init` copies the entire `templates/skills/` tree into the new project's `.claude/skills/`. After init, the project owns them — they are committed to git, version-controlled, auditable, and freely editable per project. Two projects can have completely different rules for messaging, both fully under their own control.
+How skills get into the project repo: the `keel` package ships them as defaults under `templates/skills/`. `tripwire init` copies the entire `templates/skills/` tree into the new project's `.claude/skills/`. After init, the project owns them — they are committed to git, version-controlled, auditable, and freely editable per project. Two projects can have completely different rules for messaging, both fully under their own control.
 
 ### `setup_skills()` — workspace.py
 
@@ -503,7 +503,7 @@ def setup_skills(workspace_dir: Path, project_dir: Path, agent: AgentDefinition)
         if not src.exists():
             raise ConfigError(
                 f"Skill '{skill_name}' not found at {src}. "
-                f"Run 'keel init' to install default skills, "
+                f"Run 'tripwire init' to install default skills, "
                 f"or add it manually to .claude/skills/."
             )
         copy_tree(src, workspace_skills_dir / skill_name)
@@ -514,7 +514,7 @@ def setup_skills(workspace_dir: Path, project_dir: Path, agent: AgentDefinition)
 - **Default for every agent**: `["agent-messaging"]` — loaded regardless of what the agent definition says, so every container can talk to the human via the MCP messaging server.
 - **Per-agent**: whatever is listed in `agent.context.skills` — typical examples are `backend-development`, `frontend-development`, `verification`, `project-manager`.
 
-If a required skill is missing from `<project>/.claude/skills/`, `setup_skills()` raises a `ConfigError` with a hint to run `keel init`. The container does not start with missing skills.
+If a required skill is missing from `<project>/.claude/skills/`, `setup_skills()` raises a `ConfigError` with a hint to run `tripwire init`. The container does not start with missing skills.
 
 ---
 
@@ -903,7 +903,7 @@ keel-containers/
 │           └── entrypoint-custom.sh.j2
 ├── mcp_server/                       # Runtime binary that runs INSIDE the container.
 │   └── agent_messaging.py            #   The skill that teaches its use ships in the
-│                                     #   keel templates, NOT here.
+│                                     #   tripwire templates, NOT here.
 ├── scripts/
 │   └── agent-msg                    # Fallback shell script (curl wrapper)
 ├── docker/

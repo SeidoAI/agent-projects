@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from keel.core.freshness import (
+from tripwire.core.freshness import (
     HASH_PREFIX,
     _read_local,
     _slice_lines,
@@ -20,13 +20,13 @@ from keel.core.freshness import (
     fetch_content,
     hash_content,
 )
-from keel.models import (
+from tripwire.models import (
     ConceptNode,
     NodeSource,
     ProjectConfig,
     RepoEntry,
 )
-from keel.models.graph import FreshnessStatus
+from tripwire.models.graph import FreshnessStatus
 
 
 class TestHashContent:

@@ -1,4 +1,4 @@
-"""Integration tests for `keel scaffold-for-creation`.
+"""Integration tests for `tripwire scaffold-for-creation`.
 
 Verifies both output formats against:
 - A freshly-init'd v0 project (minimal state, no optional templates)
@@ -16,7 +16,7 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from keel.cli.main import cli
+from tripwire.cli.main import cli
 
 
 @pytest.fixture
@@ -194,7 +194,7 @@ class TestScaffoldText:
         result = runner.invoke(
             cli, ["scaffold-for-creation", "--project-dir", str(target)]
         )
-        assert "keel validate --strict" in result.output
+        assert "tripwire validate --strict" in result.output
 
     def test_id_allocation_instructions_present(
         self, runner: CliRunner, tmp_path: Path
@@ -204,7 +204,7 @@ class TestScaffoldText:
         result = runner.invoke(
             cli, ["scaffold-for-creation", "--project-dir", str(target)]
         )
-        assert "keel next-key --type issue" in result.output
+        assert "tripwire next-key --type issue" in result.output
         assert "uuid4" in result.output
         assert "Do NOT hand-write UUIDs" in result.output
 

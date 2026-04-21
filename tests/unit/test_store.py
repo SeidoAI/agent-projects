@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from keel.core.store import (
+from tripwire.core.store import (
     ProjectNotFoundError,
     issue_exists,
     list_issues,
@@ -19,7 +19,7 @@ from keel.core.store import (
     save_issue,
     save_project,
 )
-from keel.models import Comment, Issue, ProjectConfig, RepoEntry
+from tripwire.models import Comment, Issue, ProjectConfig, RepoEntry
 
 
 @pytest.fixture
@@ -236,7 +236,7 @@ class TestCacheInvalidationOnSave:
     the graph cache consistent with what's on disk."""
 
     def test_save_issue_updates_graph_cache(self, project_dir: Path) -> None:
-        from keel.core.graph_cache import load_index
+        from tripwire.core.graph_cache import load_index
 
         issue = Issue(
             id="TST-42",
@@ -256,7 +256,7 @@ class TestCacheInvalidationOnSave:
     def test_save_issue_with_update_cache_false_does_not_touch_cache(
         self, project_dir: Path
     ) -> None:
-        from keel.core.graph_cache import load_index
+        from tripwire.core.graph_cache import load_index
 
         issue = Issue(
             id="TST-99",

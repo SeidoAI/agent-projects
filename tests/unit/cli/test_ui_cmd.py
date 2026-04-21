@@ -1,4 +1,4 @@
-"""Tests for keel.cli.ui — the `keel ui` subcommand."""
+"""Tests for tripwire.cli.ui — the `tripwire ui` subcommand."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from keel.cli.main import cli
+from tripwire.cli.main import cli
 
 runner = CliRunner()
 
@@ -31,8 +31,8 @@ class TestGracefulDegradation:
         ):
             result = runner.invoke(cli, ["ui"])
         assert result.exit_code == 1
-        assert "full keel install" in result.output
-        assert "pip install keel" in result.output
+        assert "full tripwire install" in result.output
+        assert "pip install tripwire" in result.output
 
     def test_missing_uvicorn_prints_helpful_message(self):
         with patch(
@@ -41,19 +41,19 @@ class TestGracefulDegradation:
         ):
             result = runner.invoke(cli, ["ui"])
         assert result.exit_code == 1
-        assert "full keel install" in result.output
+        assert "full tripwire install" in result.output
 
 
 class TestNoProjects:
     def test_no_projects_found_prints_hint(self, tmp_path: Path):
         with patch(
-            "keel.ui.services.project_service.discover_projects",
+            "tripwire.ui.services.project_service.discover_projects",
             return_value=[],
         ):
             result = runner.invoke(cli, ["ui"])
         assert result.exit_code == 1
         assert "No projects found" in result.output
-        assert "keel init" in result.output
+        assert "tripwire init" in result.output
 
 
 class TestServerLaunch:
@@ -65,7 +65,7 @@ class TestServerLaunch:
         (proj / "project.yaml").write_text(
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        with patch("keel.ui.server.start_server") as mock_start:
+        with patch("tripwire.ui.server.start_server") as mock_start:
             result = runner.invoke(cli, ["ui", "--project-dir", str(proj)])
         assert result.exit_code == 0
         mock_start.assert_called_once()
@@ -81,7 +81,7 @@ class TestServerLaunch:
         (proj / "project.yaml").write_text(
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        with patch("keel.ui.server.start_server") as mock_start:
+        with patch("tripwire.ui.server.start_server") as mock_start:
             result = runner.invoke(
                 cli, ["ui", "--project-dir", str(proj), "--port", "9999"]
             )
@@ -94,7 +94,7 @@ class TestServerLaunch:
         (proj / "project.yaml").write_text(
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        with patch("keel.ui.server.start_server") as mock_start:
+        with patch("tripwire.ui.server.start_server") as mock_start:
             result = runner.invoke(
                 cli,
                 ["ui", "--project-dir", str(proj), "--no-browser", "--dev"],
@@ -110,7 +110,7 @@ def _make_import_blocker(blocked_module: str):
     _real_import = builtins.__import__
 
     def _blocker(name, *args, **kwargs):
-        if name == "keel.ui.server":
+        if name == "tripwire.ui.server":
             exc = ModuleNotFoundError(f"No module named '{blocked_module}'")
             exc.name = blocked_module
             raise exc

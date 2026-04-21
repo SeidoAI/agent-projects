@@ -6,13 +6,13 @@ A single Python package — `keel` — that replaces Linear + Notion + manual ag
 
 | Module | What it does | Install |
 |--------|-------------|---------|
-| **keel.core** + **keel.cli** | Data layer: issues, concept graph, dependencies, status — all as files in git. CLI for validation, status, and atomic operations. | `pip install keel` (or `pip install keel[projects]` for minimal) |
-| **keel.ui** | Visibility layer: web dashboard for projects, issues, graph, live agent status | Included in `pip install keel` |
-| **keel.containers** | Execution layer: containerised Claude Code agents with strict egress, repo isolation | Included in `pip install keel` |
+| **keel.core** + **keel.cli** | Data layer: issues, concept graph, dependencies, status — all as files in git. CLI for validation, status, and atomic operations. | `pip install tripwire` (or `pip install tripwire[projects]` for minimal) |
+| **keel.ui** | Visibility layer: web dashboard for projects, issues, graph, live agent status | Included in `pip install tripwire` |
+| **keel.containers** | Execution layer: containerised Claude Code agents with strict egress, repo isolation | Included in `pip install tripwire` |
 
 ```
-pip install keel              # everything (projects + UI + containers)
-pip install keel[projects]    # minimal: CLI, validator, skills only
+pip install tripwire              # everything (projects + UI + containers)
+pip install tripwire[projects]    # minimal: CLI, validator, skills only
 ```
 
 **The primary user of `keel` is Claude Code with the project-manager skill loaded.** Humans interact with the system *through* the agent, not directly via the CLI. The CLI is intentionally minimal — read commands, validation, and atomic operations only — because agents create issues, nodes, and sessions by writing files directly via their `Write` tool, not by invoking CLI mutation commands. The PM skill (shipped in `templates/skills/project-manager/` and copied to the project repo on init) is the linchpin: it teaches agents how to work with the file layout, schemas, references, and the validation gate.
@@ -20,11 +20,11 @@ pip install keel[projects]    # minimal: CLI, validator, skills only
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                       keel                                  │
-│  pip install keel — one package, three modules              │
+│  pip install tripwire — one package, three modules              │
 │                                                             │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │ keel.ui — React 19 · React Flow · Kanban · Dashboard │   │
-│  │ keel ui — starts FastAPI + serves bundled frontend    │   │
+│  │ tripwire ui — starts FastAPI + serves bundled frontend    │   │
 │  └──────────────────────────────────────────────────────┘   │
 │          reads from ↓                    reads from ↓       │
 │  ┌────────────────────┐  ┌──────────────────────────────┐   │
@@ -45,7 +45,7 @@ This is the central design principle that informs everything else in this docume
 
 **The project repo is the single source of truth for everything customisable** — skills, agent definitions, orchestration patterns, templates, enums, artifact specs, standards, and project config. If an agent reads it, it lives in the project repo.
 
-**`keel` ships defaults that get COPIED into the project repo on init.** The package contains canonical reference templates under `templates/` (skills, agent definitions, enums, orchestration patterns, artifact templates, etc.). `keel init` copies the entire `templates/` tree into the new project. After init, the project owns them — they are version-controlled in git, edited freely, and the package is no longer their source of truth.
+**`keel` ships defaults that get COPIED into the project repo on init.** The package contains canonical reference templates under `templates/` (skills, agent definitions, enums, orchestration patterns, artifact templates, etc.). `tripwire init` copies the entire `templates/` tree into the new project. After init, the project owns them — they are version-controlled in git, edited freely, and the package is no longer their source of truth.
 
 **`keel.containers` is a thin runtime that READS from the project repo.** It ships no skills, no templates, no defaults of its own. When a container launches, it clones the project repo, mounts the relevant skills from `<project>/.claude/skills/`, reads the orchestration pattern from `<project>/orchestration/`, reads enums from `<project>/enums/`, and reads artifact templates from `<project>/templates/artifacts/`. The runtime executes whatever the project repo says.
 
@@ -427,7 +427,7 @@ The UI is the human's primary interface for the entire platform. Key control flo
 - Open iTerm to any container
 - Approve/reject PRs (calls `gh pr merge` or `gh pr close`)
 - Edit issue status (drag-and-drop on Kanban)
-- Launch validation (`keel validate`)
+- Launch validation (`tripwire validate`)
 - View and approve PM agent plans
 - Delete branches, cleanup containers
 
@@ -713,7 +713,7 @@ Status messages have a structured body: `{ state, summary }` where `state` is fr
 When human responds to a blocking message:
 1. Human types response in UI → `POST /api/messages/:id/respond`
 2. UI backend stores response in SQLite
-3. UI backend calls `keel session re-engage <id> --trigger human_response --context "..."`
+3. UI backend calls `tripwire session re-engage <id> --trigger human_response --context "..."`
 4. `keel-containers launch <id>` restarts the container
 5. Agent resumes, calls `check_messages` MCP tool, reads the response
 
@@ -773,7 +773,7 @@ Full implementation details (MCP server code, skill protocol, UI components) in 
 - `sessions/` — agent session definitions (dependency-based parallelism)
 - `.claude/skills/project-manager/` — PM agent skill for generated repos
 
-**CLI:** `keel init`, `issue`, `node`, `refs`, `status`, `graph`, `session`
+**CLI:** `tripwire init`, `issue`, `node`, `refs`, `status`, `graph`, `session`
 
 ---
 
@@ -1004,7 +1004,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 RUN (curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
     dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg) && \
     apt-get update && apt-get install -y gh
-RUN pip install keel
+RUN pip install tripwire
 RUN mkdir -p /workspace/{repo,project,config,docs}
 WORKDIR /workspace/repo
 ```
@@ -1145,7 +1145,7 @@ Why a backend API instead of reading git directly from the frontend:
 - Columns = statuses from project.yaml (configurable)
 - Cards = issues, showing: key, title, priority badge, executor badge, agent name
 - Cards colored by staleness (red border if referencing stale nodes)
-- Drag-and-drop to change status (calls `keel issue update`)
+- Drag-and-drop to change status (calls `tripwire issue update`)
 - Filter by: executor, label, parent epic, assignee
 - Active agent indicator on cards (green dot if a container is working on this issue)
 
@@ -1180,8 +1180,8 @@ Why a backend API instead of reading git directly from the frontend:
   - Delete branch + cleanup (`gh` + `git`)
   - Launch agent session (`keel-containers launch`)
   - Approve plan (merge PR via `gh pr merge`)
-  - Run validation (`keel validate`)
-  - Rebuild graph index (`keel refs rebuild`)
+  - Run validation (`tripwire validate`)
+  - Rebuild graph index (`tripwire refs rebuild`)
 
 ### Package structure
 
@@ -1236,7 +1236,7 @@ keel-ui/
 Phase 1: keel (data layer)
   ├── Python package: models, parser, store, validator, graph, CLI
   ├── Templates: project scaffold, PM agent skill, issue templates
-  └── Deliverable: `pip install keel` works, `keel init` generates projects
+  └── Deliverable: `pip install tripwire` works, `tripwire init` generates projects
 
 Phase 2: keel-containers (execution layer)  ← depends on keel
   ├── Base Docker image with Claude Code + tools

@@ -9,8 +9,8 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from keel.cli.session import session_cmd
-from keel.core.session_store import load_session, save_session
+from tripwire.cli.session import session_cmd
+from tripwire.core.session_store import load_session, save_session
 
 
 def _init_repo(path: Path) -> None:
@@ -82,7 +82,7 @@ class TestSpawnLifecycle:
         assert load_session(tmp_path_project, "lifecycle-test").status == "queued"
 
         # Spawn (with mocked clone resolution)
-        with patch("keel.cli.session._resolve_clone_path", return_value=clone):
+        with patch("tripwire.cli.session._resolve_clone_path", return_value=clone):
             result = runner.invoke(
                 session_cmd, ["spawn", "lifecycle-test", "--project-dir", pdir]
             )

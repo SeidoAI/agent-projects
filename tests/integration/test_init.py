@@ -1,4 +1,4 @@
-"""Integration tests for `keel init`.
+"""Integration tests for `tripwire init`.
 
 These tests exercise the CLI end-to-end via Click's `CliRunner`: they
 invoke the actual command against a tmp directory and assert on the
@@ -15,8 +15,8 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from keel.cli.main import cli
-from keel.core.validator import validate_project
+from tripwire.cli.main import cli
+from tripwire.core.validator import validate_project
 
 
 @pytest.fixture
@@ -141,7 +141,7 @@ class TestInitBasics:
         target = tmp_path / "p"
         runner.invoke(cli, _init_args(target))
         gi = (target / ".gitignore").read_text()
-        assert ".keel.lock" in gi
+        assert ".tripwire.lock" in gi
         assert "graph/.index.lock" in gi
 
     def test_non_interactive_missing_name_uses_target_basename(

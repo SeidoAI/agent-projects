@@ -3,13 +3,13 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from keel.core.handoff_store import (
+from tripwire.core.handoff_store import (
     handoff_exists,
     load_handoff,
     save_handoff,
 )
-from keel.core.paths import handoff_path
-from keel.models.handoff import SessionHandoff
+from tripwire.core.paths import handoff_path
+from tripwire.models.handoff import SessionHandoff
 
 
 def _handoff(session_id: str) -> SessionHandoff:

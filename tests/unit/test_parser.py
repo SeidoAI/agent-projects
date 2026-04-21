@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from keel.core.parser import (
+from tripwire.core.parser import (
     ParseError,
     parse_frontmatter_body,
     serialize_frontmatter_body,

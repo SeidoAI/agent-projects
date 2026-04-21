@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from keel.models.handoff import SessionHandoff, WorkspaceContext
+from tripwire.models.handoff import SessionHandoff, WorkspaceContext
 
 
 def _now():

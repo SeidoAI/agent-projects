@@ -21,8 +21,8 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from keel.cli.main import cli
-from keel.core.parser import serialize_frontmatter_body
+from tripwire.cli.main import cli
+from tripwire.core.parser import serialize_frontmatter_body
 
 
 @pytest.fixture

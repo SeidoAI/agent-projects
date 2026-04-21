@@ -1,4 +1,4 @@
-"""Tests for `_extract_key_prefix` in `keel.cli.init`.
+"""Tests for `_extract_key_prefix` in `tripwire.cli.init`.
 
 The extractor takes a project name and produces a short uppercase
 prefix suitable for issue keys (e.g. `MPC-42`). It splits on common
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from keel.cli.init import KEY_PREFIX_PATTERN, _extract_key_prefix
+from tripwire.cli.init import KEY_PREFIX_PATTERN, _extract_key_prefix
 
 
 @pytest.mark.parametrize(

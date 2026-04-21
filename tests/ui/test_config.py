@@ -1,4 +1,4 @@
-"""Tests for keel.ui.config — UserConfig model + load_user_config()."""
+"""Tests for tripwire.ui.config — UserConfig model + load_user_config()."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from keel.ui.config import UserConfig, load_user_config
+from tripwire.ui.config import UserConfig, load_user_config
 
 
 class TestUserConfigDefaults:
@@ -62,7 +62,7 @@ class TestLoadUserConfig:
     ):
         f = tmp_path / "config.yaml"
         f.write_text(":\n  - :\n  bad: [yaml", encoding="utf-8")
-        with caplog.at_level(logging.WARNING, logger="keel.ui.config"):
+        with caplog.at_level(logging.WARNING, logger="tripwire.ui.config"):
             cfg = load_user_config(f)
         assert cfg == UserConfig()
         assert "Invalid YAML" in caplog.text
@@ -72,7 +72,7 @@ class TestLoadUserConfig:
     ):
         f = tmp_path / "config.yaml"
         f.write_text("port: abc\n", encoding="utf-8")
-        with caplog.at_level(logging.WARNING, logger="keel.ui.config"):
+        with caplog.at_level(logging.WARNING, logger="tripwire.ui.config"):
             cfg = load_user_config(f)
         assert cfg == UserConfig()
         assert "Invalid config" in caplog.text
@@ -82,7 +82,7 @@ class TestLoadUserConfig:
     ):
         f = tmp_path / "config.yaml"
         f.write_text("port: 99999\n", encoding="utf-8")
-        with caplog.at_level(logging.WARNING, logger="keel.ui.config"):
+        with caplog.at_level(logging.WARNING, logger="tripwire.ui.config"):
             cfg = load_user_config(f)
         assert cfg == UserConfig()
         assert "Invalid config" in caplog.text
@@ -93,7 +93,7 @@ class TestLoadUserConfig:
         missing = tmp_path / "does-not-exist"
         f = tmp_path / "config.yaml"
         f.write_text(f"project_roots:\n  - {missing}\n", encoding="utf-8")
-        with caplog.at_level(logging.WARNING, logger="keel.ui.config"):
+        with caplog.at_level(logging.WARNING, logger="tripwire.ui.config"):
             cfg = load_user_config(f)
         assert missing in cfg.project_roots
         assert "project root does not exist" in caplog.text
@@ -103,13 +103,13 @@ class TestLoadUserConfig:
     ):
         f = tmp_path / "config.yaml"
         f.write_text("- just\n- a\n- list\n", encoding="utf-8")
-        with caplog.at_level(logging.WARNING, logger="keel.ui.config"):
+        with caplog.at_level(logging.WARNING, logger="tripwire.ui.config"):
             cfg = load_user_config(f)
         assert cfg == UserConfig()
         assert "Expected a YAML mapping" in caplog.text
 
     def test_default_path_resolves_to_home(self):
-        """load_user_config(None) should target ~/.keel/config.yaml."""
+        """load_user_config(None) should target ~/.tripwire/config.yaml."""
         # We just verify it doesn't crash — the file likely doesn't exist
         cfg = load_user_config()
         assert isinstance(cfg, UserConfig)

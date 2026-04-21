@@ -1,4 +1,4 @@
-"""keel workspace merge-resolve: finalize an agent-resolved merge."""
+"""tripwire workspace merge-resolve: finalize an agent-resolved merge."""
 
 import subprocess
 from pathlib import Path
@@ -6,11 +6,11 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from keel.cli.workspace import workspace_cmd
-from keel.core.merge_brief import (
+from tripwire.cli.workspace import workspace_cmd
+from tripwire.core.merge_brief import (
     list_pending_briefs,
 )
-from keel.core.paths import workspace_nodes_dir
+from tripwire.core.paths import workspace_nodes_dir
 
 
 def _git_commit_all(repo: Path, message: str) -> str:
@@ -81,7 +81,7 @@ tags: []
         )
 
         # Project edit.
-        from keel.core.node_store import load_node, save_node
+        from tripwire.core.node_store import load_node, save_node
 
         node = load_node(proj_dir, "auth-system")
         save_node(
@@ -124,7 +124,7 @@ class TestMergeResolve:
         _ws_dir, proj_dir, node_id, head_sha = pull_produced_conflict(tmp_path)
 
         # Simulate agent resolving: edit node file to a combined description.
-        from keel.core.node_store import load_node, save_node
+        from tripwire.core.node_store import load_node, save_node
 
         node = load_node(proj_dir, node_id)
         resolved = node.model_copy(
@@ -166,7 +166,7 @@ class TestMergeResolve:
         _ws_dir, proj_dir, node_id, _head = pull_produced_conflict(tmp_path)
 
         # Corrupt the node file so Pydantic validation fails on load.
-        from keel.core.paths import node_path
+        from tripwire.core.paths import node_path
 
         node_path(proj_dir, node_id).write_text(
             "---\nuuid: not-a-valid-uuid\nid: auth-system\n---\n",

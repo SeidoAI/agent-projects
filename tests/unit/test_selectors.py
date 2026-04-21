@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from keel.core.selectors import (
+from tripwire.core.selectors import (
     _DOWNSTREAM_RE,
     _TAG_RE,
     _UPSTREAM_RE,

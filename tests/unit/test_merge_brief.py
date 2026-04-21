@@ -1,6 +1,6 @@
 """Merge brief generator: structured output for agent mediation."""
 
-from keel.core.merge_brief import (
+from tripwire.core.merge_brief import (
     MergeType,
     build_merge_brief,
     delete_merge_brief,

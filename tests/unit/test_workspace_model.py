@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from keel.models.workspace import Workspace, WorkspaceProjectEntry
+from tripwire.models.workspace import Workspace, WorkspaceProjectEntry
 
 
 def _now():
@@ -20,7 +20,7 @@ def _minimal_workspace(**kwargs):
         "slug": "seido",
         "description": "",
         "schema_version": 1,
-        "keel_version": "0.6.0",
+        "tripwire_version": "0.6.0",
         "created_at": _now(),
         "updated_at": _now(),
     }

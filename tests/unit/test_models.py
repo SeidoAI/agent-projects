@@ -16,7 +16,7 @@ from uuid import UUID
 
 import pytest
 
-from keel.models import (
+from tripwire.models import (
     AgentSession,
     ArtifactSpec,
     Comment,
@@ -311,26 +311,26 @@ class TestAgentSession:
 
 class TestRuntimeStateExtended:
     def test_worktree_entry_roundtrip(self) -> None:
-        from keel.models.session import WorktreeEntry
+        from tripwire.models.session import WorktreeEntry
 
         entry = WorktreeEntry(
-            repo="SeidoAI/keel",
-            clone_path="/home/user/keel",
-            worktree_path="/home/user/keel-wt-api-endpoints",
+            repo="SeidoAI/tripwire",
+            clone_path="/home/user/tripwire",
+            worktree_path="/home/user/tripwire-wt-api-endpoints",
             branch="feat/api-endpoints",
         )
-        assert entry.repo == "SeidoAI/keel"
+        assert entry.repo == "SeidoAI/tripwire"
         assert entry.branch == "feat/api-endpoints"
 
     def test_runtime_state_with_worktrees(self) -> None:
-        from keel.models.session import RuntimeState, WorktreeEntry
+        from tripwire.models.session import RuntimeState, WorktreeEntry
 
         rs = RuntimeState(
             worktrees=[
                 WorktreeEntry(
-                    repo="SeidoAI/keel",
-                    clone_path="/tmp/keel",
-                    worktree_path="/tmp/keel-wt-test",
+                    repo="SeidoAI/tripwire",
+                    clone_path="/tmp/tripwire",
+                    worktree_path="/tmp/tripwire-wt-test",
                     branch="feat/test",
                 )
             ],
@@ -344,7 +344,7 @@ class TestRuntimeStateExtended:
         assert rs.log_path == "/tmp/test.log"
 
     def test_runtime_state_defaults_empty(self) -> None:
-        from keel.models.session import RuntimeState
+        from tripwire.models.session import RuntimeState
 
         rs = RuntimeState()
         assert rs.worktrees == []

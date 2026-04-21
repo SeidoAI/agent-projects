@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from keel.models.node import ConceptNode
+from tripwire.models.node import ConceptNode
 
 
 def _base_node(**overrides):

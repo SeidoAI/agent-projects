@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from keel.core.status import (
+from tripwire.core.status import (
     is_status_reachable,
     is_transition_allowed,
     reachable_statuses,
 )
-from keel.models import ProjectConfig
+from tripwire.models import ProjectConfig
 
 
 def make_project(transitions: dict[str, list[str]]) -> ProjectConfig:

@@ -1,4 +1,4 @@
-"""Tests for keel.ui.dependencies — ProjectContext + FastAPI dependencies."""
+"""Tests for tripwire.ui.dependencies — ProjectContext + FastAPI dependencies."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from unittest.mock import patch
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
-from keel.ui.dependencies import (
+from tripwire.ui.dependencies import (
     ProjectContext,
     get_event_queue,
     get_hub,
@@ -57,7 +57,7 @@ class TestGetProject:
         client = TestClient(app)
 
         with patch(
-            "keel.ui.dependencies._resolve_project_dir",
+            "tripwire.ui.dependencies._resolve_project_dir",
             return_value=proj,
         ):
             r = client.get("/test/abc123abc123")
@@ -72,7 +72,7 @@ class TestGetProject:
         client = TestClient(app)
 
         with patch(
-            "keel.ui.dependencies._resolve_project_dir",
+            "tripwire.ui.dependencies._resolve_project_dir",
             return_value=None,
         ):
             r = client.get("/test/deadbeef1234")
@@ -91,7 +91,7 @@ class TestGetProject:
         client = TestClient(app)
 
         with patch(
-            "keel.ui.dependencies._resolve_project_dir",
+            "tripwire.ui.dependencies._resolve_project_dir",
             return_value=proj,
         ):
             r = client.get("/test/abc123abc123")
@@ -110,18 +110,18 @@ class TestGetProject:
 
 class TestResetProjectCache:
     def test_clears_cache(self):
-        from keel.ui.dependencies import _resolve_project_dir
+        from tripwire.ui.dependencies import _resolve_project_dir
 
         # Prime the cache
         with patch(
-            "keel.ui.dependencies.get_project_dir",
+            "tripwire.ui.dependencies.get_project_dir",
             return_value=Path("/fake"),
         ):
             result1 = _resolve_project_dir("test_id")
 
         # Change the underlying return, but cache should still hold
         with patch(
-            "keel.ui.dependencies.get_project_dir",
+            "tripwire.ui.dependencies.get_project_dir",
             return_value=Path("/other"),
         ):
             result2 = _resolve_project_dir("test_id")
@@ -130,7 +130,7 @@ class TestResetProjectCache:
         # Clear and re-resolve
         reset_project_cache()
         with patch(
-            "keel.ui.dependencies.get_project_dir",
+            "tripwire.ui.dependencies.get_project_dir",
             return_value=Path("/other"),
         ):
             result3 = _resolve_project_dir("test_id")

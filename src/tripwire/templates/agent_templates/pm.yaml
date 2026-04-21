@@ -1,0 +1,52 @@
+---
+id: pm
+name: "Project Manager Agent"
+description: "Orchestrates coding agents, reviews project-repo PRs, maintains the concept graph"
+runtime: claude-code
+skill: project-manager
+
+github_identity:
+  username: seido-pm-bot
+  email: pm-bot@example.com
+  token_env: GITHUB_TOKEN_PM
+
+# PM has write access to the project repo (not target repos).
+permissions:
+  github: read-write
+  gcp: none
+  network:
+    - "github.com"
+    - "api.github.com"
+resources:
+  memory: "4Gi"
+  cpus: 2
+tools:
+  - git
+  - gh
+  - tripwire
+
+context:
+  skills:
+    - project-manager
+    - agent-messaging
+  docs:
+    - docs
+  mcp_servers:
+    - agent-messaging
+
+# PM-specific orchestration capabilities.
+orchestration:
+  can_launch_agents: true
+  max_concurrent_agents: 4
+  auto_launch_on_status:
+    - trigger: "issue moved to todo"
+      action: "assign to matching agent, add to next session"
+    - trigger: "PR opened"
+      action: "launch verifier agent"
+    - trigger: "verifier approved"
+      action: "notify human for review"
+    - trigger: "CI failed on PR"
+      action: "re-engage coding agent with failure context"
+
+multi_ticket: false
+---

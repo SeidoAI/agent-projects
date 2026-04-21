@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from keel.core.key_allocator import KeyAllocationError, allocate_keys
+from tripwire.core.key_allocator import KeyAllocationError, allocate_keys
 
 
 @pytest.fixture
@@ -148,15 +148,15 @@ class TestStaleLock:
         import os
         import time as _time
 
-        from keel.core.locks import STALE_LOCK_AGE_S, project_lock
+        from tripwire.core.locks import STALE_LOCK_AGE_S, project_lock
 
         # Create a "stale" lock file with an old mtime.
-        lock_path = project_dir / ".keel.lock"
+        lock_path = project_dir / ".tripwire.lock"
         lock_path.touch()
         old_mtime = _time.time() - (STALE_LOCK_AGE_S + 10)
         os.utime(lock_path, (old_mtime, old_mtime))
 
-        caplog.set_level(logging.WARNING, logger="keel.core.locks")
+        caplog.set_level(logging.WARNING, logger="tripwire.core.locks")
 
         with project_lock(project_dir):
             pass  # Acquired without error.

@@ -1,7 +1,7 @@
-"""Concurrent `keel validate --fix` integration test.
+"""Concurrent `tripwire validate --fix` integration test.
 
 The most important safety property of `apply_fixes` is that two concurrent
-`keel validate --fix` invocations can't overwrite each other. This test
+`tripwire validate --fix` invocations can't overwrite each other. This test
 fires 5 parallel subprocesses at a project that has multiple fixable
 issues and confirms every fix landed (no lost writes).
 
@@ -20,8 +20,8 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from keel.cli.main import cli
-from keel.core.parser import parse_frontmatter_body
+from tripwire.cli.main import cli
+from tripwire.core.parser import parse_frontmatter_body
 
 
 @pytest.fixture
@@ -96,7 +96,7 @@ def _seed_anchor_node(project_dir: Path) -> None:
 
 
 def _run_fix(project_dir_str: str) -> int:
-    """Run `keel validate --fix` via subprocess.
+    """Run `tripwire validate --fix` via subprocess.
 
     Returns the exit code. We don't care about stdout — we'll inspect
     the files afterwards.
@@ -105,7 +105,7 @@ def _run_fix(project_dir_str: str) -> int:
         [
             sys.executable,
             "-m",
-            "keel.cli.main",
+            "tripwire.cli.main",
             "validate",
             "--fix",
             "--project-dir",
@@ -128,7 +128,7 @@ class TestConcurrentFix:
         self, runner: CliRunner, tmp_path: Path
     ) -> None:
         """Seed 10 issues with missing UUIDs. Fire 5 concurrent
-        `keel validate --fix` processes. Every issue must end up with a
+        `tripwire validate --fix` processes. Every issue must end up with a
         valid UUID — none can be lost to a race between writers."""
         target = tmp_path / "p"
         _init_project(runner, target)

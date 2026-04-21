@@ -1,4 +1,4 @@
-# Plan v2: `keel` — Git-Native Agent Project Management Framework
+# Plan v2: `tripwire` — Git-Native Agent Project Management Framework
 
 ## Context
 
@@ -14,9 +14,9 @@ We're replacing Linear + Notion with a single git-native project management syst
 
 ---
 
-## How keel is used
+## How tripwire is used
 
-`keel` is not primarily a tool for humans typing CLI commands. Its primary user is Claude Code (or a similar agent) loaded with the `project-manager` skill. Humans interact with the system *through* the agent, not directly. This shapes every other decision in the v0 design.
+`tripwire` is not primarily a tool for humans typing CLI commands. Its primary user is Claude Code (or a similar agent) loaded with the `project-manager` skill. Humans interact with the system *through* the agent, not directly. This shapes every other decision in the v0 design.
 
 The first concrete test case is `project-kb-pivot/raw_planning/*.md` — a directory of unstructured planning documents that an agent must transform into a fully scoped project: issues, concept nodes, sessions, decisions, contracts. Until that pipeline works end-to-end, the v0 surface is not done.
 
@@ -24,15 +24,15 @@ The first concrete test case is `project-kb-pivot/raw_planning/*.md` — a direc
 
 - **The PM skill is the most important artifact in the system.** More than the CLI, more than the templates, more than the validator. The skill is what tells the agent how to think about a project, what to read first, what to write, when to validate, and what mistakes to avoid. Investing in the skill pays back on every agent invocation.
 
-- **Direct file writes are the agent's primary creation mechanism.** When the agent needs to create an issue, it does not call `keel issue create`. It reads the schema reference, reads the example file, and uses the `Write` tool to drop a YAML file into `issues/`. The CLI does not stand between the agent and its output.
+- **Direct file writes are the agent's primary creation mechanism.** When the agent needs to create an issue, it does not call `tripwire issue create`. It reads the schema reference, reads the example file, and uses the `Write` tool to drop a YAML file into `issues/`. The CLI does not stand between the agent and its output.
 
 - **The CLI is minimal: read + validate + atomic operations only.** No `issue create`, `node create`, `session create`, `comment add`. Mutation commands are deferred. The 11 v0 commands are: `init`, `scaffold-for-creation`, `next-key`, `validate`, `status`, `graph`, `refs`, `node check`, `templates`, `enums`, `artifacts`. (See the CLI Commands section.)
 
-- **`keel validate` is the gate.** After every batch of agent file writes, the agent runs `validate --strict --format=json`, parses the errors, fixes them, and re-runs until exit code 0. The validator catches ~95% of structural mistakes before they reach a commit. It also rebuilds the graph cache as a side effect, so there is exactly one command and one mental model.
+- **`tripwire validate` is the gate.** After every batch of agent file writes, the agent runs `validate --strict --format=json`, parses the errors, fixes them, and re-runs until exit code 0. The validator catches ~95% of structural mistakes before they reach a commit. It also rebuilds the graph cache as a side effect, so there is exactly one command and one mental model.
 
 - **Templates ship as readable example files, not as CLI generator inputs.** The PM skill points the agent at `examples/issue-fully-formed.yaml`, `examples/node-endpoint.yaml`, etc. The agent reads them, learns the shape, and produces files that match. There is no `--template default` flag the agent has to remember.
 
-- **`keel` is fully standalone first-class.** Useful and polished before anyone touches `keel-containers` or `keel-ui`. The verification target (`project-kb-pivot`) only requires the CLI, the skill, and Claude Code — no orchestration runtime, no UI, no containers. The other layers come later, after v0 ships and the verification passes.
+- **`tripwire` is fully standalone first-class.** Useful and polished before anyone touches `tripwire-containers` or `keel-ui`. The verification target (`project-kb-pivot`) only requires the CLI, the skill, and Claude Code — no orchestration runtime, no UI, no containers. The other layers come later, after v0 ships and the verification passes.
 
 The rest of this document describes the data model, CLI surface, validator, ID system, and skill structure with this primary use case in mind.
 
@@ -40,8 +40,8 @@ The rest of this document describes the data model, CLI surface, validator, ID s
 
 ## Decisions
 
-- **Package name**: `keel` (generic, not Seido-branded)
-- **CLI command**: `keel`
+- **Package name**: `tripwire` (generic, not Seido-branded)
+- **CLI command**: `tripwire`
 - **File format**: YAML frontmatter + Markdown body (`.yaml` extension, `---` separator)
 - **Status flow**: Full 9-status flow as default, configurable per project
 - **Build system**: `hatchling` (matches existing ecosystem)
@@ -73,7 +73,7 @@ The Pydantic models add a `uuid: UUID = Field(default_factory=uuid.uuid4)` field
 ### Generation rules
 
 - **UUIDs**: agents generate their own (uuid4) when drafting a file. No CLI call is needed. Two agents picking the same UUID is astronomically unlikely (~2^122 collision space). This avoids any race condition or coordination between concurrent agents.
-- **Sequential keys**: agents call `keel next-key --type issue` once per new issue (or `--type session`). The CLI takes a file lock on `project.yaml`, reads `next_issue_number`, increments and writes back, releases the lock, and returns the allocated key on stdout. This is atomic across concurrent callers on the same machine.
+- **Sequential keys**: agents call `tripwire next-key --type issue` once per new issue (or `--type session`). The CLI takes a file lock on `project.yaml`, reads `next_issue_number`, increments and writes back, releases the lock, and returns the allocated key on stdout. This is atomic across concurrent callers on the same machine.
 
 ### Conflict resolution
 
@@ -164,7 +164,7 @@ The concept graph is not maintained by humans. It's maintained by agents as part
 - Updates existing nodes if it modified referenced code (rehash)
 
 **PM agent** (during update workflow — already defined in the current skill):
-- Runs `keel node check` to detect stale nodes after an issue completes
+- Runs `tripwire node check` to detect stale nodes after an issue completes
 - Updates node `source` fields when code has moved
 - Rehashes content after updates
 - Identifies downstream issues that reference changed nodes
@@ -215,25 +215,25 @@ keels/                          # /Users/maia/Code/seido/projects/keels/
 │       │   ├── graph_cache.py           # Incremental graph index cache (v2 schema)
 │       │   └── pm_review.py             # DEFERRED: PM agent PR review checks (deferred from v0)
 │       │   #
-│       │   # NOTE: the orchestration RUNTIME lives in the keel-containers package
+│       │   # NOTE: the orchestration RUNTIME lives in the tripwire-containers package
 │       │   # (`keel_containers/core/orchestration.py`), NOT here. The keel
 │       │   # package owns the data models and CLI for managing patterns; the runtime
-│       │   # that reads patterns and dispatches actions ships with keel-containers.
+│       │   # that reads patterns and dispatches actions ships with tripwire-containers.
 │       │
 │       ├── cli/                         # Click CLI — v0 surface only (read + atomic ops)
 │       │   ├── __init__.py
 │       │   ├── main.py                  # Root group + global options
-│       │   ├── init.py                  # `keel init` (interactive wizard + flags)
-│       │   ├── scaffold.py              # NEW: `keel scaffold-for-creation`
-│       │   ├── next_key.py              # NEW: `keel next-key` (atomic, file-locked)
-│       │   ├── validate.py              # `keel validate` (the gate; rebuilds cache)
-│       │   ├── status.py                # `keel status`
-│       │   ├── graph.py                 # `keel graph` (dependency + concept)
-│       │   ├── refs.py                  # `keel refs {list,reverse,check}`
-│       │   ├── node.py                  # `keel node check` (read-only freshness)
-│       │   ├── templates.py             # `keel templates {list,show}`
-│       │   ├── enums.py                 # `keel enums {list,show}`
-│       │   └── artifacts.py             # `keel artifacts {list,show}`
+│       │   ├── init.py                  # `tripwire init` (interactive wizard + flags)
+│       │   ├── scaffold.py              # NEW: `tripwire scaffold-for-creation`
+│       │   ├── next_key.py              # NEW: `tripwire next-key` (atomic, file-locked)
+│       │   ├── validate.py              # `tripwire validate` (the gate; rebuilds cache)
+│       │   ├── status.py                # `tripwire status`
+│       │   ├── graph.py                 # `tripwire graph` (dependency + concept)
+│       │   ├── refs.py                  # `tripwire refs {list,reverse,check}`
+│       │   ├── node.py                  # `tripwire node check` (read-only freshness)
+│       │   ├── templates.py             # `tripwire templates {list,show}`
+│       │   ├── enums.py                 # `tripwire enums {list,show}`
+│       │   └── artifacts.py             # `tripwire artifacts {list,show}`
 │       │   #
 │       │   # DEFERRED (not in v0): cli/issue.py mutation (create/update),
 │       │   # cli/session.py mutation (create/update/re-engage), cli/pm.py (review-pr),
@@ -367,9 +367,9 @@ keels/                          # /Users/maia/Code/seido/projects/keels/
 
 ## Data Model
 
-### Generated Project Directory (output of `keel init`)
+### Generated Project Directory (output of `tripwire init`)
 
-`keel init` copies the entire `templates/` tree from the package into the new project, with template substitution for project name, key prefix, etc. After init, the **project repo is the source of truth** — the `keel` package is no longer canonical for these files. The user owns them, edits them freely, and commits them to git.
+`tripwire init` copies the entire `templates/` tree from the package into the new project, with template substitution for project name, key prefix, etc. After init, the **project repo is the source of truth** — the `tripwire` package is no longer canonical for these files. The user owns them, edits them freely, and commits them to git.
 
 ```
 my-project/
@@ -403,15 +403,15 @@ my-project/
 └── .gitignore
 ```
 
-**Principle: the project repo is the source of truth.** Every Enum, schema, template, skill, orchestration pattern, and rule that ships with `keel` is a **default reference** that gets copied into the user's project on `init`. After that, the package is no longer canonical — the project repo is. Two projects can have completely different rules for messaging, completely different artifact sets, completely different orchestration patterns, all fully under their own control and version-controlled.
+**Principle: the project repo is the source of truth.** Every Enum, schema, template, skill, orchestration pattern, and rule that ships with `tripwire` is a **default reference** that gets copied into the user's project on `init`. After that, the package is no longer canonical — the project repo is. Two projects can have completely different rules for messaging, completely different artifact sets, completely different orchestration patterns, all fully under their own control and version-controlled.
 
-**`keel init --update`** pulls upstream changes from the package's `templates/` into the project selectively, never overwriting user edits without confirmation. This is the upgrade path for projects that want to track new defaults as the package evolves.
+**`tripwire init --update`** pulls upstream changes from the package's `templates/` into the project selectively, never overwriting user edits without confirmation. This is the upgrade path for projects that want to track new defaults as the package evolves.
 
-`keel templates list` and `keel templates show <name>` let users explore what ships in the package without leaving the CLI.
+`tripwire templates list` and `tripwire templates show <name>` let users explore what ships in the package without leaving the CLI.
 
 ### Enums (customisable per project)
 
-Enums are not hardcoded Python `StrEnum` classes. They are YAML files in the project repo at `<project>/enums/<name>.yaml`, copied from packaged defaults at `templates/enums/` on `keel init`. After init, the project owns its enums and can add states, rename labels, recolor for the UI, or remove states it doesn't use.
+Enums are not hardcoded Python `StrEnum` classes. They are YAML files in the project repo at `<project>/enums/<name>.yaml`, copied from packaged defaults at `templates/enums/` on `tripwire init`. After init, the project owns its enums and can add states, rename labels, recolor for the UI, or remove states it doesn't use.
 
 The Pydantic models load enums dynamically at startup via `core/enum_loader.py`, which reads `<project>/enums/*.yaml` if present and falls back to packaged defaults otherwise.
 
@@ -466,8 +466,8 @@ The complete set of enum files shipped under `templates/enums/`:
 | `node_status.yaml` | Concept node lifecycle (active, planned, deprecated, stale) |
 | `session_status.yaml` | Session lifecycle (planned, active, waiting_for_ci, …, completed, failed) |
 | `re_engagement_trigger.yaml` | Why a session was re-engaged (ci_failure, plan_approved, …) |
-| `message_type.yaml` | MCP message types — gains a new `status` value (see Section: Status Messages in `keel-containers.md`) |
-| `agent_state.yaml` | NEW enum for status messages — see Section: Status Messages in `keel-containers.md` for the full value list (investigating, planning, awaiting_plan_approval, implementing, testing, debugging, refactoring, documenting, self_verifying, blocked, handed_off, done) |
+| `message_type.yaml` | MCP message types — gains a new `status` value (see Section: Status Messages in `tripwire-containers.md`) |
+| `agent_state.yaml` | NEW enum for status messages — see Section: Status Messages in `tripwire-containers.md` for the full value list (investigating, planning, awaiting_plan_approval, implementing, testing, debugging, refactoring, documenting, self_verifying, blocked, handed_off, done) |
 
 The `AgentState` enum is brand new in this design — it powers the structured `status` message body so the UI can show "what is the agent doing right now" without parsing free-form text. Because it ships as `templates/enums/agent_state.yaml`, projects can extend it with their own states.
 
@@ -733,11 +733,11 @@ Edges are not stored as separate files. They are **emergent from the data**:
 
 **Why no edge files:** Edges stored separately from their endpoints create a synchronization problem — the exact problem we're trying to solve. By keeping edges in the entities they belong to, every entity is self-describing. The full graph is reconstructed by scanning all issues and nodes.
 
-The `keel graph` command and the `concept_graph.py` module build the complete graph on demand by scanning everything. For larger projects, an auto-generated index speeds up lookups (see below).
+The `tripwire graph` command and the `concept_graph.py` module build the complete graph on demand by scanning everything. For larger projects, an auto-generated index speeds up lookups (see below).
 
 ### The graph cache — incrementally maintained lookup index
 
-**Problem**: the implicit edge model means every render needs to recompute by scanning every issue and node file. For projects with hundreds of issues this becomes slow, especially for the UI's graph view which renders constantly. Full rebuilds (`keel refs rebuild`) are too expensive to run on every read.
+**Problem**: the implicit edge model means every render needs to recompute by scanning every issue and node file. For projects with hundreds of issues this becomes slow, especially for the UI's graph view which renders constantly. Full rebuilds (`tripwire refs rebuild`) are too expensive to run on every read.
 
 **New approach: incremental cache.** `graph/index.yaml` is committed to git as before, but it is now incrementally updated by the file watcher and CLI commands. Full rebuilds are only needed when the cache is corrupt or missing.
 
@@ -826,13 +826,13 @@ def update_cache_for_file(dir, rel_path):
 
 #### Who triggers updates
 
-1. **`keel validate`** — the primary trigger. Since validate is the gate the agent runs after every batch of writes, the cache is rebuilt as a side effect on every validation pass. In v0 this is the only path the agent needs to know about.
+1. **`tripwire validate`** — the primary trigger. Since validate is the gate the agent runs after every batch of writes, the cache is rebuilt as a side effect on every validation pass. In v0 this is the only path the agent needs to know about.
 2. **File watcher (UI backend, future)** — `watchdog` will trigger incremental rebuilds for any file changed in `issues/`, `graph/nodes/`, `sessions/`. Relevant once the UI exists.
 3. **Future CLI mutation commands** — when deferred commands like `issue create` are added, they will call `update_cache_for_file()` after saving the file. Not relevant in v0.
 
 #### Reads are now O(1)
 
-`keel graph`, the UI's `/api/projects/:id/graph` endpoint, and all `refs *` commands read directly from `graph/index.yaml` without rescanning the project. The result: O(1) graph reads instead of O(N) for N issues + nodes.
+`tripwire graph`, the UI's `/api/projects/:id/graph` endpoint, and all `refs *` commands read directly from `graph/index.yaml` without rescanning the project. The result: O(1) graph reads instead of O(N) for N issues + nodes.
 
 #### Concurrency
 
@@ -1025,7 +1025,7 @@ engagements:
 
 - **`docs: list[str] | None`** — session-level extra docs. Merged with the agent definition's `context.docs` and every issue's `docs` field, deduped by path, and mounted read-only at `/workspace/docs/<path>` in the container.
 
-- **`current_state: str | None`** — the latest agent state from a `status` message (see the Status Messages section in `keel-containers.md`). The orchestration runtime writes this back to the session YAML each time a new status message arrives so the UI can render it without subscribing to the live stream.
+- **`current_state: str | None`** — the latest agent state from a `status` message (see the Status Messages section in `tripwire-containers.md`). The orchestration runtime writes this back to the session YAML each time a new status message arrives so the UI can render it without subscribing to the live stream.
 
 - **`orchestration: { pattern: str, overrides: dict }`** — overrides for the project's default orchestration pattern. The hierarchy is **Project → Session** (just two tiers). `project.yaml` declares `orchestration.default_pattern` plus global flags; the session can either pick a different named pattern (`pattern: strict`) or override individual fields (`overrides: {plan_approval_required: true}`). Session-level fields win — straight field-level override, no deeper merging.
 
@@ -1105,7 +1105,7 @@ sessions/
 
 New CLI command:
 ```
-keel session finalize <session-id>
+tripwire session finalize <session-id>
   --messages-file TEXT   Path to messages JSON (from UI backend SQLite export)
   # Writes messages.yaml to session directory and commits to project repo.
   # Called by UI backend when session completes.
@@ -1357,7 +1357,7 @@ def _fetch_github(repo: str, path: str, lines: tuple[int, int] | None, branch: s
 ```
 
 ### `core/validator.py` — The Validation Gate (engine)
-- Implements the full check catalogue used by `keel validate`
+- Implements the full check catalogue used by `tripwire validate`
 - Returns a structured `ValidationResult` (errors, warnings, fixed entries) suitable for both human-readable and JSON output
 - Always rebuilds `graph/index.yaml` as a side effect (delegates to `core/graph_cache.py`)
 - Implements the `--fix` auto-fix subset
@@ -1411,18 +1411,18 @@ This is what the UI will visualize later.
 ### `core/pm_review.py` — PM Agent PR Review Checks
 - See the "PM PR Review" section below for the full check list
 - Each check is a function returning `CheckResult(name, passed, details, fix_hint)`
-- Run by `keel pm review-pr <pr-number>` against the diff of a project-repo PR
+- Run by `tripwire pm review-pr <pr-number>` against the diff of a project-repo PR
 
 ---
 
 ## The Validation Gate
 
-`keel validate` is the single most important command in the system. It is the gate the agent runs after every batch of file writes, and the loop converges only when validate exits clean. Investing in validate quality is the highest-leverage thing in the whole library.
+`tripwire validate` is the single most important command in the system. It is the gate the agent runs after every batch of file writes, and the loop converges only when validate exits clean. Investing in validate quality is the highest-leverage thing in the whole library.
 
 ### Behaviour
 
 ```
-keel validate [--strict] [--format=text|json] [--fix]
+tripwire validate [--strict] [--format=text|json] [--fix]
 ```
 
 - Walks the entire project repo
@@ -1571,7 +1571,7 @@ validate (clean)
 commit
 ```
 
-If `validate` is rigorous, the loop converges quickly and produces clean output. If `validate` is sloppy, errors leak into commits and surface much later (PR review time, keel-containers launch time, CI failure). Every check in the catalogue is something the validator catches that would otherwise be the agent's problem to remember and the human's problem to clean up.
+If `validate` is rigorous, the loop converges quickly and produces clean output. If `validate` is sloppy, errors leak into commits and surface much later (PR review time, tripwire-containers launch time, CI failure). Every check in the catalogue is something the validator catches that would otherwise be the agent's problem to remember and the human's problem to clean up.
 
 ---
 
@@ -1579,7 +1579,7 @@ If `validate` is rigorous, the loop converges quickly and produces clean output.
 
 Orchestration patterns codify *who acts when*: PM auto-launches vs human approves, plan gate enabled or not, verifier required or skipped, auto-merge on green, etc. Different projects and sessions need different patterns. The patterns themselves are project-owned YAML (with optional Python hook scripts as an escape hatch), version-controlled in the project repo.
 
-**Important: the orchestration runtime lives in `keel-containers`, not `keel`.** The runtime is the engine that reads patterns and dispatches actions on every event. The `keel` package owns the data models, the templates that ship as defaults, and the CLI for managing patterns. This matches the broader principle: the project repo is the configuration; `keel-containers` is the engine that executes that configuration. The runtime reads from the project repo on every event.
+**Important: the orchestration runtime lives in `tripwire-containers`, not `tripwire`.** The runtime is the engine that reads patterns and dispatches actions on every event. The `tripwire` package owns the data models, the templates that ship as defaults, and the CLI for managing patterns. This matches the broader principle: the project repo is the configuration; `tripwire-containers` is the engine that executes that configuration. The runtime reads from the project repo on every event.
 
 ### File layout
 
@@ -1594,7 +1594,7 @@ my-project/
 │       └── custom_verifier.py
 ```
 
-These are copied from `templates/orchestration/` on `keel init`. After init the project owns them — edit, add, remove freely.
+These are copied from `templates/orchestration/` on `tripwire init`. After init the project owns them — edit, add, remove freely.
 
 ### YAML rule format
 
@@ -1654,7 +1654,7 @@ hooks:
 
 | Action | Effect |
 |--------|--------|
-| `re_engage` | Calls `keel session re-engage` + `keel-containers launch` |
+| `re_engage` | Calls `tripwire session re-engage` + `tripwire-containers launch` |
 | `launch_agent` | Spawns a new container for a named agent (e.g. verifier) |
 | `send_message` | Posts to UI message inbox |
 | `wait_for` | Pauses the orchestrator until an event happens |
@@ -1736,9 +1736,9 @@ It exposes:
 - `run_action(action, ctx)` — executes a built-in action (re_engage, launch_agent, etc.)
 - `call_hook(hook_name, event, ctx)` — invokes a Python hook from `<project>/orchestration/hooks/`
 
-The PM agent is a Claude-driven container that can also call into the orchestrator (via the keel CLI or directly) for higher-level reasoning. The deterministic orchestrator handles the simple event → action flows; the PM agent handles judgement-heavy decisions (plan review, scope changes, conflict resolution).
+The PM agent is a Claude-driven container that can also call into the orchestrator (via the tripwire CLI or directly) for higher-level reasoning. The deterministic orchestrator handles the simple event → action flows; the PM agent handles judgement-heavy decisions (plan review, scope changes, conflict resolution).
 
-`keel orchestrate evaluate <event-file>` lets users dry-run an event against the project's patterns from the command line — useful for debugging.
+`tripwire orchestrate evaluate <event-file>` lets users dry-run an event against the project's patterns from the command line — useful for debugging.
 
 ---
 
@@ -1770,7 +1770,7 @@ If any fail: PM posts a `request_changes` review with specific feedback per chec
 ### CLI
 
 ```
-keel pm review-pr <pr-number>
+tripwire pm review-pr <pr-number>
   --repo TEXT          Project repo (GitHub slug) [required]
   --format TEXT        rich/json [default: rich]
   # Runs all 10 checks against the diff. Prints results. Returns nonzero on failures.
@@ -1783,12 +1783,12 @@ keel pm review-pr <pr-number>
 
 This is the complete v0 CLI surface: **11 commands, all read-only or atomic-operation**. There are no mutation commands like `issue create`, `node create`, or `session create`. Those are deferred to a later release. Agents create entities by writing files directly with the `Write` tool, then run `validate` to confirm correctness.
 
-### `keel init`
+### `tripwire init`
 
 Interactive wizard by default; takes flags for scripted use.
 
 ```
-keel init
+tripwire init
   --name TEXT             Project name (prompts if not provided)
   --key-prefix TEXT       Issue key prefix, e.g. SEI, PKB (prompts if not provided)
   --base-branch TEXT      Default base branch (prompts; defaults to test)
@@ -1799,35 +1799,35 @@ keel init
 
 The wizard creates the full project scaffold: `project.yaml`, `CLAUDE.md`, `enums/`, `issue_templates/`, `comment_templates/`, `templates/artifacts/`, `agents/`, `orchestration/`, `.claude/skills/` (PM, agent-messaging, backend-development, verification), `standards.md`, and the empty top-level directories (`issues/`, `graph/nodes/`, `sessions/`, `docs/`).
 
-### `keel scaffold-for-creation`
+### `tripwire scaffold-for-creation`
 
 Front-loads the agent's context in a single tool call. The PM skill instructs agents to run this before doing anything else.
 
 ```
-keel scaffold-for-creation
+tripwire scaffold-for-creation
   --format TEXT           text/json [default: text]
 ```
 
 Prints (in one message) the project info, next available IDs, active enums, active artifact manifest, active orchestration pattern, template paths, skill example paths, the validation gate command, and the ID allocation rules. See the "scaffold-for-creation" section below for the full output format.
 
-### `keel next-key`
+### `tripwire next-key`
 
 Atomic sequential key allocation under a file lock.
 
 ```
-keel next-key
+tripwire next-key
   --type TEXT             issue/session [default: issue]
   --count INT             How many to allocate at once [default: 1]
 ```
 
 Atomically increments `project.yaml.next_issue_number` (or session counter) under a file lock. Returns the allocated key(s) on stdout, one per line. The agent calls this once per entity it intends to create.
 
-### `keel validate`
+### `tripwire validate`
 
 The gate. Run after every batch of writes.
 
 ```
-keel validate
+tripwire validate
   --strict                Treat warnings as errors
   --format TEXT           text/json [default: text]
   --fix                   Auto-fix trivial issues (timestamps, sequence drift, sorted lists, etc.)
@@ -1835,82 +1835,82 @@ keel validate
 
 **Always rebuilds `graph/index.yaml` as a side effect** (incrementally if possible, full rebuild if needed). Exit codes: `0` = clean, `1` = warnings only, `2` = errors. JSON output schema: `{ errors: [...], warnings: [...], fixed: [...], cache_rebuilt: bool, summary: {...} }`. See "The Validation Gate" section for the full check catalogue and JSON schema.
 
-### `keel status`
+### `tripwire status`
 
 Read-only dashboard.
 
 ```
-keel status
+tripwire status
   --format TEXT           rich/json [default: rich]
 ```
 
 Shows counts by status / executor / priority, blocked issues, stale references, critical path summary, recent activity (from git log).
 
-### `keel graph`
+### `tripwire graph`
 
 Read-only graph rendering. Reads from `graph/index.yaml` (rebuilt by `validate`).
 
 ```
-keel graph
+tripwire graph
   --type TEXT             deps/concept [default: deps]
   --format TEXT           mermaid/dot/json [default: mermaid]
   --output TEXT           Output file path (default: stdout)
   --status-filter TEXT    Only include issues with these statuses
 ```
 
-### `keel refs list / reverse / check`
+### `tripwire refs list / reverse / check`
 
 Read-only reference inspection.
 
 ```
-keel refs list <issue-key>
+tripwire refs list <issue-key>
   # Show all [[references]] in this issue with freshness status.
 
-keel refs reverse <node-id>
+tripwire refs reverse <node-id>
   # Show all issues/nodes that reference this node.
 
-keel refs check
+tripwire refs check
   # Full scan: report stale references, orphan nodes, dangling refs.
   --format TEXT           table/json [default: table]
 ```
 
-### `keel node check`
+### `tripwire node check`
 
 Read-only freshness check. Fetches current content (local clone or GitHub API), hashes, compares to stored `content_hash`.
 
 ```
-keel node check [node-id]
+tripwire node check [node-id]
   # If node-id omitted, checks all active nodes with sources.
   --format TEXT           table/json [default: table]
 ```
 
 This is read-only — there is no `--update` flag in v0. Stale nodes are reported; the agent decides whether to edit the node file (using the `Write`/`Edit` tools) and re-run `validate`.
 
-### `keel templates list / show`
+### `tripwire templates list / show`
 
 Read-only exploration of the templates that ship in this project.
 
 ```
-keel templates list
-keel templates show <name>
+tripwire templates list
+tripwire templates show <name>
 ```
 
-### `keel enums list / show`
+### `tripwire enums list / show`
 
 Read-only exploration of the active enums (loaded from `<project>/enums/` if present, else from packaged defaults).
 
 ```
-keel enums list
-keel enums show <name>
+tripwire enums list
+tripwire enums show <name>
 ```
 
-### `keel artifacts list / show`
+### `tripwire artifacts list / show`
 
 Read-only inspection of session artifacts.
 
 ```
-keel artifacts list <session-id>
-keel artifacts show <session-id> <artifact-name>
+tripwire artifacts list <session-id>
+tripwire artifacts show <session-id> <artifact-name>
 ```
 
 ### What's NOT in v0
@@ -1921,7 +1921,7 @@ The following commands are intentionally absent from v0 and listed in the "Defer
 
 ## scaffold-for-creation
 
-`keel scaffold-for-creation` is the single command an agent runs FIRST when starting a session against a project. It loads all the static context the agent needs into one tool-call result, so the agent doesn't have to re-read 15 files individually.
+`tripwire scaffold-for-creation` is the single command an agent runs FIRST when starting a session against a project. It loads all the static context the agent needs into one tool-call result, so the agent doesn't have to re-read 15 files individually.
 
 ### Purpose
 
@@ -1976,12 +1976,12 @@ SKILL EXAMPLES (read these too):
   .claude/skills/project-manager/examples/session-multi-repo.yaml
 
 VALIDATION GATE (run after every batch of writes):
-  keel validate --strict --format=json
+  tripwire validate --strict --format=json
   Exit 0 = clean, 1 = warnings, 2 = errors
   Always rebuilds graph/index.yaml as a side effect.
 
 ID ALLOCATION:
-  - For each new issue: call `keel next-key --type issue`
+  - For each new issue: call `tripwire next-key --type issue`
   - For each entity: generate uuid4 and add `uuid:` to frontmatter
   - Do NOT hand-write UUIDs
   - Do NOT manually increment project.yaml.next_issue_number
@@ -2046,7 +2046,7 @@ The skill ships at `templates/skills/project-manager/`, gets copied into the use
 
 ### Progressive disclosure
 
-The entry point (`SKILL.md`) is ~1 page and scannable. It points to references that the agent loads on demand. The agent does not read every reference up front — it reads `SKILL.md`, runs `keel scaffold-for-creation`, and then loads only the references relevant to the workflow it's running. Reference files are kept short (1-3 pages each), focused on a single topic, and end with a "see also" pointer to related references and worked examples.
+The entry point (`SKILL.md`) is ~1 page and scannable. It points to references that the agent loads on demand. The agent does not read every reference up front — it reads `SKILL.md`, runs `tripwire scaffold-for-creation`, and then loads only the references relevant to the workflow it's running. Reference files are kept short (1-3 pages each), focused on a single topic, and end with a "see also" pointer to related references and worked examples.
 
 ### `SKILL.md` entry point (outline)
 
@@ -2054,12 +2054,12 @@ The entry point (`SKILL.md`) is ~1 page and scannable. It points to references t
 2. **Two workflows you'll be doing**:
    - Initial scoping → see `references/WORKFLOWS_INITIAL_SCOPING.md`
    - Incremental updates → see `references/WORKFLOWS_INCREMENTAL_UPDATE.md`
-3. **Critical: front-load your context first**. Run `keel scaffold-for-creation` and read the output before doing anything else.
+3. **Critical: front-load your context first**. Run `tripwire scaffold-for-creation` and read the output before doing anything else.
 4. **Write files directly** (don't try to use the CLI to create issues/nodes/sessions; mutation CLI commands are intentionally absent in v0). Read the relevant schema reference and example, then use the `Write` tool.
-5. **The validation gate**: run `keel validate --strict --format=json` after every batch. Parse the JSON output. Fix every error. Re-run until clean. The validate command also rebuilds the graph cache.
+5. **The validation gate**: run `tripwire validate --strict --format=json` after every batch. Parse the JSON output. Fix every error. Re-run until clean. The validate command also rebuilds the graph cache.
 6. **Allocating IDs**:
    - For UUIDs: generate yourself (uuid4) and put in frontmatter.
-   - For sequential keys (`SEI-42`, etc.): call `keel next-key --type issue` once per new issue. Don't try to read `project.yaml` and increment yourself.
+   - For sequential keys (`SEI-42`, etc.): call `tripwire next-key --type issue` once per new issue. Don't try to read `project.yaml` and increment yourself.
 7. **The five mortal sins** (link to `references/ANTI_PATTERNS.md` for full list):
    - Inventing fields not in the schema
    - Forgetting to run `validate` before declaring done
@@ -2081,9 +2081,9 @@ The entry point ENDS with: "Now read `references/SCHEMA_PROJECT.md` and `referen
 - **`SCHEMA_SESSIONS.md`** — session frontmatter, multi-repo `RepoBinding`, runtime state, engagement history.
 - **`SCHEMA_COMMENTS.md`** — comment file format, valid types, where comments live in the directory tree.
 - **`SCHEMA_ARTIFACTS.md`** — session artifacts (plan, task-checklist, verification-checklist, recommended-testing-plan, post-completion-comments).
-- **`CONCEPT_GRAPH.md`** — when to create a node vs inline prose, the `[[node-id]]` syntax, the implicit edge model, freshness, the index cache, `keel refs check`.
+- **`CONCEPT_GRAPH.md`** — when to create a node vs inline prose, the `[[node-id]]` syntax, the implicit edge model, freshness, the index cache, `tripwire refs check`.
 - **`ID_ALLOCATION.md`** — UUIDs, sequential keys, `next-key`, conflict resolution. The dual-ID system in detail.
-- **`VALIDATION.md`** — single command (`keel validate --strict --format=json`), output format, how to map error → file → fix, auto-fix behaviour, cache rebuild.
+- **`VALIDATION.md`** — single command (`tripwire validate --strict --format=json`), output format, how to map error → file → fix, auto-fix behaviour, cache rebuild.
 - **`REFERENCES.md`** — `[[node-id]]` resolution, bi-directional consistency, `blocked_by` is canonical (validator computes `blocks`), `related` on nodes is canonical and bi-directional.
 - **`COMMIT_CONVENTIONS.md`** — what goes in one commit, branch naming, PR titles.
 - **`ANTI_PATTERNS.md`** — common mistakes with worked bad/fixed examples (inventing fields, forgetting timestamps, writing `blocks`, dangling refs, hand-writing UUIDs, trying to use mutation CLI commands that don't exist).
@@ -2140,7 +2140,7 @@ dependencies = [
 ]
 
 [project.scripts]
-keel = "keel.cli.main:cli"
+tripwire = "keel.cli.main:cli"
 
 [dependency-groups]
 dev = [
@@ -2227,26 +2227,26 @@ The order below is reorganised for the agent-driven priority. Build the data lay
 
 ### Step 5: `init` command (interactive wizard)
 - `cli/main.py` — Click root group + global options
-- `cli/init.py` — `keel init` interactive wizard with `--name`, `--key-prefix`, `--base-branch`, `--repos`, `--no-git`, `--non-interactive`
+- `cli/init.py` — `tripwire init` interactive wizard with `--name`, `--key-prefix`, `--base-branch`, `--repos`, `--no-git`, `--non-interactive`
 - Copy the entire `templates/` tree from the package into the new project
 - Jinja2 substitution applied to `.j2` files only
 - Integration test: init creates valid project, git repo works (or skipped with `--no-git`)
 
 ### Step 6: `scaffold-for-creation` command
-- `cli/scaffold.py` — `keel scaffold-for-creation` with `--format=text|json`
+- `cli/scaffold.py` — `tripwire scaffold-for-creation` with `--format=text|json`
 - Output exactly matches the spec in the "scaffold-for-creation" section
 - Pure read operation, ~50 lines
 - Integration test: output contains all expected sections, JSON output is parseable
 
 ### Step 7: `next-key` command
-- `cli/next_key.py` — `keel next-key --type issue/session --count INT`
+- `cli/next_key.py` — `tripwire next-key --type issue/session --count INT`
 - Uses `core/key_allocator.py` for atomic file-locked increment
 - Integration test: 10 concurrent invocations produce 10 distinct sequential keys with no gaps or collisions
 
 ### Step 8: Read commands
-- `cli/validate.py` — `keel validate --strict --format=text|json --fix`
+- `cli/validate.py` — `tripwire validate --strict --format=text|json --fix`
 - `cli/status.py` — Dashboard with status breakdown, blocked issues, stale refs, critical path
-- `cli/graph.py` — `keel graph --type deps|concept --format mermaid|dot|json --output --status-filter`
+- `cli/graph.py` — `tripwire graph --type deps|concept --format mermaid|dot|json --output --status-filter`
 - `cli/refs.py` — `list`, `reverse`, `check`
 - `cli/node.py` — `check` subcommand only (read-only freshness check)
 - `cli/templates.py` — `list`, `show`
@@ -2280,7 +2280,7 @@ The order below is reorganised for the agent-driven priority. Build the data lay
 - `templates/skills/verification/SKILL.md`
 
 ### Step 12: End-to-end verification with `project-kb-pivot`
-- Run `keel init --name project-kb-pivot --key-prefix PKB --base-branch main --no-git --non-interactive` from inside the existing `project-kb-pivot` directory
+- Run `tripwire init --name project-kb-pivot --key-prefix PKB --base-branch main --no-git --non-interactive` from inside the existing `project-kb-pivot` directory
 - Open Claude Code with the PM skill loaded
 - Prompt: "Read all files in `raw_planning/`. Use the `WORKFLOWS_INITIAL_SCOPING` workflow to produce a fully scoped project."
 - Verify the agent runs `scaffold-for-creation`, drafts and writes issues/nodes/sessions, runs `validate` until clean, and commits in a single commit
@@ -2294,18 +2294,18 @@ The following features are NOT in v0. Each entry includes a rationale for why it
 
 | Feature | Why deferred |
 |---------|--------------|
-| `keel issue {create,update}` (mutation CLI) | Agents write files directly using the `Write` tool. Not needed in v0. Adds complexity and a parallel code path that has to stay in sync with the validator. |
-| `keel node {create,update}` (mutation CLI) | Same as above. |
-| `keel session {create,update,re-engage}` (mutation CLI) | Same. `re-engage` becomes relevant only when `keel-containers` exists. |
-| `keel comment add` (mutation CLI) | Comments are just files. Direct writes work. |
-| `keel pm review-pr` | The PM PR review concept stays in the docs but the CLI for it is deferred — in v0 the PM agent runs `validate` and inspects PRs directly via files and `gh`. |
-| `keel orchestrate evaluate` | Orchestration runtime lives in `keel-containers`, not `keel`. Deferred until that package is built. |
-| `keel migrate` (schema migrations) | Premature. Schema is too young to need migrations. Plan to add when v1 makes its first breaking change. |
+| `tripwire issue {create,update}` (mutation CLI) | Agents write files directly using the `Write` tool. Not needed in v0. Adds complexity and a parallel code path that has to stay in sync with the validator. |
+| `tripwire node {create,update}` (mutation CLI) | Same as above. |
+| `tripwire session {create,update,re-engage}` (mutation CLI) | Same. `re-engage` becomes relevant only when `tripwire-containers` exists. |
+| `tripwire comment add` (mutation CLI) | Comments are just files. Direct writes work. |
+| `tripwire pm review-pr` | The PM PR review concept stays in the docs but the CLI for it is deferred — in v0 the PM agent runs `validate` and inspects PRs directly via files and `gh`. |
+| `tripwire orchestrate evaluate` | Orchestration runtime lives in `tripwire-containers`, not `tripwire`. Deferred until that package is built. |
+| `tripwire migrate` (schema migrations) | Premature. Schema is too young to need migrations. Plan to add when v1 makes its first breaking change. |
 | Multiple starter templates (`webapp-fullstack`, `python-backend`, `multi-repo-infra`) | Deferred — only the `default` template ships in v0. Stack-specific starters with seed nodes are valuable but require domain research and maintenance. |
 | Rust validator | Premature. Python validator with `libyaml` + `msgspec` will handle 5000+ entities in <1s. Profile before reaching for Rust. |
 | CI/CD GitHub action for `validate` | Useful but not required for v0. Add when first project hits production. |
-| `keel init --update` (selective template refresh) | Useful for bringing existing projects up to date when the package adds new templates. Add when first breaking schema change happens. |
-| `keel node import-from-code` (bulk node creation) | Compelling future feature: scan a code repo, propose nodes for endpoints/models/configs. Requires AST parsing per language. Deferred until v1+. |
+| `tripwire init --update` (selective template refresh) | Useful for bringing existing projects up to date when the package adds new templates. Add when first breaking schema change happens. |
+| `tripwire node import-from-code` (bulk node creation) | Compelling future feature: scan a code repo, propose nodes for endpoints/models/configs. Requires AST parsing per language. Deferred until v1+. |
 | `--watch` mode for `validate` | Nice for a UI/dev loop. UI backend's file watcher covers the same use case once that exists. Defer. |
 | Plugin/extension system for custom validators | Premature. Hardcode the v0 check set. |
 | Multi-project / workspace mode (manage multiple projects from one CLI invocation) | Defer. Single-project is the only mode in v0. |
@@ -2318,16 +2318,16 @@ The following features are NOT in v0. Each entry includes a rationale for why it
 2. **Integration tests**: `uv run pytest tests/integration/ -v` — init flow, issue lifecycle, node lifecycle
 3. **Manual smoke test** (exercises every v0 CLI command without involving a Claude Code session — entity files are created by hand from templates):
    ```bash
-   cd /tmp && keel init --name test-project --key-prefix TST --base-branch main --non-interactive
+   cd /tmp && tripwire init --name test-project --key-prefix TST --base-branch main --non-interactive
    cd test-project
 
    # Front-load context (the same command an agent runs first)
-   keel scaffold-for-creation
-   keel scaffold-for-creation --format=json
+   tripwire scaffold-for-creation
+   tripwire scaffold-for-creation --format=json
 
    # Atomic ID allocation
-   keel next-key --type issue        # returns TST-1
-   keel next-key --type issue        # returns TST-2
+   tripwire next-key --type issue        # returns TST-1
+   tripwire next-key --type issue        # returns TST-2
 
    # Hand-create a couple of issues using the issue template + the keys above.
    # (In normal use, an agent does this via the Write tool. For the smoke test,
@@ -2339,29 +2339,29 @@ The following features are NOT in v0. Each entry includes a rationale for why it
    # as graph/nodes/auth-endpoint.yaml, and add [[auth-endpoint]] to TST-1's body.
 
    # The validation gate
-   keel validate                     # human output
-   keel validate --strict --format=json
-   keel validate --fix               # auto-fix trivial issues
+   tripwire validate                     # human output
+   tripwire validate --strict --format=json
+   tripwire validate --fix               # auto-fix trivial issues
    # validate also rebuilds graph/index.yaml as a side effect
 
    # Read commands
-   keel status
-   keel status --format=json
-   keel graph --type=deps --format=mermaid
-   keel graph --type=concept --format=mermaid
-   keel refs list TST-1
-   keel refs reverse auth-endpoint
-   keel refs check
-   keel node check                   # freshness check on all active nodes
-   keel templates list
-   keel templates show default
-   keel enums list
-   keel enums show issue_status
-   keel artifacts list <session-id>  # only meaningful after a session exists
+   tripwire status
+   tripwire status --format=json
+   tripwire graph --type=deps --format=mermaid
+   tripwire graph --type=concept --format=mermaid
+   tripwire refs list TST-1
+   tripwire refs reverse auth-endpoint
+   tripwire refs check
+   tripwire node check                   # freshness check on all active nodes
+   tripwire templates list
+   tripwire templates show default
+   tripwire enums list
+   tripwire enums show issue_status
+   tripwire artifacts list <session-id>  # only meaningful after a session exists
    ```
    This smoke test uses only v0 commands. There are no `issue create`, `issue update`, `node create` invocations because those mutation commands are deferred — entity creation goes through direct file writes.
 4. **Lint**: `uv run ruff check src/ tests/`
-5. **Package install**: `pip install .` from the repo root, then `keel --help` works
+5. **Package install**: `pip install .` from the repo root, then `tripwire --help` works
 
 ### `project-kb-pivot` end-to-end test (v0 acceptance criterion)
 
@@ -2390,15 +2390,15 @@ project-kb-pivot/
 
 **Acceptance criteria**:
 
-1. Run `keel init --name project-kb-pivot --key-prefix PKB --base-branch main --no-git --non-interactive` from inside the directory (it already has `.git/`). All scaffold files appear.
+1. Run `tripwire init --name project-kb-pivot --key-prefix PKB --base-branch main --no-git --non-interactive` from inside the directory (it already has `.git/`). All scaffold files appear.
 2. Open a Claude Code session with the `project-manager` skill loaded.
 3. Prompt the agent: "Read all files in `raw_planning/`. Use the `WORKFLOWS_INITIAL_SCOPING` workflow to produce a fully scoped project."
-4. The agent runs `keel scaffold-for-creation`, reads the planning docs, drafts and writes:
+4. The agent runs `tripwire scaffold-for-creation`, reads the planning docs, drafts and writes:
    - 15-30 issues in `issues/PKB-*.yaml`, organised by epic
    - 10-25 concept nodes in `graph/nodes/*.yaml` for endpoints, models, decisions, contracts
    - 2-5 sessions in `sessions/*.yaml` representing logical agent groupings
    - Updates to `project.yaml` if the planning docs introduce new repos
-5. The agent runs `keel validate --strict --format=json`. Exit code is 0.
+5. The agent runs `tripwire validate --strict --format=json`. Exit code is 0.
 6. The agent commits the result in a single commit on a branch.
 7. A human reviewing the output finds it:
    - Coherent (the issues actually reflect the planning docs)

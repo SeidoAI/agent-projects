@@ -3,8 +3,8 @@
 Replaced/supplemented by real unit tests in subsequent steps.
 """
 
-import keel
+import tripwire
 
 
 def test_package_imports() -> None:
-    assert keel.__version__ == "0.6.0"
+    assert tripwire.__version__ == "0.6.0"

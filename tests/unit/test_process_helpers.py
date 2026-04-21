@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 
-from keel.core.process_helpers import is_alive, send_sigterm
+from tripwire.core.process_helpers import is_alive, send_sigterm
 
 
 class TestIsAlive:

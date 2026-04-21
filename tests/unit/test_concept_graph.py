@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from keel.core.concept_graph import (
+from tripwire.core.concept_graph import (
     build_full_graph,
     orphan_issues,
     orphan_nodes,
 )
-from keel.core.graph_cache import full_rebuild
-from keel.core.node_store import save_node
-from keel.core.store import save_issue, save_project
-from keel.models import (
+from tripwire.core.graph_cache import full_rebuild
+from tripwire.core.node_store import save_node
+from tripwire.core.store import save_issue, save_project
+from tripwire.models import (
     ConceptNode,
     Issue,
     ProjectConfig,

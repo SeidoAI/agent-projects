@@ -1,4 +1,4 @@
-"""keel workspace fork + promote."""
+"""tripwire workspace fork + promote."""
 
 import subprocess
 from pathlib import Path
@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from keel.cli.workspace import workspace_cmd
-from keel.core.paths import workspace_nodes_dir
+from tripwire.cli.workspace import workspace_cmd
+from tripwire.core.paths import workspace_nodes_dir
 
 
 def _git_commit_all(repo: Path, message: str) -> str:
@@ -85,7 +85,7 @@ class TestFork:
         )
         assert result.exit_code == 0, result.output
 
-        from keel.core.node_store import load_node
+        from tripwire.core.node_store import load_node
 
         node = load_node(proj_dir, "auth-system")
         assert node.origin == "workspace"  # preserved for audit
@@ -175,7 +175,7 @@ class TestPromote:
         # Workspace should now have the node; project copy should now be workspace-origin.
         assert (workspace_nodes_dir(ws_dir) / "webhook-handler.yaml").is_file()
 
-        from keel.core.node_store import load_node
+        from tripwire.core.node_store import load_node
 
         node = load_node(proj_dir, "webhook-handler")
         assert node.origin == "workspace"

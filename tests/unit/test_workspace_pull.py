@@ -1,4 +1,4 @@
-"""keel workspace pull — trivial cases (no conflicts).
+"""tripwire workspace pull — trivial cases (no conflicts).
 
 Conflict cases (merge briefs) are covered in test_workspace_pull_conflict
 once T19 wires brief generation in.
@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from keel.cli.workspace import workspace_cmd
-from keel.core.paths import workspace_nodes_dir
+from tripwire.cli.workspace import workspace_cmd
+from tripwire.core.paths import workspace_nodes_dir
 
 
 def _git_commit_all(repo: Path, message: str) -> str:
@@ -132,7 +132,7 @@ tags: []
         assert result.exit_code == 0, result.output
 
         # Local copy should reflect v2 now, with workspace_sha bumped.
-        from keel.core.node_store import load_node
+        from tripwire.core.node_store import load_node
 
         node = load_node(proj_dir, "auth-system")
         assert node.description == "v2"
@@ -157,7 +157,7 @@ tags: []
         )
 
         # Fork the node (set scope=local).
-        from keel.core.node_store import load_node, save_node
+        from tripwire.core.node_store import load_node, save_node
 
         node = load_node(proj_dir, "auth-system")
         forked = node.model_copy(update={"scope": "local"})
@@ -229,7 +229,7 @@ tags: []
         head_sha = _git_commit_all(ws_dir, "update")
         runner.invoke(workspace_cmd, ["pull", "--project-dir", str(proj_dir)])
 
-        from keel.core.workspace_store import load_workspace
+        from tripwire.core.workspace_store import load_workspace
 
         ws = load_workspace(ws_dir)
         entry = next(p for p in ws.projects if p.slug == "x")

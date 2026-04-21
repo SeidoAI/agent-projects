@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from keel.core.node_store import (
+from tripwire.core.node_store import (
     delete_node,
     list_nodes,
     load_node,
     node_exists,
     save_node,
 )
-from keel.models import ConceptNode, NodeSource
+from tripwire.models import ConceptNode, NodeSource
 
 
 @pytest.fixture

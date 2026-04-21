@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from keel.core.workspace_store import (
+from tripwire.core.workspace_store import (
     add_project,
     load_workspace,
     remove_project,
@@ -14,7 +14,7 @@ from keel.core.workspace_store import (
     update_project_push_state,
     workspace_exists,
 )
-from keel.models.workspace import Workspace, WorkspaceProjectEntry
+from tripwire.models.workspace import Workspace, WorkspaceProjectEntry
 
 
 def _fresh_ws() -> Workspace:
@@ -25,7 +25,7 @@ def _fresh_ws() -> Workspace:
         slug="seido",
         description="",
         schema_version=1,
-        keel_version="0.6.0",
+        tripwire_version="0.6.0",
         created_at=now,
         updated_at=now,
     )

@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from keel.models.project import ProjectConfig, ProjectWorkspacePointer
+from tripwire.models.project import ProjectConfig, ProjectWorkspacePointer
 
 
 def _project_fields():

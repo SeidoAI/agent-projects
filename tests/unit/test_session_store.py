@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from keel.core.session_store import (
+from tripwire.core.session_store import (
     delete_session,
     list_sessions,
     load_session,
@@ -16,7 +16,7 @@ from keel.core.session_store import (
     session_exists,
     session_yaml_path,
 )
-from keel.models import AgentSession
+from tripwire.models import AgentSession
 
 
 @pytest.fixture

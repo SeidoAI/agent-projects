@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="img/keel_full_black_bg.svg">
     <source media="(prefers-color-scheme: light)" srcset="img/keel_full_white_bg.svg">
-    <img src="img/keel_full_transparent.svg" alt="Keel" width="520">
+    <img src="img/keel_full_transparent.svg" alt="Tripwire" width="520">
   </picture>
 </p>
 
@@ -25,8 +25,8 @@ real software projects without drifting from the code.
 ## Quickstart
 
 ```bash
-pip install keel
-keel init my-project
+pip install tripwire
+tripwire init my-project
 cd my-project
 claude
 ```
@@ -43,10 +43,10 @@ validates its own work, and hands you a clean project to commit.
 To see your project in the web dashboard:
 
 ```bash
-keel ui
+tripwire ui
 ```
 
-`keel init` auto-derives a key prefix from the project name (`my-project-cool` →
+`tripwire init` auto-derives a key prefix from the project name (`my-project-cool` →
 `MPC`), defaults to `main` as the base branch, and prompts for anything
 non-obvious. Pass `--key-prefix`, `--base-branch`, or `--repos` to override.
 
@@ -55,7 +55,7 @@ non-obvious. Pass `--key-prefix`, `--base-branch`, or `--repos` to override.
 For CI pipelines or agents that only need the CLI (no web dashboard):
 
 ```bash
-pip install keel[projects]
+pip install tripwire[projects]
 ```
 
 ## What it does
@@ -64,14 +64,14 @@ pip install keel[projects]
 - **Dual ID system.** Canonical UUID + atomic human key (`MP-42`), allocated with `fcntl.flock`. Branch-merge safe.
 - **Content-hashed concept graph.** `[[node-id]]` references point at file regions with SHA-256 hashes. Move code → one node updates → every downstream issue catches up. Drift is a validation error.
 - **14-check validation gate.** Schema, references, bidirectional consistency, status transitions, freshness, sequence drift. JSON output. Auto-fix subset. ~50 ms on a typical project. Rebuilds the graph cache as a side effect.
-- **One-shot context brief.** `keel brief` gives an agent config, enums, templates, skill examples, next IDs, and the validation loop in a single tool-call result. The PM skill calls it automatically — you never have to.
+- **One-shot context brief.** `tripwire brief` gives an agent config, enums, templates, skill examples, next IDs, and the validation loop in a single tool-call result. The PM skill calls it automatically — you never have to.
 - **Customisable session artifacts.** Plans, task checklists, verification checklists, testing plans, post-completion comments — per-project manifest, enforced by the validator.
 - **Progressive-disclosure PM skill.** 33 reference files and canonical examples ship into every `init`. The agent reads the example, not the schema doc.
 
 ## Demo
 
 ```text
-$ keel validate --strict
+$ tripwire validate --strict
 {
   "exit_code": 0,
   "errors": [],
@@ -81,14 +81,14 @@ $ keel validate --strict
   "duration_ms": 47
 }
 
-$ keel status --format=rich
+$ tripwire status --format=rich
 my-project (MP)
   Issues: 23  (backlog=12, todo=8, in_progress=3)
   Concept nodes: 17 active, 2 stale
   Sessions: 4  (2 completed, 1 in_progress, 1 waiting_for_review)
   Critical path: MP-1 → MP-7 → MP-12 → MP-18  (length 4)
 
-$ keel uuid --count 3
+$ tripwire uuid --count 3
 # Entity 1
 a1b2c3d4-e5f6-4789-abcd-ef0123456789
 # Entity 2
@@ -107,13 +107,13 @@ Four principles. Each one is a deliberate choice.
 
 **3. The concept graph is coherence.** Instead of prose like "the auth endpoint," issues reference `[[auth-token-endpoint]]` — a node file pointing at a specific file and line range with a stored content hash. When the code moves, one file updates. Stale hashes surface as validator errors.
 
-**4. Validation is the gate.** Every agent loop ends with `keel validate --strict --format=json`. The same command rebuilds the graph cache incrementally. The loop is: write files → validate → fix → validate → commit.
+**4. Validation is the gate.** Every agent loop ends with `tripwire validate --strict --format=json`. The same command rebuilds the graph cache incrementally. The loop is: write files → validate → fix → validate → commit.
 
 **Why in-repo.** Project artifacts — decisions, contracts, issue history — have long tails. You need to know why a decision was made three years from now. External SaaS trackers lose that history when companies migrate tools, pivot pricing, or shut down. Keel issues are git commits: readable with `cat` in 20 years, diffable with `git log`, portable with `git clone`. The project's history is as durable as its code.
 
 ## Slash commands
 
-After `keel init`, every project ships with `/pm-*` slash commands at
+After `tripwire init`, every project ships with `/pm-*` slash commands at
 `.claude/commands/`. Type `/pm` in Claude Code to see them all at once.
 
 | Command | What it does |
@@ -132,38 +132,38 @@ After `keel init`, every project ships with `/pm-*` slash commands at
 | `/pm-close <issue>` | Mark an issue done and write a closing comment |
 
 Each slash command loads the project-manager skill, reads current state via
-`keel brief`, then executes the relevant workflow.
+`tripwire brief`, then executes the relevant workflow.
 
 ## Commands
 
 ```text
-keel init                     Bootstrap a project with templates + skills
-keel next-key                 Atomic ID/key allocation (fcntl.flock)
-keel validate                 14-check gate  (--strict, --fix, --format=json)
-keel status                   Dashboard: issues, nodes, sessions, critical path
-keel graph                    Render dependency or concept graph (mermaid/dot/json)
-keel refs                     Inspect references to a node or issue
-keel node                     List, inspect, freshness-check concept nodes
-keel templates                List and instantiate Jinja2 templates
-keel enums                    List active enum values
-keel artifacts                List session artifact manifest
-keel brief                    Dump project context (agents use this internally)
-keel agenda                   Aggregated view of everything in flight
-keel plan                     Preview what init would produce (dry-run)
-keel uuid                     Generate RFC 4122 UUID4 values (--count N)
-keel refresh                  Rebuild the graph cache from filesystem
-keel view                     Serve a read-only HTML project viewer
-keel completion <shell>       Print bash/zsh/fish tab completion install snippet
+tripwire init                     Bootstrap a project with templates + skills
+tripwire next-key                 Atomic ID/key allocation (fcntl.flock)
+tripwire validate                 14-check gate  (--strict, --fix, --format=json)
+tripwire status                   Dashboard: issues, nodes, sessions, critical path
+tripwire graph                    Render dependency or concept graph (mermaid/dot/json)
+tripwire refs                     Inspect references to a node or issue
+tripwire node                     List, inspect, freshness-check concept nodes
+tripwire templates                List and instantiate Jinja2 templates
+tripwire enums                    List active enum values
+tripwire artifacts                List session artifact manifest
+tripwire brief                    Dump project context (agents use this internally)
+tripwire agenda                   Aggregated view of everything in flight
+tripwire plan                     Preview what init would produce (dry-run)
+tripwire uuid                     Generate RFC 4122 UUID4 values (--count N)
+tripwire refresh                  Rebuild the graph cache from filesystem
+tripwire view                     Serve a read-only HTML project viewer
+tripwire completion <shell>       Print bash/zsh/fish tab completion install snippet
 ```
 
 All commands output JSON by default (agent-first). Add `--format=text`
 or `--format=rich` for human-readable output.
 
-Run `keel --help` or `keel <cmd> --help` for details.
+Run `tripwire --help` or `tripwire <cmd> --help` for details.
 
 ## Project layout
 
-After `keel init`:
+After `tripwire init`:
 
 ```text
 my-project/
@@ -201,7 +201,7 @@ You can't run a real software project on a stack of LLM agents yet, and the reas
 - **You can't run multiple coding agents in parallel without a coordinator.** Each needs a branch, an issue key, an awareness of who owns what. Without atomic key allocation, they stomp on each other.
 - **Drift is a tax on every future invocation.** Mechanical search-and-replace across docs, issues, code, and schemas is exactly what LLMs are bad at. Partial reconciliations leave the next agent with more drift to chase.
 
-`keel` fixes this by putting everything in one git repo with cross-referenced YAML, content-hashed concept nodes, and a 14-check validator that catches drift before the next agent reads it.
+`tripwire` fixes this by putting everything in one git repo with cross-referenced YAML, content-hashed concept nodes, and a 14-check validator that catches drift before the next agent reads it.
 
 </details>
 
@@ -221,7 +221,7 @@ source:
   content_hash: "sha256:e2c5a..."
 ```
 
-`keel node check` fetches the current content (local clone preferred, `gh api` fallback) and compares SHA-256 hashes. Three outcomes: `FRESH`, `STALE`, `SOURCE_MISSING`. Stale nodes become validator errors.
+`tripwire node check` fetches the current content (local clone preferred, `gh api` fallback) and compares SHA-256 hashes. Three outcomes: `FRESH`, `STALE`, `SOURCE_MISSING`. Stale nodes become validator errors.
 
 **Graph cache.** `graph/index.yaml` is an incremental cache of all edges, rebuilt under `fcntl.flock`. `validate` calls `ensure_fresh` which picks between incremental update and full rebuild based on the current state.
 
@@ -247,12 +247,12 @@ Per-project defaults in `orchestration/default.yaml`; per-session overrides in t
 <details>
 <summary><b>Worked example</b> — scoping from raw planning docs</summary>
 
-1. `keel init my-project` creates the project with 73 templates, 43 skill files, 10 slash commands, 11 enums. Auto-derives the key prefix from the name (`my-project` → `MP`).
+1. `tripwire init my-project` creates the project with 73 templates, 43 skill files, 10 slash commands, 11 enums. Auto-derives the key prefix from the name (`my-project` → `MP`).
 2. You open Claude Code in `my-project/` and type: `/pm-scope Build a knowledge base. Planning docs in ./plans/.`
-3. The PM skill auto-loads. It calls `keel brief` to read project state, then reads `plans/*.md`.
-4. The agent calls `keel next-key --type issue` 20 times, writes 20 issue YAML files into `issues/`, writes 15 concept nodes into `graph/nodes/`, writes 3 session folders into `sessions/`.
-5. It runs `keel validate --strict --format=json`, parses the JSON, fixes any `ref/dangling`, `body/missing_heading`, or `status/unreachable` errors, re-runs.
-6. Clean. The agent commits the result. You `keel status` and see a connected dependency graph with a critical path.
+3. The PM skill auto-loads. It calls `tripwire brief` to read project state, then reads `plans/*.md`.
+4. The agent calls `tripwire next-key --type issue` 20 times, writes 20 issue YAML files into `issues/`, writes 15 concept nodes into `graph/nodes/`, writes 3 session folders into `sessions/`.
+5. It runs `tripwire validate --strict --format=json`, parses the JSON, fixes any `ref/dangling`, `body/missing_heading`, or `status/unreachable` errors, re-runs.
+6. Clean. The agent commits the result. You `tripwire status` and see a connected dependency graph with a critical path.
 
 Everything is in git. Every reference resolves. Every concept node's content hash is current. The next agent that picks up a ticket has the full picture from one clone.
 
@@ -326,7 +326,7 @@ first-third vs last-third of the issue set and flags inconsistency.
 
 ### Structure and semantics are different problems
 
-`keel validate` checks structural integrity: schemas, references,
+`tripwire validate` checks structural integrity: schemas, references,
 freshness. It does NOT check completeness — it can't know whether
 you've covered every endpoint in the planning docs.
 
@@ -345,7 +345,7 @@ every issue that mentions the concept in prose.
 
 ### The project ships its own instruction set
 
-`keel init` doesn't just create a data directory — it ships the PM
+`tripwire init` doesn't just create a data directory — it ships the PM
 skill (33 files), 12 slash commands, and canonical examples. The
 methodology is versioned in-tree with the project. Fork a project,
 fork the methodology. Evolve it in a PR, review it like code.

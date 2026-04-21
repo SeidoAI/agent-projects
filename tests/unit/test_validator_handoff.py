@@ -22,7 +22,7 @@ repos: []
 
 def test_handoff_schema_required_at_queued(tmp_project_manifest):
     """Session in queued without handoff.yaml raises error."""
-    from keel.core.validator import validate_project
+    from tripwire.core.validator import validate_project
 
     project_dir = tmp_project_manifest([])
     _write_session_yaml(project_dir, "session-x", "queued")
@@ -32,7 +32,7 @@ def test_handoff_schema_required_at_queued(tmp_project_manifest):
 
 def test_handoff_schema_planned_does_not_require_handoff(tmp_project_manifest):
     """A session in `planned` status should NOT require handoff.yaml."""
-    from keel.core.validator import validate_project
+    from tripwire.core.validator import validate_project
 
     project_dir = tmp_project_manifest([])
     _write_session_yaml(project_dir, "session-x", "planned")
@@ -44,7 +44,7 @@ def test_handoff_schema_planned_does_not_require_handoff(tmp_project_manifest):
 
 def test_handoff_schema_branch_format(tmp_project_manifest):
     """An invalid branch in handoff.yaml surfaces as branch_format error."""
-    from keel.core.validator import validate_project
+    from tripwire.core.validator import validate_project
 
     project_dir = tmp_project_manifest([])
     _write_session_yaml(project_dir, "session-x", "queued")
@@ -65,7 +65,7 @@ branch: not-valid
 
 def test_handoff_schema_valid_handoff_no_findings(tmp_project_manifest):
     """A well-formed handoff.yaml produces no handoff-schema findings."""
-    from keel.core.validator import validate_project
+    from tripwire.core.validator import validate_project
 
     project_dir = tmp_project_manifest([])
     _write_session_yaml(project_dir, "session-x", "queued")

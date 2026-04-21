@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from keel.cli.main import LOG_LEVELS, cli
+from tripwire.cli.main import LOG_LEVELS, cli
 
 
 @pytest.fixture
@@ -98,7 +98,7 @@ def test_verbose_validate_emits_info_logs(
     target = tmp_path / "p"
     _init(runner, target)
 
-    with caplog.at_level(logging.INFO, logger="keel.core.validator"):
+    with caplog.at_level(logging.INFO, logger="tripwire.core.validator"):
         result = runner.invoke(
             cli,
             ["-v", "validate", "--project-dir", str(target)],
@@ -117,7 +117,7 @@ def test_verbose_validate_emits_debug_logs(
     target = tmp_path / "p"
     _init(runner, target)
 
-    with caplog.at_level(logging.DEBUG, logger="keel.core.validator"):
+    with caplog.at_level(logging.DEBUG, logger="tripwire.core.validator"):
         result = runner.invoke(
             cli,
             ["-vv", "validate", "--project-dir", str(target)],

@@ -1,6 +1,6 @@
 """Lint framework: stage dispatch, rule registration, severity exit codes."""
 
-from keel.core.linter import (
+from tripwire.core.linter import (
     Linter,
     LintFinding,
     exit_code_for,

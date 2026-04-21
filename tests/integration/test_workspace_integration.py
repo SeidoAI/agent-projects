@@ -20,7 +20,7 @@ def _run_keel(
     cwd: Path, *args: str, check: bool = False
 ) -> subprocess.CompletedProcess:
     return subprocess.run(
-        ["uv", "run", "keel", *args],
+        ["uv", "run", "tripwire", *args],
         cwd=cwd,
         capture_output=True,
         text=True,
@@ -223,7 +223,7 @@ class TestSyncConflict:
         # Project B pulls — should surface a conflict brief.
         r = _run_keel(proj_b, "workspace", "pull")
         assert r.returncode == 10, r.stdout + r.stderr
-        brief_path = proj_b / ".keel" / "merge-briefs" / "auth-system.yaml"
+        brief_path = proj_b / ".tripwire" / "merge-briefs" / "auth-system.yaml"
         assert brief_path.is_file()
 
         # Simulate agent resolving: write a combined description.
@@ -247,7 +247,7 @@ class TestSyncConflict:
 
 class TestStandaloneProjectUnchanged:
     def test_no_workspace_field_validates(self, tmp_path):
-        """Project with no workspace pointer passes keel validate."""
+        """Project with no workspace pointer passes tripwire validate."""
         proj = tmp_path / "standalone"
         r = _run_keel(
             tmp_path,

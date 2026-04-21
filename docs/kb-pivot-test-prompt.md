@@ -5,7 +5,7 @@ You are testing Keel, a project management tool. Follow these steps one at a tim
 ## Step 1: Initialize
 
 ```bash
-keel init . --name kb-pivot --key-prefix KBP --no-git --force
+tripwire init . --name kb-pivot --key-prefix KBP --no-git --force
 ```
 
 Verify it worked:
@@ -25,29 +25,29 @@ Follow whatever the PM skill and its workflow instruct you to do. Do not cut cor
 
 ## Step 3: Exercise the CLI
 
-After scoping is complete and `keel validate --strict` passes, run each of these and report what you see:
+After scoping is complete and `tripwire validate --strict` passes, run each of these and report what you see:
 
 ```bash
-keel agenda --by status
-keel agenda --by executor --format json
-keel status
-keel status --format json
-keel graph --type concept --format json
-keel refs list --format json
-keel refresh
+tripwire agenda --by status
+tripwire agenda --by executor --format json
+tripwire status
+tripwire status --format json
+tripwire graph --type concept --format json
+tripwire refs list --format json
+tripwire refresh
 ```
 
 Then pick an issue ID and a node ID from your output and run:
 ```bash
-keel graph --type concept --upstream <issue-id> --format json
-keel graph --type concept --downstream <node-id> --format json
-keel validate --strict --format=json --select <issue-id>+
-keel refs reverse <node-id>
+tripwire graph --type concept --upstream <issue-id> --format json
+tripwire graph --type concept --downstream <node-id> --format json
+tripwire validate --strict --format=json --select <issue-id>+
+tripwire refs reverse <node-id>
 ```
 
 Then:
 ```bash
-keel view --port 7777
+tripwire view --port 7777
 ```
 Let it run briefly, then Ctrl+C.
 
@@ -55,8 +55,8 @@ Let it run briefly, then Ctrl+C.
 
 Pick one issue and change its status from `backlog` to `todo`. Edit the file, then:
 ```bash
-keel validate --strict --format=json
-keel agenda --by status
+tripwire validate --strict --format=json
+tripwire agenda --by status
 ```
 
 ## Step 5: Report

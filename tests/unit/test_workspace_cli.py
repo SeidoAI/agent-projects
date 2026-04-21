@@ -1,10 +1,10 @@
-"""keel workspace CLI: init, link, unlink, list, status, prune."""
+"""tripwire workspace CLI: init, link, unlink, list, status, prune."""
 
 from click.testing import CliRunner
 
-from keel.cli.workspace import workspace_cmd
-from keel.core.store import load_project as load_project_config
-from keel.core.workspace_store import load_workspace, workspace_exists
+from tripwire.cli.workspace import workspace_cmd
+from tripwire.core.store import load_project as load_project_config
+from tripwire.core.workspace_store import load_workspace, workspace_exists
 
 # fresh_workspace and fresh_project fixtures live in tests/conftest.py.
 

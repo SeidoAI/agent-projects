@@ -1,12 +1,12 @@
-"""Context budget tests — ensure keel-sourced content stays within bounds.
+"""Context budget tests — ensure tripwire-sourced content stays within bounds.
 
 The PM skill is the single largest source of agent context. These tests
-measure the total size of everything keel ships into a project and fail
+measure the total size of everything tripwire ships into a project and fail
 if it exceeds a budget. This prevents accidental context bloat.
 
 Budget rationale: the PM agent in v0.2 consumed ~160k tokens after
-`keel init`, leaving ~40k for actual work in a 200k window. Planning
-docs are user content (out of our control), but keel-sourced context
+`tripwire init`, leaving ~40k for actual work in a 200k window. Planning
+docs are user content (out of our control), but tripwire-sourced context
 is ours to manage.
 """
 
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from keel.templates import get_templates_dir
+from tripwire.templates import get_templates_dir
 
 TEMPLATES_DIR = get_templates_dir()
 
@@ -77,7 +77,7 @@ def test_pm_skill_md_under_budget() -> None:
 
 
 def test_total_templates_under_budget() -> None:
-    """Everything `keel init` copies must stay under 275KB total.
+    """Everything `tripwire init` copies must stay under 275KB total.
 
     v0.2 was ~217KB. v0.6a adds PM skill docs + slash command split
     + new CLI wrappers. Budget bumped to 275KB.

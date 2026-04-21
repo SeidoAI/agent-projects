@@ -2,7 +2,7 @@
 
 import pytest
 
-from keel.core.session_readiness import check_readiness
+from tripwire.core.session_readiness import check_readiness
 
 
 class TestCheckReadiness:

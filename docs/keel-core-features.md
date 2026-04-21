@@ -18,7 +18,7 @@ Keel is built on the opposite assumption: **the primary author is a forgetful ag
 
 ### 1. The project repo ships its own instruction set
 
-When you `keel init`, you don't just get a data directory. You get:
+When you `tripwire init`, you don't just get a data directory. You get:
 
 - The data schema (typed YAML for issues, concept nodes, sessions)
 - The PM methodology as a skill (`.claude/skills/project-manager/SKILL.md`)
@@ -47,7 +47,7 @@ If you strip everything else out, *git + content-hashed reference nodes + a drif
 
 ### 3. The validation gate is the single contract
 
-`keel validate --strict --format=json` exits 0 or non-zero. That's the entire contract between agents and the system.
+`tripwire validate --strict --format=json` exits 0 or non-zero. That's the entire contract between agents and the system.
 
 Not "agents must understand the schema." Not "agents must follow the workflow." Just: **whatever you do, the gate must pass**.
 
@@ -73,11 +73,11 @@ Example files are the source of truth. Schema docs are secondary reference. This
 
 ### Session artifacts as versioned templates
 
-Every session produces a plan, a task-checklist, a verification-checklist, a testing-plan, and post-completion-comments. These aren't hardcoded — they're customizable Jinja2 templates shipped by `keel init` into the project repo. Different projects can carry different rigor levels (a startup ships a lean ceremony, a regulated enterprise ships a compliance-heavy one), and agents learn the project's taste from the templates. The ceremony is versioned alongside the code it produces.
+Every session produces a plan, a task-checklist, a verification-checklist, a testing-plan, and post-completion-comments. These aren't hardcoded — they're customizable Jinja2 templates shipped by `tripwire init` into the project repo. Different projects can carry different rigor levels (a startup ships a lean ceremony, a regulated enterprise ships a compliance-heavy one), and agents learn the project's taste from the templates. The ceremony is versioned alongside the code it produces.
 
-### `keel brief` as front-loaded context
+### `tripwire brief` as front-loaded context
 
-Agents don't need to poke around with multiple commands to figure out project state. `keel brief` dumps everything an agent needs — next issue key, active enums, artifact manifest, orchestration pattern, template paths, skill example paths — in one compact output. It's the "wake up and read this before doing anything" surface.
+Agents don't need to poke around with multiple commands to figure out project state. `tripwire brief` dumps everything an agent needs — next issue key, active enums, artifact manifest, orchestration pattern, template paths, skill example paths — in one compact output. It's the "wake up and read this before doing anything" surface.
 
 ---
 

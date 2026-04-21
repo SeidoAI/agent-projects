@@ -3,7 +3,7 @@
 
 def test_validator_rejects_invalid_produced_by(tmp_project_manifest):
     """manifest_schema/produced_by_valid fires for unknown agent type."""
-    from keel.core.validator import validate_project
+    from tripwire.core.validator import validate_project
 
     proj = tmp_project_manifest(
         artifacts=[
@@ -25,7 +25,7 @@ def test_validator_rejects_invalid_produced_by(tmp_project_manifest):
 def test_validator_warns_on_phase_ownership_inconsistent(tmp_project_manifest):
     """manifest_schema/phase_ownership_consistent warns when PM owns an
     artifact produced during implementing phase."""
-    from keel.core.validator import validate_project
+    from tripwire.core.validator import validate_project
 
     proj = tmp_project_manifest(
         artifacts=[

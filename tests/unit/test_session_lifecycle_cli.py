@@ -6,8 +6,8 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from keel.cli.session import session_cmd
-from keel.core.session_store import load_session
+from tripwire.cli.session import session_cmd
+from tripwire.core.session_store import load_session
 
 
 def _init_repo(path: Path) -> None:

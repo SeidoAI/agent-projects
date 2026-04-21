@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from keel.ui.server import create_app
+from tripwire.ui.server import create_app
 
 
 class TestRegisterRoutes:

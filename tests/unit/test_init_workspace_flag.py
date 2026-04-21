@@ -1,4 +1,4 @@
-"""keel init --workspace: link newly-initialized project to a workspace."""
+"""tripwire init --workspace: link newly-initialized project to a workspace."""
 
 import subprocess
 from pathlib import Path
@@ -6,10 +6,10 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from keel.cli.init import init_cmd
-from keel.core.paths import workspace_nodes_dir
-from keel.core.store import load_project
-from keel.core.workspace_store import load_workspace
+from tripwire.cli.init import init_cmd
+from tripwire.core.paths import workspace_nodes_dir
+from tripwire.core.store import load_project
+from tripwire.core.workspace_store import load_workspace
 
 
 def _init_args(target, **overrides):
@@ -121,7 +121,7 @@ class TestInitWithWorkspace:
         )
         assert result.exit_code == 0, result.output
 
-        from keel.core.node_store import list_nodes
+        from tripwire.core.node_store import list_nodes
 
         nodes = list_nodes(target)
         assert any(n.id == "auth-system" for n in nodes)

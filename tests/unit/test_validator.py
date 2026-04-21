@@ -14,8 +14,8 @@ from typing import Any
 import pytest
 import yaml
 
-from keel.core.parser import serialize_frontmatter_body
-from keel.core.validator import (
+from tripwire.core.parser import serialize_frontmatter_body
+from tripwire.core.validator import (
     ValidationReport,
     validate_project,
 )
@@ -34,7 +34,7 @@ from keel.core.validator import (
 #   reports the resulting invalid file.
 #
 # - `save_test_issue` / `save_test_node` / `save_test_session` — go
-#   through `keel.core.store` / `node_store` / `session_store`. Use when
+#   through `tripwire.core.store` / `node_store` / `session_store`. Use when
 #   the test only cares about *validator behaviour* on structurally
 #   valid input. These helpers stay green when the on-disk layout
 #   changes — the stores encapsulate the layout.
@@ -201,8 +201,8 @@ def save_test_issue(
     correct. Use for tests that assert validator behaviour on
     structurally valid input.
     """
-    from keel.core.store import save_issue
-    from keel.models import Issue
+    from tripwire.core.store import save_issue
+    from tripwire.models import Issue
 
     default_body = (
         "## Context\nWith [[user-model]] reference.\n"
@@ -236,8 +236,8 @@ def save_test_node(
     **kwargs: Any,
 ) -> None:
     """Save a minimal valid ConceptNode through `node_store.save_node`."""
-    from keel.core.node_store import save_node
-    from keel.models import ConceptNode
+    from tripwire.core.node_store import save_node
+    from tripwire.models import ConceptNode
 
     fm: dict[str, Any] = {
         "id": node_id,
@@ -263,9 +263,9 @@ def save_test_session(
     YAML. The session directory layout is handled by the store — callers
     don't need to know about it.
     """
-    from keel.core import paths
-    from keel.core.session_store import save_session
-    from keel.models import AgentSession
+    from tripwire.core import paths
+    from tripwire.core.session_store import save_session
+    from tripwire.models import AgentSession
 
     fm: dict[str, Any] = {
         "id": session_id,
@@ -822,7 +822,7 @@ class TestCategorySummary:
         assert report.category_summary == {}
 
     def test_single_error_counted(self) -> None:
-        from keel.core.validator import CheckResult
+        from tripwire.core.validator import CheckResult
 
         report = ValidationReport(
             errors=[CheckResult(code="ref/dangling", severity="error", message="x")]
@@ -834,7 +834,7 @@ class TestCategorySummary:
         assert cats["ref"]["fixed"] == 0
 
     def test_mixed_severities_and_categories(self) -> None:
-        from keel.core.validator import CheckResult
+        from tripwire.core.validator import CheckResult
 
         report = ValidationReport(
             errors=[

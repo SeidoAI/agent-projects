@@ -1,4 +1,4 @@
-"""Tests for keel.ui.server — app factory, lifespan, start_server."""
+"""Tests for tripwire.ui.server — app factory, lifespan, start_server."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from unittest.mock import patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from keel.ui.server import create_app, start_server
+from tripwire.ui.server import create_app, start_server
 
 
 class TestCreateApp:
@@ -17,11 +17,11 @@ class TestCreateApp:
         assert isinstance(app, FastAPI)
 
     def test_title_and_version(self):
-        import keel
+        import tripwire
 
         app = create_app(dev_mode=True)
         assert app.title == "Keel UI"
-        assert app.version == keel.__version__
+        assert app.version == tripwire.__version__
 
     def test_openapi_json_available(self):
         app = create_app(dev_mode=True)
@@ -114,7 +114,7 @@ class TestStartServer:
         assert captured_app.state.project_dirs == [proj]
 
     def test_seeds_project_index(self, tmp_path: Path):
-        from keel.ui.services.project_service import (
+        from tripwire.ui.services.project_service import (
             _project_id,
             get_project_dir,
             reload_project_index,

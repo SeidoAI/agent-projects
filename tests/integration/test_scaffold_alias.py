@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from keel.cli.main import cli
+from tripwire.cli.main import cli
 
 
 @pytest.fixture
@@ -75,7 +75,7 @@ def test_brief_and_alias_produce_identical_output(
 
 
 def test_scaffold_alias_hidden_from_help(runner: CliRunner) -> None:
-    """The `scaffold-for-creation` alias should not appear in `keel --help`."""
+    """The `scaffold-for-creation` alias should not appear in `tripwire --help`."""
     result = runner.invoke(cli, ["--help"])
     assert result.exit_code == 0
     assert "brief" in result.output
@@ -83,7 +83,7 @@ def test_scaffold_alias_hidden_from_help(runner: CliRunner) -> None:
 
 
 def test_brief_in_help(runner: CliRunner) -> None:
-    """`brief` should appear in `keel --help` with its description."""
+    """`brief` should appear in `tripwire --help` with its description."""
     result = runner.invoke(cli, ["--help"])
     assert result.exit_code == 0
     assert "brief" in result.output

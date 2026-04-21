@@ -5,8 +5,8 @@ from __future__ import annotations
 import click
 import pytest
 
-from keel.cli.graph import _bfs_reachable, _filter_graph_by_direction
-from keel.models.graph import FullGraphResult, GraphEdge, GraphNode
+from tripwire.cli.graph import _bfs_reachable, _filter_graph_by_direction
+from tripwire.models.graph import FullGraphResult, GraphEdge, GraphNode
 
 
 def _make_graph() -> FullGraphResult:

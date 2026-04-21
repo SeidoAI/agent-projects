@@ -1,8 +1,8 @@
-"""keel session CLI (v0.6a additions: derive-branch, check, progress)."""
+"""tripwire session CLI (v0.6a additions: derive-branch, check, progress)."""
 
 from click.testing import CliRunner
 
-from keel.cli.session import session_cmd
+from tripwire.cli.session import session_cmd
 
 
 class TestDeriveBranch:

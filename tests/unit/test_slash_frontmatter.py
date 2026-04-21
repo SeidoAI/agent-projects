@@ -10,7 +10,7 @@ from pathlib import Path
 import yaml
 
 COMMANDS_DIR = (
-    Path(__file__).parent.parent.parent / "src" / "keel" / "templates" / "commands"
+    Path(__file__).parent.parent.parent / "src" / "tripwire" / "templates" / "commands"
 )
 
 ALLOWED_NAMES = {

@@ -1,4 +1,4 @@
-"""Tests for keel session spawn."""
+"""Tests for tripwire session spawn."""
 
 import subprocess
 from pathlib import Path
@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from keel.cli.session import session_cmd
-from keel.core.session_store import load_session
+from tripwire.cli.session import session_cmd
+from tripwire.core.session_store import load_session
 
 
 def _init_repo(path: Path) -> None:
@@ -53,13 +53,13 @@ class TestSessionSpawn:
             "s1",
             plan=True,
             status="queued",
-            repos=[{"repo": "SeidoAI/keel", "base_branch": "main"}],
+            repos=[{"repo": "SeidoAI/tripwire", "base_branch": "main"}],
         )
         write_handoff_yaml(tmp_path_project, "s1")
 
         with (
             patch("shutil.which", return_value="/usr/bin/claude"),
-            patch("keel.cli.session._resolve_clone_path", return_value=clone),
+            patch("tripwire.cli.session._resolve_clone_path", return_value=clone),
         ):
             runner = CliRunner()
             result = runner.invoke(
@@ -84,15 +84,15 @@ class TestSessionSpawn:
             plan=True,
             status="queued",
             repos=[
-                {"repo": "SeidoAI/keel", "base_branch": "main", "branch": "feat/s1"}
+                {"repo": "SeidoAI/tripwire", "base_branch": "main", "branch": "feat/s1"}
             ],
         )
         write_handoff_yaml(tmp_path_project, "s1", branch="feat/s1")
 
         with (
             patch("shutil.which", return_value="/usr/bin/claude"),
-            patch("keel.cli.session._resolve_clone_path", return_value=clone),
-            patch("keel.cli.session._launch_claude", return_value=99999),
+            patch("tripwire.cli.session._resolve_clone_path", return_value=clone),
+            patch("tripwire.cli.session._launch_claude", return_value=99999),
         ):
             runner = CliRunner()
             result = runner.invoke(

@@ -1,0 +1,44 @@
+# {{ project_name }}
+
+This is a `tripwire` repository: git-native project management with a
+concept graph, designed to be driven primarily by Claude Code (or similar
+agents) loaded with the `project-manager` skill.
+
+## For the PM agent
+
+If you are an agent loaded with the `project-manager` skill, your entry
+point is `.claude/skills/project-manager/SKILL.md`. Before doing any work,
+run:
+
+```
+tripwire brief
+```
+
+This prints the project config, active enums, templates, and next-available
+IDs — everything you need to start creating or updating entities. Then
+read the relevant workflow reference from the skill (usually
+`WORKFLOWS_INITIAL_SCOPING.md` or `WORKFLOWS_INCREMENTAL_UPDATE.md`).
+
+After every batch of file writes, run:
+
+```
+tripwire validate --strict
+```
+
+This is the gate. Parse the JSON, fix every error, re-run until exit 0.
+
+## For humans
+
+- `issues/` — one YAML file per issue
+- `nodes/` — one YAML file per concept node
+- `sessions/` — agent session definitions and runtime state
+- `issues/<KEY>/` — per-issue developer notes, comments, verified records
+- `project.yaml` — project config (status flow, repos, orchestration defaults)
+- `.claude/skills/project-manager/` — PM skill (loaded by agents; edit to
+  customise agent behaviour for this project)
+
+Humans typically interact with this repo through the agent rather than by
+editing YAML directly. If you need to make changes, ask the agent.
+
+Key prefix: **{{ key_prefix }}**
+Base branch: **{{ base_branch }}**

@@ -2,7 +2,7 @@
 
 import pytest
 
-from keel.core.session_agenda import (
+from tripwire.core.session_agenda import (
     CycleDetectedError,
     build_agenda,
 )

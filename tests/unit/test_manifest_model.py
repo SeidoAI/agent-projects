@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from keel.models.manifest import ArtifactEntry, ArtifactManifest
+from tripwire.models.manifest import ArtifactEntry, ArtifactManifest
 
 
 class TestArtifactEntry:

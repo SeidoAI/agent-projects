@@ -1,0 +1,109 @@
+"""File-based CRUD for agent sessions.
+
+Sessions live at `<project>/sessions/<id>/session.yaml`. The session
+directory contains:
+
+- `session.yaml` — the session definition (frontmatter + optional body)
+- `plan.md` — the implementation plan (required before phase `executing`)
+- `artifacts/` — session artifacts produced during execution
+- `comments/` — session-level messages
+
+This module handles only the YAML file. Artifacts, plans, and comments
+are accessed via their own path helpers in `tripwire.core.paths`.
+
+The directory layout is enforced here: `list_sessions` only finds
+sessions that have `session.yaml` in their directory. A flat
+`sessions/<id>.yaml` is not recognised.
+"""
+
+from __future__ import annotations
+
+import shutil
+from datetime import datetime
+from pathlib import Path
+
+from tripwire.core import paths
+from tripwire.core.parser import (
+    ParseError,
+    parse_frontmatter_body,
+    serialize_frontmatter_body,
+)
+from tripwire.models.session import AgentSession
+
+
+def session_dir(project_dir: Path, session_id: str) -> Path:
+    """Directory containing `session.yaml`, `plan.md`, `artifacts/`."""
+    return paths.session_dir(project_dir, session_id)
+
+
+def session_yaml_path(project_dir: Path, session_id: str) -> Path:
+    """Path to the session YAML file inside its directory."""
+    return paths.session_yaml_path(project_dir, session_id)
+
+
+def load_session(project_dir: Path, session_id: str) -> AgentSession:
+    """Load `sessions/<session_id>/session.yaml` into an AgentSession."""
+    path = session_yaml_path(project_dir, session_id)
+    if not path.exists():
+        raise FileNotFoundError(f"Session file not found: {path}")
+    text = path.read_text(encoding="utf-8")
+    try:
+        frontmatter, body = parse_frontmatter_body(text)
+    except ParseError as exc:
+        raise ValueError(f"Could not parse {path}: {exc}") from exc
+    return AgentSession.model_validate({**frontmatter, "body": body})
+
+
+def save_session(project_dir: Path, session: AgentSession) -> None:
+    """Serialise an AgentSession to `sessions/<id>/session.yaml`.
+
+    Creates the session directory if missing. Sets `updated_at` to now
+    if it is unset. Does not invalidate the graph cache (sessions are
+    not tracked in the concept graph).
+    """
+    if session.updated_at is None:
+        session.updated_at = datetime.now()
+
+    path = session_yaml_path(project_dir, session.id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    data = session.model_dump(mode="json", exclude={"body"}, exclude_none=True)
+    text = serialize_frontmatter_body(data, session.body)
+    path.write_text(text, encoding="utf-8")
+
+
+def list_sessions(project_dir: Path) -> list[AgentSession]:
+    """Load every session under `sessions/<id>/session.yaml`.
+
+    Files that fail to parse raise the error; callers must decide whether
+    to skip them. The validator loader swallows per-file errors and
+    reports them as `session/parse_error` / `session/schema_invalid`.
+    """
+    sessions_root = paths.sessions_dir(project_dir)
+    if not sessions_root.is_dir():
+        return []
+    sessions: list[AgentSession] = []
+    for sdir in sorted(p for p in sessions_root.iterdir() if p.is_dir()):
+        if sdir.name.startswith("."):
+            continue
+        yaml_path = sdir / paths.SESSION_FILENAME
+        if not yaml_path.is_file():
+            continue
+        text = yaml_path.read_text(encoding="utf-8")
+        frontmatter, body = parse_frontmatter_body(text)
+        sessions.append(AgentSession.model_validate({**frontmatter, "body": body}))
+    return sessions
+
+
+def session_exists(project_dir: Path, session_id: str) -> bool:
+    return session_yaml_path(project_dir, session_id).is_file()
+
+
+def delete_session(project_dir: Path, session_id: str) -> None:
+    """Delete an entire session directory (yaml, plan, artifacts, comments).
+
+    No-op if the directory does not exist.
+    """
+    sdir = session_dir(project_dir, session_id)
+    if sdir.exists():
+        shutil.rmtree(sdir)

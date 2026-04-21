@@ -5,7 +5,7 @@ non-overlapping auto-merge) and conflict detection. Agent-mediated
 brief generation is separately tested in test_merge_brief.
 """
 
-from keel.core.workspace_sync import (
+from tripwire.core.workspace_sync import (
     MergeStatus,
     merge_nodes,
 )

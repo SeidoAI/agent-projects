@@ -1,4 +1,4 @@
-"""keel workspace pull — conflict path writes merge briefs."""
+"""tripwire workspace pull — conflict path writes merge briefs."""
 
 import subprocess
 from pathlib import Path
@@ -6,9 +6,9 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from keel.cli.workspace import workspace_cmd
-from keel.core.merge_brief import load_merge_brief
-from keel.core.paths import merge_brief_path, workspace_nodes_dir
+from tripwire.cli.workspace import workspace_cmd
+from tripwire.core.merge_brief import load_merge_brief
+from tripwire.core.paths import merge_brief_path, workspace_nodes_dir
 
 
 def _git_commit_all(repo: Path, message: str) -> str:
@@ -82,7 +82,7 @@ class TestPullWritesBriefOnConflict:
         )
 
         # Project modifies description locally.
-        from keel.core.node_store import load_node, save_node
+        from tripwire.core.node_store import load_node, save_node
 
         node = load_node(proj_dir, "auth-system")
         save_node(
@@ -140,7 +140,7 @@ tags: []
             workspace_cmd, ["copy", "auth-system", "--project-dir", str(proj_dir)]
         )
 
-        from keel.core.node_store import load_node, save_node
+        from tripwire.core.node_store import load_node, save_node
 
         node = load_node(proj_dir, "auth-system")
         save_node(

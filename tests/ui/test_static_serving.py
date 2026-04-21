@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from keel.ui.server import create_app
+from tripwire.ui.server import create_app
 
 
 class TestDevMode:
@@ -21,7 +21,7 @@ class TestDevMode:
         assert r.status_code == 404
 
     def test_info_log_emitted(self, caplog):
-        with caplog.at_level(logging.INFO, logger="keel.ui.server"):
+        with caplog.at_level(logging.INFO, logger="tripwire.ui.server"):
             create_app(dev_mode=True)
         assert any("Dev mode" in m for m in caplog.messages)
 
@@ -31,19 +31,17 @@ class TestProdModeWithBundle:
         static = tmp_path / "static"
         static.mkdir()
         (static / "index.html").write_text(
-            "<html><body>keel</body></html>", encoding="utf-8"
+            "<html><body>tripwire</body></html>", encoding="utf-8"
         )
 
-        with patch(
-            "keel.ui.server.importlib.resources.files"
-        ) as mock_files:
+        with patch("tripwire.ui.server.importlib.resources.files") as mock_files:
             mock_files.return_value = tmp_path
             app = create_app(dev_mode=False)
 
         client = TestClient(app)
         r = client.get("/")
         assert r.status_code == 200
-        assert "keel" in r.text
+        assert "tripwire" in r.text
 
     def test_unknown_path_returns_index_html(self, tmp_path: Path):
         static = tmp_path / "static"
@@ -52,9 +50,7 @@ class TestProdModeWithBundle:
             "<html><body>spa-fallback</body></html>", encoding="utf-8"
         )
 
-        with patch(
-            "keel.ui.server.importlib.resources.files"
-        ) as mock_files:
+        with patch("tripwire.ui.server.importlib.resources.files") as mock_files:
             mock_files.return_value = tmp_path
             app = create_app(dev_mode=False)
 
@@ -68,9 +64,7 @@ class TestProdModeWithBundle:
         static.mkdir()
         (static / "index.html").write_text("<html></html>", encoding="utf-8")
 
-        with patch(
-            "keel.ui.server.importlib.resources.files"
-        ) as mock_files:
+        with patch("tripwire.ui.server.importlib.resources.files") as mock_files:
             mock_files.return_value = tmp_path
             app = create_app(dev_mode=False)
 
@@ -82,7 +76,7 @@ class TestProdModeWithBundle:
 
 class TestProdModeWithoutBundle:
     def test_warning_logged(self, caplog):
-        with caplog.at_level(logging.WARNING, logger="keel.ui.server"):
+        with caplog.at_level(logging.WARNING, logger="tripwire.ui.server"):
             create_app(dev_mode=False)
         assert any("Frontend statics not found" in m for m in caplog.messages)
 
