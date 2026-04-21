@@ -43,7 +43,7 @@ from tripwire.core.git_helpers import (
 from tripwire.core.process_helpers import is_alive, send_sigterm
 from tripwire.core.session_readiness import check_readiness
 from tripwire.core.session_store import list_sessions, load_session, save_session
-from tripwire.models.session import EngagementEntry, WorktreeEntry
+from tripwire.models.session import AgentSession, EngagementEntry, WorktreeEntry
 
 console = Console()
 
@@ -395,49 +395,69 @@ def _resolve_clone_path(project_dir: Path, repo_slug: str) -> Path | None:
 def _launch_claude(
     wt_path: Path,
     plan_content: str,
-    session_id: str,
+    session: AgentSession,
+    project_dir: Path,
     session_name: str,
     branch_type: str,
     claude_session_id: str,
     max_turns: int,
     log_path: Path,
+    project_slug: str,
     *,
     resume: bool = False,
 ) -> int:
-    """Launch ``claude -p`` as a background process. Returns PID."""
-    prompt = (
-        f"{plan_content}\n\n"
-        f"You are autonomous. Execute the plan above.\n"
-        f"Stop only at the plan's stop-and-ask points.\n"
-        f"Open a PR titled '{branch_type}({session_id}): {session_name}' when done.\n"
-        f"Report back as the final message."
+    """Launch ``claude -p`` as a background process. Returns PID.
+
+    Spawn args are built from the resolved spawn config (tripwire default
+    ← project ← session overrides). `max_turns` is the CLI override that
+    wins over any layer; if None, the resolved config's value is used.
+    """
+    from tripwire.core.spawn_config import (
+        build_claude_args,
+        load_resolved_spawn_config,
+        render_prompt,
+        render_system_append,
+    )
+
+    resolved = load_resolved_spawn_config(project_dir, session=session)
+    # CLI max-turns override, if provided, takes final precedence.
+    if max_turns is not None:
+        resolved.config.max_turns = max_turns
+
+    prompt = render_prompt(
+        resolved,
+        plan=plan_content,
+        agent=session.agent,
+        session_id=session.id,
+        session_name=session_name,
+        session_slug=session.id,
+        branch_type=branch_type,
+    )
+    system_append = render_system_append(
+        resolved,
+        session_id=session.id,
+        project_slug=project_slug,
+    )
+    args = build_claude_args(
+        resolved,
+        prompt=prompt,
+        system_append=system_append,
+        claude_session_id=claude_session_id,
+        resume=resume,
     )
 
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_file = open(log_path, "w")
-
-    args = [
-        "claude",
-        "-p",
-        prompt,
-        "--session-id",
-        claude_session_id,
-        "--max-turns",
-        str(max_turns),
-        "--output-format",
-        "json",
-    ]
-    if resume:
-        args.append("--resume")
-
-    proc = subprocess.Popen(
-        args,
-        cwd=str(wt_path),
-        stdout=log_file,
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
-    )
-    log_file.close()
+    try:
+        proc = subprocess.Popen(
+            args,
+            cwd=str(wt_path),
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    finally:
+        log_file.close()
     return proc.pid
 
 
@@ -608,12 +628,14 @@ def session_spawn_cmd(
     pid = _launch_claude(
         wt_path=primary_wt_path,
         plan_content=plan_content,
-        session_id=session_id,
+        session=session,
+        project_dir=resolved,
         session_name=session.name,
         branch_type=branch_type,
         claude_session_id=claude_sid,
         max_turns=max_turns,
         log_path=log_file,
+        project_slug=project_slug,
         resume=resume_flag,
     )
 

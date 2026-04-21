@@ -34,11 +34,7 @@ def _deep_merge(base: dict, override: dict) -> dict:
     """Merge `override` into `base`. Dicts recurse; other types replace."""
     result = dict(base)
     for key, value in override.items():
-        if (
-            key in result
-            and isinstance(result[key], dict)
-            and isinstance(value, dict)
-        ):
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
             result[key] = _deep_merge(result[key], value)
         else:
             result[key] = value
@@ -55,13 +51,9 @@ def load_resolved_spawn_config(
     )
 
     # 2. Project file override
-    file_override = (
-        project_dir / ".tripwire" / "spawn" / "defaults.yaml"
-    )
+    file_override = project_dir / ".tripwire" / "spawn" / "defaults.yaml"
     if file_override.is_file():
-        override = (
-            yaml.safe_load(file_override.read_text(encoding="utf-8")) or {}
-        )
+        override = yaml.safe_load(file_override.read_text(encoding="utf-8")) or {}
         base = _deep_merge(base, override)
 
     # 3. Project.yaml inline
@@ -100,19 +92,22 @@ def build_claude_args(
     *,
     prompt: str,
     system_append: str,
-    session_id: str,
+    claude_session_id: str,
     resume: bool = False,
 ) -> list[str]:
-    """Build the claude CLI argv from the resolved config."""
+    """Build the claude CLI argv from the resolved spawn config.
+
+    `claude_session_id` is claude's internal session identifier (UUID),
+    used by `claude -p --session-id` for conversation resumption — distinct
+    from the tripwire session_id which names the tripwire lifecycle unit.
+    """
     cfg = defaults.config
     args = [
         defaults.invocation.command,
         "-p",
         prompt,
-        "--name",
-        session_id,
-        "--effort",
-        cfg.effort,
+        "--session-id",
+        claude_session_id,
         "--model",
         cfg.model,
         "--fallback-model",
@@ -123,8 +118,6 @@ def build_claude_args(
         ",".join(cfg.disallowed_tools),
         "--max-turns",
         str(cfg.max_turns),
-        "--max-budget-usd",
-        str(cfg.max_budget_usd),
         "--output-format",
         cfg.output_format,
         "--append-system-prompt",

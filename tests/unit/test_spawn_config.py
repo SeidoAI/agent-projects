@@ -56,9 +56,7 @@ def test_project_file_override_read(tmp_path_project: Path):
     assert resolved.config.model == "haiku"
 
 
-def test_session_override_wins_over_project(
-    tmp_path_project: Path, save_test_session
-):
+def test_session_override_wins_over_project(tmp_path_project: Path, save_test_session):
     # Project sets model=haiku, session sets model=sonnet → sonnet wins.
     project_yaml = tmp_path_project / "project.yaml"
     data = yaml.safe_load(project_yaml.read_text(encoding="utf-8"))
@@ -93,12 +91,14 @@ def test_build_claude_args_shape():
         defaults,
         prompt="Do the thing.",
         system_append="extras",
-        session_id="s1",
+        claude_session_id="abc-123",
         resume=False,
     )
     assert args[0] == "claude"
     assert "-p" in args
     assert "Do the thing." in args
+    assert "--session-id" in args
+    assert "abc-123" in args
     assert "--model" in args
     assert "--disallowedTools" in args
     assert "Agent" in args
@@ -113,7 +113,7 @@ def test_build_claude_args_with_resume():
         defaults,
         prompt="x",
         system_append="y",
-        session_id="s1",
+        claude_session_id="abc",
         resume=True,
     )
     assert args[-1] == "--resume"

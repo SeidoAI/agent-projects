@@ -11,9 +11,7 @@ from tripwire.models.spawn import SpawnDefaults
 def test_spawn_defaults_load_from_shipped():
     import tripwire
 
-    path = (
-        Path(tripwire.__file__).parent / "templates" / "spawn" / "defaults.yaml"
-    )
+    path = Path(tripwire.__file__).parent / "templates" / "spawn" / "defaults.yaml"
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     defaults = SpawnDefaults.model_validate(data)
 
