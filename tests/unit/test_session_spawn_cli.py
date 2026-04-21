@@ -11,7 +11,9 @@ from tripwire.core.session_store import load_session
 
 
 def _init_repo(path: Path) -> None:
-    subprocess.run(["git", "init", "-q"], cwd=path, check=True)
+    # `-b main` makes the initial branch deterministic regardless of
+    # `init.defaultBranch`.
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=path, check=True)
     subprocess.run(
         [
             "git",
