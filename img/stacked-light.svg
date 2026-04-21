@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 440">
+  
+  <rect x="0" y="0" width="480" height="440" fill="#f0eee9"></rect>
+  <g transform="translate(112 20)">
+    <path d="M 20 210 L 96 210 Q 118 178 140 210 L 236 210" stroke="#c83d2e" stroke-width="6" fill="none" stroke-linecap="round"></path>
+    <g transform="rotate(8 128 200)">
+      <text x="128" y="168" text-anchor="middle" font-size="200" fill="#1a1815" letter-spacing="-3">p</text>
+    </g>
+  </g>
+  <g transform="translate(30 290)">
+    <path d="M 20 124 L 92 124 Q 104 114 116 124 L 400 124" stroke="#c83d2e" stroke-width="1.8" fill="none" stroke-linecap="round"></path>
+    <text x="20" y="104" font-size="88" fill="#1a1815" letter-spacing="-2.4">tri</text>
+    <g transform="rotate(8 104 124)">
+      <text x="84" y="104" font-size="88" fill="#1a1815" letter-spacing="-2.4">p</text>
+    </g>
+    <text x="126" y="104" font-size="88" fill="#1a1815" letter-spacing="-2.4">wire</text>
+  </g>
+</svg>
