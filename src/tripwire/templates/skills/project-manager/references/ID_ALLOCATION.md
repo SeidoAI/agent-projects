@@ -28,14 +28,14 @@ Issues carry a human-readable `<PREFIX>-<N>` key (e.g. `SEI-42`).
 **Allocate keys via the CLI:**
 
 ```bash
-keel next-key --type issue
+tripwire next-key --type issue
 # → SEI-42
 ```
 
 For a batch of N issues, use `--count N`:
 
 ```bash
-keel next-key --type issue --count 5
+tripwire next-key --type issue --count 5
 # → SEI-42
 # → SEI-43
 # → SEI-44

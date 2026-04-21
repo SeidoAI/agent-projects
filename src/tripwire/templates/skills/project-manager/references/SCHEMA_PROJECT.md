@@ -1,6 +1,6 @@
 # Schema: project.yaml
 
-The root config file for an keel repo. Defines the project's
+The root config file for a tripwire repo. Defines the project's
 name, key prefix, repo registry, status flow, enum defaults, and
 counters. Read it early in any workflow — everything else references it.
 
@@ -48,7 +48,7 @@ orchestration:
   plan_approval_required: false
   auto_merge_on_pass: false
 
-# Sequential key counters — DO NOT hand-edit. Use `keel next-key`.
+# Sequential key counters — DO NOT hand-edit. Use `tripwire next-key`.
 next_issue_number: 1
 next_session_number: 1
 
@@ -68,7 +68,7 @@ created_at: "2026-04-07T10:00:00"
 ## When NOT to update
 
 - **`next_issue_number` / `next_session_number`** — use
-  `keel next-key`. Hand-editing these causes sequence drift
+  `tripwire next-key`. Hand-editing these causes sequence drift
   that the validator catches but is a waste of an iteration.
 - **Removing statuses that issues are currently in** — you'll create
   unreachable-status errors.

@@ -7,7 +7,7 @@ session plans ready for delegation to execution agents.
 
 ## Precondition
 
-You are in a freshly-init'd `keel` directory. `keel init` creates an
+You are in a freshly-init'd `tripwire` directory. `tripwire init` creates an
 empty `./plans/` subdirectory by default — the user drops raw planning
 docs in there before invoking scoping. Scoping also works from user
 intent alone if `./plans/` is empty or missing.
@@ -34,7 +34,7 @@ repetitive, that is a signal that it is important.
 
 ### 1. Front-load context
 ```bash
-keel brief
+tripwire brief
 ```
 Read the output. Note the `next issue key`, active enums, registered
 repos, artifact manifest, orchestration pattern, and skill example
@@ -110,13 +110,13 @@ cannot proceed.
 
 Read `plans/artifacts/scoping-plan.md`. For each issue listed:
 ```bash
-keel next-key --type issue --count N
+tripwire next-key --type issue --count N
 ```
 where N is the number of issues. Collect the allocated keys.
 
 For UUIDs:
 ```bash
-keel uuid --count N
+tripwire uuid --count N
 ```
 where N is the total entity count (issues + nodes + sessions). Save
 the output. Assign UUIDs to entities from this list as you write
@@ -176,7 +176,7 @@ After every 20 concrete issues written, pause and calibrate:
    quality standard. Do not rationalise the difference ("these are
    simpler issues") — check the planning docs to verify.
 
-4. **Run `keel validate --strict`** after rewriting to confirm the
+4. **Run `tripwire validate --strict`** after rewriting to confirm the
    rewrites are clean.
 
 5. **Record the calibration** in `plans/artifacts/compliance.md`
@@ -194,7 +194,7 @@ validator also detects this pattern (`quality/body_degradation`,
 
 After every 3-5 files:
 ```bash
-keel validate --strict
+tripwire validate --strict
 ```
 
 Default output is human-readable text. Use `--format summary` for
@@ -211,7 +211,7 @@ by category. Walk them in order:
 
 Repeat until `exit_code == 0`.
 
-**What validate checks and doesn't check:** `keel validate` checks
+**What validate checks and doesn't check:** `tripwire validate` checks
 structural integrity — schemas, references, bidirectional consistency,
 status transitions, freshness, UUID format. It does NOT check semantic
 completeness. A clean validate means structurally sound, not "the
@@ -235,7 +235,7 @@ body:
 - Any issue with zero `[[node-id]]` references in its body? → The
   issue isn't linked to the concept graph. Add references.
 
-Run `keel refs summary` to see reference counts across all nodes.
+Run `tripwire refs summary` to see reference counts across all nodes.
 
 ### 9. Gap analysis
 
@@ -267,7 +267,7 @@ depend on endpoints the API spec doesn't list? Flag as
 **INCONSISTENCY** and create a comment on the relevant issue.
 
 **Project self-coherence:**
-Run `keel agenda` and `keel graph --type concept`. Check:
+Run `tripwire agenda` and `tripwire graph --type concept`. Check:
 - Any issues with 0 concept node refs? Flag.
 - Any nodes with only 1 referrer? Flag.
 - Any sessions with 0 issues? Flag.
@@ -297,11 +297,11 @@ Write three artifacts in `plans/artifacts/`:
 
 ### 11. Final validation + confirm shape
 ```bash
-keel validate --strict
-keel status
-keel agenda --by status
-keel graph --type concept
-keel refs summary
+tripwire validate --strict
+tripwire status
+tripwire agenda --by status
+tripwire graph --type concept
+tripwire refs summary
 ```
 All clean. Counts match your scoping plan. No orphan nodes.
 
@@ -321,7 +321,7 @@ Advance the project phase:
 phase: scoped
 ```
 
-Then run `keel validate --strict`. If the gap analysis or compliance
+Then run `tripwire validate --strict`. If the gap analysis or compliance
 artifacts are missing or incomplete, validation will fail. Fix before
 committing.
 
@@ -340,7 +340,7 @@ Per `COMMIT_CONVENTIONS.md`. One commit for the whole initial scoping.
 - Skipping session plans ("I'll write them later").
 - Omitting repo fields from issues because repos aren't registered
   (register them first).
-- Hand-crafting UUIDs instead of using `keel uuid`.
+- Hand-crafting UUIDs instead of using `tripwire uuid`.
 - Treating validate-green as "done" (it checks structure, not
   completeness).
 - **Delegating file writing to subagents.** Write every file yourself.
@@ -361,7 +361,7 @@ Per `COMMIT_CONVENTIONS.md`. One commit for the whole initial scoping.
 | "I'll write the plan later — let me get the issues down first" | The plan artifact is consumed by step 5. It must exist first. |
 | "The planning docs are ambiguous so I'll make my best guess" | Stop. Ask the user. A wrong assumption cascades into every issue. |
 | "I'll skip the gap analysis — validate passed" | Validate checks structure. Gap analysis checks completeness. Both are required. |
-| "I can track UUIDs in my head if I make them predictable" | Use `keel uuid`. Hand-crafted UUIDs will be caught by the validator. |
+| "I can track UUIDs in my head if I make them predictable" | Use `tripwire uuid`. Hand-crafted UUIDs will be caught by the validator. |
 | "With more time I would split this issue" | You have the time. Split it now. |
 | "The execution agent will figure out the details" | No. The execution agent has no context you don't write down. Be explicit. |
 | "These later issues are simpler, they don't need as much detail" | Check the planning docs. Every issue needs the same depth of context, test plan, and node references regardless of position in the sequence. |

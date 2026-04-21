@@ -75,4 +75,4 @@ make lint
 - [ ] `issues/SEI-42/developer.md` written
 - [ ] `issues/SEI-42/verified.md` written (by the verifier agent)
 - [ ] [[auth-token-endpoint]] node created and referenced here
-- [ ] `keel validate --strict` exits 0
+- [ ] `tripwire validate --strict` exits 0

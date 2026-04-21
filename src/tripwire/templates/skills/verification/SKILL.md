@@ -7,11 +7,11 @@ description: >-
   a read-only agent — cannot push code, only post PR reviews.
 license: MIT
 metadata:
-  author: keel
+  author: tripwire
   version: "1.0"
 compatibility: >-
   Any target code repo. Requires `gh` CLI for PR operations. Uses
-  the keel CLI for concept graph freshness checks.
+  the tripwire CLI for concept graph freshness checks.
 ---
 
 # Verification
@@ -27,7 +27,7 @@ commits or merge PRs. You can only:
 
 - Read the PR diff and comments
 - Run tests locally in a clone of the target repo
-- Run `keel` CLI commands against the project repo
+- Run `tripwire` CLI commands against the project repo
 - Post PR reviews (approve, request changes, comment)
 - Write `verified.md` to the project repo and commit it
 
@@ -136,17 +136,17 @@ incomplete implementation.
 
 12. **Identify nodes the PR touched**. For every source path in the
     diff, check if any node points at it (use
-    `keel refs reverse` or read the cache directly).
+    `tripwire refs reverse` or read the cache directly).
 13. **Confirm nodes that point at changed code were rehashed**:
     ```bash
-    keel node check
+    tripwire node check
     ```
     If any active node is stale after the PR merges, flag it.
 14. **Confirm new concept nodes were created** where the issue's
     Definition of Done says they should be.
 15. **Run the project-level validator**:
     ```bash
-    keel validate --strict
+    tripwire validate --strict
     ```
     Any errors must be fixed before approval.
 
@@ -175,8 +175,8 @@ incomplete implementation.
 
     ### Evidence
     - `make test` → 42 passed in 3.2s
-    - `keel validate --strict` → exit 0
-    - `keel node check` → all fresh
+    - `tripwire validate --strict` → exit 0
+    - `tripwire node check` → all fresh
 
     Approved.
     EOF
@@ -204,7 +204,7 @@ incomplete implementation.
     2. Rewrite `test_expired_token` to use real timestamps
     3. Rehash [[user-model]] and update `updated_at`
 
-    After fixing, re-run `keel validate --strict` and
+    After fixing, re-run `tripwire validate --strict` and
     push again. I will re-verify.
     EOF
     )"
@@ -228,7 +228,7 @@ incomplete implementation.
     write access to the project repo, just not the target repo).
     Branch: `verifier/<KEY>-verified`.
 
-21. **Run `keel validate --strict`** on the project repo
+21. **Run `tripwire validate --strict`** on the project repo
     before pushing your commit. Your own changes must pass the gate.
 
 ## Operating rules

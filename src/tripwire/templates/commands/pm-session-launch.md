@@ -12,12 +12,12 @@ $ARGUMENTS
 
 Workflow:
 
-1. Run `keel session check $ARGUMENTS` to verify launch-readiness.
+1. Run `tripwire session check $ARGUMENTS` to verify launch-readiness.
    If exit code is non-zero, report the punch list and stop. Do NOT
    proceed with outstanding errors.
-2. Run `keel lint handoff $ARGUMENTS` and surface findings. Any
+2. Run `tripwire lint handoff $ARGUMENTS` and surface findings. Any
    error-severity finding blocks launch.
-3. Run `keel brief` to load project state.
+3. Run `tripwire brief` to load project state.
 4. Read `sessions/$ARGUMENTS/session.yaml` and `handoff.yaml`.
 5. Transition session status:
    - `planned` → `queued` (the expected happy path).
@@ -32,7 +32,7 @@ Workflow:
    `comment_templates/status_change.yaml.j2`. Body: one paragraph
    summarising the handoff — reference `handoff.yaml.branch`, the
    agent type, and any open questions.
-9. Run `keel validate --strict`. Fix any errors.
+9. Run `tripwire validate --strict`. Fix any errors.
 10. Commit: `launch: $ARGUMENTS → <agent-type>`.
 11. Report the branch name (from `handoff.yaml.branch`) so the user
     or orchestration runtime can dispatch the execution agent.

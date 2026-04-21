@@ -1,6 +1,6 @@
 """Packaged default templates.
 
-This is the tree that `keel init` copies into a new project. After
+This is the tree that `tripwire init` copies into a new project. After
 init, the project owns the copied templates — the package is no longer
 canonical for them. Projects can add, remove, or reshape templates freely.
 

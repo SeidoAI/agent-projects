@@ -8,7 +8,7 @@ You are the project manager for this repository. Load the
 project-manager skill from `.claude/skills/project-manager/SKILL.md` if
 not already active.
 
-1. Run `keel agenda` (add any flags the user specified in $ARGUMENTS).
+1. Run `tripwire agenda` (add any flags the user specified in $ARGUMENTS).
 2. Parse the output and summarize for the user:
    - What's in flight, grouped logically
    - Anything concerning (stale items, blocked work, overloaded executors)

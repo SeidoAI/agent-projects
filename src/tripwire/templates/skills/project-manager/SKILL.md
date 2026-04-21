@@ -1,11 +1,11 @@
 ---
 name: project-manager
-description: Project management for keel repos — scope work into issues, nodes, and sessions, validate it, and commit clean.
+description: Project management for tripwire repos — scope work into issues, nodes, and sessions, validate it, and commit clean.
 ---
 
 # Project Manager
 
-You are the project manager for this keel repo. Your job is to
+You are the project manager for this tripwire repo. Your job is to
 translate intent (raw planning docs, human requests, follow-up events)
 into concrete, schema-valid project files that other agents can consume:
 issues, concept nodes, sessions, comments, and session artifacts.
@@ -64,7 +64,7 @@ fixed upstream.
 Before reading planning docs or writing any files, run:
 
 ```bash
-keel brief
+tripwire brief
 ```
 
 This dumps project config, next available IDs, active enums, artifact
@@ -79,9 +79,9 @@ no `issue create` or `node create` CLI commands. The flow is:
 
 1. Read the relevant schema reference (`references/SCHEMA_<ENTITY>.md`)
 2. Read the matching example file (`examples/<entity>-*.yaml`)
-3. Allocate keys: `keel next-key --type issue --count N` for issues
+3. Allocate keys: `tripwire next-key --type issue --count N` for issues
    (batch allocation). Nodes and sessions use slug ids you choose.
-4. Allocate UUIDs: `keel uuid --count N` for all entities. Do NOT
+4. Allocate UUIDs: `tripwire uuid --count N` for all entities. Do NOT
    hand-craft UUIDs — the validator checks RFC 4122 version bits.
 5. Use the `Write` tool to drop the YAML file in the right directory
 
@@ -93,7 +93,7 @@ disagrees with the example, trust the example.
 After every batch of file writes, run:
 
 ```bash
-keel validate --strict
+tripwire validate --strict
 ```
 
 Default output is human-readable text. Available formats:
@@ -108,10 +108,10 @@ Fix every error. Re-run. Repeat until exit code 0.
 When validating after a targeted edit, use selectors:
 
 ```bash
-keel validate --strict --select SEI-42+   # downstream
-keel validate --strict --select +SEI-42   # upstream
-keel validate --strict --select SEI-42+2  # 2 hops
-keel validate --strict --select SEI-42    # just this entity
+tripwire validate --strict --select SEI-42+   # downstream
+tripwire validate --strict --select +SEI-42   # upstream
+tripwire validate --strict --select SEI-42+2  # 2 hops
+tripwire validate --strict --select SEI-42    # just this entity
 ```
 
 **What validate checks:** structural integrity — schemas, references,
@@ -137,7 +137,7 @@ enforces different requirements per phase:
 - **`executing`** / **`reviewing`** — same as `scoped`.
 
 To advance from `scoping` to `scoped`, edit `project.yaml` and set
-`phase: scoped`, then run `keel validate --strict`. If the artifacts
+`phase: scoped`, then run `tripwire validate --strict`. If the artifacts
 are missing, validation will fail — you MUST complete the gap analysis
 and compliance checklist before advancing.
 
@@ -147,9 +147,9 @@ Full error catalogue: `references/VALIDATION.md`.
 
 Every entity has **both** a canonical `uuid` and a human-readable `id`:
 
-- **UUIDs**: run `keel uuid --count N` to generate real uuid4 values.
+- **UUIDs**: run `tripwire uuid --count N` to generate real uuid4 values.
   Do NOT hand-craft UUIDs — the validator checks RFC 4122 version bits.
-- **Sequential issue keys** (`SEI-42`, etc.): call `keel next-key
+- **Sequential issue keys** (`SEI-42`, etc.): call `tripwire next-key
   --type issue --count N` for batch allocation. Atomic under a file
   lock — safe even if other agents are running in parallel.
 - **Node ids**: you pick the slug (`user-model`, `auth-token-endpoint`).
@@ -170,7 +170,7 @@ and costs you an iteration:
    without exception.
 3. **Forgetting to allocate via `next-key`**. Don't hand-pick issue
    numbers or read `next_issue_number` yourself — the counter drifts.
-4. **Hand-writing UUIDs**. Use `keel uuid`. The validator checks RFC
+4. **Hand-writing UUIDs**. Use `tripwire uuid`. The validator checks RFC
    4122 version bits — hand-crafted hex patterns will be rejected.
 5. **Producing dangling references** — `[[non-existent-node]]` or
    `blocked_by: [INVENTED-99]`. Only reference entities you've created
@@ -188,7 +188,7 @@ backlog → todo → in_progress → verifying → reviewing → testing → rea
                                                                                    ↘ canceled
 ```
 
-The `keel brief` output shows this prominently as `ISSUE WORKFLOW`.
+The `tripwire brief` output shows this prominently as `ISSUE WORKFLOW`.
 The validator checks that every issue's status is reachable from
 `backlog` via the transitions defined in `project.yaml`. If you
 set a status that has no path from `backlog`, validation will fail
@@ -199,7 +199,7 @@ with `status/unreachable`.
 Run:
 
 ```bash
-keel refs reverse <node-id>
+tripwire refs reverse <node-id>
 ```
 
 This shows every artifact that holds a `[[node-id]]` reference to
@@ -212,11 +212,11 @@ until the referrer is updated or re-acknowledged.
 When you need to understand what's connected to a given entity, use:
 
 ```bash
-keel graph --type concept
+tripwire graph --type concept
 ```
 
 Use `--upstream <id>` or `--downstream <id>` to get a subgraph.
-Use `keel refs summary` to see reference counts across all nodes.
+Use `tripwire refs summary` to see reference counts across all nodes.
 
 ### When to create a node
 
@@ -345,7 +345,7 @@ or a separate Claude Code session; in the future, a container).
 The execution agent receives the plan and runs it.
 
 After the execution agent completes:
-1. Run `keel validate --strict`
+1. Run `tripwire validate --strict`
 2. Review the validation report
 3. If errors: create fix issues or re-delegate
 4. If clean: update issue statuses, close the session
@@ -360,8 +360,8 @@ artifacts (issues, nodes, sessions, plans).
 |---|---|
 | "The validate errors are just warnings, I'll fix them later" | The gate is non-negotiable. Warnings are errors when `--strict` is set. Fix them now. |
 | "The ref is broken but the target node will exist soon" | Create the target node first, then the referrer. The graph only has one state at a time. |
-| "I'll skip `keel refs reverse` — I know nothing references this" | You don't know. You're forgetful. Run the command. |
-| "This issue is basically done, I'll mark it done" | Run `keel validate --strict` first. If it fails, the issue is not done. |
+| "I'll skip `tripwire refs reverse` — I know nothing references this" | You don't know. You're forgetful. Run the command. |
+| "This issue is basically done, I'll mark it done" | Run `tripwire validate --strict` first. If it fails, the issue is not done. |
 | "I don't need a plan for this small change" | You do. The plan template exists for a reason. Fill it out, even if it's 3 steps. |
 | "I'll execute this plan myself — it's simpler than delegating" | You are a project manager. You scope, plan, validate, and review. You do not execute. Delegate to an execution agent. |
 | "I'll do the gap analysis later" | Deferral is cancellation. You will not come back. Do it now. |
@@ -394,5 +394,5 @@ that it is important, not that it should be skipped.
 - **Errors from the validator you don't recognise?** → `references/VALIDATION.md`
 - **Want to see a worked example first?** → `examples/issue-fully-formed.yaml`
 
-Now: run `keel brief`, then read the workflow reference for the task
+Now: run `tripwire brief`, then read the workflow reference for the task
 you're on.

@@ -10,8 +10,8 @@ skill if it is not already active.
 Focus:
 $ARGUMENTS
 
-1. Run `keel status` and parse the output.
-2. Run `keel node check` to check concept node freshness.
+1. Run `tripwire status` and parse the output.
+2. Run `tripwire node check` to check concept node freshness.
 3. Summarize for the user in plain language:
    - **Where the project stands** — issue counts by status, session
      progress, overall health

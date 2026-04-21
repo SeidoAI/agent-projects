@@ -66,4 +66,4 @@ make lint
 - [ ] Tests added
 - [ ] Completion comment added
 - [ ] [[auth-token-endpoint]] rehashed after touching its file
-- [ ] `keel validate --strict` exits 0
+- [ ] `tripwire validate --strict` exits 0

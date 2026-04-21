@@ -22,13 +22,13 @@
 
 | Command | Keys allocated | Range |
 |---|---|---|
-| `keel next-key --type issue --count 25` | 25 | SEI-1 to SEI-25 |
+| `tripwire next-key --type issue --count 25` | 25 | SEI-1 to SEI-25 |
 
 ## UUID allocation
 
 | Command | Count |
 |---|---|
-| `keel uuid --count 45` | 45 |
+| `tripwire uuid --count 45` | 45 |
 
 ## File counts
 
@@ -44,7 +44,7 @@
 
 | Step | Done? | Notes |
 |---|---|---|
-| 1. Run keel brief | Yes | |
+| 1. Run tripwire brief | Yes | |
 | 2. Read all planning docs | Yes | Read 10 files (~8,000 lines) |
 | 3. Read canonical examples | Yes | 6 examples |
 | 4. Write scoping plan | Yes | plans/artifacts/scoping-plan.md |

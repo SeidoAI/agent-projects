@@ -6,7 +6,7 @@ it in with its own content.
 
 ## What goes here
 
-Things that are true for **this project** but not for keel in
+Things that are true for **this project** but not for tripwire in
 general:
 
 - Required labels (e.g. "every issue must have a `domain/*` label")
@@ -22,7 +22,7 @@ general:
 
 ## What does NOT go here
 
-- General keel conventions (those live in `SCHEMA_*.md`,
+- General tripwire conventions (those live in `SCHEMA_*.md`,
   `WORKFLOWS_*.md`, and `ANTI_PATTERNS.md`).
 - The project's `standards.md` (that's the top-level standards file the
   PM review checks against).

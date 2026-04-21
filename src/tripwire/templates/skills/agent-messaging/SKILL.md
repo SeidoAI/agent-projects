@@ -8,7 +8,7 @@ description: >-
   type — all agents in containerised execution need this.
 license: MIT
 metadata:
-  author: keel
+  author: tripwire
   version: "1.0"
 compatibility: >-
   Agents running in agent-containers with the MCP agent-messaging server

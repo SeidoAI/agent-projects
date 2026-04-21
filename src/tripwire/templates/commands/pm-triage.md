@@ -14,7 +14,7 @@ $ARGUMENTS
 
 Before acting:
 
-1. Run `keel brief` to load current project state.
+1. Run `tripwire brief` to load current project state.
 2. Identify the inbound items to triage:
    - If the user passed a specific item ID, focus on that one.
    - Otherwise, gather all pending inbound items: unprocessed comments
@@ -27,7 +27,7 @@ Before acting:
    - **Won't do** → close with a reason comment
    - **Strategic** → surface for human review (do not auto-act)
 4. Apply the appropriate action for each.
-5. Run `keel validate --strict`. Fix any errors.
+5. Run `tripwire validate --strict`. Fix any errors.
 6. Commit the triage result with a commit message summarizing what was
    processed.
 

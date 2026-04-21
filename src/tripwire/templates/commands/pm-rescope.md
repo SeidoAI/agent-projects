@@ -15,14 +15,14 @@ $ARGUMENTS
 Rescoping differs from initial scoping because the project already has
 content:
 
-1. Run `keel brief` to load current project state.
+1. Run `tripwire brief` to load current project state.
 2. Read the existing issues, concept nodes, and sessions so you know
    what's already scoped and what's in progress.
 3. If the user's description references a new planning doc path, read
    those files.
 4. Identify what the new scope adds:
    - **New issues** to create (allocate new keys via
-     `keel next-key --type issue`)
+     `tripwire next-key --type issue`)
    - **New concept nodes** to add
    - **Existing issues to modify** (priority changes, acceptance
      criteria updates, new references)
@@ -31,7 +31,7 @@ content:
 5. Do NOT delete or renumber existing items without explicit user
    permission. Incremental growth only.
 6. Write the new files and update the existing ones.
-7. Run `keel validate --strict`. Fix errors.
+7. Run `tripwire validate --strict`. Fix errors.
 8. Commit with a message describing the rescope (e.g.
    `rescope: add billing initiative with 8 new issues`).
 

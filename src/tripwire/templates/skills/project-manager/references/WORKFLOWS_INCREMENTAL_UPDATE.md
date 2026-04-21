@@ -9,7 +9,7 @@ initial scoping is done.
 
 ### 1. Front-load context (still cheap)
 ```bash
-keel brief
+tripwire brief
 ```
 Even for small updates, this is worth running — it confirms the current
 project shape and catches stale assumptions.
@@ -34,7 +34,7 @@ cat issues/<KEY>/issue.yaml
   `nodes/<id>.yaml`. Use the example most similar to what you're
   creating (endpoint, model, decision, config, contract). Then add
   `[[<id>]]` references to wherever it's needed.
-- **New issue** → call `keel next-key --type issue` for the
+- **New issue** → call `tripwire next-key --type issue` for the
   key, then write `issues/<KEY>/issue.yaml`. See the initial scoping workflow
   for the full issue-creation procedure.
 - **Session update (e.g. re-engagement event)** → edit
@@ -52,7 +52,7 @@ cannot rehash, but it can at least flag and report).
 
 ### 5. Validate
 ```bash
-keel validate --strict
+tripwire validate --strict
 ```
 Fix every error. Re-run until clean.
 
@@ -86,7 +86,7 @@ one commit per logical edit is fine.
 | Agent thought | Reality |
 |---|---|
 | "It's just one field change, I don't need to validate" | You do. One field change can break a reference chain. Always validate. |
-| "I'll update the status without checking `refs reverse`" | Run `keel refs reverse <id>` first. Status changes on a heavily-referenced entity may need downstream updates. |
+| "I'll update the status without checking `refs reverse`" | Run `tripwire refs reverse <id>` first. Status changes on a heavily-referenced entity may need downstream updates. |
 
 ## See also
 

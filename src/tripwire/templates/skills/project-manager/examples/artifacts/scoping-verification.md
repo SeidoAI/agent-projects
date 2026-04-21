@@ -1,6 +1,6 @@
 # Scoping verification — storage-adapter-impl
 
-Maps planning doc sections to keel project entities.
+Maps planning doc sections to tripwire project entities.
 
 | Planning doc | Section | Mapped to | Status |
 |---|---|---|---|

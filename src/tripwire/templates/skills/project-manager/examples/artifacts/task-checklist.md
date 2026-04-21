@@ -12,7 +12,7 @@
 | 8 | Run `make lint` and fix any issues | pending | — |
 | 9 | Create [[auth-token-endpoint]] node and reference it in SEI-42 | pending | — |
 | 10 | Write `issues/SEI-42/developer.md` | pending | — |
-| 11 | Run `keel validate --strict` until clean | pending | Must be exit 0 before commit. |
+| 11 | Run `tripwire validate --strict` until clean | pending | Must be exit 0 before commit. |
 | 12 | Write verification-checklist.md | pending | — |
 | 13 | Write recommended-testing-plan.md | pending | — |
 | 14 | Write post-completion-comments.md | pending | — |

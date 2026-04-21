@@ -61,7 +61,7 @@ The endpoint must satisfy [[contract-auth-token]] and use the
 - **Verify:**
   - `uv run pytest tests/ -x -q` → all pass
   - `uv run ruff check .` → clean
-  - `keel validate --strict` → exit 0
+  - `tripwire validate --strict` → exit 0
 - **Est:** 2 min
 
 ## Key decisions
@@ -81,5 +81,5 @@ The endpoint must satisfy [[contract-auth-token]] and use the
 ## Verification
 - [ ] `uv run pytest tests/ -x -q` passes
 - [ ] `uv run ruff check .` clean
-- [ ] `keel validate --strict` exits 0
+- [ ] `tripwire validate --strict` exits 0
 - [ ] Response matches [[contract-auth-token]] envelope exactly

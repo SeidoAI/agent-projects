@@ -21,11 +21,11 @@ Workflow:
    - If `--workspace=<path>`, use that.
    - Else if cwd has `workspace.yaml` at root, use cwd.
    - Else walk up for a workspace.yaml; if none found, standalone project.
-3. Run `keel init <name>` to scaffold the project directory. After init,
+3. Run `tripwire init <name>` to scaffold the project directory. After init,
    if a workspace context was detected:
    a. `cd <new-project>` (so relative workspace pointers resolve).
-   b. Run `keel workspace link <workspace-path> --slug <key-prefix-lowercased>`.
-   c. If `--copy-nodes` given, run `keel workspace copy <node-ids...>`.
+   b. Run `tripwire workspace link <workspace-path> --slug <key-prefix-lowercased>`.
+   c. If `--copy-nodes` given, run `tripwire workspace copy <node-ids...>`.
 4. Report:
    - Project directory created
    - Workspace link status

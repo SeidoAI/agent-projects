@@ -6,7 +6,7 @@ description: |
 
   The runtime that reads this pattern lives in the `agent-containers`
   package (`agent_containers/core/orchestration.py`), not in
-  `keel`. This file is configuration for that runtime.
+  `tripwire`. This file is configuration for that runtime.
 
 events:
   session_started:

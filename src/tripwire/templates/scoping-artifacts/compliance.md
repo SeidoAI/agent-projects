@@ -4,7 +4,7 @@
 
 ## Validation checkpoints
 
-Record every `keel validate` run during file writing. Each row is one
+Record every `tripwire validate` run during file writing. Each row is one
 checkpoint. No gap between checkpoints should exceed 10 files.
 
 | Checkpoint | Files written since last | Error count | Clean? |
@@ -24,13 +24,13 @@ first 3 concrete issues against your last 3 at each checkpoint.
 
 | Command | Keys allocated | Range |
 |---|---|---|
-| `keel next-key --type issue --count N` | N | KEY-X to KEY-Y |
+| `tripwire next-key --type issue --count N` | N | KEY-X to KEY-Y |
 
 ## UUID allocation
 
 | Command | Count |
 |---|---|
-| `keel uuid --count N` | N |
+| `tripwire uuid --count N` | N |
 
 ## File counts
 
@@ -46,7 +46,7 @@ first 3 concrete issues against your last 3 at each checkpoint.
 
 | Step | Done? | Notes |
 |---|---|---|
-| 1. Run keel brief | | |
+| 1. Run tripwire brief | | |
 | 2. Read all planning docs | | |
 | 3. Read canonical examples | | |
 | 4. Write scoping plan | | |

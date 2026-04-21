@@ -30,7 +30,7 @@ the PR's state.
 
 ### 3. Run the validation gate
 ```bash
-keel validate --strict
+tripwire validate --strict
 ```
 If this exits non-zero, the PR fails review. Comment on the PR with
 the specific errors from the JSON output (one line per error, with

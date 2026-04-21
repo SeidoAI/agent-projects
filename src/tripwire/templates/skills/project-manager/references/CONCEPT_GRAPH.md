@@ -141,11 +141,11 @@ auto-adds the missing side. Write both sides yourself — it's clearer.
 
 ## Commands
 
-- `keel refs list <issue-key>` — see an issue's references
-- `keel refs reverse <node-id>` — see what references a node
-- `keel refs check` — full scan for dangling/orphan/stale refs
-- `keel node check [node-id]` — freshness check
-- `keel graph --type concept` — render the full graph
+- `tripwire refs list <issue-key>` — see an issue's references
+- `tripwire refs reverse <node-id>` — see what references a node
+- `tripwire refs check` — full scan for dangling/orphan/stale refs
+- `tripwire node check [node-id]` — freshness check
+- `tripwire graph --type concept` — render the full graph
 
 ## See also
 

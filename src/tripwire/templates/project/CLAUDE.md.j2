@@ -1,6 +1,6 @@
 # {{ project_name }}
 
-This is an `keel` repository: git-native project management with a
+This is a `tripwire` repository: git-native project management with a
 concept graph, designed to be driven primarily by Claude Code (or similar
 agents) loaded with the `project-manager` skill.
 
@@ -11,7 +11,7 @@ point is `.claude/skills/project-manager/SKILL.md`. Before doing any work,
 run:
 
 ```
-keel brief
+tripwire brief
 ```
 
 This prints the project config, active enums, templates, and next-available
@@ -22,7 +22,7 @@ read the relevant workflow reference from the skill (usually
 After every batch of file writes, run:
 
 ```
-keel validate --strict
+tripwire validate --strict
 ```
 
 This is the gate. Parse the JSON, fix every error, re-run until exit 0.

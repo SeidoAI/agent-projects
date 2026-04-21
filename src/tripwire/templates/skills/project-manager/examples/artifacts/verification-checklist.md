@@ -20,7 +20,7 @@
 - [x] [[auth-token-endpoint]] node created and referenced in SEI-42
 - [x] [[user-model]] rehashed after touching `src/models/user.py` (no-op; not touched)
 - [x] Every `[[reference]]` in committed markdown resolves
-- [x] `keel refs check` reports no dangling refs
+- [x] `tripwire refs check` reports no dangling refs
 
 ## Artifacts
 - [x] plan.md committed
@@ -31,5 +31,5 @@
 - [x] developer.md draft at `issues/SEI-42/developer.md`
 
 ## PM review gate
-- [x] `keel validate --strict` exits 0
+- [x] `tripwire validate --strict` exits 0
 - [x] No standards violations from `standards.md`

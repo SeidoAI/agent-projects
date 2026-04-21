@@ -10,7 +10,7 @@ active.
 Focus:
 $ARGUMENTS
 
-1. Run `keel session progress` (pass `--focus` if the user gave one).
+1. Run `tripwire session progress` (pass `--focus` if the user gave one).
 2. Interpret:
    - Which sessions are moving fast (high task-checklist done ratio)
    - Which look stuck (long `days_in_status`, low done ratio)

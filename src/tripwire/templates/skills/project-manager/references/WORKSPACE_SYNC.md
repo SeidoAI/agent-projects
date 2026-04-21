@@ -1,12 +1,12 @@
 # Workspace sync — agent mediation guide
 
 This doc explains how to handle a merge brief produced by
-`keel workspace pull`. It is referenced by the `/pm-project-sync`
+`tripwire workspace pull`. It is referenced by the `/pm-project-sync`
 slash command.
 
 ## When this applies
 
-A merge brief is created when `keel workspace pull` encounters a
+A merge brief is created when `tripwire workspace pull` encounters a
 non-trivial 3-way conflict on a workspace-origin node. Trivial cases
 (fast-forward, non-overlapping field changes) are auto-applied; only
 genuinely overlapping edits reach you.
@@ -81,7 +81,7 @@ Only `conflict` entries need your intelligence.
 After editing `nodes/<node-id>.yaml` to the resolved form:
 
 ```bash
-keel workspace merge-resolve <node-id>
+tripwire workspace merge-resolve <node-id>
 ```
 
 Validates the node schema, bumps `workspace_sha` to the current
@@ -94,7 +94,7 @@ brief is preserved — fix the node and retry.
 - Upstream has evolved in a direction that doesn't fit your use case.
 - You want to stop receiving updates for this node entirely.
 
-Fork via `keel workspace fork <node-id>`. The node's `scope` flips to
+Fork via `tripwire workspace fork <node-id>`. The node's `scope` flips to
 `local`; sync skips it in both directions. The `workspace_sha` is
 preserved for audit but no longer checked.
 

@@ -23,7 +23,7 @@ resources:
 tools:
   - git
   - gh
-  - keel
+  - tripwire
 
 context:
   skills:

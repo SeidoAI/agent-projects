@@ -12,8 +12,8 @@ $ARGUMENTS
 
 Workflow:
 
-1. Run `keel session check $ARGUMENTS`.
-2. Also run `keel lint handoff $ARGUMENTS`.
+1. Run `tripwire session check $ARGUMENTS`.
+2. Also run `tripwire lint handoff $ARGUMENTS`.
 3. Summarise for the user:
    - Must-fix items (errors)
    - Warnings

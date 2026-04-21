@@ -14,7 +14,7 @@ bad/good examples and the reasoning behind each rule.
    `issue/schema_invalid`. Stick to what's in the example file.
 
 2. **Forgetting to run `validate`** before declaring done. Every batch
-   of writes must be followed by `keel validate --strict`.
+   of writes must be followed by `tripwire validate --strict`.
    No exceptions. It catches 95% of errors before a human or PM
    reviewer has to.
 
@@ -22,7 +22,7 @@ bad/good examples and the reasoning behind each rule.
    guess the next key is `SEI-42` based on what you see, write that
    file, and then the validator catches `sequence/drift` because
    `next_issue_number` in `project.yaml` wasn't updated. Use
-   `keel next-key --type issue`.
+   `tripwire next-key --type issue`.
 
 4. **Hand-writing UUIDs.** You put `uuid: 1234` or
    `uuid: some-placeholder` in the frontmatter. The validator rejects
@@ -62,7 +62,7 @@ status: in_progress
 priority: high
 ```
 
-Look at `enums/<name>.yaml` (or run `keel enums show <name>`)
+Look at `enums/<name>.yaml` (or run `tripwire enums show <name>`)
 to see the exact allowed values.
 
 ### Bad timestamp format
@@ -101,7 +101,7 @@ nodes and sessions.
 ### Skipping the scaffold
 
 Jumping straight into writing files without running
-`keel brief` first. You miss the current
+`tripwire brief` first. You miss the current
 enum values, the next available ID, the active orchestration pattern,
 and the template paths. Running `brief` once at the
 top of every session is free and catches 90% of misalignment early.
@@ -124,9 +124,9 @@ them 25 times.
 
 ```bash
 # These don't exist in v0:
-keel issue create --title "..."
-keel node create --id user-model
-keel session create --name ...
+tripwire issue create --title "..."
+tripwire node create --id user-model
+tripwire session create --name ...
 ```
 
 All mutation happens via direct file writes. If you try these, the
@@ -207,7 +207,7 @@ touch code at a node's source, rehash the node.
 
 ### Orphan nodes
 
-You create a node but never reference it anywhere. `keel refs
+You create a node but never reference it anywhere. `tripwire refs
 check` reports it as an orphan. Either delete the node or add a
 reference.
 

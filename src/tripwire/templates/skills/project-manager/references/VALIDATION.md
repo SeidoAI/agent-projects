@@ -1,6 +1,6 @@
 # Validation Gate
 
-`keel validate` is the single most important command you run.
+`tripwire validate` is the single most important command you run.
 It's the gate you must pass after every batch of file writes before
 declaring any work done.
 
@@ -39,7 +39,7 @@ declaring any work done.
 ## The one command
 
 ```bash
-keel validate --strict
+tripwire validate --strict
 ```
 
 - `--strict` promotes warnings to errors (your normal mode)
@@ -177,7 +177,7 @@ Fix the file, re-run, continue.
 ## Auto-fix (`--fix`)
 
 ```bash
-keel validate --strict --fix
+tripwire validate --strict --fix
 ```
 
 Safely repairs:
@@ -214,15 +214,15 @@ If you find yourself stuck (same error recurring), you've probably
 misread the schema. Re-read the relevant `SCHEMA_*.md` and the
 matching example file.
 
-## `keel lint` — heuristic checks (v0.6a+)
+## `tripwire lint` — heuristic checks (v0.6a+)
 
-Distinct from `keel validate`. Validate is mechanical (schema/refs);
+Distinct from `tripwire validate`. Validate is mechanical (schema/refs);
 lint is heuristic (did someone actually do the work at each stage).
 
 ```bash
-keel lint scoping              # project-level scoping checks
-keel lint handoff <session-id> # handoff-readiness checks
-keel lint session <session-id> # in-flight session health checks
+tripwire lint scoping              # project-level scoping checks
+tripwire lint handoff <session-id> # handoff-readiness checks
+tripwire lint session <session-id> # in-flight session health checks
 ```
 
 Exit codes: 0 (info-only), 1 (warning present), 2 (error present).

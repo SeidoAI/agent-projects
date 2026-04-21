@@ -342,8 +342,8 @@ def test_verification_skill_is_read_only() -> None:
 
 
 def test_backend_development_skill_mentions_validation_gate() -> None:
-    """The backend skill must point at `keel validate` as the gate."""
+    """The backend skill must point at `tripwire validate` as the gate."""
     skill = (SKILLS_DIR / "backend-development" / "SKILL.md").read_text(
         encoding="utf-8"
     )
-    assert "keel validate" in skill
+    assert "tripwire validate" in skill

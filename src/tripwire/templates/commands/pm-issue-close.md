@@ -14,7 +14,7 @@ Workflow:
 
 1. Parse `$ARGUMENTS`. First token is the issue key. The rest (if
    any) is a closing note.
-2. Run `keel brief` to load project state.
+2. Run `tripwire brief` to load project state.
 3. Read `issues/<issue-key>/issue.yaml`. Verify:
    - Status is not already `done` or `canceled` (if so, report and
      stop).
@@ -32,7 +32,7 @@ Workflow:
    - Body = the closing note, or a default describing the session +
      PR closure if applicable.
 6. Write the comment file to the issue's `comments/` directory.
-7. Run `keel validate --strict`. Fix any errors.
+7. Run `tripwire validate --strict`. Fix any errors.
 8. Commit: `close: <issue-key>`.
 
 If the issue has downstream consumers (other issues that `blocked_by`

@@ -10,7 +10,7 @@ skill if not active.
 Graph type (defaults to deps if omitted):
 $ARGUMENTS
 
-1. Run `keel graph --type deps` (or `--type concept`
+1. Run `tripwire graph --type deps` (or `--type concept`
    if the user asked for the concept graph).
 2. Parse the JSON output.
 3. Analyse the structure:

@@ -1,15 +1,15 @@
 ---
 name: backend-development
 description: >-
-  Development skill for a Python backend repo in an keel. Covers
+  Development skill for a Python backend repo in a tripwire. Covers
   branching, test-driven development, commit patterns, code quality
-  checks, keel interaction (reading issues, writing comments,
+  checks, tripwire interaction (reading issues, writing comments,
   maintaining concept nodes), and completion artifacts. Use when
   implementing a backend issue, fixing a backend bug, or making any
   code changes in a backend repo referenced by the project.
 license: MIT
 metadata:
-  author: keel
+  author: tripwire
   version: "1.0"
 compatibility: >-
   Python 3.10+, any Python backend framework (FastAPI, Django, Flask).
@@ -20,13 +20,13 @@ compatibility: >-
 # Backend Development
 
 You are a backend coding agent working on an issue from an
-keel. You have been given one or more issue keys and the
+tripwire. You have been given one or more issue keys and the
 repos the session is allowed to branch and PR in. Your job is to
 implement the issue, test it, and open a PR against the target repo.
 
 ## The project layer
 
-This is an keel repo. The PM skill manages issues, concept
+This is a tripwire repo. The PM skill manages issues, concept
 nodes, and sessions; you consume them. You do NOT write issue files
 directly — that's the PM's job. What you DO write:
 
@@ -48,7 +48,7 @@ Before committing ANY changes to the project repo (artifacts,
 comments, nodes), run:
 
 ```bash
-keel validate --strict
+tripwire validate --strict
 ```
 
 Parse the JSON. Fix every error. Re-run until exit 0. This is
@@ -74,7 +74,7 @@ separate from the target code repo's test suite — both must pass.
 
 5. **Front-load context** with the PM skill:
    ```bash
-   keel brief
+   tripwire brief
    ```
 6. **Read the current code** at the concept node paths. Understand
    the existing patterns before designing anything.
@@ -141,7 +141,7 @@ separate from the target code repo's test suite — both must pass.
     checkable (✓ or ✗). If anything fails, fix it and re-run.
 20. **Run the project-level validate**:
     ```bash
-    keel validate --strict
+    tripwire validate --strict
     ```
     Must exit 0. Parse errors, fix, re-run.
 21. **Run the target repo's checks**:
@@ -150,7 +150,7 @@ separate from the target code repo's test suite — both must pass.
     make test
     # Any build/Docker/package-specific checks
     ```
-22. **Run `keel refs check`** to confirm no dangling or stale
+22. **Run `tripwire refs check`** to confirm no dangling or stale
     references in anything you wrote.
 
 ### Phase 6: Delivery

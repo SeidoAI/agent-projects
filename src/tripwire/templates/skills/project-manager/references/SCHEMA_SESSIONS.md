@@ -160,7 +160,7 @@ last_verification_passed_at: null
 ### Who writes what
 
 - `/pm-session-create` writes the initial version with `branch` filled
-  in from `keel session derive-branch` output.
+  in from `tripwire session derive-branch` output.
 - `/pm-session-launch` validates readiness and confirms; it does not
   rewrite the handoff record.
 - Execution agents read `handoff.yaml` first thing on start.
