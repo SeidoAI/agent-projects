@@ -6,16 +6,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from fastapi.testclient import TestClient
 
+from tests.ui.routes.conftest import assert_v2_envelope
 from tripwire.ui.dependencies import reset_project_cache
-from tripwire.ui.routes._v2_stub import V2_NOT_IMPLEMENTED_CODE
-from tripwire.ui.server import create_app
-
-
-@pytest.fixture
-def client() -> TestClient:
-    return TestClient(create_app(dev_mode=True))
 
 
 @pytest.fixture
@@ -31,17 +24,6 @@ def project_dir(tmp_path: Path) -> Path:
     reset_project_cache()
 
 
-def _assert_v2_envelope(resp) -> None:
-    assert resp.status_code == 501, f"expected 501, got {resp.status_code}"
-    body = resp.json()
-    assert "detail" in body, body
-    detail = body["detail"]
-    assert isinstance(detail, dict), detail
-    assert detail["code"] == V2_NOT_IMPLEMENTED_CODE
-    assert isinstance(detail.get("detail"), str) and detail["detail"]
-    assert isinstance(detail.get("extras"), dict)
-
-
 class TestPmReviewRoutes501:
     """Valid project id — expect 501 on every endpoint."""
 
@@ -50,7 +32,7 @@ class TestPmReviewRoutes501:
             "tripwire.ui.dependencies._resolve_project_dir",
             return_value=project_dir,
         ):
-            _assert_v2_envelope(
+            assert_v2_envelope(
                 client.get("/api/projects/abc123abc123/pm-reviews")
             )
 
@@ -59,7 +41,7 @@ class TestPmReviewRoutes501:
             "tripwire.ui.dependencies._resolve_project_dir",
             return_value=project_dir,
         ):
-            _assert_v2_envelope(
+            assert_v2_envelope(
                 client.get("/api/projects/abc123abc123/pm-reviews/42")
             )
 
@@ -68,7 +50,7 @@ class TestPmReviewRoutes501:
             "tripwire.ui.dependencies._resolve_project_dir",
             return_value=project_dir,
         ):
-            _assert_v2_envelope(
+            assert_v2_envelope(
                 client.post("/api/projects/abc123abc123/pm-reviews/42/run")
             )
 

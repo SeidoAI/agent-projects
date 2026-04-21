@@ -4,41 +4,21 @@ from __future__ import annotations
 
 import sys
 
-import pytest
-from fastapi.testclient import TestClient
-
-from tripwire.ui.routes._v2_stub import V2_NOT_IMPLEMENTED_CODE
-from tripwire.ui.server import create_app
-
-
-@pytest.fixture
-def client() -> TestClient:
-    return TestClient(create_app(dev_mode=True))
-
-
-def _assert_v2_envelope(resp) -> None:
-    assert resp.status_code == 501, f"expected 501, got {resp.status_code}"
-    body = resp.json()
-    assert "detail" in body, body
-    detail = body["detail"]
-    assert isinstance(detail, dict), detail
-    assert detail["code"] == V2_NOT_IMPLEMENTED_CODE
-    assert isinstance(detail.get("detail"), str) and detail["detail"]
-    assert isinstance(detail.get("extras"), dict)
+from tests.ui.routes.conftest import assert_v2_envelope
 
 
 class TestContainerRoutes501:
     def test_list_containers(self, client):
-        _assert_v2_envelope(client.get("/api/containers"))
+        assert_v2_envelope(client.get("/api/containers"))
 
     def test_get_stats(self, client):
-        _assert_v2_envelope(client.get("/api/containers/abc123/stats"))
+        assert_v2_envelope(client.get("/api/containers/abc123/stats"))
 
     def test_get_logs(self, client):
-        _assert_v2_envelope(client.get("/api/containers/abc123/logs"))
+        assert_v2_envelope(client.get("/api/containers/abc123/logs"))
 
     def test_launch(self, client):
-        _assert_v2_envelope(
+        assert_v2_envelope(
             client.post(
                 "/api/containers/launch",
                 json={"session_id": "s1", "project_id": "p1"},
@@ -46,13 +26,13 @@ class TestContainerRoutes501:
         )
 
     def test_stop(self, client):
-        _assert_v2_envelope(client.post("/api/containers/abc123/stop"))
+        assert_v2_envelope(client.post("/api/containers/abc123/stop"))
 
     def test_terminal(self, client):
-        _assert_v2_envelope(client.post("/api/containers/abc123/terminal"))
+        assert_v2_envelope(client.post("/api/containers/abc123/terminal"))
 
     def test_cleanup(self, client):
-        _assert_v2_envelope(client.post("/api/containers/cleanup"))
+        assert_v2_envelope(client.post("/api/containers/cleanup"))
 
 
 class TestContainerOpenAPI:

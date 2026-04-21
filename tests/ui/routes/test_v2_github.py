@@ -4,42 +4,22 @@ from __future__ import annotations
 
 import inspect
 
-import pytest
-from fastapi.testclient import TestClient
-
+from tests.ui.routes.conftest import assert_v2_envelope
 from tripwire.ui.routes import github as github_routes
-from tripwire.ui.routes._v2_stub import V2_NOT_IMPLEMENTED_CODE
-from tripwire.ui.server import create_app
 from tripwire.ui.services import github_service
-
-
-@pytest.fixture
-def client() -> TestClient:
-    return TestClient(create_app(dev_mode=True))
-
-
-def _assert_v2_envelope(resp) -> None:
-    assert resp.status_code == 501, f"expected 501, got {resp.status_code}"
-    body = resp.json()
-    assert "detail" in body, body
-    detail = body["detail"]
-    assert isinstance(detail, dict), detail
-    assert detail["code"] == V2_NOT_IMPLEMENTED_CODE
-    assert isinstance(detail.get("detail"), str) and detail["detail"]
-    assert isinstance(detail.get("extras"), dict)
 
 
 class TestGitHubRoutes501:
     def test_list_prs(self, client):
-        _assert_v2_envelope(client.get("/api/github/prs", params={"repo": "owner/x"}))
+        assert_v2_envelope(client.get("/api/github/prs", params={"repo": "owner/x"}))
 
     def test_pr_checks(self, client):
-        _assert_v2_envelope(
+        assert_v2_envelope(
             client.get("/api/github/prs/42/checks", params={"repo": "owner/x"})
         )
 
     def test_pr_reviews(self, client):
-        _assert_v2_envelope(
+        assert_v2_envelope(
             client.get("/api/github/prs/42/reviews", params={"repo": "owner/x"})
         )
 
