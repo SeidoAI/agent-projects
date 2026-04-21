@@ -78,7 +78,7 @@ def ui_cmd(
             click.echo(
                 "No projects found.\n"
                 "Hint: run `keel init` in a project directory, or add paths\n"
-                "to ~/.keel/config.yaml under `project_roots`."
+                "to ~/.tripwire/config.yaml under `project_roots`."
             )
             sys.exit(1)
         project_dirs = [Path(p.dir) for p in projects]

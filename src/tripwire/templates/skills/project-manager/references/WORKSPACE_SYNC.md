@@ -13,7 +13,7 @@ genuinely overlapping edits reach you.
 
 ## Brief structure
 
-File: `.keel/merge-briefs/<node-id>.yaml`
+File: `.tripwire/merge-briefs/<node-id>.yaml`
 
 ```yaml
 node_id: auth-system
@@ -103,7 +103,7 @@ preserved for audit but no longer checked.
 If a pull produced briefs you don't want to resolve right now:
 
 ```bash
-rm .keel/merge-briefs/<node-id>.yaml
+rm .tripwire/merge-briefs/<node-id>.yaml
 ```
 
 Then revert `nodes/<node-id>.yaml` to its pre-pull state (`git

@@ -2,7 +2,7 @@
 
 Verifies the behaviour of the decorator on `validate`:
   - No flag → no profile file written, command runs normally
-  - `--profile` (no value) → writes to `.keel.profile`
+  - `--profile` (no value) → writes to `.tripwire.profile`
   - `--profile=PATH` → writes to PATH
   - The profile file is non-empty and parseable with `pstats.Stats`
 """

@@ -26,7 +26,7 @@ Workflow:
    c. Exit 10 — merges pending. Go to step 4.
    d. Other non-zero — report and stop.
 4. Merge mediation (if step 3 returned exit 10):
-   a. For each brief in `.keel/merge-briefs/*.yaml`:
+   a. For each brief in `.tripwire/merge-briefs/*.yaml`:
       - Read the brief (`base_version`, `ours_version`, `theirs_version`,
         `field_diffs`, `auto_merged_fields`, `hints`).
       - Read the draft merge in `nodes/<node-id>.yaml` (starting point).

@@ -753,7 +753,7 @@ def workspace_pull_cmd(project_dir: Path, nodes: str | None, dry_run: bool) -> N
 
     click.echo(f"\nNeeds agent resolution ({len(conflicts)}):")
     for node_id, _ in conflicts:
-        click.echo(f"  → .keel/merge-briefs/{node_id}.yaml")
+        click.echo(f"  → .tripwire/merge-briefs/{node_id}.yaml")
     click.echo(
         "\nRun /pm-project-sync (or `keel workspace merge-resolve <id>` per "
         "brief) to proceed."
@@ -1125,7 +1125,7 @@ def workspace_merge_resolve_cmd(node_id: str, project_dir: Path) -> None:
     if brief is None:
         raise click.ClickException(
             f"no pending merge brief for '{node_id}' at "
-            f".keel/merge-briefs/{node_id}.yaml"
+            f".tripwire/merge-briefs/{node_id}.yaml"
         )
 
     try:

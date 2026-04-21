@@ -1,6 +1,6 @@
 """Single source of truth for project-state file paths.
 
-Every entity directory and well-known file path used inside a keel-managed
+Every entity directory and well-known file path used inside a tripwire-managed
 project lives here. Other modules import from this module instead of
 hardcoding strings, so that structural changes (renaming a directory,
 moving artifacts) can be made in one place.
@@ -23,7 +23,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 PROJECT_CONFIG = "project.yaml"
-PROJECT_LOCK = ".keel.lock"
+PROJECT_LOCK = ".tripwire.lock"
 STANDARDS = "standards.md"
 CLAUDE_MD = "CLAUDE.md"
 
@@ -86,7 +86,7 @@ DEVELOPER_FILENAME = "developer.md"
 VERIFIED_FILENAME = "verified.md"
 
 # Sessions are directories: `sessions/<id>/session.yaml` plus `plan.md` and
-# `artifacts/`. Enforced by `keel.core.session_store` since Phase 3.
+# `artifacts/`. Enforced by `tripwire.core.session_store` since Phase 3.
 SESSION_FILENAME = "session.yaml"
 SESSION_PLAN = "plan.md"
 SESSION_ARTIFACTS_SUBDIR = "artifacts"
@@ -100,10 +100,10 @@ HANDOFF_FILENAME = "handoff.yaml"
 # docs/superpowers/specs/2026-04-15-keel-workspace-design.md.
 WORKSPACE_YAML = "workspace.yaml"
 WORKSPACE_NODES_DIR = "nodes"  # same name as in-project nodes/, at workspace root
-MERGE_BRIEFS_DIR = ".keel/merge-briefs"
+MERGE_BRIEFS_DIR = ".tripwire/merge-briefs"
 
 # Issues are directories: `issues/<KEY>/issue.yaml` plus `comments/`,
-# `developer.md`, `verified.md` alongside. Enforced by `keel.core.store`
+# `developer.md`, `verified.md` alongside. Enforced by `tripwire.core.store`
 # since Phase 4.
 ISSUE_FILENAME = "issue.yaml"
 
@@ -229,8 +229,8 @@ def workspace_lock_path(workspace_dir: Path) -> Path:
 def merge_briefs_dir(project_dir: Path) -> Path:
     """Path to a project's merge-briefs directory.
 
-    Briefs live in .keel/merge-briefs/ (hidden) so they don't clutter
-    the project tree. ``keel workspace pull`` writes briefs here when
+    Briefs live in .tripwire/merge-briefs/ (hidden) so they don't clutter
+    the project tree. ``tripwire workspace pull`` writes briefs here when
     a 3-way merge produces conflicts; ``merge-resolve`` removes them.
     """
     return project_dir / MERGE_BRIEFS_DIR

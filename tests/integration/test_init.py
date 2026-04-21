@@ -141,7 +141,7 @@ class TestInitBasics:
         target = tmp_path / "p"
         runner.invoke(cli, _init_args(target))
         gi = (target / ".gitignore").read_text()
-        assert ".keel.lock" in gi
+        assert ".tripwire.lock" in gi
         assert "graph/.index.lock" in gi
 
     def test_non_interactive_missing_name_uses_target_basename(

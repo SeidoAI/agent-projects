@@ -1,7 +1,7 @@
 """Merge brief generator and store.
 
 A merge brief is a structured YAML file written to
-``<project>/.keel/merge-briefs/<node-id>.yaml`` when a 3-way merge
+``<project>/.tripwire/merge-briefs/<node-id>.yaml`` when a 3-way merge
 surfaces non-trivial conflicts. The PM agent reads the brief, edits
 the node file to a resolved form, and runs ``keel workspace
 merge-resolve`` to finalize.

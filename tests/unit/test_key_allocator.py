@@ -151,7 +151,7 @@ class TestStaleLock:
         from tripwire.core.locks import STALE_LOCK_AGE_S, project_lock
 
         # Create a "stale" lock file with an old mtime.
-        lock_path = project_dir / ".keel.lock"
+        lock_path = project_dir / ".tripwire.lock"
         lock_path.touch()
         old_mtime = _time.time() - (STALE_LOCK_AGE_S + 10)
         os.utime(lock_path, (old_mtime, old_mtime))

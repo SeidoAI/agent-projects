@@ -3,7 +3,7 @@
 Used by `keel next-key` to allocate sequential issue/session keys
 without races between concurrent invocations.
 
-The lock file lives at `<project>/.keel.lock` and is acquired via
+The lock file lives at `<project>/.tripwire.lock` and is acquired via
 `fcntl.flock` (Unix). On contention, the call blocks until the lock is
 released by the other process. Holding the lock is short — read a number,
 increment it, write it back.

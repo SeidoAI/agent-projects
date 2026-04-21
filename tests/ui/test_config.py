@@ -111,7 +111,7 @@ class TestLoadUserConfig:
         assert "Expected a YAML mapping" in caplog.text
 
     def test_default_path_resolves_to_home(self):
-        """load_user_config(None) should target ~/.keel/config.yaml."""
+        """load_user_config(None) should target ~/.tripwire/config.yaml."""
         # We just verify it doesn't crash — the file likely doesn't exist
         cfg = load_user_config()
         assert isinstance(cfg, UserConfig)

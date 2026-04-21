@@ -1,4 +1,4 @@
-"""User-scoped configuration loader for ``~/.keel/config.yaml``.
+"""User-scoped configuration loader for ``~/.tripwire/config.yaml``.
 
 Reads the YAML file into a pydantic ``UserConfig`` model. A missing file
 returns defaults without error; invalid content logs a warning and falls
@@ -15,11 +15,11 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 
 logger = logging.getLogger("tripwire.ui.config")
 
-_DEFAULT_CONFIG_PATH = Path.home() / ".keel" / "config.yaml"
+_DEFAULT_CONFIG_PATH = Path.home() / ".tripwire" / "config.yaml"
 
 
 class UserConfig(BaseModel):
-    """Schema for ``~/.keel/config.yaml``."""
+    """Schema for ``~/.tripwire/config.yaml``."""
 
     project_roots: list[Path] = Field(default_factory=list)
     default_project: Path | None = None
@@ -42,7 +42,7 @@ class UserConfig(BaseModel):
 
 
 def load_user_config(path: Path | None = None) -> UserConfig:
-    """Load user config from *path* (default ``~/.keel/config.yaml``).
+    """Load user config from *path* (default ``~/.tripwire/config.yaml``).
 
     Returns ``UserConfig()`` with defaults when the file is missing or
     contains invalid content.

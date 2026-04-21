@@ -8,7 +8,7 @@ commands (pm-status, pm-agenda, pm-graph) also have 2 hyphens.
 from pathlib import Path
 
 COMMANDS_DIR = (
-    Path(__file__).parent.parent.parent / "src" / "keel" / "templates" / "commands"
+    Path(__file__).parent.parent.parent / "src" / "tripwire" / "templates" / "commands"
 )
 
 ALLOWED_ENTITIES = {"issue", "session", "project", "workspace"}

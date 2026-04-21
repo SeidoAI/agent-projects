@@ -2,7 +2,7 @@
 
 The agent's most-invoked command is `validate`. When investigating slow
 runs, wrap any decorated command with `--profile[=PATH]` to dump a
-`cProfile` output file. Defaults to `.keel.profile` in the cwd
+`cProfile` output file. Defaults to `.tripwire.profile` in the cwd
 with a hint about inspecting it via `snakeviz` or `python -m pstats`.
 
 Usage:
@@ -27,14 +27,14 @@ from typing import Any
 
 import click
 
-DEFAULT_PROFILE_PATH = ".keel.profile"
+DEFAULT_PROFILE_PATH = ".tripwire.profile"
 
 
 def profileable(command: Callable[..., Any]) -> Callable[..., Any]:
     """Add a `--profile[=PATH]` option to a Click command.
 
     When `--profile` is passed without a value, dumps to
-    `.keel.profile`. When passed with a value (`--profile=foo.prof`),
+    `.tripwire.profile`. When passed with a value (`--profile=foo.prof`),
     dumps to that path. When omitted entirely, runs the command unwrapped.
 
     A hint about inspecting the profile is printed to stderr after the

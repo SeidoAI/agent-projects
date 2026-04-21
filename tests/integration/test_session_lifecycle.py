@@ -20,7 +20,7 @@ from pathlib import Path
 
 def _run_keel(cwd: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        ["uv", "run", "keel", *args],
+        ["uv", "run", "tripwire", *args],
         cwd=cwd,
         capture_output=True,
         text=True,
