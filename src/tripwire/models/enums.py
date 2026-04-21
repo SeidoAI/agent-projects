@@ -1,7 +1,7 @@
-"""Default enum values for keel entities.
+"""Default enum values for tripwire entities.
 
 These StrEnum classes mirror the YAML enum files shipped under
-`templates/enums/` and copied into a project on `keel init`.
+`templates/enums/` and copied into a project on `tripwire init`.
 After init, the project owns its enum YAMLs and can add states, rename
 labels, recolor for the UI, or remove states it doesn't use.
 

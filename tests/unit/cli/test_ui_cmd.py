@@ -1,4 +1,4 @@
-"""Tests for keel.cli.ui — the `keel ui` subcommand."""
+"""Tests for tripwire.cli.ui — the `tripwire ui` subcommand."""
 
 from __future__ import annotations
 

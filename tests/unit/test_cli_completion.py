@@ -1,4 +1,4 @@
-"""Tests for the `keel completion <shell>` subcommand.
+"""Tests for the `tripwire completion <shell>` subcommand.
 
 The subcommand prints install instructions for tab completion in
 bash/zsh/fish. Click handles the actual completion via its

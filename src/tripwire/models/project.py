@@ -3,7 +3,7 @@
 The project config is the entry point for every CLI command and the
 authoritative source for repo registry, status flow, label categories,
 graph settings, the orchestration default, and the next-issue counter
-used by `keel next-key`.
+used by `tripwire next-key`.
 """
 
 from datetime import datetime

@@ -1,4 +1,4 @@
-"""keel workspace fork + promote."""
+"""tripwire workspace fork + promote."""
 
 import subprocess
 from pathlib import Path

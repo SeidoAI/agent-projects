@@ -1,4 +1,4 @@
-"""keel init --workspace: link newly-initialized project to a workspace."""
+"""tripwire init --workspace: link newly-initialized project to a workspace."""
 
 import subprocess
 from pathlib import Path

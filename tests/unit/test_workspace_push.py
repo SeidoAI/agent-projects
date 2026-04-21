@@ -1,4 +1,4 @@
-"""keel workspace push — trivial cases (no upstream divergence)."""
+"""tripwire workspace push — trivial cases (no upstream divergence)."""
 
 import subprocess
 from pathlib import Path

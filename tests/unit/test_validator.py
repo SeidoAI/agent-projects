@@ -34,7 +34,7 @@ from tripwire.core.validator import (
 #   reports the resulting invalid file.
 #
 # - `save_test_issue` / `save_test_node` / `save_test_session` — go
-#   through `keel.core.store` / `node_store` / `session_store`. Use when
+#   through `tripwire.core.store` / `node_store` / `session_store`. Use when
 #   the test only cares about *validator behaviour* on structurally
 #   valid input. These helpers stay green when the on-disk layout
 #   changes — the stores encapsulate the layout.

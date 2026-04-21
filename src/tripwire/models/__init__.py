@@ -1,4 +1,4 @@
-"""Pydantic data models for keel entities.
+"""Pydantic data models for tripwire entities.
 
 The models are intentionally permissive about enum-typed fields (using `str`
 rather than `StrEnum`) so that projects can customise their enums via

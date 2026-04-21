@@ -1,4 +1,4 @@
-"""keel workspace merge-resolve: finalize an agent-resolved merge."""
+"""tripwire workspace merge-resolve: finalize an agent-resolved merge."""
 
 import subprocess
 from pathlib import Path

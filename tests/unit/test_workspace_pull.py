@@ -1,4 +1,4 @@
-"""keel workspace pull — trivial cases (no conflicts).
+"""tripwire workspace pull — trivial cases (no conflicts).
 
 Conflict cases (merge briefs) are covered in test_workspace_pull_conflict
 once T19 wires brief generation in.

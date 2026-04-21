@@ -1,4 +1,4 @@
-"""Integration tests for `keel init`.
+"""Integration tests for `tripwire init`.
 
 These tests exercise the CLI end-to-end via Click's `CliRunner`: they
 invoke the actual command against a tmp directory and assert on the

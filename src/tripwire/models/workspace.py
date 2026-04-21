@@ -50,7 +50,7 @@ class Workspace(BaseModel):
         if self.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
             raise ValueError(
                 f"workspace schema_version {self.schema_version} not supported "
-                f"(this keel supports {SUPPORTED_SCHEMA_VERSIONS})"
+                f"(this tripwire supports {SUPPORTED_SCHEMA_VERSIONS})"
             )
         return self
 

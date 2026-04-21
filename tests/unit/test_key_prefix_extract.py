@@ -1,4 +1,4 @@
-"""Tests for `_extract_key_prefix` in `keel.cli.init`.
+"""Tests for `_extract_key_prefix` in `tripwire.cli.init`.
 
 The extractor takes a project name and produces a short uppercase
 prefix suitable for issue keys (e.g. `MPC-42`). It splits on common

@@ -9,7 +9,7 @@ import yaml
 
 @pytest.fixture
 def tmp_path_project(tmp_path: Path) -> Path:
-    """Create a minimal keel project with default manifest, return its path.
+    """Create a minimal tripwire project with default manifest, return its path.
 
     Mirrors the minimum shape expected by validator and CLI: project.yaml,
     issues/, nodes/, sessions/, docs/, and a default manifest in
@@ -163,7 +163,7 @@ def write_handoff_yaml():
 
 @pytest.fixture
 def fresh_project():
-    """Factory: create a minimal keel project directory.
+    """Factory: create a minimal tripwire project directory.
 
     Writes plain YAML (no frontmatter) matching ProjectConfig shape.
     Used by workspace CLI tests that need a real project on disk.

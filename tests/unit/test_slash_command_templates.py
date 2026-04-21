@@ -1,6 +1,6 @@
 """Tests for the packaged `/pm-*` slash command templates.
 
-These templates ship at `src/keel/templates/commands/` and are copied
+These templates ship at `src/tripwire/templates/commands/` and are copied
 into `.claude/commands/` in every initialized project. Each is a
 Markdown file with a YAML frontmatter block containing at minimum a
 `name`, `description`, and `argument-hint`.
@@ -112,7 +112,7 @@ def test_command_name_matches_filename(command_name: str) -> None:
 
 @pytest.mark.parametrize("command_name", EXPECTED_COMMANDS)
 def test_command_body_references_keel_not_agent_project(command_name: str) -> None:
-    """Every command body must use `keel <cmd>`, not `agent-project <cmd>`."""
+    """Every command body must use `tripwire <cmd>`, not `agent-project <cmd>`."""
     path = COMMANDS_DIR / f"{command_name}.md"
     _, body = _parse_frontmatter(path)
     assert "agent-project" not in body, (

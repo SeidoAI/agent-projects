@@ -1,4 +1,4 @@
-"""Tests for keel.ui.config — UserConfig model + load_user_config()."""
+"""Tests for tripwire.ui.config — UserConfig model + load_user_config()."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""keel workspace CLI: init, link, unlink, list, status, prune."""
+"""tripwire workspace CLI: init, link, unlink, list, status, prune."""
 
 from click.testing import CliRunner
 

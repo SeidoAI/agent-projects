@@ -99,7 +99,7 @@ describe("queryKeys", () => {
   });
 
   it("v2 keys: githubPrs", () => {
-    expect(queryKeys.githubPrs("SeidoAI/keel")).toEqual(["github", "prs", "SeidoAI/keel"]);
+    expect(queryKeys.githubPrs("SeidoAI/tripwire")).toEqual(["github", "prs", "SeidoAI/tripwire"]);
   });
 });
 

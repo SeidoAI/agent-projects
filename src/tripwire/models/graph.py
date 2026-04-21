@@ -1,7 +1,7 @@
 """Graph models — the cache schema and computed graph results.
 
 The cache (`<project>/graph/index.yaml`) is committed to git and incrementally
-updated by `keel validate`. Reads of the graph (UI, CLI, agent) go
+updated by `tripwire validate`. Reads of the graph (UI, CLI, agent) go
 through the cache for O(1) lookups instead of rescanning every file.
 
 The cache is a derived view; deleting it always rebuilds correctly from the
@@ -93,7 +93,7 @@ class GraphIndex(BaseModel):
     """The cache committed to `<project>/graph/index.yaml`.
 
     This is a derived view of the underlying files. Deleting it and running
-    `keel validate` always rebuilds it correctly. The cache is
+    `tripwire validate` always rebuilds it correctly. The cache is
     purely a performance layer; the source of truth is the issue and node
     files themselves.
     """

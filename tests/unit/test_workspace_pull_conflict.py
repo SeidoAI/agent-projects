@@ -1,4 +1,4 @@
-"""keel workspace pull — conflict path writes merge briefs."""
+"""tripwire workspace pull — conflict path writes merge briefs."""
 
 import subprocess
 from pathlib import Path

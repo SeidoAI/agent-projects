@@ -1,11 +1,11 @@
-"""Integration tests for `keel next-key`.
+"""Integration tests for `tripwire next-key`.
 
 The single most important test in this file is the concurrent-subprocess
 case: fire 10 parallel CLI invocations at the same project and confirm
 they produce 10 distinct sequential keys with no gaps or collisions. The
 core allocator is already unit-tested for this via threads + processes
 in `test_key_allocator.py`; this test exercises the end-to-end path
-through the Click command and the real `keel` entry point.
+through the Click command and the real `tripwire` entry point.
 """
 
 from __future__ import annotations
@@ -182,7 +182,7 @@ class TestErrors:
 def _allocate_via_subprocess(project_dir_str: str) -> str:
     """Top-level function for ProcessPoolExecutor (must be pickleable).
 
-    Shells out to the real `keel` entry point so we exercise the
+    Shells out to the real `tripwire` entry point so we exercise the
     wheel-installed script path, not just the in-process Click runner.
     """
     result = subprocess.run(
@@ -215,7 +215,7 @@ class TestConcurrentSubprocess:
         This is the end-to-end version of the concurrent test in
         `test_key_allocator.py::test_concurrent_processes_no_collisions`.
         That test hits `allocate_keys()` directly; this one goes through
-        Click + argv parsing + the `keel` script shim. If the
+        Click + argv parsing + the `tripwire` script shim. If the
         file lock fails at any layer, this test will produce duplicates.
         """
         target = tmp_path / "p"

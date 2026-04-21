@@ -1,4 +1,4 @@
-"""Unit tests for `keel refresh`."""
+"""Unit tests for `tripwire refresh`."""
 
 from __future__ import annotations
 

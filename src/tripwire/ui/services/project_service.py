@@ -140,7 +140,7 @@ def _find_projects_in_root(root: Path, max_depth: int) -> list[Path]:
 
 
 def discover_projects(config: UserConfig) -> list[ProjectSummary]:
-    """Discover keel projects and return their summaries.
+    """Discover tripwire projects and return their summaries.
 
     Results are cached for 60 seconds. The search order is:
 

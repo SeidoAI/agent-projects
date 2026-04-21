@@ -40,8 +40,8 @@ class Issue(BaseModel):
     verifier: str
 
     # Conventional-commits-style kind. Optional; used by
-    # `keel session derive-branch` to emit the canonical <type>/<slug>
-    # branch name. Valid values track keel.core.branch_naming.ALLOWED_TYPES.
+    # `tripwire session derive-branch` to emit the canonical <type>/<slug>
+    # branch name. Valid values track tripwire.core.branch_naming.ALLOWED_TYPES.
     kind: str | None = None
 
     agent: str | None = None

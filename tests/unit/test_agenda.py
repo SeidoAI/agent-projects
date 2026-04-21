@@ -1,4 +1,4 @@
-"""Unit tests for `keel agenda`."""
+"""Unit tests for `tripwire agenda`."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Integration tests for `keel scaffold-for-creation`.
+"""Integration tests for `tripwire scaffold-for-creation`.
 
 Verifies both output formats against:
 - A freshly-init'd v0 project (minimal state, no optional templates)

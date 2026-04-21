@@ -1,4 +1,4 @@
-"""keel workspace copy: first-time import of workspace nodes into a project."""
+"""tripwire workspace copy: first-time import of workspace nodes into a project."""
 
 import subprocess
 from datetime import datetime, timezone

@@ -247,7 +247,7 @@ class TestSyncConflict:
 
 class TestStandaloneProjectUnchanged:
     def test_no_workspace_field_validates(self, tmp_path):
-        """Project with no workspace pointer passes keel validate."""
+        """Project with no workspace pointer passes tripwire validate."""
         proj = tmp_path / "standalone"
         r = _run_keel(
             tmp_path,

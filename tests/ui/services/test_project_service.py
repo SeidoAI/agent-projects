@@ -1,4 +1,4 @@
-"""Tests for keel.ui.services.project_service — discovery, caching, index."""
+"""Tests for tripwire.ui.services.project_service — discovery, caching, index."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def _make_project(
     nodes: int = 0,
     sessions: int = 0,
 ) -> Path:
-    """Create a minimal keel project directory under *root*."""
+    """Create a minimal tripwire project directory under *root*."""
     root.mkdir(parents=True, exist_ok=True)
     (root / "project.yaml").write_text(
         f"name: {name}\nkey_prefix: {key_prefix}\n"

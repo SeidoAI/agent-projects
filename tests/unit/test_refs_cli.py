@@ -1,4 +1,4 @@
-"""keel refs check: ref-integrity subcommand.
+"""tripwire refs check: ref-integrity subcommand.
 
 v0.6a: refs check already existed from v0.5 refactor, but now exits
 non-zero on integrity errors (dangling refs, stale nodes).

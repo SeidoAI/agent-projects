@@ -1,4 +1,4 @@
-"""keel session CLI (v0.6a additions: derive-branch, check, progress)."""
+"""tripwire session CLI (v0.6a additions: derive-branch, check, progress)."""
 
 from click.testing import CliRunner
 

@@ -1,4 +1,4 @@
-"""Per-rule tests for keel lint project-only rules (v0.6a)."""
+"""Per-rule tests for tripwire lint project-only rules (v0.6a)."""
 
 from datetime import datetime, timedelta, timezone
 
