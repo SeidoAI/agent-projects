@@ -152,3 +152,56 @@ def _append_to_git_info_exclude(worktree: Path) -> None:
                 fh.write("\n")
             for entry in additions:
                 fh.write(entry + "\n")
+
+
+def _template_env():
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+    import tripwire
+
+    templates_root = (
+        Path(tripwire.__file__).parent / "templates" / "worktree"
+    )
+    return Environment(
+        loader=FileSystemLoader(str(templates_root)),
+        autoescape=select_autoescape(disabled_extensions=("j2", "md")),
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+
+
+def render_claude_md(
+    *,
+    code_worktree: Path,
+    agent_id: str,
+    skill_names: list[str],
+    worktrees: list[WorktreeEntry],
+    session_id: str,
+) -> None:
+    """Render <code_worktree>/CLAUDE.md from the template. Back up any
+    existing CLAUDE.md first."""
+    target = code_worktree / "CLAUDE.md"
+    if target.exists():
+        ts = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
+        backup = code_worktree / f"CLAUDE.md.bak.{ts}"
+        target.rename(backup)
+
+    env = _template_env()
+    tpl = env.get_template("CLAUDE.md.j2")
+    out = tpl.render(
+        agent_id=agent_id,
+        skill_names=skill_names,
+        worktrees=worktrees,
+        session_id=session_id,
+    )
+    target.write_text(out, encoding="utf-8")
+
+
+def render_kickoff(*, code_worktree: Path, prompt: str) -> None:
+    """Write the kickoff prompt to <code-worktree>/.tripwire/kickoff.md.
+
+    This file is what the operator pastes (manual mode) and what the
+    tmux send-keys step delivers on ready-probe timeout."""
+    kickoff = code_worktree / ".tripwire" / "kickoff.md"
+    kickoff.parent.mkdir(parents=True, exist_ok=True)
+    kickoff.write_text(prompt, encoding="utf-8")

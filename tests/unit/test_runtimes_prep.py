@@ -232,3 +232,74 @@ class TestCopySkills:
         exclude = (worktree / ".git" / "info" / "exclude").read_text()
         assert exclude.count(".claude/") == 1
         assert exclude.count(".tripwire/") == 1
+
+
+class TestRenderClaudeMd:
+    def test_renders_with_skill_and_worktree_refs(self, tmp_path):
+        from tripwire.models.session import WorktreeEntry
+        from tripwire.runtimes.prep import render_claude_md
+
+        code_wt = tmp_path / "code-wt"
+        code_wt.mkdir()
+        project_wt = tmp_path / "project-wt"
+        project_wt.mkdir()
+
+        render_claude_md(
+            code_worktree=code_wt,
+            agent_id="backend-coder",
+            skill_names=["backend-development"],
+            worktrees=[
+                WorktreeEntry(
+                    repo="SeidoAI/code",
+                    clone_path=str(tmp_path / "code-clone"),
+                    worktree_path=str(code_wt),
+                    branch="feat/s1",
+                ),
+                WorktreeEntry(
+                    repo="SeidoAI/project-tracking",
+                    clone_path=str(tmp_path / "project-clone"),
+                    worktree_path=str(project_wt),
+                    branch="feat/s1",
+                ),
+            ],
+            session_id="s1",
+        )
+
+        out = (code_wt / "CLAUDE.md").read_text()
+        assert "backend-coder" in out
+        assert ".claude/skills/backend-development/SKILL.md" in out
+        assert str(project_wt) in out
+        assert "s1" in out
+
+    def test_existing_claude_md_backed_up(self, tmp_path):
+        from tripwire.runtimes.prep import render_claude_md
+
+        code_wt = tmp_path / "code-wt"
+        code_wt.mkdir()
+        (code_wt / "CLAUDE.md").write_text("OLD")
+
+        render_claude_md(
+            code_worktree=code_wt,
+            agent_id="backend-coder",
+            skill_names=[],
+            worktrees=[],
+            session_id="s1",
+        )
+
+        backups = list(code_wt.glob("CLAUDE.md.bak.*"))
+        assert len(backups) == 1
+        assert backups[0].read_text() == "OLD"
+
+
+class TestRenderKickoff:
+    def test_writes_kickoff_md(self, tmp_path):
+        from tripwire.runtimes.prep import render_kickoff
+
+        code_wt = tmp_path / "wt"
+        code_wt.mkdir()
+
+        render_kickoff(code_worktree=code_wt, prompt="do the thing")
+
+        kickoff = code_wt / ".tripwire" / "kickoff.md"
+        assert kickoff.is_file()
+        assert kickoff.read_text() == "do the thing"
