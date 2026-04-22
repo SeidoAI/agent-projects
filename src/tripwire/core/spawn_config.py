@@ -90,13 +90,19 @@ def render_system_append(defaults: SpawnDefaults, **ctx: Any) -> str:
 def build_claude_args(
     defaults: SpawnDefaults,
     *,
-    prompt: str,
+    prompt: str | None,
     system_append: str,
     session_id: str,
     claude_session_id: str,
     resume: bool = False,
+    interactive: bool = False,
 ) -> list[str]:
     """Build the claude CLI argv from the resolved spawn config.
+
+    When ``interactive=True``, the ``-p <prompt>`` pair is omitted so
+    claude starts in interactive mode. ``prompt`` must be ``None`` in
+    that case; the caller delivers the kickoff prompt via send-keys
+    after the ready-probe.
 
     The two session identifiers are distinct:
     - ``session_id`` — tripwire's human-readable session slug, passed as
@@ -107,11 +113,16 @@ def build_claude_args(
 
     Flag set matches ``claude --help`` output and spec §8.1.
     """
+    if interactive and prompt is not None:
+        raise ValueError("prompt must be None when interactive=True")
+    if not interactive and prompt is None:
+        raise ValueError("prompt is required when interactive=False")
+
     cfg = defaults.config
-    args = [
-        defaults.invocation.command,
-        "-p",
-        prompt,
+    args: list[str] = [defaults.invocation.command]
+    if not interactive:
+        args += ["-p", prompt]
+    args += [
         "--name",
         session_id,
         "--session-id",
