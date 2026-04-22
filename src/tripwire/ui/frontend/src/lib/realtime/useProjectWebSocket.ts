@@ -74,6 +74,12 @@ export function useProjectWebSocket(projectId: string): { status: UseProjectWebS
             listener(next);
           }
         },
+        // After a dropped connection comes back, bust every cached query
+        // for this project so we catch up on events that fired while
+        // disconnected (per [[websocket-client]]).
+        onReconnect: () => {
+          queryClient.invalidateQueries();
+        },
       });
       connections.set(projectId, entry);
       tracked = entry;

@@ -10,6 +10,7 @@ const clients: Array<{
   client: WebSocketClient;
   onEvent: (event: unknown) => void;
   onStatusChange?: (status: string) => void;
+  onReconnect?: () => void;
   close: ReturnType<typeof vi.fn>;
 }> = [];
 
@@ -19,6 +20,7 @@ vi.mock("@/lib/realtime/websocketClient", () => {
       url: string;
       onEvent: (ev: unknown) => void;
       onStatusChange?: (status: string) => void;
+      onReconnect?: () => void;
     }) => {
       const close = vi.fn();
       const client = {
@@ -30,6 +32,7 @@ vi.mock("@/lib/realtime/websocketClient", () => {
         client,
         onEvent: opts.onEvent,
         onStatusChange: opts.onStatusChange,
+        onReconnect: opts.onReconnect,
         close,
       });
       return client;
@@ -126,5 +129,24 @@ describe("useProjectWebSocket", () => {
       clients[0]?.onStatusChange?.("error");
     });
     expect(result.current.status).toBe("error");
+  });
+
+  it("invalidates every cached query on reconnect", async () => {
+    const { useProjectWebSocket } = await loadHook();
+    const queryClient = new QueryClient();
+    const invalidateAll = vi.spyOn(queryClient, "invalidateQueries");
+
+    function CustomWrapper({ children }: { children: ReactNode }) {
+      return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    }
+
+    renderHook(() => useProjectWebSocket("p1"), { wrapper: CustomWrapper });
+    expect(invalidateAll).not.toHaveBeenCalled();
+
+    act(() => {
+      clients[0]?.onReconnect?.();
+    });
+    // No-arg invalidate → all queries (catch up after a dropped connection).
+    expect(invalidateAll).toHaveBeenCalledWith();
   });
 });

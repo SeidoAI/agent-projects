@@ -15,6 +15,7 @@ interface FakeSocket {
   onclose: CloseHandler | null;
   onerror: ErrorHandler | null;
   close: () => void;
+  send: ReturnType<typeof vi.fn>;
   fireOpen(): void;
   fireMessage(data: unknown): void;
   fireError(ev?: Event): void;
@@ -53,6 +54,7 @@ function makeSocketFactory() {
       onclose: null,
       onerror: null,
       close: vi.fn(),
+      send: vi.fn(),
       fireOpen: () => socket.onopen?.(),
       fireMessage: (data: unknown) => {
         socket.onmessage?.({ data: JSON.stringify(data) } as MessageEvent);
@@ -272,6 +274,59 @@ describe("createWebSocketClient", () => {
     expect(last?.cancelled).toBe(true);
     expect(client.getStatus()).toBe("closed");
     expect(sockets.length).toBe(1);
+  });
+
+  it("auto-responds to ping with a pong over the same socket", () => {
+    const { createSocket, sockets } = makeSocketFactory();
+    const { schedule } = makeScheduler();
+    const onEvent = vi.fn();
+
+    createWebSocketClient({
+      url: "ws://x",
+      onEvent,
+      createSocket,
+      schedule,
+      random: () => 0.5,
+    });
+
+    const socket = sockets[0];
+    if (!socket) throw new Error("expected socket");
+    socket.fireOpen();
+    socket.fireMessage({ type: "ping", timestamp: "2026-04-22T00:00:00.000Z" });
+
+    expect(socket.send).toHaveBeenCalledTimes(1);
+    const payload = socket.send.mock.calls[0]?.[0];
+    expect(typeof payload).toBe("string");
+    expect(JSON.parse(payload as string)).toMatchObject({ type: "pong" });
+    // The consumer still sees the ping.
+    expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "ping" }));
+  });
+
+  it("fires onReconnect after a successful re-open, not on initial connect", () => {
+    const { createSocket, sockets } = makeSocketFactory();
+    const { schedule, runLast } = makeScheduler();
+    const onReconnect = vi.fn();
+
+    createWebSocketClient({
+      url: "ws://x",
+      onEvent: vi.fn(),
+      onReconnect,
+      createSocket,
+      schedule,
+      random: () => 0.5,
+    });
+
+    const socket1 = sockets[0];
+    if (!socket1) throw new Error("expected socket 1");
+    socket1.fireOpen();
+    expect(onReconnect).not.toHaveBeenCalled();
+
+    socket1.fireClose();
+    runLast();
+    const socket2 = sockets[1];
+    if (!socket2) throw new Error("expected socket 2");
+    socket2.fireOpen();
+    expect(onReconnect).toHaveBeenCalledTimes(1);
   });
 
   it("reports status transitions via onStatusChange", () => {

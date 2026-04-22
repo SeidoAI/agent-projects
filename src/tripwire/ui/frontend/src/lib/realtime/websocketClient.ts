@@ -11,6 +11,13 @@ export interface WebSocketClientOptions {
   onClose?: (ev: CloseEvent) => void;
   onError?: (ev: Event) => void;
   onStatusChange?: (status: WebSocketClientStatus) => void;
+  /**
+   * Called when a socket reopens after at least one prior failed attempt.
+   * Distinct from `onOpen` so consumers can run catch-up work (e.g. a
+   * sweeping cache invalidation) only on actual reconnects, not the
+   * initial connect.
+   */
+  onReconnect?: () => void;
   /** Initial reconnect delay (default 250ms). */
   initialDelayMs?: number;
   /** Max reconnect delay (default 8000ms). */
@@ -89,9 +96,13 @@ export function createWebSocketClient(options: WebSocketClientOptions): WebSocke
 
     next.onopen = () => {
       if (closed) return;
+      const wasReconnect = attempts > 0;
       attempts = 0;
       setStatus("open");
       options.onOpen?.();
+      if (wasReconnect) {
+        options.onReconnect?.();
+      }
     };
 
     next.onmessage = (ev: MessageEvent) => {
@@ -103,6 +114,16 @@ export function createWebSocketClient(options: WebSocketClientOptions): WebSocke
         // Malformed payload — surface as an error but keep the socket open.
         options.onError?.(new Event("parse-error"));
         return;
+      }
+      // Auto-respond to server heartbeats — the hub uses these to detect
+      // dead clients (see `tripwire.ui.ws.hub.heartbeat_loop`).
+      if (parsed.type === "ping") {
+        try {
+          next.send(JSON.stringify({ type: "pong", timestamp: new Date().toISOString() }));
+        } catch {
+          // Socket may have flipped to CLOSING between dispatch and send;
+          // the close handler will kick reconnection.
+        }
       }
       options.onEvent(parsed);
     };

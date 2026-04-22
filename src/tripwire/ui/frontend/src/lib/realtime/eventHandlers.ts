@@ -70,6 +70,8 @@ function dispatchFileChanged(event: FileChangedEvent, queryClient: QueryClient):
     case "issue":
       queryClient.invalidateQueries({ queryKey: queryKeys.issues(pid) });
       queryClient.invalidateQueries({ queryKey: queryKeys.issue(pid, entity_id) });
+      // Issue status/dependency edits change the dep graph layout.
+      queryClient.invalidateQueries({ queryKey: queryKeys.graph(pid, "deps") });
       return;
 
     case "node":

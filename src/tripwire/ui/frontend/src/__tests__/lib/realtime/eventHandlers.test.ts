@@ -35,7 +35,7 @@ describe("dispatchEvent", () => {
     return invalidate.mock.calls.map((call) => call[0]?.queryKey);
   }
 
-  it("file_changed entity=issue → invalidates issues list and the issue", () => {
+  it("file_changed entity=issue → invalidates issues list, the issue, and the deps graph", () => {
     const event: FileChangedEvent = makeEvent({
       type: "file_changed",
       project_id: "p1",
@@ -49,6 +49,7 @@ describe("dispatchEvent", () => {
     const keys = invalidatedKeys();
     expect(keys).toContainEqual(queryKeys.issues("p1"));
     expect(keys).toContainEqual(queryKeys.issue("p1", "KUI-42"));
+    expect(keys).toContainEqual(queryKeys.graph("p1", "deps"));
   });
 
   it("file_changed entity=node → invalidates node lists and graph views", () => {
