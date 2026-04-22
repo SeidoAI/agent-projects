@@ -38,15 +38,30 @@ def _init_repo(path: Path) -> None:
 
 @pytest.fixture
 def fake_claude_on_path(tmp_path, monkeypatch):
-    """A claude that just sleeps — lets tmux think the command is
-    alive without actually launching claude."""
+    """A minimal stand-in for the claude CLI: prints a distinctive
+    ready marker, then idles to keep the tmux session alive.
+
+    ``tmux capture-pane`` strips trailing whitespace per line, so the
+    default marker of ``"> "`` with a trailing space does not survive
+    capture — a real investigation point we hit while integration-
+    testing. We side-step it here by overriding the marker via
+    ``TRIPWIRE_TMUX_READY_MARKER`` (F6) to something unambiguous the
+    fake emits. Verifying the production default against real claude
+    still has to happen on a host with real claude installed."""
     bin_dir = tmp_path / "claudebin"
     bin_dir.mkdir()
     fake = bin_dir / "claude"
-    fake.write_text("#!/bin/sh\nexec sleep 60\n")
+    fake.write_text(
+        "#!/bin/sh\n"
+        "printf 'TRIPWIRE_TEST_READY\\n'\n"
+        "exec sleep 60\n"
+    )
     fake.chmod(0o755)
     monkeypatch.setenv(
         "PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}"
+    )
+    monkeypatch.setenv(
+        "TRIPWIRE_TMUX_READY_MARKER", "TRIPWIRE_TEST_READY"
     )
     return fake
 
