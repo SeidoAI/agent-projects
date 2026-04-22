@@ -184,6 +184,31 @@ class TestAdvancePhase:
         with pytest.raises(ValueError, match="Unknown phase"):
             advance_phase(project_with_phase, "imaginary")
 
+    def test_reverts_phase_when_validator_crashes(
+        self, project_with_phase: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """The try/except BaseException branch must revert even on a crash.
+
+        The revert invariant — "a half-advanced phase never lands on
+        disk" — is what the bare-except in advance_phase exists for. A
+        test that only exercises the validator-returns-errors path
+        doesn't prove that invariant; an exception-throwing validator
+        does.
+        """
+        from tripwire.core.store import load_project
+        from tripwire.ui.services import action_service
+
+        def _boom(*_a, **_kw):
+            raise RuntimeError("simulated validator crash")
+
+        monkeypatch.setattr(action_service, "validate_project", _boom)
+
+        with pytest.raises(RuntimeError, match="simulated"):
+            advance_phase(project_with_phase, "scoped")
+
+        # Revert invariant: phase on disk is still the original.
+        assert load_project(project_with_phase).phase.value == "scoping"
+
     def test_same_phase_noop_does_not_audit(self, project_with_phase: Path):
         """Same-phase 'advance' is an idempotent no-op — nothing to audit."""
         advance_phase(project_with_phase, "scoping")
