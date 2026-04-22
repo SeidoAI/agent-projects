@@ -507,6 +507,51 @@ def session_spawn_cmd(
     click.echo(f"  Claude session: {start_result.claude_session_id}")
 
 
+@session_cmd.command("attach")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_attach_cmd(session_id: str, project_dir: Path) -> None:
+    """Attach to a running session. Behaviour is runtime-specific:
+    tmux runtimes exec `tmux attach`; manual runtimes print the
+    command to run."""
+    import os
+
+    from tripwire.core.spawn_config import load_resolved_spawn_config
+    from tripwire.runtimes import get_runtime
+    from tripwire.runtimes.base import AttachExec, AttachInstruction
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(
+            f"session '{session_id}' not found"
+        ) from exc
+
+    spawn = load_resolved_spawn_config(resolved, session=session)
+    try:
+        runtime = get_runtime(spawn.invocation.runtime)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    cmd = runtime.attach_command(session)
+    if isinstance(cmd, AttachExec):
+        os.execvp(cmd.argv[0], cmd.argv)
+    elif isinstance(cmd, AttachInstruction):
+        click.echo(cmd.message)
+    else:
+        raise click.ClickException(
+            f"Runtime '{runtime.name}' returned unexpected attach command."
+        )
+
+
 @session_cmd.command("pause")
 @click.argument("session_id")
 @click.option(
