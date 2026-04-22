@@ -561,7 +561,10 @@ def session_attach_cmd(session_id: str, project_dir: Path) -> None:
     show_default=True,
 )
 def session_pause_cmd(session_id: str, project_dir: Path) -> None:
-    """SIGTERM the claude process, transition to paused."""
+    """Pause the session via its runtime, transition to paused."""
+    from tripwire.core.spawn_config import load_resolved_spawn_config
+    from tripwire.runtimes import get_runtime
+
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
@@ -575,16 +578,33 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
             f"session '{session_id}' is '{session.status}', must be 'executing' to pause"
         )
 
-    pid = session.runtime_state.pid
+    spawn = load_resolved_spawn_config(resolved, session=session)
+    runtime_name = spawn.invocation.runtime
     now = datetime.now(tz=timezone.utc)
 
-    if pid and is_alive(pid):
-        send_sigterm(pid)
-        session.status = "paused"
-        click.echo(f"Session '{session_id}' → paused (SIGTERM sent to PID {pid})")
+    # v0.7 legacy fallback: session has pid but no tmux_session_name.
+    if (
+        runtime_name == "tmux"
+        and not session.runtime_state.tmux_session_name
+        and session.runtime_state.pid
+    ):
+        pid = session.runtime_state.pid
+        if pid and is_alive(pid):
+            send_sigterm(pid)
+            session.status = "paused"
+            click.echo(
+                f"Session '{session_id}' → paused (legacy SIGTERM to PID {pid})"
+            )
+        else:
+            session.status = "failed"
+            click.echo(
+                f"Warning: PID {pid} not found — session '{session_id}' → failed"
+            )
     else:
-        session.status = "failed"
-        click.echo(f"Warning: PID {pid} not found — session '{session_id}' → failed")
+        runtime = get_runtime(runtime_name)
+        runtime.pause(session)
+        session.status = "paused"
+        click.echo(f"Session '{session_id}' → paused")
 
     session.updated_at = now
     save_session(resolved, session)
@@ -599,7 +619,10 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
     show_default=True,
 )
 def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
-    """Kill the process if running, transition to abandoned."""
+    """Kill the session's runtime handle if running, transition to abandoned."""
+    from tripwire.core.spawn_config import load_resolved_spawn_config
+    from tripwire.runtimes import get_runtime
+
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
@@ -613,10 +636,23 @@ def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
             f"session '{session_id}' is already '{session.status}'"
         )
 
-    pid = session.runtime_state.pid
-    if pid and session.status == "executing" and is_alive(pid):
-        send_sigterm(pid)
-        click.echo(f"Sent SIGTERM to PID {pid}")
+    spawn = load_resolved_spawn_config(resolved, session=session)
+    runtime_name = spawn.invocation.runtime
+
+    # v0.7 legacy fallback: session has pid but no tmux_session_name.
+    if (
+        runtime_name == "tmux"
+        and not session.runtime_state.tmux_session_name
+        and session.runtime_state.pid
+    ):
+        pid = session.runtime_state.pid
+        if pid and session.status == "executing" and is_alive(pid):
+            send_sigterm(pid)
+            click.echo(f"Sent SIGTERM to PID {pid}")
+    else:
+        runtime = get_runtime(runtime_name)
+        if session.status == "executing":
+            runtime.abandon(session)
 
     session.status = "abandoned"
     session.updated_at = datetime.now(tz=timezone.utc)

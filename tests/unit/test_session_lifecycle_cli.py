@@ -419,3 +419,87 @@ class TestSessionAgenda:
         )
         assert result.exit_code != 0
         assert "cycle" in result.output.lower()
+
+
+class TestSessionPauseDispatch:
+    def test_pause_uses_runtime_abandon_for_tmux(
+        self, fake_tmux_on_path, tmp_path_project, save_test_session
+    ):
+        fake_tmux_on_path.mark_session_exists("tw-s1")
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="executing",
+            spawn_config={"invocation": {"runtime": "tmux"}},
+            runtime_state={
+                "claude_session_id": "uuid-1",
+                "tmux_session_name": "tw-s1",
+            },
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            ["pause", "s1", "--project-dir", str(tmp_path_project)],
+        )
+
+        assert result.exit_code == 0, result.output
+        calls = fake_tmux_on_path.calls()
+        assert any(c[0] == "send-keys" and "C-c" in c for c in calls)
+
+        s = load_session(tmp_path_project, "s1")
+        assert s.status == "paused"
+
+
+class TestSessionAbandonDispatch:
+    def test_abandon_uses_runtime_for_tmux(
+        self, fake_tmux_on_path, tmp_path_project, save_test_session
+    ):
+        fake_tmux_on_path.mark_session_exists("tw-s1")
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="executing",
+            spawn_config={"invocation": {"runtime": "tmux"}},
+            runtime_state={
+                "claude_session_id": "uuid-1",
+                "tmux_session_name": "tw-s1",
+            },
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            ["abandon", "s1", "--project-dir", str(tmp_path_project)],
+        )
+
+        assert result.exit_code == 0, result.output
+        calls = fake_tmux_on_path.calls()
+        assert any(c[0] == "kill-session" for c in calls)
+
+        s = load_session(tmp_path_project, "s1")
+        assert s.status == "abandoned"
+
+
+class TestSessionAbandonLegacyPidFallback:
+    def test_abandon_v07_session_with_pid_only(
+        self, tmp_path_project, save_test_session
+    ):
+        """v0.7 sessions have only pid — no tmux_session_name.
+        Abandon should still fall through to SIGTERM path."""
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="executing",
+            runtime_state={"pid": 99999},  # non-existent pid
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            ["abandon", "s1", "--project-dir", str(tmp_path_project)],
+        )
+
+        assert result.exit_code == 0, result.output
+        s = load_session(tmp_path_project, "s1")
+        assert s.status == "abandoned"
