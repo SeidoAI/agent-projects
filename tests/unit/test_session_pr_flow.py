@@ -246,3 +246,184 @@ class TestRunPrFlowBasic:
                 project_dir=tmp_path_project,
                 skip_push=True,
             )
+
+
+class TestRunPrFlowCrossLink:
+    def test_pr_bodies_cross_link_when_two_prs_open(
+        self, fake_gh_on_path, tmp_path, tmp_path_project, save_test_session
+    ):
+        from tripwire.core.session_pr_flow import run_pr_flow
+        from tripwire.core.session_store import load_session
+
+        code_wt = tmp_path / "code-wt"
+        code_wt.mkdir()
+        _init_repo_with_commit(code_wt)
+        _add_commit_on_branch(code_wt, "feat/s1", "c")
+
+        project_wt = tmp_path / "project-wt"
+        project_wt.mkdir()
+        _init_repo_with_commit(project_wt)
+        _add_commit_on_branch(project_wt, "feat/s1", "p")
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="executing",
+            repos=[
+                {"repo": "SeidoAI/code", "base_branch": "main"},
+                {"repo": "SeidoAI/project", "base_branch": "main"},
+            ],
+            runtime_state={
+                "worktrees": [
+                    {
+                        "repo": "SeidoAI/code",
+                        "clone_path": str(code_wt),
+                        "worktree_path": str(code_wt),
+                        "branch": "feat/s1",
+                    },
+                    {
+                        "repo": "SeidoAI/project",
+                        "clone_path": str(project_wt),
+                        "worktree_path": str(project_wt),
+                        "branch": "feat/s1",
+                    },
+                ],
+            },
+        )
+        session = load_session(tmp_path_project, "s1")
+        result = run_pr_flow(
+            session=session,
+            project_dir=tmp_path_project,
+            skip_push=True,
+        )
+
+        edits = [
+            c for c in fake_gh_on_path.calls() if c[:2] == ["pr", "edit"]
+        ]
+        assert len(edits) == len(result.pr_urls) == 2
+
+    def test_merge_policy_await_review_does_not_merge(
+        self, fake_gh_on_path, tmp_path, tmp_path_project, save_test_session
+    ):
+        from tripwire.core.session_pr_flow import run_pr_flow
+        from tripwire.core.session_store import load_session
+
+        code_wt = tmp_path / "code-wt"
+        code_wt.mkdir()
+        _init_repo_with_commit(code_wt)
+        _add_commit_on_branch(code_wt, "feat/s1", "c")
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="executing",
+            repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
+            merge_policy="await_review",
+            runtime_state={
+                "worktrees": [
+                    {
+                        "repo": "SeidoAI/code",
+                        "clone_path": str(code_wt),
+                        "worktree_path": str(code_wt),
+                        "branch": "feat/s1",
+                    }
+                ],
+            },
+        )
+        session = load_session(tmp_path_project, "s1")
+        run_pr_flow(
+            session=session,
+            project_dir=tmp_path_project,
+            skip_push=True,
+        )
+
+        merges = [
+            c for c in fake_gh_on_path.calls() if c[:2] == ["pr", "merge"]
+        ]
+        assert merges == []
+
+    def test_merge_policy_auto_on_green_passes_auto_flag(
+        self, fake_gh_on_path, tmp_path, tmp_path_project, save_test_session
+    ):
+        from tripwire.core.session_pr_flow import run_pr_flow
+        from tripwire.core.session_store import load_session
+
+        code_wt = tmp_path / "code-wt"
+        code_wt.mkdir()
+        _init_repo_with_commit(code_wt)
+        _add_commit_on_branch(code_wt, "feat/s1", "c")
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="executing",
+            repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
+            merge_policy="auto_merge_on_green",
+            runtime_state={
+                "worktrees": [
+                    {
+                        "repo": "SeidoAI/code",
+                        "clone_path": str(code_wt),
+                        "worktree_path": str(code_wt),
+                        "branch": "feat/s1",
+                    }
+                ],
+            },
+        )
+        session = load_session(tmp_path_project, "s1")
+        run_pr_flow(
+            session=session,
+            project_dir=tmp_path_project,
+            skip_push=True,
+        )
+
+        merges = [
+            c for c in fake_gh_on_path.calls() if c[:2] == ["pr", "merge"]
+        ]
+        assert len(merges) == 1
+        joined = " ".join(merges[0])
+        assert "--auto" in joined
+        assert "--squash" in joined
+
+    def test_merge_policy_auto_immediate_omits_auto_flag(
+        self, fake_gh_on_path, tmp_path, tmp_path_project, save_test_session
+    ):
+        from tripwire.core.session_pr_flow import run_pr_flow
+        from tripwire.core.session_store import load_session
+
+        code_wt = tmp_path / "code-wt"
+        code_wt.mkdir()
+        _init_repo_with_commit(code_wt)
+        _add_commit_on_branch(code_wt, "feat/s1", "c")
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="executing",
+            repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
+            merge_policy="auto_merge_immediate",
+            runtime_state={
+                "worktrees": [
+                    {
+                        "repo": "SeidoAI/code",
+                        "clone_path": str(code_wt),
+                        "worktree_path": str(code_wt),
+                        "branch": "feat/s1",
+                    }
+                ],
+            },
+        )
+        session = load_session(tmp_path_project, "s1")
+        run_pr_flow(
+            session=session,
+            project_dir=tmp_path_project,
+            skip_push=True,
+        )
+
+        merges = [
+            c for c in fake_gh_on_path.calls() if c[:2] == ["pr", "merge"]
+        ]
+        assert len(merges) == 1
+        joined = " ".join(merges[0])
+        assert "--auto" not in joined
+        assert "--squash" in joined

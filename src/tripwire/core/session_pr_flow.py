@@ -176,4 +176,34 @@ def run_pr_flow(
 
         result.pr_urls.append(url)
 
+    # Second pass: cross-link sibling URLs into each PR body.
+    if len(result.pr_urls) > 1:
+        for i, url in enumerate(result.pr_urls):
+            siblings = [u for j, u in enumerate(result.pr_urls) if j != i]
+            new_body = _render_pr_body(
+                session=session,
+                repo="",
+                sibling_urls=siblings,
+            )
+            subprocess.run(
+                ["gh", "pr", "edit", url, "--body", new_body],
+                check=False,
+            )
+
+    # Merge policy
+    policy = session.merge_policy
+    if policy == "auto_merge_on_green":
+        for url in result.pr_urls:
+            subprocess.run(
+                ["gh", "pr", "merge", "--auto", "--squash", url],
+                check=False,
+            )
+    elif policy == "auto_merge_immediate":
+        for url in result.pr_urls:
+            subprocess.run(
+                ["gh", "pr", "merge", "--squash", url],
+                check=False,
+            )
+    # await_review: no-op
+
     return result
