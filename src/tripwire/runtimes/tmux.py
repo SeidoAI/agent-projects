@@ -9,6 +9,7 @@ via ``tmux capture-pane``, then delivers the kickoff prompt with
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import time
@@ -27,9 +28,27 @@ from tripwire.runtimes.base import (
     RuntimeStatus,
 )
 
-_READY_MARKER = "> "
-_READY_POLL_INTERVAL = 0.25
-_READY_TIMEOUT = 10.0
+# Marker that signals claude's interactive prompt is ready to receive
+# input. Must be empirically verified against the claude version you're
+# running — the prompt UI has shifted between releases (past values
+# include "> ", "│ ", and box-drawing prefixes). Override via the env
+# var TRIPWIRE_TMUX_READY_MARKER at launch time.
+#
+# To verify locally:
+#   tmux new-session -d -s probe -- claude
+#   sleep 5
+#   tmux capture-pane -pt probe | tail -3
+#   tmux kill-session -t probe
+#
+# Take the trailing substring of the prompt line that's stable
+# (appearing on every ready prompt).
+_READY_MARKER = os.environ.get("TRIPWIRE_TMUX_READY_MARKER", "> ")
+_READY_POLL_INTERVAL = float(
+    os.environ.get("TRIPWIRE_TMUX_READY_POLL_INTERVAL", "0.25")
+)
+_READY_TIMEOUT = float(
+    os.environ.get("TRIPWIRE_TMUX_READY_TIMEOUT", "10.0")
+)
 
 
 def _tmux_session_name(session_id: str) -> str:
