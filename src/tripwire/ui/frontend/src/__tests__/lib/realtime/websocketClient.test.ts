@@ -276,6 +276,40 @@ describe("createWebSocketClient", () => {
     expect(sockets.length).toBe(1);
   });
 
+  it("does not fire onClose when the user calls client.close()", () => {
+    const { createSocket, sockets } = makeSocketFactory();
+    const { schedule } = makeScheduler();
+    const onClose = vi.fn();
+
+    const client = createWebSocketClient({
+      url: "ws://x",
+      onEvent: vi.fn(),
+      onClose,
+      createSocket,
+      schedule,
+      random: () => 0.5,
+    });
+
+    const socket = sockets[0];
+    if (!socket) throw new Error("expected socket");
+    socket.fireOpen();
+
+    // Capture the handler the client attached. Explicit client.close()
+    // nulls this so in normal operation the native close frame wouldn't
+    // hit it — but if a race delivers the close event before the
+    // handler is nulled, the callback-site guard inside the handler
+    // must still keep onClose silent (contract: only server-initiated
+    // closes fire onClose, never teardown).
+    const originalOnclose = socket.onclose;
+    client.close();
+    if (originalOnclose) {
+      originalOnclose({ code: 1000, reason: "", wasClean: true } as CloseEvent);
+    }
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(client.getStatus()).toBe("closed");
+  });
+
   it("auto-responds to ping with a pong over the same socket", () => {
     const { createSocket, sockets } = makeSocketFactory();
     const { schedule } = makeScheduler();
