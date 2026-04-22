@@ -483,3 +483,44 @@ class TestBuildClaudeArgsResumePropagation:
         new_session = next(c for c in calls if c[0] == "new-session")
         # --resume must appear among the claude args tmux was asked to run
         assert "--resume" in new_session
+
+
+class TestCopySkillsIdempotency:
+    def test_unchanged_skill_set_does_not_back_up(self, tmp_path):
+        """Re-copying the same skill set must not create a new
+        .claude/skills.bak.<ts>/ directory each time (M10)."""
+        from tripwire.runtimes.prep import copy_skills
+
+        worktree = tmp_path / "wt"
+        worktree.mkdir()
+        (worktree / ".git" / "info").mkdir(parents=True)
+        (worktree / ".git" / "info" / "exclude").touch()
+
+        copy_skills(worktree=worktree, skill_names=["backend-development"])
+        copy_skills(worktree=worktree, skill_names=["backend-development"])
+        copy_skills(worktree=worktree, skill_names=["backend-development"])
+
+        backups = list(worktree.glob(".claude/skills.bak.*"))
+        assert len(backups) == 0
+
+    def test_changed_skill_set_triggers_backup(self, tmp_path):
+        """A genuine change to skill_names does back up the old set."""
+        from tripwire.runtimes.prep import copy_skills
+
+        worktree = tmp_path / "wt"
+        worktree.mkdir()
+        (worktree / ".git" / "info").mkdir(parents=True)
+        (worktree / ".git" / "info" / "exclude").touch()
+
+        copy_skills(worktree=worktree, skill_names=["backend-development"])
+        copy_skills(
+            worktree=worktree,
+            skill_names=["backend-development", "verification"],
+        )
+
+        backups = list(worktree.glob(".claude/skills.bak.*"))
+        assert len(backups) == 1
+        # New set in place.
+        assert (
+            worktree / ".claude/skills/verification/SKILL.md"
+        ).is_file()

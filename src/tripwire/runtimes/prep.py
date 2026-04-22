@@ -100,16 +100,28 @@ def resolve_worktrees(
     return entries
 
 
+def _skills_hash(skill_names: list[str]) -> str:
+    """Stable fingerprint of the requested skill set."""
+    import hashlib
+
+    joined = "\n".join(sorted(skill_names))
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+
 def copy_skills(*, worktree: Path, skill_names: list[str]) -> None:
     """Copy each named skill from tripwire.templates.skills into
-    <worktree>/.claude/skills/<name>/. Back up any pre-existing
-    .claude/skills/ directory, then append .claude/ and .tripwire/ to
-    the worktree's .git/info/exclude (idempotent).
+    <worktree>/.claude/skills/<name>/.
+
+    Idempotent: compares the requested skill set against the sentinel
+    at <worktree>/.claude/.tripwire-skills-hash. If the set matches
+    and every skill file is present, this is a no-op. Otherwise the
+    existing .claude/skills/ is backed up and re-populated from
+    scratch. Always appends .claude/ and .tripwire/ to the worktree's
+    info/exclude.
     """
     source_root = files("tripwire.templates.skills")
 
     if skill_names:
-        # Validate all skills exist before mutating anything.
         for name in skill_names:
             skill_src = source_root / name / "SKILL.md"
             if not skill_src.is_file():
@@ -119,16 +131,34 @@ def copy_skills(*, worktree: Path, skill_names: list[str]) -> None:
                 )
 
         dest_root = worktree / ".claude" / "skills"
-        if dest_root.exists():
-            ts = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
-            backup = worktree / ".claude" / f"skills.bak.{ts}"
-            dest_root.rename(backup)
+        sentinel = worktree / ".claude" / ".tripwire-skills-hash"
+        wanted = _skills_hash(skill_names)
 
-        dest_root.mkdir(parents=True, exist_ok=True)
-        for name in skill_names:
-            src_dir = source_root / name
-            dst_dir = dest_root / name
-            _copy_traversable(src_dir, dst_dir)
+        current = sentinel.read_text().strip() if sentinel.is_file() else ""
+        all_present = all(
+            (dest_root / n / "SKILL.md").is_file() for n in skill_names
+        )
+
+        if current != wanted or not all_present:
+            if dest_root.exists():
+                ts = datetime.now(tz=timezone.utc).strftime(
+                    "%Y%m%dT%H%M%S%f"
+                )
+                backup = worktree / ".claude" / f"skills.bak.{ts}"
+                # Walk children and move to avoid "Directory not empty"
+                # from os.rename on non-empty dest dirs.
+                import shutil as _sh
+
+                _sh.move(str(dest_root), str(backup))
+
+            dest_root.mkdir(parents=True, exist_ok=True)
+            for name in skill_names:
+                src_dir = source_root / name
+                dst_dir = dest_root / name
+                _copy_traversable(src_dir, dst_dir)
+
+            sentinel.parent.mkdir(parents=True, exist_ok=True)
+            sentinel.write_text(wanted + "\n", encoding="utf-8")
 
     _append_to_git_info_exclude(worktree)
 
