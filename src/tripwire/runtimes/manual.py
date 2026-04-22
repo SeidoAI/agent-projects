@@ -25,11 +25,17 @@ from tripwire.runtimes.base import (
 
 
 def _start_command(
-    worktree: str, session_id: str, claude_session_id: str
+    worktree: str,
+    session_id: str,
+    claude_session_id: str,
+    *,
+    resume: bool = False,
 ) -> str:
+    resume_flag = " --resume" if resume else ""
     return (
         f"cd {worktree}\n"
         f"  claude --name {session_id} --session-id {claude_session_id}"
+        f"{resume_flag}"
     )
 
 
@@ -47,6 +53,7 @@ class ManualRuntime:
                 str(prepped.code_worktree),
                 prepped.session_id,
                 prepped.claude_session_id,
+                resume=prepped.resume,
             )
         )
         click.echo("")

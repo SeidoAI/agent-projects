@@ -43,6 +43,7 @@ def resolve_worktrees(
     project_dir: Path,
     branch: str,
     base_ref: str,
+    resume: bool = False,
 ) -> list[WorktreeEntry]:
     """Create one git worktree per session.repos entry.
 
@@ -52,8 +53,10 @@ def resolve_worktrees(
     project-tracking repo) are referenced from CLAUDE.md by their
     absolute paths.
 
-    Raises RuntimeError if any repo doesn't have a resolvable local
-    clone or if the requested branch already exists in a clone.
+    On ``resume=True``, existing worktrees and existing branches are
+    reused — we assume a prior spawn set them up and the agent was
+    paused or failed. On ``resume=False`` (default), existing worktree
+    paths or branches raise RuntimeError.
     """
     entries: list[WorktreeEntry] = []
     for rb in session.repos:
@@ -65,16 +68,27 @@ def resolve_worktrees(
             )
         wt_path = worktree_path_for_session(clone_path, session.id)
         if wt_path.exists():
-            raise RuntimeError(
-                f"Worktree path {wt_path} already exists. "
-                f"Use 'tripwire session cleanup {session.id}' to remove it."
-            )
-        if branch_exists(clone_path, branch):
-            raise RuntimeError(
-                f"Branch '{branch}' already exists in {clone_path}. "
-                f"Delete the branch or pick a different name."
-            )
-        worktree_add(clone_path, wt_path, branch, rb.base_branch or base_ref)
+            if not resume:
+                raise RuntimeError(
+                    f"Worktree path {wt_path} already exists. "
+                    f"Use 'tripwire session cleanup {session.id}' "
+                    f"or re-spawn with --resume."
+                )
+            # resume: reuse existing worktree
+        else:
+            if resume:
+                raise RuntimeError(
+                    f"Worktree {wt_path} was expected to exist for "
+                    f"--resume but does not. Run "
+                    f"'tripwire session cleanup {session.id}' then "
+                    f"spawn without --resume."
+                )
+            if branch_exists(clone_path, branch):
+                raise RuntimeError(
+                    f"Branch '{branch}' already exists in {clone_path}. "
+                    f"Delete the branch or pick a different name."
+                )
+            worktree_add(clone_path, wt_path, branch, rb.base_branch or base_ref)
         entries.append(
             WorktreeEntry(
                 repo=rb.repo,
@@ -253,6 +267,7 @@ def run(
     runtime,
     max_turns_override: int | None = None,
     claude_session_id: str | None = None,
+    resume: bool = False,
 ) -> PreppedSession:
     """Orchestrate all prep steps:
 
@@ -295,6 +310,7 @@ def run(
         project_dir=project_dir,
         branch=branch,
         base_ref="HEAD",
+        resume=resume,
     )
     if not worktrees:
         raise RuntimeError(
@@ -371,4 +387,5 @@ def run(
         prompt=prompt,
         system_append=system_append,
         spawn_defaults=resolved,
+        resume=resume,
     )

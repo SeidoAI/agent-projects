@@ -359,3 +359,127 @@ class TestPrepRun:
         assert (prepped.code_worktree / ".tripwire/kickoff.md").is_file()
         assert prepped.prompt
         assert prepped.claude_session_id
+
+
+class TestResolveWorktreesResume:
+    def test_resume_reuses_existing_worktree(
+        self, tmp_path, tmp_path_project, save_test_session
+    ):
+        """resume=True must not error when the worktree already exists —
+        it reuses the existing one. Regression test for B1."""
+        from tripwire.runtimes.prep import resolve_worktrees
+
+        code_clone = tmp_path / "code-clone"
+        code_clone.mkdir()
+        _init_repo(code_clone)
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="paused",
+            repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
+        )
+
+        from tripwire.core.session_store import load_session
+
+        session = load_session(tmp_path_project, "s1")
+
+        # First pass creates the worktree
+        with patch(
+            "tripwire.runtimes.prep._resolve_clone_path",
+            return_value=code_clone,
+        ):
+            entries = resolve_worktrees(
+                session=session,
+                project_dir=tmp_path_project,
+                branch="feat/s1",
+                base_ref="main",
+            )
+        assert len(entries) == 1
+        first_path = entries[0].worktree_path
+
+        # Second pass with resume=True reuses the same worktree
+        with patch(
+            "tripwire.runtimes.prep._resolve_clone_path",
+            return_value=code_clone,
+        ):
+            entries2 = resolve_worktrees(
+                session=session,
+                project_dir=tmp_path_project,
+                branch="feat/s1",
+                base_ref="main",
+                resume=True,
+            )
+        assert len(entries2) == 1
+        assert entries2[0].worktree_path == first_path
+
+    def test_resume_errors_when_worktree_vanished(
+        self, tmp_path_project, save_test_session
+    ):
+        from tripwire.runtimes.prep import resolve_worktrees
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="paused",
+            repos=[{"repo": "SeidoAI/missing", "base_branch": "main"}],
+        )
+
+        from tripwire.core.session_store import load_session
+
+        session = load_session(tmp_path_project, "s1")
+
+        with patch(
+            "tripwire.runtimes.prep._resolve_clone_path",
+            return_value=None,
+        ):
+            with pytest.raises(RuntimeError, match="No local clone"):
+                resolve_worktrees(
+                    session=session,
+                    project_dir=tmp_path_project,
+                    branch="feat/s1",
+                    base_ref="main",
+                    resume=True,
+                )
+
+
+class TestBuildClaudeArgsResumePropagation:
+    def test_tmux_runtime_passes_resume_flag(
+        self, fake_tmux_on_path, tmp_path
+    ):
+        """TmuxRuntime.start must thread resume through build_claude_args."""
+        from tripwire.models.session import AgentSession, WorktreeEntry
+        from tripwire.models.spawn import SpawnDefaults
+        from tripwire.runtimes import TmuxRuntime
+        from tripwire.runtimes.base import PreppedSession
+
+        wt = WorktreeEntry(
+            repo="SeidoAI/code",
+            clone_path=str(tmp_path / "clone"),
+            worktree_path=str(tmp_path / "wt"),
+            branch="feat/s1",
+        )
+        (tmp_path / "wt").mkdir()
+        prepped = PreppedSession(
+            session_id="s1",
+            session=AgentSession(id="s1", name="test", agent="a"),
+            project_dir=tmp_path,
+            code_worktree=tmp_path / "wt",
+            worktrees=[wt],
+            claude_session_id="uuid-1",
+            prompt="RESUMING",
+            system_append="",
+            spawn_defaults=SpawnDefaults.model_validate({
+                "prompt_template": "{plan}",
+                "system_prompt_append": "",
+            }),
+            resume=True,
+        )
+        fake_tmux_on_path.set_pane_text("> ")
+
+        TmuxRuntime().start(prepped)
+
+        calls = fake_tmux_on_path.calls()
+        new_session = next(c for c in calls if c[0] == "new-session")
+        # --resume must appear among the claude args tmux was asked to run
+        assert "--resume" in new_session

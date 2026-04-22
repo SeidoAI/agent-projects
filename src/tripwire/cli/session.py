@@ -457,6 +457,7 @@ def session_spawn_cmd(
             claude_session_id=(
                 session.runtime_state.claude_session_id if resume_flag else None
             ),
+            resume=resume_flag,
         )
     except RuntimeError as exc:
         raise click.ClickException(str(exc)) from exc

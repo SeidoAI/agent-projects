@@ -73,6 +73,15 @@ class TmuxRuntime:
 
     def start(self, prepped: PreppedSession) -> RuntimeStartResult:
         session_name = _tmux_session_name(prepped.session_id)
+
+        # Kill any pre-existing tmux session with the same name (e.g. a
+        # previous spawn that was paused at the tmux layer). Idempotent.
+        subprocess.run(
+            ["tmux", "kill-session", "-t", session_name],
+            check=False,
+            capture_output=True,
+        )
+
         claude_args = build_claude_args(
             prepped.spawn_defaults,
             prompt=None,
@@ -80,6 +89,7 @@ class TmuxRuntime:
             system_append=prepped.system_append,
             session_id=prepped.session_id,
             claude_session_id=prepped.claude_session_id,
+            resume=prepped.resume,
         )
 
         subprocess.run(

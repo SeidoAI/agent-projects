@@ -28,6 +28,7 @@ class PreppedSession:
     prompt: str
     system_append: str
     spawn_defaults: SpawnDefaults
+    resume: bool = False
 
 
 @dataclass
