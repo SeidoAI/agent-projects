@@ -110,15 +110,44 @@ class TmuxRuntime:
             tmux_session_name=session_name,
         )
 
-    # Lifecycle methods filled in T11
     def pause(self, session: AgentSession) -> None:
-        raise NotImplementedError
+        name = session.runtime_state.tmux_session_name
+        if not name:
+            raise RuntimeError(
+                f"Session '{session.id}' has no tmux_session_name in runtime_state."
+            )
+        subprocess.run(
+            ["tmux", "send-keys", "-t", name, "C-c"],
+            check=False,
+        )
 
     def abandon(self, session: AgentSession) -> None:
-        raise NotImplementedError
+        name = session.runtime_state.tmux_session_name
+        if not name:
+            return
+        subprocess.run(
+            ["tmux", "kill-session", "-t", name],
+            check=False,
+        )
 
     def status(self, session: AgentSession) -> RuntimeStatus:
-        raise NotImplementedError
+        name = session.runtime_state.tmux_session_name
+        if not name:
+            return "unknown"
+        rc = subprocess.run(
+            ["tmux", "has-session", "-t", name],
+            capture_output=True,
+        ).returncode
+        return "running" if rc == 0 else "exited"
 
     def attach_command(self, session: AgentSession) -> AttachCommand:
-        raise NotImplementedError
+        name = session.runtime_state.tmux_session_name
+        if not name:
+            return AttachInstruction(
+                message=(
+                    f"Session '{session.id}' has no tmux session recorded. "
+                    "The tmux session may not have been created, or "
+                    "'tripwire session cleanup' has removed the runtime state."
+                )
+            )
+        return AttachExec(argv=["tmux", "attach", "-t", name])
