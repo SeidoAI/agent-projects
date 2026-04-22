@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)"  srcset="https://raw.githubusercontent.com/SeidoAI/tripwire/main/img/mark-mono-cream.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/SeidoAI/tripwire/main/img/mark-mono-ink.svg">
-    <img alt="tripwire" src="https://raw.githubusercontent.com/SeidoAI/tripwire/main/img/mark-mono-ink.svg" width="360">
+    <source media="(prefers-color-scheme: dark)"  srcset="https://raw.githubusercontent.com/SeidoAI/tripwire/main/img/mark-accent-cream.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/SeidoAI/tripwire/main/img/mark-accent.svg">
+    <img alt="tripwire" src="https://raw.githubusercontent.com/SeidoAI/tripwire/main/img/mark-accent.svg" width="360">
   </picture>
 </p>
 
