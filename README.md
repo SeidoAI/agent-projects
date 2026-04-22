@@ -65,9 +65,9 @@ When the same concept gets described in five places — issue text, PR descripti
 
 Agents skip stages, fudge artifacts, degrade over long sessions, and occasionally claim work they haven't done. Blocking every step cripples autonomy; ignoring the problem ships bad PRs. Tripwires sit between those: validators drop warnings into the agent's *most recent* context, so **recency bias** makes them likely to land before the next action. Sensors, not locks.
 
-### 3. Defaults are strong; the mechanism doesn't bend
+### 3. Opinionated defaults, fully configurable
 
-YAML configures what projects legitimately differ on — how sessions spawn, what artifacts are required, what statuses mean, what prompts the agent gets. The validation gate, the required artifacts, the single-agent-session rule, the graph-as-canon: these aren't configurable. Softening them breaks the point.
+Tripwire ships opinions on every question the agent shouldn't have to answer: what statuses mean, which transitions are legal, what artifacts a phase requires, how sessions spawn, what prompts the agent gets. Projects override any of them via YAML. Nothing is hardcoded, nothing is neutral. Every default is an opinion you can reshape when your project needs something different.
 
 ### 4. Sessions produce knowledge, not just code
 
