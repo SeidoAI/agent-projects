@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
 </p>
 
-> A git-native project-management framework for AI software teams. Tripwires catch drift; the concept graph stays canonical.
+> A git-native project-management framework for AI software teams. Tripwires catch agent drift from workflow requirements; a concept graph as ground truth aligns agents.
 
 **[Quickstart](#quickstart)** · **[What you get](#what-you-get)** · **[Principles](#principles)** · **[Lifecycle](#v07-lifecycle-flow)** · **[Commands](#commands)** · **[Slash commands](#slash-commands)**
 
