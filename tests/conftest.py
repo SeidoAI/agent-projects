@@ -1,10 +1,54 @@
 """Shared pytest fixtures."""
 
+import os
+import shutil
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
+
+
+@pytest.fixture
+def fake_tmux_on_path(tmp_path, monkeypatch):
+    """Install a fake tmux executable on PATH and return a handle to
+    inspect captured args, pane text, session-existence, etc."""
+    bin_dir = tmp_path / "tmuxbin"
+    bin_dir.mkdir()
+    src = Path(__file__).parent / "fixtures" / "fake_tmux.py"
+    dst = bin_dir / "tmux"
+    shutil.copy(src, dst)
+    dst.chmod(0o755)
+
+    log_path = tmp_path / "fake_tmux.log"
+    has_dir = tmp_path / "fake_tmux_has"
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("FAKE_TMUX_LOG", str(log_path))
+    monkeypatch.setenv("FAKE_TMUX_HAS", str(has_dir))
+    monkeypatch.setenv("FAKE_TMUX_PANE_TEXT", "")
+
+    class Handle:
+        def __init__(self):
+            self.log_path = log_path
+            self.has_dir = has_dir
+
+        def calls(self) -> list[list[str]]:
+            if not log_path.exists():
+                return []
+            return [
+                line.split()
+                for line in log_path.read_text().splitlines()
+                if line
+            ]
+
+        def set_pane_text(self, text: str) -> None:
+            monkeypatch.setenv("FAKE_TMUX_PANE_TEXT", text)
+
+        def mark_session_exists(self, name: str) -> None:
+            has_dir.mkdir(parents=True, exist_ok=True)
+            (has_dir / name).touch()
+
+    return Handle()
 
 
 @pytest.fixture
