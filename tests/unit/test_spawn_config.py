@@ -131,3 +131,42 @@ def test_build_claude_args_with_resume():
         resume=True,
     )
     assert args[-1] == "--resume"
+
+
+# -------- runtime field (T1) --------
+
+
+def test_runtime_defaults_to_tmux(tmp_path_project):
+    resolved = load_resolved_spawn_config(tmp_path_project)
+    assert resolved.invocation.runtime == "tmux"
+
+
+def test_runtime_session_override_beats_default(
+    tmp_path_project, save_test_session
+):
+    save_test_session(
+        tmp_path_project,
+        "s1",
+        status="planned",
+        spawn_config={"invocation": {"runtime": "manual"}},
+    )
+
+    session = load_session(tmp_path_project, "s1")
+    resolved = load_resolved_spawn_config(tmp_path_project, session=session)
+    assert resolved.invocation.runtime == "manual"
+
+
+def test_runtime_rejects_unknown_value(tmp_path_project, save_test_session):
+    import pytest
+    from pydantic import ValidationError
+
+    save_test_session(
+        tmp_path_project,
+        "s1",
+        status="planned",
+        spawn_config={"invocation": {"runtime": "docker"}},
+    )
+
+    session = load_session(tmp_path_project, "s1")
+    with pytest.raises(ValidationError):
+        load_resolved_spawn_config(tmp_path_project, session=session)

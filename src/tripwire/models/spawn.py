@@ -8,6 +8,8 @@ with precedence (session > project > tripwire default) happens in
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -15,6 +17,7 @@ class SpawnInvocation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     command: str = "claude"
+    runtime: Literal["tmux", "manual"] = "tmux"
     background: bool = True
     log_path_template: str = (
         "~/.tripwire/logs/{project_slug}/{session_id}-{timestamp}.log"
