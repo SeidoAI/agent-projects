@@ -69,6 +69,7 @@ class TestSpawnLifecycle:
             plan=True,
             status="planned",
             repos=[{"repo": "SeidoAI/test", "base_branch": "main"}],
+            spawn_config={"invocation": {"runtime": "manual"}},
         )
         write_handoff_yaml(
             tmp_path_project, "lifecycle-test", branch="feat/lifecycle-test"
@@ -93,14 +94,10 @@ class TestSpawnLifecycle:
         assert result.exit_code == 0, result.output
         s = load_session(tmp_path_project, "lifecycle-test")
         assert s.status == "executing"
-        assert s.runtime_state.pid is not None
+        assert s.runtime_state.claude_session_id is not None
         assert len(s.runtime_state.worktrees) == 1
 
-        import time
-
-        time.sleep(0.5)
-
-        # Pause
+        # Pause (manual runtime — no process to kill; lifecycle transitions only)
         result = runner.invoke(
             session_cmd, ["pause", "lifecycle-test", "--project-dir", pdir]
         )
