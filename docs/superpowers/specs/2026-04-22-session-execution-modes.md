@@ -1,8 +1,61 @@
-# Session execution modes + dual-PR completion
+# Session execution modes + agent-driven PRs
 
-**Status:** design — awaiting implementation plan
+**Status:** implemented on `feat/v0.7.2-tmux` (PR #16) with mid-stream correction — see below
 **Authors:** sean@seido.dev + Claude Opus 4.7
 **Date:** 2026-04-22
+
+## Correction (2026-04-22 afternoon)
+
+The original spec put PR creation inside `tripwire session complete`
+(see §"Dual-PR at `session complete`" below, §Decisions 8, and parts of
+§Architecture / §Components). **This was wrong.** The implementation
+shipped it that way, and three independent code reviews (self, Codex,
+superpowers code-reviewer) flagged the ordering conflict: the existing
+`_verify_pr_merged` gate aborts the command before `run_pr_flow` can
+open the PRs, so first-ever `session complete` invocations fail unless
+the PM explicitly bypasses all gates.
+
+The real model:
+
+- The **executor agent opens the PR(s) when it finishes.** PR-open is
+  the exit signal to the PM that the agent is done.
+- For multi-worktree sessions, the agent opens one PR per worktree
+  with commits (typically: the code PR and the project-tracking PR),
+  cross-linked in the bodies.
+- `tripwire session complete` stays as the PM's post-merge
+  finalization step. `_verify_pr_merged` is the correct gate. It
+  requires the PM (or auto-merge on GitHub) to have merged before
+  tripwire transitions the session to `done`.
+
+The exit protocol is instructed in the shipped prompt template
+(`src/tripwire/templates/spawn/defaults.yaml`). No code in tripwire
+opens PRs.
+
+**Removed from the design:**
+
+- `src/tripwire/core/session_pr_flow.py` (entire file, reverted)
+- `AgentSession.merge_policy` field
+- `AgentSession.commit_on_complete` field
+- `EngagementEntry.pr_urls` field
+- `session complete` `--skip-pr-flow` / `--skip-pr-flow-push` flags
+
+**Retained from the design** (still correct):
+
+- Pluggable `SessionRuntime` registry (tmux + manual)
+- Runtime-agnostic prep pipeline (worktrees + skill copy + CLAUDE.md + kickoff.md)
+- `tripwire session attach` subcommand
+- Schema additions: `SpawnInvocation.runtime`, `RuntimeState.tmux_session_name`, `RuntimeState.skills_hash`
+
+The rest of this document describes the original (flawed) dual-PR
+design and its rationale. Keep for historical context; do not read as
+current truth. The sections that remain fully accurate:
+§Non-goals, §Decisions 1–7, §Architecture (ignore the "At `session
+complete`..." line), §`SessionRuntime` protocol, §Prep pipeline,
+§Runtime: `TmuxRuntime`, §Runtime: `ManualRuntime`, §`tripwire
+session attach`, §Error handling summary rows for runtime concerns,
+§Migration / backwards compat.
+
+---
 
 ## Context
 
