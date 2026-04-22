@@ -22,7 +22,6 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
-import uuid as _uuid_mod
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,16 +33,14 @@ from rich.table import Table
 from tripwire.cli._utils import require_project as _require_project
 from tripwire.cli.artifacts import artifacts_list
 from tripwire.core.git_helpers import (
-    worktree_add,
     worktree_is_dirty,
-    worktree_path_for_session,
     worktree_prune,
     worktree_remove,
 )
 from tripwire.core.process_helpers import is_alive, send_sigterm
 from tripwire.core.session_readiness import check_readiness
 from tripwire.core.session_store import list_sessions, load_session, save_session
-from tripwire.models.session import AgentSession, EngagementEntry, WorktreeEntry
+from tripwire.models.session import EngagementEntry
 
 console = Console()
 

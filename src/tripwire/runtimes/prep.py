@@ -20,6 +20,7 @@ from tripwire.core.git_helpers import (
     worktree_path_for_session,
 )
 from tripwire.models.session import AgentSession, WorktreeEntry
+from tripwire.runtimes.base import PreppedSession
 
 _MANAGED_EXCLUDES = (".claude/", ".tripwire/")
 
@@ -252,7 +253,7 @@ def run(
     runtime,
     max_turns_override: int | None = None,
     claude_session_id: str | None = None,
-) -> "PreppedSession":
+) -> PreppedSession:
     """Orchestrate all prep steps:
 
       1. validate_environment on the selected runtime
@@ -274,7 +275,6 @@ def run(
         render_prompt,
         render_system_append,
     )
-    from tripwire.runtimes.base import PreppedSession
 
     runtime.validate_environment()
 
