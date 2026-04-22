@@ -36,6 +36,7 @@ export const queryKeys = {
   artifactManifest: (pid: string) => ["projects", pid, "artifact-manifest"] as const,
   enum: (pid: string, name: string) => ["projects", pid, "enums", name] as const,
   orchestration: (pid: string) => ["projects", pid, "orchestration"] as const,
+  validationStatus: (pid: string) => ["projects", pid, "validation-status"] as const,
 
   // v2 (declared but unused in v1 — placeholder to avoid churn later)
   containers: () => ["containers"] as const,

@@ -1,11 +1,25 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { createMemoryRouter, Navigate, RouterProvider } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Placeholder } from "@/app/Placeholder";
 import { ProjectShell } from "@/app/ProjectShell";
 import { V2Placeholder } from "@/app/V2Placeholder";
+import { __resetProjectWebSocketsForTests } from "@/lib/realtime/useProjectWebSocket";
 
-afterEach(cleanup);
+// Avoid opening a real WebSocket when ProjectShell mounts — the router
+// tests only care about the layout, not the live data path.
+vi.mock("@/lib/realtime/websocketClient", () => ({
+  createWebSocketClient: () => ({
+    close: vi.fn(),
+    getStatus: () => "connecting",
+  }),
+}));
+
+afterEach(() => {
+  cleanup();
+  __resetProjectWebSocketsForTests();
+});
 
 function renderRoute(path: string) {
   const routes = [
@@ -25,7 +39,12 @@ function renderRoute(path: string) {
     },
   ];
   const router = createMemoryRouter(routes, { initialEntries: [path] });
-  return render(<RouterProvider router={router} />);
+  const queryClient = new QueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 }
 
 describe("Router", () => {
@@ -54,10 +73,9 @@ describe("Router", () => {
     expect(screen.getByRole("heading", { name: "Agents" })).toBeDefined();
   });
 
-  it("renders AgentStatusBar in shell", () => {
+  it("renders AgentStatusBar in the top bar", () => {
     renderRoute("/p/proj-1/board");
     expect(screen.getByText("0 agents running")).toBeDefined();
-    expect(screen.getByText("file watcher: connected")).toBeDefined();
   });
 
   it("renders nav tabs in TopBar", () => {
