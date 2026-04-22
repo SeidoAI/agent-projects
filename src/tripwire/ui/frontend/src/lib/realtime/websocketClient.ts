@@ -136,12 +136,17 @@ export function createWebSocketClient(options: WebSocketClientOptions): WebSocke
     };
 
     next.onclose = (ev: CloseEvent) => {
-      options.onClose?.(ev);
       socket = null;
       if (closed) {
+        // Post-teardown close (user called client.close()). `close()`
+        // nulls this handler before closing, so we normally don't get
+        // here — the guard covers a race where the native close frame
+        // was already in-flight when teardown ran. Don't fire onClose
+        // (contract: only server-initiated closes) and don't reconnect.
         setStatus("closed");
         return;
       }
+      options.onClose?.(ev);
       scheduleReconnect();
     };
   }
