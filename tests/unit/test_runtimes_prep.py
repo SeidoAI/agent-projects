@@ -128,3 +128,107 @@ class TestResolveWorktrees:
                     branch="feat/s1",
                     base_ref="main",
                 )
+
+
+class TestCopySkills:
+    def test_copies_named_skills_into_claude_skills(self, tmp_path):
+        from tripwire.runtimes.prep import copy_skills
+
+        worktree = tmp_path / "wt"
+        worktree.mkdir()
+        (worktree / ".git" / "info").mkdir(parents=True)
+        (worktree / ".git" / "info" / "exclude").touch()
+
+        copy_skills(
+            worktree=worktree,
+            skill_names=["backend-development"],
+        )
+
+        skill_md = worktree / ".claude" / "skills" / "backend-development" / "SKILL.md"
+        assert skill_md.is_file()
+
+    def test_copies_multiple_skills(self, tmp_path):
+        from tripwire.runtimes.prep import copy_skills
+
+        worktree = tmp_path / "wt"
+        worktree.mkdir()
+        (worktree / ".git" / "info").mkdir(parents=True)
+        (worktree / ".git" / "info" / "exclude").touch()
+
+        copy_skills(
+            worktree=worktree,
+            skill_names=["backend-development", "verification"],
+        )
+
+        assert (worktree / ".claude/skills/backend-development/SKILL.md").is_file()
+        assert (worktree / ".claude/skills/verification/SKILL.md").is_file()
+
+    def test_missing_skill_raises(self, tmp_path):
+        from tripwire.runtimes.prep import copy_skills
+
+        worktree = tmp_path / "wt"
+        worktree.mkdir()
+        (worktree / ".git" / "info").mkdir(parents=True)
+        (worktree / ".git" / "info" / "exclude").touch()
+
+        with pytest.raises(RuntimeError, match="no-such-skill"):
+            copy_skills(
+                worktree=worktree,
+                skill_names=["no-such-skill"],
+            )
+
+    def test_existing_skills_dir_backed_up(self, tmp_path):
+        from tripwire.runtimes.prep import copy_skills
+
+        worktree = tmp_path / "wt"
+        worktree.mkdir()
+        (worktree / ".git" / "info").mkdir(parents=True)
+        (worktree / ".git" / "info" / "exclude").touch()
+        existing = worktree / ".claude" / "skills"
+        existing.mkdir(parents=True)
+        (existing / "marker.txt").write_text("old")
+
+        copy_skills(
+            worktree=worktree,
+            skill_names=["backend-development"],
+        )
+
+        backups = list(worktree.glob(".claude/skills.bak.*"))
+        assert len(backups) == 1
+        assert (backups[0] / "marker.txt").read_text() == "old"
+        assert (
+            worktree / ".claude/skills/backend-development/SKILL.md"
+        ).is_file()
+
+    def test_appends_to_git_info_exclude(self, tmp_path):
+        from tripwire.runtimes.prep import copy_skills
+
+        worktree = tmp_path / "wt"
+        worktree.mkdir()
+        (worktree / ".git" / "info").mkdir(parents=True)
+        (worktree / ".git" / "info" / "exclude").write_text("# existing\n")
+
+        copy_skills(
+            worktree=worktree,
+            skill_names=["backend-development"],
+        )
+
+        exclude = (worktree / ".git" / "info" / "exclude").read_text()
+        assert ".claude/" in exclude
+        assert ".tripwire/" in exclude
+        assert "# existing" in exclude
+
+    def test_git_info_exclude_idempotent(self, tmp_path):
+        from tripwire.runtimes.prep import copy_skills
+
+        worktree = tmp_path / "wt"
+        worktree.mkdir()
+        (worktree / ".git" / "info").mkdir(parents=True)
+        (worktree / ".git" / "info" / "exclude").touch()
+
+        copy_skills(worktree=worktree, skill_names=["backend-development"])
+        copy_skills(worktree=worktree, skill_names=["backend-development"])
+
+        exclude = (worktree / ".git" / "info" / "exclude").read_text()
+        assert exclude.count(".claude/") == 1
+        assert exclude.count(".tripwire/") == 1
