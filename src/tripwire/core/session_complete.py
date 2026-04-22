@@ -54,6 +54,8 @@ def complete_session(
     skip_artifact_check: bool = False,
     skip_worktree_cleanup: bool = False,
     skip_pr_merge_check: bool = False,
+    skip_pr_flow: bool = False,
+    skip_pr_flow_push: bool = False,
 ) -> CompleteResult:
     """Run the close-out gates then transition the session to `done`.
 
@@ -90,6 +92,21 @@ def complete_session(
 
     if dry_run:
         return result
+
+    # Dual-PR flow — commit + push + PR per worktree with changes.
+    if not skip_pr_flow:
+        from tripwire.core.session_pr_flow import PrFlowError, run_pr_flow
+
+        try:
+            pr_result = run_pr_flow(
+                session=session,
+                project_dir=project_dir,
+                skip_push=skip_pr_flow_push,
+            )
+        except PrFlowError as exc:
+            raise CompleteError("complete/pr_flow_failed", str(exc)) from exc
+        if pr_result.pr_urls and session.engagements:
+            session.engagements[-1].pr_urls = list(pr_result.pr_urls)
 
     for issue_key in session.issues:
         try:

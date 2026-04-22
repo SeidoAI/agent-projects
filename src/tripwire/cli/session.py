@@ -887,6 +887,18 @@ session_cmd.add_command(artifacts_list, name="artifacts")
 @click.option("--skip-artifact-check", is_flag=True, default=False)
 @click.option("--skip-worktree-cleanup", is_flag=True, default=False)
 @click.option("--skip-pr-merge-check", is_flag=True, default=False)
+@click.option(
+    "--skip-pr-flow",
+    is_flag=True,
+    default=False,
+    help="Skip the dual-PR commit/push/create flow.",
+)
+@click.option(
+    "--skip-pr-flow-push",
+    is_flag=True,
+    default=False,
+    help="Run the PR flow but skip `git push` (useful when PRs already exist).",
+)
 def session_complete_cmd(
     session_id: str,
     project_dir: Path,
@@ -896,8 +908,10 @@ def session_complete_cmd(
     skip_artifact_check: bool,
     skip_worktree_cleanup: bool,
     skip_pr_merge_check: bool,
+    skip_pr_flow: bool,
+    skip_pr_flow_push: bool,
 ) -> None:
-    """Complete a session: verify gates, close issues, cleanup."""
+    """Complete a session: verify gates, open dual PRs, close issues, cleanup."""
     from tripwire.core.session_complete import (
         CompleteError,
         complete_session,
@@ -916,6 +930,8 @@ def session_complete_cmd(
             skip_artifact_check=skip_artifact_check,
             skip_worktree_cleanup=skip_worktree_cleanup,
             skip_pr_merge_check=skip_pr_merge_check,
+            skip_pr_flow=skip_pr_flow,
+            skip_pr_flow_push=skip_pr_flow_push,
         )
     except CompleteError as exc:
         raise click.ClickException(str(exc)) from exc

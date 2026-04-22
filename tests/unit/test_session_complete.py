@@ -195,3 +195,83 @@ def test_complete_force_bypasses_gates(tmp_path_project: Path, save_test_session
         skip_artifact_check=True,
     )
     assert result.session_id == "s1"
+
+
+class TestCompleteInvokesPrFlow:
+    def test_complete_runs_pr_flow_after_gates(
+        self, fake_gh_on_path, tmp_path, tmp_path_project, save_test_session
+    ):
+        """A happy-path complete should invoke run_pr_flow and record
+        the resulting PR URLs on the latest engagement."""
+        import subprocess as _sp
+        from datetime import datetime, timezone
+
+        from tripwire.core.session_complete import complete_session
+        from tripwire.core.session_store import load_session
+        from tripwire.models.session import EngagementEntry
+
+        code_wt = tmp_path / "code-wt"
+        code_wt.mkdir()
+        _sp.run(["git", "init", "-q", "-b", "main"], cwd=code_wt, check=True)
+        _sp.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
+             "commit", "--allow-empty", "-q", "-m", "init"],
+            cwd=code_wt, check=True,
+        )
+        _sp.run(
+            ["git", "checkout", "-q", "-b", "feat/s1"],
+            cwd=code_wt, check=True,
+        )
+        (code_wt / "f.txt").write_text("x")
+        _sp.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
+             "add", "f.txt"], cwd=code_wt, check=True,
+        )
+        _sp.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t",
+             "commit", "-q", "-m", "work"], cwd=code_wt, check=True,
+        )
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="in_review",
+            repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
+            runtime_state={
+                "worktrees": [
+                    {
+                        "repo": "SeidoAI/code",
+                        "clone_path": str(code_wt),
+                        "worktree_path": str(code_wt),
+                        "branch": "feat/s1",
+                    }
+                ],
+            },
+            engagements=[
+                {
+                    "started_at": datetime.now(tz=timezone.utc).isoformat(),
+                    "trigger": "initial_launch",
+                }
+            ],
+        )
+
+        result = complete_session(
+            tmp_path_project,
+            "s1",
+            dry_run=False,
+            force=True,
+            force_review=True,
+            skip_artifact_check=True,
+            skip_worktree_cleanup=True,
+            skip_pr_flow_push=True,
+        )
+
+        pr_calls = [
+            c for c in fake_gh_on_path.calls() if c[:2] == ["pr", "create"]
+        ]
+        assert len(pr_calls) == 1
+
+        s = load_session(tmp_path_project, "s1")
+        assert s.status == "done"
+        assert s.engagements[-1].pr_urls
+        assert s.engagements[-1].pr_urls[0].startswith("https://")
