@@ -24,7 +24,22 @@ prompt_template: |
 
   You are the {agent} agent for session {session_id}.
   Execute the plan. Stop at stop-and-ask points.
-  Open a PR titled '{branch_type}({session_id}): {session_name}' when done.
+
+  Exit protocol — how you signal you're done:
+
+  CLAUDE.md lists your worktrees. For every worktree that has commits
+  ahead of its base branch, before you stop:
+
+  1. `git push origin <branch>` from that worktree.
+  2. `gh pr create --repo <repo> --base <base-branch> --head <branch>
+     --title '{branch_type}({session_id}): {session_name}' --body ...`
+     where <body> summarises the work in that worktree.
+  3. If there are two PRs (code + project-tracking), cross-link them
+     in the PR bodies.
+
+  PR-open is your exit signal. Once every dirty worktree has a PR, you
+  are done. The PM reviews and merges; `tripwire session complete`
+  verifies the merges and closes the session.
 
   Before you end the session: ask honestly — did you learn anything future
   agents in this area would benefit from inheriting? Not "what did I do"
