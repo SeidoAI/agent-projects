@@ -10,8 +10,9 @@ forces the next release to remember to bump both.
 from __future__ import annotations
 
 import sys
-import tomllib
 from pathlib import Path
+
+import tomllib
 
 import tripwire
 
