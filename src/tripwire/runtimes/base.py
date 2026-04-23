@@ -1,6 +1,6 @@
 """SessionRuntime protocol and shared types.
 
-Each runtime implementation (tmux, manual, future: container) owns
+Each runtime implementation (subprocess, manual, future: container) owns
 the lifecycle for one session: start, pause, abandon, status, attach.
 The prep pipeline runs before ``start`` and is runtime-agnostic.
 """
@@ -71,7 +71,7 @@ class SessionRuntime(Protocol):
 
     def validate_environment(self) -> None:
         """Raise with a user-facing message if this runtime can't run
-        on this host (e.g. tmux missing). Called at prep time BEFORE
+        on this host (e.g. a required binary missing). Called at prep time BEFORE
         any filesystem mutation."""
         ...
 

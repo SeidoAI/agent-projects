@@ -1,8 +1,9 @@
 """ManualRuntime — prep-only runtime.
 
-Does the skill copy + CLAUDE.md render like tmux, then prints the
-exact claude invocation the operator should run, and exits. The
-operator launches claude themselves from the code worktree.
+Does the skill copy + CLAUDE.md render like the subprocess runtime,
+then prints the exact claude invocation the operator should run,
+and exits. The operator launches claude themselves from the code
+worktree.
 
 Pause/abandon are no-ops (tripwire has no process handle); status is
 always 'unknown'. Attach prints the same instruction as start.

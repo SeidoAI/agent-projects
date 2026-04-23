@@ -7,7 +7,7 @@ on the log file); there is no mid-run interactive channel.
 
 This is the default runtime. ``-p`` mode sidesteps the workspace-
 trust dialog, multi-line prompt quirks, and ready-probe fragility
-that tmux-based runtimes suffer from.
+that an interactive runtime would need to solve.
 """
 
 from __future__ import annotations

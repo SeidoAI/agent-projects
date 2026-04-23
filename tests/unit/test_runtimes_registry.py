@@ -23,9 +23,9 @@ def test_get_runtime_unknown_raises_with_valid_options():
 def test_attach_exec_and_attach_instruction_are_distinct_types():
     from tripwire.runtimes.base import AttachExec, AttachInstruction
 
-    e = AttachExec(argv=["tmux", "attach"])
+    e = AttachExec(argv=["tail", "-f", "/tmp/x.log"])
     i = AttachInstruction(message="run this yourself")
-    assert e.argv == ["tmux", "attach"]
+    assert e.argv == ["tail", "-f", "/tmp/x.log"]
     assert i.message == "run this yourself"
     assert not isinstance(e, AttachInstruction)
     assert not isinstance(i, AttachExec)

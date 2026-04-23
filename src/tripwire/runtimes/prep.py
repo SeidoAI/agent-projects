@@ -332,8 +332,8 @@ def render_claude_md(
 def render_kickoff(*, code_worktree: Path, prompt: str) -> None:
     """Write the kickoff prompt to <code-worktree>/.tripwire/kickoff.md.
 
-    This file is what the operator pastes (manual mode) and what the
-    tmux send-keys step delivers on ready-probe timeout."""
+    This file is what the operator pastes (manual mode) and what
+    the subprocess runtime's ``claude -p`` argv uses at start."""
     kickoff = code_worktree / ".tripwire" / "kickoff.md"
     kickoff.parent.mkdir(parents=True, exist_ok=True)
     kickoff.write_text(prompt, encoding="utf-8")

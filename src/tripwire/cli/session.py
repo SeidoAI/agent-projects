@@ -513,8 +513,8 @@ def session_spawn_cmd(
 )
 def session_attach_cmd(session_id: str, project_dir: Path) -> None:
     """Attach to a running session. Behaviour is runtime-specific:
-    tmux runtimes exec `tmux attach`; manual runtimes print the
-    command to run."""
+    subprocess runtimes exec `tail -f <log>`; manual runtimes print
+    the command to run."""
     import os
 
     from tripwire.core.spawn_config import load_resolved_spawn_config
@@ -701,7 +701,7 @@ def session_cleanup_cmd(
 
     cleaned = 0
     for session in targets:
-        # If the runtime still has a live process (tmux session, etc.),
+        # If the runtime still has a live process (claude subprocess, etc.),
         # tear it down before ripping the worktree out from under it.
         try:
             spawn = load_resolved_spawn_config(resolved, session=session)
