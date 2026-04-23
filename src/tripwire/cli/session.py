@@ -664,11 +664,19 @@ def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
     default=False,
     help="Skip dirty-worktree check",
 )
+@click.option(
+    "--with-logs",
+    "with_logs",
+    is_flag=True,
+    default=False,
+    help="Also remove the session's log files from ~/.tripwire/logs/",
+)
 def session_cleanup_cmd(
     session_id: str | None,
     project_dir: Path,
     clean_all: bool,
     force: bool,
+    with_logs: bool,
 ) -> None:
     """Remove worktrees for completed/abandoned sessions."""
     resolved = project_dir.expanduser().resolve()
@@ -727,10 +735,118 @@ def session_cleanup_cmd(
             session.runtime_state.worktrees = remaining
             save_session(resolved, session)
 
+        # Optionally drop the session's log files. Log files are named
+        # <session_id>-<timestamp>.log under a shared {project_slug}
+        # directory, so we glob-match rather than rm -rf the parent
+        # (which would nuke other sessions' logs in the same project).
+        if with_logs and session.runtime_state.log_path:
+            log_parent = Path(session.runtime_state.log_path).expanduser().parent
+            if log_parent.is_dir():
+                removed = 0
+                for log_file in log_parent.glob(f"{session.id}-*.log"):
+                    log_file.unlink()
+                    removed += 1
+                if removed:
+                    click.echo(
+                        f"  Removed {removed} log file(s) for '{session.id}'"
+                    )
+
     for clone_str in clones_to_prune:
         worktree_prune(Path(clone_str))
 
     click.echo(f"Cleaned {cleaned} worktree(s)")
+
+
+@session_cmd.command("logs")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+@click.option(
+    "--tail",
+    "tail_lines",
+    type=int,
+    default=50,
+    show_default=True,
+    help="Number of lines to show from the tail of the latest log file.",
+)
+@click.option(
+    "--full",
+    is_flag=True,
+    default=False,
+    help="Dump the entire latest log file instead of tailing.",
+)
+@click.option(
+    "--list",
+    "list_only",
+    is_flag=True,
+    default=False,
+    help="List all log files for the session; don't dump contents.",
+)
+def session_logs_cmd(
+    session_id: str,
+    project_dir: Path,
+    tail_lines: int,
+    full: bool,
+    list_only: bool,
+) -> None:
+    """Show log files for a session.
+
+    Per-spawn logs accumulate under the shared
+    ``~/.tripwire/logs/<project-slug>/`` directory as
+    ``<session_id>-<timestamp>.log``. This subcommand surfaces them
+    without requiring operators to grep the filesystem by hand.
+    """
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(
+            f"session '{session_id}' not found"
+        ) from exc
+
+    log_path_str = session.runtime_state.log_path
+    if not log_path_str:
+        raise click.ClickException(
+            f"session '{session_id}' has no recorded log_path — "
+            "the session may never have been spawned."
+        )
+    latest_log = Path(log_path_str).expanduser()
+    log_dir = latest_log.parent
+    if not log_dir.is_dir():
+        raise click.ClickException(
+            f"log directory does not exist: {log_dir}"
+        )
+
+    matches = sorted(log_dir.glob(f"{session_id}-*.log"))
+    if not matches and latest_log.is_file():
+        matches = [latest_log]
+    if not matches:
+        raise click.ClickException(
+            f"no log files found for session '{session_id}'"
+        )
+
+    if list_only:
+        for path in matches:
+            st = path.stat()
+            ts = datetime.fromtimestamp(
+                st.st_mtime, tz=timezone.utc
+            ).strftime("%Y-%m-%d %H:%M:%S UTC")
+            click.echo(f"  {path.name}  {st.st_size:>10} bytes  {ts}")
+        return
+
+    latest = matches[-1]
+    content = latest.read_text(encoding="utf-8", errors="replace")
+    if full:
+        click.echo(content, nl=False)
+        return
+    lines = content.splitlines()
+    for line in lines[-tail_lines:]:
+        click.echo(line)
 
 
 @session_cmd.command("agenda")
