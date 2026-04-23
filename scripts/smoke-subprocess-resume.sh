@@ -11,8 +11,13 @@
 set -euo pipefail
 
 TIMEOUT="${TW_SMOKE_TIMEOUT:-180}"
+TRIPWIRE="${TRIPWIRE:-tripwire}"
 
-for bin in claude tripwire git; do
+if ! command -v "$TRIPWIRE" >/dev/null; then
+  echo "FAIL: tripwire not found. Set TRIPWIRE=/path/to/tripwire" >&2
+  exit 1
+fi
+for bin in claude git; do
   if ! command -v "$bin" >/dev/null; then
     echo "FAIL: $bin not on PATH" >&2
     exit 1
@@ -27,11 +32,11 @@ mkdir -p "$project_dir" "$clone_dir"
 SESSION_ID="smk-resume-1"
 cleanup() {
   local exit_code=$?
-  tripwire session abandon "$SESSION_ID" \
+  "$TRIPWIRE" session abandon "$SESSION_ID" \
     --project-dir "$project_dir" 2>/dev/null || true
   if (( exit_code != 0 )); then
     echo "--- FAIL (exit=$exit_code). Tree: $tmp_root" >&2
-    tripwire session logs "$SESSION_ID" \
+    "$TRIPWIRE" session logs "$SESSION_ID" \
       --project-dir "$project_dir" --tail 80 2>/dev/null || true
   else
     rm -rf "$tmp_root"
@@ -65,8 +70,11 @@ context:
 YAML
 
 # Session with an ambiguous plan that forces stop-and-ask.
+# spawn_config overrides prompt_template so the agent doesn't attempt
+# the push+PR exit protocol against a local-only repo.
 mkdir -p "$project_dir/sessions/$SESSION_ID"
 cat > "$project_dir/sessions/$SESSION_ID/session.yaml" <<YAML
+---
 id: $SESSION_ID
 name: Smoke resume
 agent: backend-coder
@@ -75,6 +83,18 @@ status: planned
 repos:
   - repo: SeidoAI/smoke-code
     base_branch: main
+spawn_config:
+  config:
+    max_turns: 20
+  prompt_template: |
+    {plan}
+
+    You are running headless (claude -p). Execute the plan and exit.
+    Do NOT push, do NOT open a PR — this is a local-only smoke test.
+    If you need clarification, write your question as plain text in
+    your final response and stop. The PM will update the plan and
+    respawn you with --resume.
+---
 YAML
 cat > "$project_dir/sessions/$SESSION_ID/plan.md" <<'MD'
 # Resume smoke plan
@@ -90,34 +110,52 @@ This is intentional.
 `## PM follow-up` section, create `password.txt` containing
 exactly the password string. Commit with message `smoke: password`.
 MD
+handoff_uuid="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+handoff_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 cat > "$project_dir/sessions/$SESSION_ID/handoff.yaml" <<YAML
+---
+uuid: $handoff_uuid
 session_id: $SESSION_ID
+handoff_at: $handoff_at
+handed_off_by: pm
 branch: feat/$SESSION_ID
+---
 YAML
 
-# Phase 1: queue + spawn; expect the agent to stop-and-ask.
-tripwire session queue "$SESSION_ID" --project-dir "$project_dir"
-tripwire session spawn "$SESSION_ID" --project-dir "$project_dir"
+_show_json() {
+  "$TRIPWIRE" session show "$SESSION_ID" --project-dir "$project_dir" --format json 2>/dev/null
+}
+_get_pid() {
+  _show_json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("runtime_state",{}).get("pid") or "")'
+}
+_get_status() {
+  _show_json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))'
+}
 
-deadline=$(( $(date +%s) + TIMEOUT ))
-while :; do
-  status="$(
-    tripwire session show "$SESSION_ID" --project-dir "$project_dir" 2>/dev/null \
-      | awk -F': ' '/^status/ {print $2; exit}'
-  )"
-  if [[ "$status" != "executing" ]]; then
-    echo "phase 1: agent exited, status=$status"
-    break
-  fi
-  if (( $(date +%s) > deadline )); then
-    echo "FAIL: phase 1 timed out after ${TIMEOUT}s" >&2
-    exit 1
-  fi
-  sleep 2
-done
+_wait_for_exit() {
+  local phase="$1" pid="$2" deadline=$(( $(date +%s) + TIMEOUT ))
+  while :; do
+    if [[ -n "$pid" ]] && ! kill -0 "$pid" 2>/dev/null; then
+      echo "$phase: claude subprocess (pid $pid) has exited"
+      return 0
+    fi
+    if (( $(date +%s) > deadline )); then
+      echo "FAIL: $phase timed out after ${TIMEOUT}s (pid=$pid still alive)" >&2
+      return 1
+    fi
+    sleep 2
+  done
+}
+
+# Phase 1: queue + spawn; expect the agent to stop-and-ask.
+"$TRIPWIRE" session queue "$SESSION_ID" --project-dir "$project_dir"
+"$TRIPWIRE" session spawn "$SESSION_ID" --project-dir "$project_dir"
+
+PHASE1_PID="$(_get_pid)"
+_wait_for_exit "phase 1" "$PHASE1_PID" || exit 1
 
 # Phase 1 should have stopped-to-ask: the summary heuristic flags this.
-if ! tripwire session summary "$SESSION_ID" --project-dir "$project_dir" \
+if ! "$TRIPWIRE" session summary "$SESSION_ID" --project-dir "$project_dir" \
   | grep -qi "stopped to ask"; then
   echo "WARN: phase 1 did not obviously stop-to-ask — continuing anyway" >&2
 fi
@@ -130,35 +168,19 @@ cat >> "$project_dir/sessions/$SESSION_ID/plan.md" <<'MD'
 The magic password is `hunter2`. Proceed with Phase 2.
 MD
 
-# --resume requires status 'paused' or 'failed'. If the agent exited
-# cleanly (status=executing → pause command won't apply), we need to
-# coax the session into 'paused' first.
-status="$(
-  tripwire session show "$SESSION_ID" --project-dir "$project_dir" 2>/dev/null \
-    | awk -F': ' '/^status/ {print $2; exit}'
-)"
+# --resume requires status 'paused' or 'failed'. tripwire doesn't
+# auto-flip status when the subprocess exits, so phase 1 leaves it
+# as 'executing' with a dead pid. `session pause` sees the dead pid
+# and transitions to 'failed', which --resume accepts.
+status="$(_get_status)"
 if [[ "$status" == "executing" ]]; then
-  tripwire session pause "$SESSION_ID" --project-dir "$project_dir"
+  "$TRIPWIRE" session pause "$SESSION_ID" --project-dir "$project_dir" || true
 fi
 
-tripwire session spawn "$SESSION_ID" --project-dir "$project_dir" --resume
+"$TRIPWIRE" session spawn "$SESSION_ID" --project-dir "$project_dir" --resume
 
-deadline=$(( $(date +%s) + TIMEOUT ))
-while :; do
-  status="$(
-    tripwire session show "$SESSION_ID" --project-dir "$project_dir" 2>/dev/null \
-      | awk -F': ' '/^status/ {print $2; exit}'
-  )"
-  if [[ "$status" != "executing" ]]; then
-    echo "phase 2: agent exited, status=$status"
-    break
-  fi
-  if (( $(date +%s) > deadline )); then
-    echo "FAIL: phase 2 timed out after ${TIMEOUT}s" >&2
-    exit 1
-  fi
-  sleep 2
-done
+PHASE2_PID="$(_get_pid)"
+_wait_for_exit "phase 2" "$PHASE2_PID" || exit 1
 
 # Phase 2 assertion: password.txt exists with 'hunter2'.
 password_file="$(
@@ -173,6 +195,6 @@ if ! grep -q "^hunter2$" "$password_file"; then
   exit 1
 fi
 
-tripwire session summary "$SESSION_ID" --project-dir "$project_dir" || true
+"$TRIPWIRE" session summary "$SESSION_ID" --project-dir "$project_dir" || true
 
 echo "PASS: subprocess-resume smoke"
