@@ -22,7 +22,6 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
-import uuid as _uuid_mod
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,16 +33,14 @@ from rich.table import Table
 from tripwire.cli._utils import require_project as _require_project
 from tripwire.cli.artifacts import artifacts_list
 from tripwire.core.git_helpers import (
-    worktree_add,
     worktree_is_dirty,
-    worktree_path_for_session,
     worktree_prune,
     worktree_remove,
 )
-from tripwire.core.process_helpers import is_alive, send_sigterm
+from tripwire.core.process_helpers import is_alive
 from tripwire.core.session_readiness import check_readiness
 from tripwire.core.session_store import list_sessions, load_session, save_session
-from tripwire.models.session import AgentSession, EngagementEntry, WorktreeEntry
+from tripwire.models.session import EngagementEntry
 
 console = Console()
 
@@ -392,75 +389,6 @@ def _resolve_clone_path(project_dir: Path, repo_slug: str) -> Path | None:
     return p if p.exists() else None
 
 
-def _launch_claude(
-    wt_path: Path,
-    plan_content: str,
-    session: AgentSession,
-    project_dir: Path,
-    session_name: str,
-    branch_type: str,
-    claude_session_id: str,
-    max_turns: int,
-    log_path: Path,
-    project_slug: str,
-    *,
-    resume: bool = False,
-) -> int:
-    """Launch ``claude -p`` as a background process. Returns PID.
-
-    Spawn args are built from the resolved spawn config (tripwire default
-    ← project ← session overrides). `max_turns` is the CLI override that
-    wins over any layer; if None, the resolved config's value is used.
-    """
-    from tripwire.core.spawn_config import (
-        build_claude_args,
-        load_resolved_spawn_config,
-        render_prompt,
-        render_system_append,
-    )
-
-    resolved = load_resolved_spawn_config(project_dir, session=session)
-    # CLI max-turns override, if provided, takes final precedence.
-    if max_turns is not None:
-        resolved.config.max_turns = max_turns
-
-    prompt = render_prompt(
-        resolved,
-        plan=plan_content,
-        agent=session.agent,
-        session_id=session.id,
-        session_name=session_name,
-        branch_type=branch_type,
-    )
-    system_append = render_system_append(
-        resolved,
-        session_id=session.id,
-        project_slug=project_slug,
-    )
-    args = build_claude_args(
-        resolved,
-        prompt=prompt,
-        system_append=system_append,
-        session_id=session.id,
-        claude_session_id=claude_session_id,
-        resume=resume,
-    )
-
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_file = open(log_path, "w")
-    try:
-        proc = subprocess.Popen(
-            args,
-            cwd=str(wt_path),
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-    finally:
-        log_file.close()
-    return proc.pid
-
-
 @session_cmd.command("spawn")
 @click.argument("session_id")
 @click.option(
@@ -481,7 +409,12 @@ def session_spawn_cmd(
     dry_run: bool,
     resume_flag: bool,
 ) -> None:
-    """Create worktree(s), launch claude -p, transition to executing."""
+    """Prep worktrees + skills + CLAUDE.md, then dispatch to the
+    configured runtime to launch the agent. Transitions to executing."""
+    from tripwire.core.spawn_config import load_resolved_spawn_config
+    from tripwire.runtimes import get_runtime
+    from tripwire.runtimes.prep import run as prep_run
+
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
@@ -502,150 +435,50 @@ def session_spawn_cmd(
                 f"session '{session_id}' is '{session.status}', must be 'queued' to spawn"
             )
 
-    # Claude on PATH
     if not shutil.which("claude"):
         raise click.ClickException("claude CLI not found on PATH")
 
-    # Load plan
-    from tripwire.core.paths import session_plan_path
-
-    plan_path = session_plan_path(resolved, session_id)
-    if not plan_path.is_file():
-        raise click.ClickException(f"plan.md not found at {plan_path}")
-    plan_content = plan_path.read_text(encoding="utf-8")
-
-    # Load handoff for branch name
-    from tripwire.core.handoff_store import load_handoff
-
-    handoff = load_handoff(resolved, session_id)
-    if handoff is None:
-        raise click.ClickException("handoff.yaml not found")
-    branch = handoff.branch
-
-    # Parse branch type for PR title (e.g. "feat" from "feat/api-endpoints")
-    from tripwire.core.branch_naming import parse_branch_name
-
+    # Resolve runtime from spawn config
+    resolved_spawn = load_resolved_spawn_config(resolved, session=session)
     try:
-        branch_type, _ = parse_branch_name(branch)
-    except Exception:
-        branch_type = "feat"
+        runtime = get_runtime(resolved_spawn.invocation.runtime)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
 
-    # max_turns precedence: CLI override > agent YAML > 200
-    agent_max_turns: int | None = None
-    agent_yaml = resolved / "agents" / f"{session.agent}.yaml"
-    if agent_yaml.is_file():
-        import yaml as _yaml
-
-        try:
-            agent_data = _yaml.safe_load(agent_yaml.read_text(encoding="utf-8"))
-            if isinstance(agent_data, dict):
-                agent_max_turns = agent_data.get("max_turns")
-        except Exception:
-            pass
-    max_turns = max_turns_override or agent_max_turns or 200
-
-    # Create worktrees (or reuse on --resume)
-    worktree_entries: list[WorktreeEntry] = []
-    primary_wt_path: Path | None = None
-
-    if resume_flag and session.runtime_state.worktrees:
-        for wt in session.runtime_state.worktrees:
-            wt_path = Path(wt.worktree_path)
-            if not wt_path.exists():
-                raise click.ClickException(
-                    f"Worktree {wt_path} no longer exists. "
-                    f"Run 'tripwire session cleanup {session_id}' then spawn without --resume."
-                )
-            worktree_entries.append(wt)
-            if primary_wt_path is None:
-                primary_wt_path = wt_path
-    else:
-        for rb in session.repos:
-            clone_path = _resolve_clone_path(resolved, rb.repo)
-            if clone_path is None:
-                raise click.ClickException(
-                    f"No local clone for {rb.repo}. "
-                    f"Set local path in project.yaml repos."
-                )
-            wt_path = worktree_path_for_session(clone_path, session_id)
-            if wt_path.exists() and not resume_flag:
-                raise click.ClickException(
-                    f"Worktree path {wt_path} already exists. "
-                    f"Use --resume or 'tripwire session cleanup {session_id}'."
-                )
-            if not wt_path.exists():
-                from tripwire.core.git_helpers import branch_exists
-
-                if branch_exists(clone_path, branch):
-                    raise click.ClickException(
-                        f"Branch '{branch}' already exists in {clone_path}. "
-                        f"Use --resume to reuse it, or delete the branch first."
-                    )
-                base_ref = rb.base_branch or "HEAD"
-                worktree_add(clone_path, wt_path, branch, base_ref)
-            worktree_entries.append(
-                WorktreeEntry(
-                    repo=rb.repo,
-                    clone_path=str(clone_path),
-                    worktree_path=str(wt_path),
-                    branch=branch,
-                )
-            )
-            if primary_wt_path is None:
-                primary_wt_path = wt_path
+    # Prep (runtime-agnostic): worktrees + skills + CLAUDE.md + kickoff
+    try:
+        prepped = prep_run(
+            session=session,
+            project_dir=resolved,
+            runtime=runtime,
+            max_turns_override=max_turns_override,
+            claude_session_id=(
+                session.runtime_state.claude_session_id if resume_flag else None
+            ),
+            resume=resume_flag,
+        )
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc)) from exc
 
     if dry_run:
         click.echo(f"Dry run — would spawn session '{session_id}'")
-        click.echo(f"  Branch: {branch}")
-        for wt in worktree_entries:
+        click.echo(f"  Runtime: {runtime.name}")
+        for wt in prepped.worktrees:
             click.echo(f"  Worktree: {wt.worktree_path}")
-        click.echo(f"  Max turns: {max_turns}")
+        click.echo(f"  Max turns: {prepped.spawn_defaults.config.max_turns}")
         return
 
-    if primary_wt_path is None:
-        raise click.ClickException("No repos configured for this session")
-
-    # Generate claude session ID
-    claude_sid = (
-        session.runtime_state.claude_session_id
-        if resume_flag
-        else str(_uuid_mod.uuid4())
-    )
-
-    # Log path
-    if log_dir is None:
-        log_dir = Path.home() / ".tripwire" / "logs"
-    from tripwire.core.store import load_project as _lp
-
-    try:
-        proj = _lp(resolved)
-        project_slug = proj.name.lower().replace(" ", "-")
-    except Exception:
-        project_slug = "unknown"
-    ts = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
-    log_file = log_dir / project_slug / f"{session_id}-{ts}.log"
-
-    pid = _launch_claude(
-        wt_path=primary_wt_path,
-        plan_content=plan_content,
-        session=session,
-        project_dir=resolved,
-        session_name=session.name,
-        branch_type=branch_type,
-        claude_session_id=claude_sid,
-        max_turns=max_turns,
-        log_path=log_file,
-        project_slug=project_slug,
-        resume=resume_flag,
-    )
+    # Launch via the runtime
+    start_result = runtime.start(prepped)
 
     now = datetime.now(tz=timezone.utc)
     session.status = "executing"
-    session.runtime_state.worktrees = worktree_entries
-    session.runtime_state.pid = pid
-    session.runtime_state.claude_session_id = claude_sid
-    session.runtime_state.started_at = now.isoformat()
-    session.runtime_state.log_path = str(log_file)
+    session.runtime_state.worktrees = start_result.worktrees
+    session.runtime_state.claude_session_id = start_result.claude_session_id
+    session.runtime_state.pid = start_result.pid
+    session.runtime_state.started_at = start_result.started_at
+    session.runtime_state.log_path = start_result.log_path
+    session.runtime_state.last_spawn_resumed = resume_flag
     session.updated_at = now
     session.engagements.append(
         EngagementEntry(
@@ -655,13 +488,58 @@ def session_spawn_cmd(
     )
     save_session(resolved, session)
 
-    click.echo(f"Session '{session_id}' → executing")
-    click.echo(f"  PID: {pid}")
-    click.echo(f"  Branch: {branch}")
-    click.echo(f"  Worktree: {primary_wt_path}")
-    click.echo(f"  Log: {log_file}")
-    click.echo(f"  Claude session: {claude_sid}")
-    click.echo(f"\n  tail -f {log_file}")
+    click.echo(f"Session '{session_id}' → executing  (runtime: {runtime.name})")
+    click.echo(f"  Branch: {prepped.worktrees[0].branch}")
+    click.echo(f"  Code worktree: {prepped.code_worktree}")
+    if start_result.pid:
+        click.echo(f"  PID: {start_result.pid}")
+    if start_result.log_path:
+        click.echo(f"  Log: {start_result.log_path}")
+        click.echo(f"\n  tripwire session attach {session_id}")
+    click.echo(f"  Claude session: {start_result.claude_session_id}")
+
+
+@session_cmd.command("attach")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_attach_cmd(session_id: str, project_dir: Path) -> None:
+    """Attach to a running session. Behaviour is runtime-specific:
+    subprocess runtimes exec `tail -f <log>`; manual runtimes print
+    the command to run."""
+    import os
+
+    from tripwire.core.spawn_config import load_resolved_spawn_config
+    from tripwire.runtimes import get_runtime
+    from tripwire.runtimes.base import AttachExec, AttachInstruction
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session '{session_id}' not found") from exc
+
+    spawn = load_resolved_spawn_config(resolved, session=session)
+    try:
+        runtime = get_runtime(spawn.invocation.runtime)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    cmd = runtime.attach_command(session)
+    if isinstance(cmd, AttachExec):
+        os.execvp(cmd.argv[0], cmd.argv)
+    elif isinstance(cmd, AttachInstruction):
+        click.echo(cmd.message)
+    else:
+        raise click.ClickException(
+            f"Runtime '{runtime.name}' returned unexpected attach command."
+        )
 
 
 @session_cmd.command("pause")
@@ -673,7 +551,10 @@ def session_spawn_cmd(
     show_default=True,
 )
 def session_pause_cmd(session_id: str, project_dir: Path) -> None:
-    """SIGTERM the claude process, transition to paused."""
+    """Pause the session via its runtime, transition to paused."""
+    from tripwire.core.spawn_config import load_resolved_spawn_config
+    from tripwire.runtimes import get_runtime
+
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
@@ -687,18 +568,32 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
             f"session '{session_id}' is '{session.status}', must be 'executing' to pause"
         )
 
+    spawn = load_resolved_spawn_config(resolved, session=session)
+    runtime = get_runtime(spawn.invocation.runtime)
+
+    # For subprocess runtime, a dead pid means the agent already exited
+    # (cleanly or otherwise). Surface that as 'failed' — pause doesn't
+    # make sense once the process is gone.
     pid = session.runtime_state.pid
-    now = datetime.now(tz=timezone.utc)
-
-    if pid and is_alive(pid):
-        send_sigterm(pid)
-        session.status = "paused"
-        click.echo(f"Session '{session_id}' → paused (SIGTERM sent to PID {pid})")
-    else:
+    if pid and not is_alive(pid):
         session.status = "failed"
-        click.echo(f"Warning: PID {pid} not found — session '{session_id}' → failed")
+        click.echo(f"Warning: PID {pid} not alive — session '{session_id}' → failed")
+        session.updated_at = datetime.now(tz=timezone.utc)
+        save_session(resolved, session)
+        return
 
-    session.updated_at = now
+    try:
+        runtime.pause(session)
+    except RuntimeError as exc:
+        click.echo(f"Warning: {exc}", err=True)
+        click.echo(
+            f"Session '{session_id}' remains 'executing' — state matches reality"
+        )
+        return
+
+    session.status = "paused"
+    click.echo(f"Session '{session_id}' → paused")
+    session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
 
 
@@ -711,7 +606,10 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
     show_default=True,
 )
 def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
-    """Kill the process if running, transition to abandoned."""
+    """Kill the session's runtime handle if running, transition to abandoned."""
+    from tripwire.core.spawn_config import load_resolved_spawn_config
+    from tripwire.runtimes import get_runtime
+
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
@@ -725,10 +623,11 @@ def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
             f"session '{session_id}' is already '{session.status}'"
         )
 
-    pid = session.runtime_state.pid
-    if pid and session.status == "executing" and is_alive(pid):
-        send_sigterm(pid)
-        click.echo(f"Sent SIGTERM to PID {pid}")
+    spawn = load_resolved_spawn_config(resolved, session=session)
+    runtime = get_runtime(spawn.invocation.runtime)
+
+    if session.status == "executing":
+        runtime.abandon(session)
 
     session.status = "abandoned"
     session.updated_at = datetime.now(tz=timezone.utc)
@@ -757,11 +656,19 @@ def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
     default=False,
     help="Skip dirty-worktree check",
 )
+@click.option(
+    "--with-logs",
+    "with_logs",
+    is_flag=True,
+    default=False,
+    help="Also remove the session's log files from ~/.tripwire/logs/",
+)
 def session_cleanup_cmd(
     session_id: str | None,
     project_dir: Path,
     clean_all: bool,
     force: bool,
+    with_logs: bool,
 ) -> None:
     """Remove worktrees for completed/abandoned sessions."""
     resolved = project_dir.expanduser().resolve()
@@ -781,8 +688,23 @@ def session_cleanup_cmd(
     else:
         targets = [s for s in sessions if s.status in ("completed", "abandoned")]
 
+    from tripwire.core.spawn_config import load_resolved_spawn_config
+    from tripwire.runtimes import get_runtime
+
     cleaned = 0
     for session in targets:
+        # If the runtime still has a live process (claude subprocess, etc.),
+        # tear it down before ripping the worktree out from under it.
+        try:
+            spawn = load_resolved_spawn_config(resolved, session=session)
+            runtime = get_runtime(spawn.invocation.runtime)
+            if runtime.status(session) == "running":
+                runtime.abandon(session)
+        except (ValueError, RuntimeError, FileNotFoundError):
+            # Best-effort — unknown runtime / missing config shouldn't
+            # block worktree cleanup.
+            pass
+
         for wt in session.runtime_state.worktrees:
             wt_path = Path(wt.worktree_path)
             if not wt_path.exists():
@@ -805,10 +727,173 @@ def session_cleanup_cmd(
             session.runtime_state.worktrees = remaining
             save_session(resolved, session)
 
+        # Optionally drop the session's log files. Log files are named
+        # <session_id>-<timestamp>.log under a shared {project_slug}
+        # directory, so we glob-match rather than rm -rf the parent
+        # (which would nuke other sessions' logs in the same project).
+        if with_logs and session.runtime_state.log_path:
+            log_parent = Path(session.runtime_state.log_path).expanduser().parent
+            if log_parent.is_dir():
+                removed = 0
+                for log_file in log_parent.glob(f"{session.id}-*.log"):
+                    log_file.unlink()
+                    removed += 1
+                if removed:
+                    click.echo(f"  Removed {removed} log file(s) for '{session.id}'")
+
     for clone_str in clones_to_prune:
         worktree_prune(Path(clone_str))
 
     click.echo(f"Cleaned {cleaned} worktree(s)")
+
+
+@session_cmd.command("logs")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+@click.option(
+    "--tail",
+    "tail_lines",
+    type=int,
+    default=50,
+    show_default=True,
+    help="Number of lines to show from the tail of the latest log file.",
+)
+@click.option(
+    "--full",
+    is_flag=True,
+    default=False,
+    help="Dump the entire latest log file instead of tailing.",
+)
+@click.option(
+    "--list",
+    "list_only",
+    is_flag=True,
+    default=False,
+    help="List all log files for the session; don't dump contents.",
+)
+def session_logs_cmd(
+    session_id: str,
+    project_dir: Path,
+    tail_lines: int,
+    full: bool,
+    list_only: bool,
+) -> None:
+    """Show log files for a session.
+
+    Per-spawn logs accumulate under the shared
+    ``~/.tripwire/logs/<project-slug>/`` directory as
+    ``<session_id>-<timestamp>.log``. This subcommand surfaces them
+    without requiring operators to grep the filesystem by hand.
+    """
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session '{session_id}' not found") from exc
+
+    log_path_str = session.runtime_state.log_path
+    if not log_path_str:
+        raise click.ClickException(
+            f"session '{session_id}' has no recorded log_path — "
+            "the session may never have been spawned."
+        )
+    latest_log = Path(log_path_str).expanduser()
+    log_dir = latest_log.parent
+    if not log_dir.is_dir():
+        raise click.ClickException(f"log directory does not exist: {log_dir}")
+
+    matches = sorted(log_dir.glob(f"{session_id}-*.log"))
+    if not matches and latest_log.is_file():
+        matches = [latest_log]
+    if not matches:
+        raise click.ClickException(f"no log files found for session '{session_id}'")
+
+    if list_only:
+        for path in matches:
+            st = path.stat()
+            ts = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).strftime(
+                "%Y-%m-%d %H:%M:%S UTC"
+            )
+            click.echo(f"  {path.name}  {st.st_size:>10} bytes  {ts}")
+        return
+
+    latest = matches[-1]
+    content = latest.read_text(encoding="utf-8", errors="replace")
+    if full:
+        click.echo(content, nl=False)
+        return
+    lines = content.splitlines()
+    for line in lines[-tail_lines:]:
+        click.echo(line)
+
+
+@session_cmd.command("summary")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    show_default=True,
+)
+def session_summary_cmd(
+    session_id: str,
+    project_dir: Path,
+    output_format: str,
+) -> None:
+    """Summarise the latest spawn attempt for a session.
+
+    Parses the most recent stream-json log file into a readable
+    shape: claude session uuid, exit subtype, tool-call count, token
+    usage, and the final assistant text. Flags sessions that
+    "stopped to ask" (clean exit whose final text contains a
+    question).
+    """
+    import dataclasses
+    import json as _json
+
+    from tripwire.core.session_log_parser import format_text, parse
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session '{session_id}' not found") from exc
+
+    log_path_str = session.runtime_state.log_path
+    if not log_path_str:
+        raise click.ClickException(
+            f"session '{session_id}' has no recorded log_path — "
+            "the session may never have been spawned."
+        )
+    latest_log = Path(log_path_str).expanduser()
+    log_dir = latest_log.parent
+    matches = sorted(log_dir.glob(f"{session_id}-*.log")) if log_dir.is_dir() else []
+    if not matches and latest_log.is_file():
+        matches = [latest_log]
+    if not matches:
+        raise click.ClickException(f"no log files found for session '{session_id}'")
+
+    summary = parse(matches[-1])
+    if output_format == "json":
+        payload = dataclasses.asdict(summary)
+        payload["log_path"] = str(summary.log_path)
+        click.echo(_json.dumps(payload, indent=2))
+    else:
+        click.echo(format_text(summary))
 
 
 @session_cmd.command("agenda")
@@ -973,7 +1058,7 @@ def session_complete_cmd(
     skip_worktree_cleanup: bool,
     skip_pr_merge_check: bool,
 ) -> None:
-    """Complete a session: verify gates, close issues, cleanup."""
+    """Complete a session: verify PRs merged, close issues, cleanup."""
     from tripwire.core.session_complete import (
         CompleteError,
         complete_session,

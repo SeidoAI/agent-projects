@@ -419,3 +419,170 @@ class TestSessionAgenda:
         )
         assert result.exit_code != 0
         assert "cycle" in result.output.lower()
+
+
+class TestSessionPauseDispatch:
+    def test_pause_uses_subprocess_runtime(self, tmp_path_project, save_test_session):
+        """pause must go through runtime.pause which SIGTERMs the pid."""
+        proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        try:
+            save_test_session(
+                tmp_path_project,
+                "s1",
+                status="executing",
+                spawn_config={"invocation": {"runtime": "subprocess"}},
+                runtime_state={
+                    "claude_session_id": "uuid-1",
+                    "pid": proc.pid,
+                },
+            )
+
+            runner = CliRunner()
+            result = runner.invoke(
+                session_cmd,
+                ["pause", "s1", "--project-dir", str(tmp_path_project)],
+            )
+
+            assert result.exit_code == 0, result.output
+            s = load_session(tmp_path_project, "s1")
+            assert s.status == "paused"
+            # The subprocess should have been SIGTERM'd
+            proc.wait(timeout=3)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+
+
+class TestSessionAbandonDispatch:
+    def test_abandon_uses_subprocess_runtime(self, tmp_path_project, save_test_session):
+        """abandon must go through runtime.abandon which SIGTERMs the pid."""
+        proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        try:
+            save_test_session(
+                tmp_path_project,
+                "s1",
+                status="executing",
+                spawn_config={"invocation": {"runtime": "subprocess"}},
+                runtime_state={
+                    "claude_session_id": "uuid-1",
+                    "pid": proc.pid,
+                },
+            )
+
+            runner = CliRunner()
+            result = runner.invoke(
+                session_cmd,
+                ["abandon", "s1", "--project-dir", str(tmp_path_project)],
+            )
+
+            assert result.exit_code == 0, result.output
+            s = load_session(tmp_path_project, "s1")
+            assert s.status == "abandoned"
+            proc.wait(timeout=3)
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+
+    def test_abandon_already_dead_pid(self, tmp_path_project, save_test_session):
+        """Abandon on a session whose pid is long-dead should still
+        transition to abandoned without error."""
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="executing",
+            runtime_state={"pid": 99999},  # non-existent pid
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            ["abandon", "s1", "--project-dir", str(tmp_path_project)],
+        )
+
+        assert result.exit_code == 0, result.output
+        s = load_session(tmp_path_project, "s1")
+        assert s.status == "abandoned"
+
+
+class TestCleanupKillsRuntime:
+    def test_cleanup_abandons_runtime_before_removing_worktree(
+        self, tmp_path, tmp_path_project, save_test_session
+    ):
+        """M7: cleanup must kill the runtime (SIGTERM the pid for
+        subprocess) before removing the worktree, otherwise claude
+        is left running with its cwd yanked."""
+        import subprocess as _sp
+
+        clone = tmp_path / "clone"
+        clone.mkdir()
+        _sp.run(["git", "init", "-q"], cwd=clone, check=True)
+        _sp.run(
+            [
+                "git",
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "commit",
+                "--allow-empty",
+                "-q",
+                "-m",
+                "init",
+            ],
+            cwd=clone,
+            check=True,
+        )
+        wt_path = tmp_path / "wt"
+        _sp.run(
+            [
+                "git",
+                "-C",
+                str(clone),
+                "worktree",
+                "add",
+                str(wt_path),
+                "-b",
+                "feat/s1",
+                "HEAD",
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+        proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        try:
+            save_test_session(
+                tmp_path_project,
+                "s1",
+                status="completed",
+                spawn_config={"invocation": {"runtime": "subprocess"}},
+                runtime_state={
+                    "claude_session_id": "uuid-1",
+                    "pid": proc.pid,
+                    "worktrees": [
+                        {
+                            "repo": "X/Y",
+                            "clone_path": str(clone),
+                            "worktree_path": str(wt_path),
+                            "branch": "feat/s1",
+                        }
+                    ],
+                },
+            )
+
+            runner = CliRunner()
+            result = runner.invoke(
+                session_cmd,
+                ["cleanup", "s1", "--project-dir", str(tmp_path_project)],
+            )
+            assert result.exit_code == 0, result.output
+
+            # runtime.abandon SIGTERM'd our test process
+            proc.wait(timeout=3)
+            assert proc.poll() is not None, (
+                "cleanup must abandon the runtime (kill the pid) before "
+                "removing the worktree"
+            )
+        finally:
+            if proc.poll() is None:
+                proc.kill()

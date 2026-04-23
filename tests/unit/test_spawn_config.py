@@ -111,7 +111,10 @@ def test_build_claude_args_shape():
     assert "--fallback-model" in args
     assert "--permission-mode" in args
     assert "--disallowedTools" in args
-    assert "Agent" in args
+    # disallowed_tools is joined comma-separated; the value arg contains
+    # each disallowed tool name.
+    disallowed_value = args[args.index("--disallowedTools") + 1]
+    assert "Agent" in disallowed_value
     assert "--max-turns" in args
     assert "--output-format" in args
     assert "--append-system-prompt" in args
@@ -119,6 +122,8 @@ def test_build_claude_args_shape():
 
 
 def test_build_claude_args_with_resume():
+    """resume=True: --resume <uuid> is emitted, --session-id is NOT
+    (claude rejects the combination without --fork-session)."""
     from tripwire.models.spawn import SpawnDefaults
 
     defaults = SpawnDefaults.model_validate({})
@@ -130,4 +135,91 @@ def test_build_claude_args_with_resume():
         claude_session_id="abc",
         resume=True,
     )
-    assert args[-1] == "--resume"
+    assert "--resume" in args
+    resume_idx = args.index("--resume")
+    assert args[resume_idx + 1] == "abc"
+    assert "--session-id" not in args
+    # --name still present (display-only, safe with --resume).
+    assert "--name" in args
+
+
+def test_build_claude_args_resume_false_uses_session_id():
+    """resume=False: --session-id <uuid> is emitted, --resume is NOT."""
+    from tripwire.models.spawn import SpawnDefaults
+
+    defaults = SpawnDefaults.model_validate({})
+    args = build_claude_args(
+        defaults,
+        prompt="x",
+        system_append="y",
+        session_id="s1",
+        claude_session_id="abc",
+        resume=False,
+    )
+    assert "--session-id" in args
+    assert args[args.index("--session-id") + 1] == "abc"
+    assert "--resume" not in args
+
+
+# -------- runtime field (T1) --------
+
+
+def test_runtime_defaults_to_subprocess(tmp_path_project):
+    resolved = load_resolved_spawn_config(tmp_path_project)
+    assert resolved.invocation.runtime == "subprocess"
+
+
+def test_runtime_session_override_beats_default(tmp_path_project, save_test_session):
+    save_test_session(
+        tmp_path_project,
+        "s1",
+        status="planned",
+        spawn_config={"invocation": {"runtime": "manual"}},
+    )
+
+    session = load_session(tmp_path_project, "s1")
+    resolved = load_resolved_spawn_config(tmp_path_project, session=session)
+    assert resolved.invocation.runtime == "manual"
+
+
+def test_runtime_rejects_unknown_value(tmp_path_project, save_test_session):
+    import pytest
+    from pydantic import ValidationError
+
+    save_test_session(
+        tmp_path_project,
+        "s1",
+        status="planned",
+        spawn_config={"invocation": {"runtime": "tmux"}},
+    )
+
+    session = load_session(tmp_path_project, "s1")
+    with pytest.raises(ValidationError):
+        load_resolved_spawn_config(tmp_path_project, session=session)
+
+
+def test_resume_prompt_template_shipped_default(tmp_path_project):
+    """The shipped defaults.yaml ships a non-empty resume prompt template."""
+    resolved = load_resolved_spawn_config(tmp_path_project)
+    assert resolved.resume_prompt_template.strip()
+    assert "Resuming session" in resolved.resume_prompt_template
+
+
+def test_disallowed_tools_includes_ask_and_send_user_message(tmp_path_project):
+    """Defaults block AskUserQuestion and SendUserMessage to prevent
+    retry-loops in -p mode (see probe 1 in the session design)."""
+    resolved = load_resolved_spawn_config(tmp_path_project)
+    assert "AskUserQuestion" in resolved.config.disallowed_tools
+    assert "SendUserMessage" in resolved.config.disallowed_tools
+    assert "Agent" in resolved.config.disallowed_tools
+
+
+def test_render_resume_prompt_interpolates():
+    from tripwire.core.spawn_config import render_resume_prompt
+    from tripwire.models.spawn import SpawnDefaults
+
+    defaults = SpawnDefaults.model_validate(
+        {"resume_prompt_template": "Resuming {session_id} at {plan_path}"}
+    )
+    out = render_resume_prompt(defaults, session_id="s1", plan_path="/tmp/x")
+    assert out == "Resuming s1 at /tmp/x"

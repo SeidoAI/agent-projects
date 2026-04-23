@@ -60,6 +60,8 @@ class RuntimeState(BaseModel):
     pid: int | None = None
     started_at: datetime | str | None = None
     log_path: str | None = None
+    skills_hash: str | None = None  # sentinel for copy_skills idempotency
+    last_spawn_resumed: bool = False  # whether last spawn was --resume
 
 
 class SessionOrchestration(BaseModel):

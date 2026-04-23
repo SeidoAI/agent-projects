@@ -1,0 +1,5 @@
+{"type":"system","subtype":"init","session_id":"uuid-ask","timestamp":"2026-04-23T12:00:00Z","tools":["Read"]}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"plan.md"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"# Plan\n(ambiguous)"}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"The plan mentions a retry policy but doesn't specify the retry count. Is it three retries with exponential backoff, or a single retry?"}]}}
+{"type":"result","subtype":"success","timestamp":"2026-04-23T12:02:15Z","result":"The plan mentions a retry policy but doesn't specify the retry count. Is it three retries with exponential backoff, or a single retry?","duration_ms":135000,"total_cost_usd":0.0421,"usage":{"input_tokens":3200,"output_tokens":180}}

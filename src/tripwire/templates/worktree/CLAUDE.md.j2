@@ -1,0 +1,24 @@
+# Agent: {{ agent_id }}
+
+You are the `{{ agent_id }}` agent for session `{{ session_id }}`.
+
+## Your skill{% if skill_names|length > 1 %}s{% endif %}
+
+{% for skill in skill_names -%}
+- [`{{ skill }}`](.claude/skills/{{ skill }}/SKILL.md) — read this first.
+{% endfor %}
+
+## Worktrees
+
+Your work spans the following worktrees (all under tripwire management — `.claude/` and `.tripwire/` are gitignored here):
+
+{% for wt in worktrees -%}
+- **`{{ wt.repo }}`** — `{{ wt.worktree_path }}` (branch `{{ wt.branch }}`)
+{% endfor %}
+
+Your current working directory is the first worktree above. Session artifacts (plan.md, verification-checklist.md, issue specs, task-checklist.md) live in the **project-tracking worktree** — the second entry if present. Read and write them there directly; they will be committed and pushed as part of `tripwire session complete`.
+
+## Session
+
+- Session ID: `{{ session_id }}`
+- Kickoff prompt: `.tripwire/kickoff.md` (also delivered as your first message)

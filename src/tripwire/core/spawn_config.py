@@ -87,35 +87,61 @@ def render_system_append(defaults: SpawnDefaults, **ctx: Any) -> str:
     return defaults.system_prompt_append.format(**ctx)
 
 
+def render_resume_prompt(defaults: SpawnDefaults, **ctx: Any) -> str:
+    """Interpolate `{key}` placeholders in the resume-prompt template.
+
+    Used when re-spawning a paused/failed session — the new user turn
+    is a brief continuation cue, not a full re-send of plan.md. Claude
+    loads the prior conversation from its jsonl via ``--resume <uuid>``.
+    """
+    return defaults.resume_prompt_template.format(**ctx)
+
+
 def build_claude_args(
     defaults: SpawnDefaults,
     *,
-    prompt: str,
+    prompt: str | None,
     system_append: str,
     session_id: str,
     claude_session_id: str,
     resume: bool = False,
+    interactive: bool = False,
 ) -> list[str]:
     """Build the claude CLI argv from the resolved spawn config.
 
-    The two session identifiers are distinct:
-    - ``session_id`` — tripwire's human-readable session slug, passed as
-      ``--name`` (display label in claude's prompt box, /resume picker,
-      and terminal title).
-    - ``claude_session_id`` — claude's internal UUID identifier, passed
-      as ``--session-id`` (required for ``--resume`` to work).
+    When ``interactive=True``, the ``-p <prompt>`` pair is omitted so
+    claude starts in interactive mode. ``prompt`` must be ``None`` in
+    that case; the caller delivers the kickoff prompt via send-keys
+    after the ready-probe.
+
+    When ``resume=True``, ``--resume <claude_session_id>`` is appended
+    and ``--session-id`` is omitted. Claude rejects the combination
+    ``--session-id X --resume X`` unless ``--fork-session`` is also
+    present; for same-session resume, ``--resume`` alone is correct.
+
+    When ``resume=False``, ``--session-id <claude_session_id>`` is
+    emitted so the session is addressable (and resumable later).
+
+    ``session_id`` (tripwire's human slug) is passed as ``--name``
+    unconditionally — it's display-only and safe in both modes.
 
     Flag set matches ``claude --help`` output and spec §8.1.
     """
+    if interactive and prompt is not None:
+        raise ValueError("prompt must be None when interactive=True")
+    if not interactive and prompt is None:
+        raise ValueError("prompt is required when interactive=False")
+
     cfg = defaults.config
-    args = [
-        defaults.invocation.command,
-        "-p",
-        prompt,
-        "--name",
-        session_id,
-        "--session-id",
-        claude_session_id,
+    args: list[str] = [defaults.invocation.command]
+    if not interactive:
+        args += ["-p", prompt]
+    args += ["--name", session_id]
+    if resume:
+        args += ["--resume", claude_session_id]
+    else:
+        args += ["--session-id", claude_session_id]
+    args += [
         "--effort",
         cfg.effort,
         "--model",
@@ -135,6 +161,4 @@ def build_claude_args(
         "--append-system-prompt",
         system_append,
     ]
-    if resume:
-        args.append("--resume")
     return args

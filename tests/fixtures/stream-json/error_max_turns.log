@@ -1,0 +1,7 @@
+{"type":"system","subtype":"init","session_id":"uuid-max","timestamp":"2026-04-23T12:00:00Z","tools":["Read","Bash"]}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Retrying..."}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"grep foo"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"no match"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t2","name":"Bash","input":{"command":"grep bar"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t2","content":"no match"}]}}
+{"type":"result","subtype":"error_max_turns","timestamp":"2026-04-23T12:15:00Z","duration_ms":900000,"total_cost_usd":0.9500,"usage":{"input_tokens":50000,"output_tokens":3000}}

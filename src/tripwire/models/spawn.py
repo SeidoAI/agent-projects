@@ -8,6 +8,8 @@ with precedence (session > project > tripwire default) happens in
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -15,6 +17,7 @@ class SpawnInvocation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     command: str = "claude"
+    runtime: Literal["subprocess", "manual"] = "subprocess"
     background: bool = True
     log_path_template: str = (
         "~/.tripwire/logs/{project_slug}/{session_id}-{timestamp}.log"
@@ -28,7 +31,13 @@ class SpawnConfigValues(BaseModel):
     fallback_model: str = "sonnet"
     effort: str = "max"
     permission_mode: str = "bypassPermissions"
-    disallowed_tools: list[str] = Field(default_factory=lambda: ["Agent"])
+    disallowed_tools: list[str] = Field(
+        default_factory=lambda: [
+            "Agent",
+            "AskUserQuestion",
+            "SendUserMessage",
+        ]
+    )
     max_turns: int = 200
     max_budget_usd: int = 50
     output_format: str = "stream-json"
@@ -42,4 +51,5 @@ class SpawnDefaults(BaseModel):
     invocation: SpawnInvocation = Field(default_factory=SpawnInvocation)
     config: SpawnConfigValues = Field(default_factory=SpawnConfigValues)
     prompt_template: str = ""
+    resume_prompt_template: str = ""
     system_prompt_append: str = ""
