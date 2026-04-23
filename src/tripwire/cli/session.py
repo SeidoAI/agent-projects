@@ -586,11 +586,21 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
         click.echo(
             f"Warning: PID {pid} not alive — session '{session_id}' → failed"
         )
-    else:
-        runtime.pause(session)
-        session.status = "paused"
-        click.echo(f"Session '{session_id}' → paused")
+        session.updated_at = datetime.now(tz=timezone.utc)
+        save_session(resolved, session)
+        return
 
+    try:
+        runtime.pause(session)
+    except RuntimeError as exc:
+        click.echo(f"Warning: {exc}", err=True)
+        click.echo(
+            f"Session '{session_id}' remains 'executing' — state matches reality"
+        )
+        return
+
+    session.status = "paused"
+    click.echo(f"Session '{session_id}' → paused")
     session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
 

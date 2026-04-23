@@ -85,8 +85,21 @@ class SubprocessRuntime:
 
     def pause(self, session: AgentSession) -> None:
         pid = session.runtime_state.pid
-        if pid and is_alive(pid):
-            send_sigterm(pid)
+        if not pid or not is_alive(pid):
+            return
+        send_sigterm(pid)
+        # Poll until the process actually exits so the caller can set
+        # status to 'paused' without lying about reality. Escalation to
+        # SIGKILL is abandon's job, not pause's.
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline:
+            if not is_alive(pid):
+                return
+            time.sleep(0.1)
+        raise RuntimeError(
+            f"SIGTERM not honoured within 2s for pid {pid} — "
+            "escalate via 'tripwire session abandon'"
+        )
 
     def abandon(self, session: AgentSession) -> None:
         pid = session.runtime_state.pid

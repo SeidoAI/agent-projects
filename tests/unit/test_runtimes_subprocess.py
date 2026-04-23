@@ -106,15 +106,21 @@ def test_start_with_resume_uses_resume_flag_not_session_id(tmp_path):
 
 
 def test_pause_sigterms_live_pid(tmp_path):
+    """Sanity — pause SIGTERMs then the process exits immediately."""
     session = AgentSession(
         id="s1", name="t", agent="a",
         runtime_state=RuntimeState(pid=999, claude_session_id="uuid-1"),
     )
+    # [True, False]: gate check sees alive → SIGTERM, first poll sees
+    # dead → return cleanly.
     with patch(
-        "tripwire.runtimes.subprocess.is_alive", return_value=True
+        "tripwire.runtimes.subprocess.is_alive",
+        side_effect=[True, False],
     ), patch(
         "tripwire.runtimes.subprocess.send_sigterm"
-    ) as mock_sigterm:
+    ) as mock_sigterm, patch(
+        "tripwire.runtimes.subprocess.time.sleep"
+    ):
         SubprocessRuntime().pause(session)
 
     mock_sigterm.assert_called_once_with(999)
@@ -133,6 +139,58 @@ def test_pause_noop_on_dead_pid():
         SubprocessRuntime().pause(session)
 
     mock_sigterm.assert_not_called()
+
+
+def test_pause_waits_for_exit():
+    """Pause polls is_alive until the process exits. Regression test
+    for gap #9 — status used to flip to 'paused' before the process
+    was actually gone."""
+    session = AgentSession(
+        id="s1", name="t", agent="a",
+        runtime_state=RuntimeState(pid=999, claude_session_id="uuid-1"),
+    )
+    # gate True → sigterm; poll #1 True; poll #2 True; poll #3 False → return.
+    alive_iter = iter([True, True, True, False])
+    with patch(
+        "tripwire.runtimes.subprocess.is_alive",
+        side_effect=lambda _pid: next(alive_iter),
+    ), patch(
+        "tripwire.runtimes.subprocess.send_sigterm"
+    ), patch(
+        "tripwire.runtimes.subprocess.time.sleep"
+    ) as mock_sleep:
+        SubprocessRuntime().pause(session)
+
+    # Two sleeps between the three "alive" poll responses — proves the
+    # loop actually polls rather than returning immediately after SIGTERM.
+    assert mock_sleep.call_count >= 2
+
+
+def test_pause_raises_when_sigterm_ignored():
+    """If the process ignores SIGTERM for 2s, pause raises so the CLI
+    can leave the session in 'executing' rather than lying that it's
+    paused."""
+    import pytest as _pytest
+
+    session = AgentSession(
+        id="s1", name="t", agent="a",
+        runtime_state=RuntimeState(pid=999, claude_session_id="uuid-1"),
+    )
+    # monotonic: first call sets deadline base; subsequent calls jump
+    # past the 2s window so the loop exits with the process still alive.
+    times = iter([0.0, 0.1, 3.0, 3.0])
+    with patch(
+        "tripwire.runtimes.subprocess.is_alive", return_value=True
+    ), patch(
+        "tripwire.runtimes.subprocess.send_sigterm"
+    ), patch(
+        "tripwire.runtimes.subprocess.time.sleep"
+    ), patch(
+        "tripwire.runtimes.subprocess.time.monotonic",
+        side_effect=lambda: next(times),
+    ):
+        with _pytest.raises(RuntimeError, match="SIGTERM not honoured"):
+            SubprocessRuntime().pause(session)
 
 
 def test_status_reflects_is_alive():
