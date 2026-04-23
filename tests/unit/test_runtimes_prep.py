@@ -359,6 +359,10 @@ class TestPrepRun:
         assert (prepped.code_worktree / ".tripwire/kickoff.md").is_file()
         assert prepped.prompt
         assert prepped.claude_session_id
+        # project_slug is populated from the tmp_path_project fixture
+        # (project.yaml name: "tmp") — guards against regression to the
+        # getattr-default "unknown" sink.
+        assert prepped.project_slug == "tmp"
 
 
 class TestResolveWorktreesResume:
@@ -471,6 +475,7 @@ class TestBuildClaudeArgsResumePropagation:
             claude_session_id="uuid-1",
             prompt="RESUMING",
             system_append="",
+            project_slug="test-proj",
             spawn_defaults=SpawnDefaults.model_validate({
                 "prompt_template": "{plan}",
                 "resume_prompt_template": "resuming",

@@ -27,6 +27,7 @@ class PreppedSession:
     claude_session_id: str
     prompt: str
     system_append: str
+    project_slug: str
     spawn_defaults: SpawnDefaults
     resume: bool = False
 

@@ -429,6 +429,7 @@ def run(
         claude_session_id=csid,
         prompt=prompt,
         system_append=system_append,
+        project_slug=proj_slug,
         spawn_defaults=resolved,
         resume=resume,
     )

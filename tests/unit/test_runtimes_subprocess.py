@@ -37,13 +37,16 @@ def _prepped(tmp_path: Path, *, resume: bool = False) -> PreppedSession:
         claude_session_id="uuid-1",
         prompt="DO THE THING",
         system_append="",
+        project_slug="test-proj",
         spawn_defaults=SpawnDefaults.model_validate(
             {
                 "prompt_template": "{plan}",
                 "resume_prompt_template": "resuming",
                 "system_prompt_append": "",
                 "invocation": {
-                    "log_path_template": str(tmp_path / "logs" / "{session_id}.log"),
+                    "log_path_template": str(
+                        tmp_path / "logs" / "{project_slug}" / "{session_id}.log"
+                    ),
                 },
             }
         ),
@@ -73,9 +76,11 @@ def test_start_invokes_popen_with_expected_argv(tmp_path):
     assert "--session-id" in argv  # resume=False → session-id, not --resume
     assert "--resume" not in argv
 
-    # Log file was created + cwd honoured.
+    # Log file was created + cwd honoured + project_slug threaded into path.
     log_path = Path(result.log_path)
     assert log_path.parent.exists()
+    assert "test-proj" in str(log_path)
+    assert "unknown" not in str(log_path)
     kwargs = mock_popen.call_args[1]
     assert kwargs["cwd"] == str(prepped.code_worktree)
     assert kwargs["start_new_session"] is True

@@ -28,6 +28,7 @@ def _prepped(tmp_path: Path) -> PreppedSession:
         claude_session_id="uuid-1",
         prompt="do the thing",
         system_append="",
+        project_slug="test-proj",
         spawn_defaults=SpawnDefaults(),
     )
 

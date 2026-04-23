@@ -34,11 +34,8 @@ def _render_log_path(prepped: PreppedSession) -> Path:
     """Render the ``log_path_template`` using the session's known fields."""
     template = prepped.spawn_defaults.invocation.log_path_template
     ts = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
-    # project_slug derived elsewhere during prep; fall back to "unknown" if
-    # we ever see it missing.
-    project_slug = getattr(prepped, "project_slug", None) or "unknown"
     raw = template.format(
-        project_slug=project_slug,
+        project_slug=prepped.project_slug,
         session_id=prepped.session_id,
         timestamp=ts,
     )
