@@ -826,6 +826,124 @@ def session_cleanup_cmd(
     click.echo(f"Cleaned {cleaned} worktree(s)")
 
 
+@session_cmd.command("scaffold")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Overwrite existing files instead of skipping them.",
+)
+@click.option(
+    "--artifact",
+    "artifact_name",
+    default=None,
+    help=(
+        "Scaffold a specific artifact by file name "
+        "(e.g. `verification-checklist.md`). Default: every planning-"
+        "phase, PM-owned, required artifact from the manifest."
+    ),
+)
+def session_scaffold_cmd(
+    session_id: str,
+    project_dir: Path,
+    force: bool,
+    artifact_name: str | None,
+) -> None:
+    """Render session planning artifacts from their Jinja templates.
+
+    Before this command existed, PMs copy-pasted
+    ``verification-checklist.md`` from other sessions because there
+    was no scaffolder. Readiness checks that artifact at queue time,
+    so the missing step was a recurring onboarding papercut.
+
+    Default: render every manifest entry where
+    ``produced_at=="planning"``, ``owned_by=="pm"``, and
+    ``required=True``. Pass ``--artifact <file>`` to scaffold a
+    single entry. ``--force`` overwrites existing files.
+    """
+    from tripwire.core.manifest_loader import load_artifact_manifest
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session '{session_id}' not found") from exc
+
+    manifest, _findings = load_artifact_manifest(resolved)
+    if manifest is None:
+        raise click.ClickException(
+            "No artifact manifest found at templates/artifacts/manifest.yaml"
+        )
+
+    if artifact_name:
+        targets = [e for e in manifest.artifacts if e.file == artifact_name]
+        if not targets:
+            raise click.ClickException(
+                f"artifact '{artifact_name}' not declared in manifest"
+            )
+    else:
+        targets = [
+            e
+            for e in manifest.artifacts
+            if e.produced_at == "planning" and e.owned_by == "pm" and e.required
+        ]
+        if not targets:
+            click.echo("No planning-phase PM-owned required artifacts to scaffold.")
+            return
+
+    # Jinja loader pointed at the project's artifacts/templates dir.
+    # init copies the packaged templates here at project-create time,
+    # so scaffold respects whatever the user has customised locally.
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+    templates_root = resolved / "templates" / "artifacts"
+    env = Environment(
+        loader=FileSystemLoader(str(templates_root)),
+        autoescape=select_autoescape(disabled_extensions=("j2", "md")),
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+
+    session_dir = resolved / "sessions" / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+
+    context = {
+        "session": session,
+        "session_id": session_id,
+        "session_name": session.name,
+        "agent": session.agent,
+        "issues": session.issues,
+    }
+
+    wrote = 0
+    for entry in targets:
+        dest = session_dir / entry.file
+        if dest.exists() and not force:
+            click.echo(f"  Skipping {entry.file} — exists (use --force to overwrite)")
+            continue
+        try:
+            tpl = env.get_template(entry.template)
+        except Exception as exc:
+            raise click.ClickException(
+                f"template {entry.template!r} not found under {templates_root}: {exc}"
+            ) from exc
+        rendered = tpl.render(**context)
+        dest.write_text(rendered, encoding="utf-8")
+        click.echo(f"  Wrote {entry.file}")
+        wrote += 1
+
+    if wrote == 0 and not artifact_name:
+        click.echo("  (nothing scaffolded — all targets already existed)")
+
+
 @session_cmd.command("logs")
 @click.argument("session_id")
 @click.option(
