@@ -1,6 +1,6 @@
 ---
 name: pm-session-review
-description: Structured review of a session's PR against issue specs, with independent verification.
+description: Structured session-PR review vs issue specs, with independent verification.
 argument-hint: "<session-id> [--pr <number>]"
 ---
 
