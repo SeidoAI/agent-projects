@@ -339,7 +339,17 @@ def session_derive_branch_cmd(session_id: str, project_dir: Path) -> None:
     default=".",
     show_default=True,
 )
-def session_queue_cmd(session_id: str, project_dir: Path) -> None:
+@click.option(
+    "--promote-issues",
+    "promote_issues",
+    is_flag=True,
+    default=False,
+    help=(
+        "Before queueing, flip every session issue currently in "
+        "`backlog` status to `todo`. Leaves other statuses alone."
+    ),
+)
+def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) -> None:
     """Validate readiness and transition session to queued."""
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
@@ -353,6 +363,24 @@ def session_queue_cmd(session_id: str, project_dir: Path) -> None:
         raise click.ClickException(
             f"session '{session_id}' is '{session.status}', must be 'planned' to queue"
         )
+
+    if promote_issues:
+        from tripwire.core.store import load_issue, save_issue
+
+        promoted = 0
+        for issue_key in session.issues:
+            try:
+                issue = load_issue(resolved, issue_key)
+            except FileNotFoundError:
+                click.echo(f"  ! issue {issue_key} not found — skipping")
+                continue
+            if issue.status == "backlog":
+                issue.status = "todo"
+                save_issue(resolved, issue)
+                click.echo(f"  {issue_key}: backlog → todo")
+                promoted += 1
+        if promoted == 0:
+            click.echo("  (no issues in backlog to promote)")
 
     report = check_readiness(resolved, session_id, kind="queue")
     if not report.ready:

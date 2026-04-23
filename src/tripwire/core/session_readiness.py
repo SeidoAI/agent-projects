@@ -66,7 +66,7 @@ def check_readiness(
                 )
             )
 
-    # 2. Blockers on issues.
+    # 2. Blockers on issues + backlog warnings.
     for issue_key in session.issues:
         try:
             issue = load_issue(project_dir, issue_key)
@@ -79,6 +79,23 @@ def check_readiness(
                 )
             )
             continue
+        # Flag backlog-status issues as a warning — they'll fail
+        # downstream work if not promoted to `todo`. Severity=warning
+        # so this doesn't block `session queue`; the fix hint points at
+        # the --promote-issues flag that flips them in one shot.
+        if issue.status == "backlog":
+            items.append(
+                ReadinessItem(
+                    label=f"issue {issue_key} status=backlog",
+                    passing=False,
+                    severity="warning",
+                    fix_hint=(
+                        "Promote with `tripwire session queue "
+                        f"{session.id} --promote-issues` "
+                        "or edit the issue's status to todo."
+                    ),
+                )
+            )
         for blocker_key in issue.blocked_by or []:
             # Skip blockers that are themselves in the same session —
             # they'll be completed in this spawn, not a prerequisite.
