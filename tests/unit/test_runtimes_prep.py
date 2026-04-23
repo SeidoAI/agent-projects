@@ -291,6 +291,85 @@ class TestRenderClaudeMd:
         assert backups[0].read_text() == "OLD"
 
 
+class TestRenderClaudeMdIdempotency:
+    """Mirror of TestCopySkillsIdempotency for CLAUDE.md. Each resume
+    used to create a fresh CLAUDE.md.bak.<ts> file — this class guards
+    against that regression (bug #2)."""
+
+    def test_idempotent_when_unchanged(self, tmp_path):
+        from tripwire.runtimes.prep import render_claude_md
+
+        code_wt = tmp_path / "code-wt"
+        code_wt.mkdir()
+
+        kwargs = {
+            "code_worktree": code_wt,
+            "agent_id": "backend-coder",
+            "skill_names": ["backend-development"],
+            "worktrees": [],
+            "session_id": "s1",
+        }
+        render_claude_md(**kwargs)
+        render_claude_md(**kwargs)
+        render_claude_md(**kwargs)
+
+        backups = list(code_wt.glob("CLAUDE.md.bak.*"))
+        assert len(backups) == 0
+        assert (code_wt / "CLAUDE.md").is_file()
+
+    def test_backed_up_on_skill_change(self, tmp_path):
+        from tripwire.runtimes.prep import render_claude_md
+
+        code_wt = tmp_path / "code-wt"
+        code_wt.mkdir()
+
+        render_claude_md(
+            code_worktree=code_wt,
+            agent_id="backend-coder",
+            skill_names=["backend-development"],
+            worktrees=[],
+            session_id="s1",
+        )
+        render_claude_md(
+            code_worktree=code_wt,
+            agent_id="backend-coder",
+            skill_names=["backend-development", "verification"],
+            worktrees=[],
+            session_id="s1",
+        )
+
+        backups = list(code_wt.glob("CLAUDE.md.bak.*"))
+        assert len(backups) == 1
+
+    def test_backed_up_on_template_version_bump(self, tmp_path, monkeypatch):
+        """Bumping the template version constant invalidates the
+        sentinel hash and forces a re-render — even when all other
+        inputs are identical."""
+        from tripwire.runtimes import prep as prep_mod
+        from tripwire.runtimes.prep import render_claude_md
+
+        code_wt = tmp_path / "code-wt"
+        code_wt.mkdir()
+
+        kwargs = {
+            "code_worktree": code_wt,
+            "agent_id": "backend-coder",
+            "skill_names": [],
+            "worktrees": [],
+            "session_id": "s1",
+        }
+        render_claude_md(**kwargs)
+        assert list(code_wt.glob("CLAUDE.md.bak.*")) == []
+
+        monkeypatch.setattr(
+            prep_mod, "_CLAUDE_MD_TEMPLATE_VERSION", "bumped"
+        )
+        render_claude_md(**kwargs)
+
+        backups = list(code_wt.glob("CLAUDE.md.bak.*"))
+        assert len(backups) == 1
+
+
 class TestRenderKickoff:
     def test_writes_kickoff_md(self, tmp_path):
         from tripwire.runtimes.prep import render_kickoff

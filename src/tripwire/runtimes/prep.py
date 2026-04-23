@@ -24,6 +24,12 @@ from tripwire.runtimes.base import PreppedSession
 
 _MANAGED_EXCLUDES = (".claude/", ".tripwire/")
 
+# Bump when the Jinja template under templates/worktree/CLAUDE.md.j2
+# changes shape (e.g. new variables, restructured sections). The hash
+# check that gates CLAUDE.md re-render folds this in, so a template
+# change forces every session's CLAUDE.md to re-render on next spawn.
+_CLAUDE_MD_TEMPLATE_VERSION = "1"
+
 
 def _resolve_clone_path(project_dir: Path, repo: str) -> Path | None:
     """Look up the local clone path for a repo slug.
@@ -246,6 +252,35 @@ def _template_env():
     )
 
 
+def _claude_md_hash(
+    *,
+    agent_id: str,
+    skill_names: list[str],
+    worktrees: list[WorktreeEntry],
+    session_id: str,
+) -> str:
+    """Stable fingerprint of every input that feeds into CLAUDE.md.
+
+    Folds in the template version so a Jinja-template change
+    invalidates the sentinel too.
+    """
+    import hashlib
+
+    worktree_keys = [
+        f"{w.repo}:{w.worktree_path}" for w in worktrees
+    ]
+    joined = "\n".join(
+        [
+            f"template-version={_CLAUDE_MD_TEMPLATE_VERSION}",
+            f"agent={agent_id}",
+            f"session={session_id}",
+            "skills=" + ",".join(sorted(skill_names)),
+            "worktrees=" + ",".join(sorted(worktree_keys)),
+        ]
+    )
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+
 def render_claude_md(
     *,
     code_worktree: Path,
@@ -254,11 +289,30 @@ def render_claude_md(
     worktrees: list[WorktreeEntry],
     session_id: str,
 ) -> None:
-    """Render <code_worktree>/CLAUDE.md from the template. Back up any
-    existing CLAUDE.md first."""
+    """Render <code_worktree>/CLAUDE.md from the template.
+
+    Idempotent via a sentinel file next to CLAUDE.md. If the sentinel
+    matches the hash of the current inputs AND CLAUDE.md exists,
+    returns without writing. Otherwise backs up any existing CLAUDE.md,
+    rewrites from the template, and updates the sentinel. This keeps
+    resume flows from accumulating a fresh CLAUDE.md.bak.<ts> on every
+    spawn when nothing meaningful changed.
+    """
     target = code_worktree / "CLAUDE.md"
+    sentinel = code_worktree / ".claude" / ".tripwire-claude-md-hash"
+    wanted = _claude_md_hash(
+        agent_id=agent_id,
+        skill_names=skill_names,
+        worktrees=worktrees,
+        session_id=session_id,
+    )
+    current = sentinel.read_text().strip() if sentinel.is_file() else ""
+
+    if current == wanted and target.is_file():
+        return
+
     if target.exists():
-        ts = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
+        ts = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S%f")
         backup = code_worktree / f"CLAUDE.md.bak.{ts}"
         target.rename(backup)
 
@@ -271,6 +325,8 @@ def render_claude_md(
         session_id=session_id,
     )
     target.write_text(out, encoding="utf-8")
+    sentinel.parent.mkdir(parents=True, exist_ok=True)
+    sentinel.write_text(wanted + "\n", encoding="utf-8")
 
 
 def render_kickoff(*, code_worktree: Path, prompt: str) -> None:
