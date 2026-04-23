@@ -5,7 +5,7 @@
 
 invocation:
   command: claude
-  runtime: tmux
+  runtime: subprocess
   background: true
   log_path_template: "~/.tripwire/logs/{project_slug}/{session_id}-{timestamp}.log"
 
@@ -14,7 +14,10 @@ config:
   fallback_model: sonnet
   effort: max
   permission_mode: bypassPermissions
-  disallowed_tools: [Agent]
+  # AskUserQuestion and SendUserMessage block in -p mode (no TTY to answer)
+  # and the agent will retry-loop until max-turns. Disallow upfront so the
+  # agent falls back to plain-text stop-and-ask.
+  disallowed_tools: [Agent, AskUserQuestion, SendUserMessage]
   max_turns: 200
   max_budget_usd: 50
   output_format: stream-json
@@ -24,6 +27,12 @@ prompt_template: |
 
   You are the {agent} agent for session {session_id}.
   Execute the plan. Stop at stop-and-ask points.
+
+  You are running headless (claude -p). Do not attempt to use
+  AskUserQuestion or SendUserMessage — those tools are disallowed in
+  this environment and will fail. If you need clarification, write
+  your question as plain text in your final response and stop. The
+  PM will read the log, update the plan, and respawn you.
 
   Exit protocol — how you signal you're done:
 
@@ -50,6 +59,21 @@ prompt_template: |
   `contract`, `pattern`). If nothing qualifies — if every insight is
   either obvious, already in a node, or specific to this session —
   leave the file absent. Do not force it.
+
+resume_prompt_template: |
+  Resuming session {session_id}.
+
+  The PM has likely updated the plan at {plan_path} to address the
+  question you raised previously. Re-read that file (especially any
+  `## PM follow-up` section) before continuing.
+
+  Your previous conversation is preserved — you have the full context
+  of what you've already tried. Continue from where you stopped.
+
+  The exit protocol is unchanged: when your work is done, push +
+  open a PR from every dirty worktree. If you're still blocked by
+  something the PM's update did not resolve, write your question as
+  plain text and stop — the PM will update the plan again.
 
 system_prompt_append: |
   tripwire session: {session_id}; project: {project_slug}

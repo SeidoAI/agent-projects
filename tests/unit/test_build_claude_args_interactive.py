@@ -65,3 +65,20 @@ def test_interactive_false_with_none_prompt_raises():
             session_id="s1",
             claude_session_id="uuid-1",
         )
+
+
+def test_interactive_with_resume_uses_resume_flag_not_session_id():
+    args = build_claude_args(
+        _defaults(),
+        prompt=None,
+        interactive=True,
+        system_append="sa",
+        session_id="s1",
+        claude_session_id="uuid-1",
+        resume=True,
+    )
+    assert "--resume" in args
+    assert args[args.index("--resume") + 1] == "uuid-1"
+    assert "--session-id" not in args
+    # Interactive still omits -p and prompt.
+    assert "-p" not in args

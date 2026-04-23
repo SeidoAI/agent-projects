@@ -58,7 +58,6 @@ class RuntimeState(BaseModel):
     workspace_volume: str | None = None
     worktrees: list[WorktreeEntry] = Field(default_factory=list)
     pid: int | None = None
-    tmux_session_name: str | None = None
     started_at: datetime | str | None = None
     log_path: str | None = None
     skills_hash: str | None = None        # sentinel for copy_skills idempotency

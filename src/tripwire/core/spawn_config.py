@@ -87,6 +87,16 @@ def render_system_append(defaults: SpawnDefaults, **ctx: Any) -> str:
     return defaults.system_prompt_append.format(**ctx)
 
 
+def render_resume_prompt(defaults: SpawnDefaults, **ctx: Any) -> str:
+    """Interpolate `{key}` placeholders in the resume-prompt template.
+
+    Used when re-spawning a paused/failed session — the new user turn
+    is a brief continuation cue, not a full re-send of plan.md. Claude
+    loads the prior conversation from its jsonl via ``--resume <uuid>``.
+    """
+    return defaults.resume_prompt_template.format(**ctx)
+
+
 def build_claude_args(
     defaults: SpawnDefaults,
     *,
@@ -104,12 +114,16 @@ def build_claude_args(
     that case; the caller delivers the kickoff prompt via send-keys
     after the ready-probe.
 
-    The two session identifiers are distinct:
-    - ``session_id`` — tripwire's human-readable session slug, passed as
-      ``--name`` (display label in claude's prompt box, /resume picker,
-      and terminal title).
-    - ``claude_session_id`` — claude's internal UUID identifier, passed
-      as ``--session-id`` (required for ``--resume`` to work).
+    When ``resume=True``, ``--resume <claude_session_id>`` is appended
+    and ``--session-id`` is omitted. Claude rejects the combination
+    ``--session-id X --resume X`` unless ``--fork-session`` is also
+    present; for same-session resume, ``--resume`` alone is correct.
+
+    When ``resume=False``, ``--session-id <claude_session_id>`` is
+    emitted so the session is addressable (and resumable later).
+
+    ``session_id`` (tripwire's human slug) is passed as ``--name``
+    unconditionally — it's display-only and safe in both modes.
 
     Flag set matches ``claude --help`` output and spec §8.1.
     """
@@ -122,11 +136,12 @@ def build_claude_args(
     args: list[str] = [defaults.invocation.command]
     if not interactive:
         args += ["-p", prompt]
+    args += ["--name", session_id]
+    if resume:
+        args += ["--resume", claude_session_id]
+    else:
+        args += ["--session-id", claude_session_id]
     args += [
-        "--name",
-        session_id,
-        "--session-id",
-        claude_session_id,
         "--effort",
         cfg.effort,
         "--model",
@@ -146,6 +161,4 @@ def build_claude_args(
         "--append-system-prompt",
         system_append,
     ]
-    if resume:
-        args.append("--resume")
     return args

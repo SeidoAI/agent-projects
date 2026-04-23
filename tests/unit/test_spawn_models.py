@@ -18,8 +18,13 @@ def test_spawn_defaults_load_from_shipped():
     assert defaults.config.model == "opus"
     assert defaults.config.fallback_model == "sonnet"
     assert defaults.config.max_budget_usd == 50
-    assert defaults.config.disallowed_tools == ["Agent"]
+    assert defaults.config.disallowed_tools == [
+        "Agent",
+        "AskUserQuestion",
+        "SendUserMessage",
+    ]
     assert "{plan}" in defaults.prompt_template
+    assert "Resuming session" in defaults.resume_prompt_template
 
 
 def test_spawn_defaults_minimal_roundtrip():
