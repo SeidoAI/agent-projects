@@ -37,7 +37,7 @@ from tripwire.core.git_helpers import (
     worktree_prune,
     worktree_remove,
 )
-from tripwire.core.process_helpers import is_alive, send_sigterm
+from tripwire.core.process_helpers import is_alive
 from tripwire.core.session_readiness import check_readiness
 from tripwire.core.session_store import list_sessions, load_session, save_session
 from tripwire.models.session import EngagementEntry

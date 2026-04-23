@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import subprocess as _sp
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from tripwire.models.session import (
     AgentSession,

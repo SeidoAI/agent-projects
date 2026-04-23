@@ -17,8 +17,6 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-import click
-
 from tripwire.core.process_helpers import is_alive, send_sigterm
 from tripwire.core.spawn_config import build_claude_args
 from tripwire.models.session import AgentSession
