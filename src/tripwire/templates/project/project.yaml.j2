@@ -7,13 +7,18 @@ description: {{ description | default("", true) }}
 base_branch: {{ base_branch }}
 environments: [test, prod]
 
-# Repository registry — GitHub slug → local clone path (optional).
-# Add `local: ~/path/to/clone` under each repo to speed up freshness checks.
+# Repository registry — GitHub slug → local clone path.
+# `local` must point at a clone on disk for `tripwire session spawn`
+# to create worktrees. Leave null and fill in later if you need to.
 repos:
 {%- if repos %}
-{%- for repo in repos %}
-  {{ repo }}:
+{%- for slug in repos %}
+  {{ slug }}:
+{%- if repos_locals and repos_locals[slug] %}
+    local: {{ repos_locals[slug] }}
+{%- else %}
     local: null
+{%- endif %}
 {%- endfor %}
 {%- else %}
   # e.g. SeidoAI/web-app-backend:

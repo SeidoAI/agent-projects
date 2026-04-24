@@ -28,7 +28,7 @@ _MANAGED_EXCLUDES = (".claude/", ".tripwire/")
 # changes shape (e.g. new variables, restructured sections). The hash
 # check that gates CLAUDE.md re-render folds this in, so a template
 # change forces every session's CLAUDE.md to re-render on next spawn.
-_CLAUDE_MD_TEMPLATE_VERSION = "1"
+_CLAUDE_MD_TEMPLATE_VERSION = "2"
 
 
 def _resolve_clone_path(project_dir: Path, repo: str) -> Path | None:
@@ -249,15 +249,18 @@ def _claude_md_hash(
     skill_names: list[str],
     worktrees: list[WorktreeEntry],
     session_id: str,
+    concept_context: list | None = None,
 ) -> str:
     """Stable fingerprint of every input that feeds into CLAUDE.md.
 
     Folds in the template version so a Jinja-template change
-    invalidates the sentinel too.
+    invalidates the sentinel too. Folds in the concept-context entries
+    so a plan edit that adds/removes a [[ref]] re-renders CLAUDE.md.
     """
     import hashlib
 
     worktree_keys = [f"{w.repo}:{w.worktree_path}" for w in worktrees]
+    concept_keys = [f"{c.id}:{c.exists}" for c in (concept_context or [])]
     joined = "\n".join(
         [
             f"template-version={_CLAUDE_MD_TEMPLATE_VERSION}",
@@ -265,6 +268,7 @@ def _claude_md_hash(
             f"session={session_id}",
             "skills=" + ",".join(sorted(skill_names)),
             "worktrees=" + ",".join(sorted(worktree_keys)),
+            "concepts=" + ",".join(sorted(concept_keys)),
         ]
     )
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
@@ -277,6 +281,7 @@ def render_claude_md(
     skill_names: list[str],
     worktrees: list[WorktreeEntry],
     session_id: str,
+    concept_context: list | None = None,
 ) -> None:
     """Render <code_worktree>/CLAUDE.md from the template.
 
@@ -286,6 +291,11 @@ def render_claude_md(
     rewrites from the template, and updates the sentinel. This keeps
     resume flows from accumulating a fresh CLAUDE.md.bak.<ts> on every
     spawn when nothing meaningful changed.
+
+    `concept_context` is a list of `ConceptContextEntry` (from
+    `tripwire.core.concept_context`). When non-empty, the template
+    renders a "Concept context" section pointing the agent at the
+    nodes referenced from plan.md.
     """
     target = code_worktree / "CLAUDE.md"
     sentinel = code_worktree / ".claude" / ".tripwire-claude-md-hash"
@@ -294,6 +304,7 @@ def render_claude_md(
         skill_names=skill_names,
         worktrees=worktrees,
         session_id=session_id,
+        concept_context=concept_context,
     )
     current = sentinel.read_text().strip() if sentinel.is_file() else ""
 
@@ -312,6 +323,7 @@ def render_claude_md(
         skill_names=skill_names,
         worktrees=worktrees,
         session_id=session_id,
+        concept_context=concept_context or [],
     )
     target.write_text(out, encoding="utf-8")
     sentinel.parent.mkdir(parents=True, exist_ok=True)
@@ -408,12 +420,22 @@ def run(
 
     copy_skills(worktree=code_worktree, skill_names=skill_names)
 
+    # Concept-context breadcrumbs: every [[ref]] in plan.md becomes a
+    # row in CLAUDE.md so the agent reads the cited nodes at session
+    # start (rather than discovering them mid-flight). Empty list if
+    # plan.md is missing — render_claude_md treats that as "no
+    # Concept context section".
+    from tripwire.core.concept_context import extract_plan_concepts
+
+    concept_context = extract_plan_concepts(project_dir, session.id)
+
     render_claude_md(
         code_worktree=code_worktree,
         agent_id=session.agent,
         skill_names=skill_names,
         worktrees=worktrees,
         session_id=session.id,
+        concept_context=concept_context,
     )
 
     # Build the kickoff prompt. On resume we render the short

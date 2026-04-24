@@ -147,6 +147,49 @@ def _parse_repos(raw: str) -> list[str]:
     return [r.strip() for r in raw.split(",") if r.strip()]
 
 
+def _guess_local_for_slug(slug: str, cwd: Path) -> str | None:
+    """Look for a sibling directory whose basename matches the repo name.
+
+    `cwd` is where `tripwire init` is running; typically projects sit in
+    a monorepo-ish parent where the clone lives a directory or two
+    over. Check the parent and grandparent for a directory whose name
+    matches ``slug.split('/')[-1]`` — an exact basename match is a
+    high-signal guess and almost never wrong.
+    """
+    repo_name = slug.split("/")[-1]
+    for parent in (cwd.parent, cwd.parent.parent):
+        candidate = parent / repo_name
+        if candidate.is_dir() and (candidate / ".git").exists():
+            return str(candidate)
+    return None
+
+
+def _prompt_for_repo_locals(slugs: list[str], cwd: Path) -> dict[str, str | None]:
+    """For each repo slug, prompt for the local clone path.
+
+    Without `local`, `tripwire session spawn` can't find the clone and
+    fails with "No local clone for X. Set local path in project.yaml
+    repos." (see `runtimes/prep.py`). Prompting up-front saves the
+    round-trip.
+
+    The prompt defaults to a sibling directory whose basename matches
+    the repo name if such a clone exists on disk; otherwise the user
+    types a path (or leaves blank to skip — we record null and they
+    can fix it later).
+    """
+    locals_map: dict[str, str | None] = {}
+    for slug in slugs:
+        guess = _guess_local_for_slug(slug, cwd)
+        answer = click.prompt(
+            f"  Local clone path for {slug} (blank to skip)",
+            default=guess or "",
+            show_default=bool(guess),
+            type=str,
+        ).strip()
+        locals_map[slug] = answer or None
+    return locals_map
+
+
 def _validate_key_prefix(prefix: str) -> str:
     prefix = prefix.strip().upper()
     if not KEY_PREFIX_PATTERN.match(prefix):
@@ -642,6 +685,14 @@ def init_cmd(
     else:
         repos_list = _parse_repos(repos)
 
+    # Collect a `local:` path per slug (interactive only). Non-interactive
+    # mode defaults to null per slug so the project.yaml is still valid;
+    # spawn will fail with a clear message telling the user to fill it in.
+    if repos_list and not non_interactive:
+        repos_locals = _prompt_for_repo_locals(repos_list, target_dir)
+    else:
+        repos_locals = dict.fromkeys(repos_list)
+
     # Git init is on by default. `--no-git` skips it deterministically.
     # In interactive mode without an explicit flag, the default behaviour
     # is to init a git repo — we don't prompt because the answer is
@@ -657,6 +708,7 @@ def init_cmd(
         "base_branch": base_branch,
         "description": description,
         "repos": repos_list,
+        "repos_locals": repos_locals,
         "created_at": datetime.now().replace(microsecond=0).isoformat(),
         "tripwire_version": _tripwire_version,
     }

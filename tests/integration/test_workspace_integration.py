@@ -16,11 +16,18 @@ from pathlib import Path
 # ============================================================================
 
 
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
 def _run_tripwire(
     cwd: Path, *args: str, check: bool = False
 ) -> subprocess.CompletedProcess:
+    # `uv run` resolves the script entry point from the project named
+    # in --project. Without it, uv looks for a pyproject.toml in cwd or
+    # ancestors; tmp dirs have neither, so the lookup falls back to
+    # $PATH where tripwire is not installed. Pin to the repo root.
     return subprocess.run(
-        ["uv", "run", "tripwire", *args],
+        ["uv", "run", "--project", str(_REPO_ROOT), "tripwire", *args],
         cwd=cwd,
         capture_output=True,
         text=True,

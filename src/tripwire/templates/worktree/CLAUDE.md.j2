@@ -18,6 +18,16 @@ Your work spans the following worktrees (all under tripwire management — `.cla
 
 Your current working directory is the first worktree above. Session artifacts (plan.md, verification-checklist.md, issue specs, task-checklist.md) live in the **project-tracking worktree** — the second entry if present. Read and write them there directly; they will be committed and pushed as part of `tripwire session complete`.
 
+{% if concept_context %}
+## Concept context
+
+The plan references these nodes — read them at start to confirm they still describe what's actually shipped:
+
+{% for c in concept_context -%}
+- `[[{{ c.id }}]]` — `{{ c.node_path }}`{% if not c.exists %} ⚠ NODE FILE NOT FOUND{% endif %}
+{% endfor %}
+
+{% endif %}
 ## Session
 
 - Session ID: `{{ session_id }}`
