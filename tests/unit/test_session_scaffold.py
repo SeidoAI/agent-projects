@@ -201,3 +201,78 @@ class TestSessionScaffold:
         )
         assert result.exit_code != 0
         assert "not declared in manifest" in result.output
+
+
+class TestSessionScaffoldHandoff:
+    """Default scaffold also writes handoff.yaml with a derived branch.
+
+    Covers the v0.7.3 item E gap: handoff.yaml lives outside the
+    artifact manifest but is a planning-phase PM-owned file. PMs
+    shouldn't have to hand-craft it.
+    """
+
+    def test_default_writes_handoff_with_derived_branch(
+        self, tmp_path_project, save_test_session, save_test_issue
+    ):
+        _seed_manifest_with_verification(tmp_path_project)
+        save_test_issue(tmp_path_project, "T-1", kind="feat")
+        save_test_session(
+            tmp_path_project, "auth-rework", status="planned", issues=["T-1"]
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            ["scaffold", "auth-rework", "--project-dir", str(tmp_path_project)],
+        )
+
+        assert result.exit_code == 0, result.output
+        handoff_path = tmp_path_project / "sessions" / "auth-rework" / "handoff.yaml"
+        assert handoff_path.is_file()
+        body = handoff_path.read_text()
+        # Branch derived from kind=feat + session-id slug.
+        assert "branch: feat/auth-rework" in body
+        # Sentinel fields rendered correctly.
+        assert "session_id: auth-rework" in body
+        assert "handed_off_by: pm" in body
+
+    def test_no_handoff_flag_suppresses_write(
+        self, tmp_path_project, save_test_session, save_test_issue
+    ):
+        _seed_manifest_with_verification(tmp_path_project)
+        save_test_issue(tmp_path_project, "T-1", kind="feat")
+        save_test_session(tmp_path_project, "s1", status="planned", issues=["T-1"])
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            [
+                "scaffold",
+                "s1",
+                "--project-dir",
+                str(tmp_path_project),
+                "--no-handoff",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert not (tmp_path_project / "sessions" / "s1" / "handoff.yaml").is_file()
+
+    def test_handoff_skipped_when_already_exists_without_force(
+        self, tmp_path_project, save_test_session, save_test_issue
+    ):
+        _seed_manifest_with_verification(tmp_path_project)
+        save_test_issue(tmp_path_project, "T-1", kind="feat")
+        save_test_session(tmp_path_project, "s1", status="planned", issues=["T-1"])
+
+        sess_dir = tmp_path_project / "sessions" / "s1"
+        sess_dir.mkdir(parents=True, exist_ok=True)
+        (sess_dir / "handoff.yaml").write_text("CUSTOM HANDOFF\n")
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            ["scaffold", "s1", "--project-dir", str(tmp_path_project)],
+        )
+        assert result.exit_code == 0, result.output
+        # User's existing handoff is preserved.
+        assert (sess_dir / "handoff.yaml").read_text() == "CUSTOM HANDOFF\n"

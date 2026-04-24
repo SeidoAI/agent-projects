@@ -850,11 +850,21 @@ def session_cleanup_cmd(
         "phase, PM-owned, required artifact from the manifest."
     ),
 )
+@click.option(
+    "--no-handoff",
+    is_flag=True,
+    default=False,
+    help=(
+        "Skip writing handoff.yaml. Default behaviour: write handoff.yaml "
+        "with a derived branch name if the file does not yet exist."
+    ),
+)
 def session_scaffold_cmd(
     session_id: str,
     project_dir: Path,
     force: bool,
     artifact_name: str | None,
+    no_handoff: bool,
 ) -> None:
     """Render session planning artifacts from their Jinja templates.
 
@@ -942,6 +952,62 @@ def session_scaffold_cmd(
 
     if wrote == 0 and not artifact_name:
         click.echo("  (nothing scaffolded — all targets already existed)")
+
+    # Handoff.yaml — session state, not an artifact (lives outside the
+    # manifest), but conceptually a planning-phase PM-owned file. PMs
+    # should not have to hand-craft it; derive the branch from the
+    # session's primary issue kind and write it here unless suppressed.
+    if not no_handoff and not artifact_name:
+        _scaffold_handoff(resolved, session, force)
+
+
+def _scaffold_handoff(project_dir: Path, session, force: bool) -> None:
+    """Write sessions/<id>/handoff.yaml with a derived branch name.
+
+    Skips silently if the file already exists and `force` is False.
+    Logs a warning (without failing) if branch derivation fails — the
+    PM can still hand-write the file as a fallback.
+    """
+    import uuid as _uuid
+    from datetime import datetime, timezone
+
+    from tripwire.core.branch_naming import BranchNameError, derive_branch_name
+    from tripwire.core.handoff_store import handoff_path, save_handoff
+    from tripwire.core.store import load_issue
+    from tripwire.models.handoff import SessionHandoff
+
+    dest = handoff_path(project_dir, session.id)
+    if dest.exists() and not force:
+        click.echo("  Skipping handoff.yaml — exists (use --force to overwrite)")
+        return
+
+    # Pick the first issue's kind as the branch type. Fallback to "feat"
+    # if no issues are bound or the first issue's kind isn't a valid
+    # branch type for this project.
+    primary_kind = "feat"
+    if session.issues:
+        try:
+            first_issue = load_issue(project_dir, session.issues[0])
+            if first_issue.kind:
+                primary_kind = first_issue.kind
+        except (FileNotFoundError, AttributeError):
+            pass
+
+    try:
+        branch = derive_branch_name(session.id, primary_kind, project_dir=project_dir)
+    except BranchNameError as exc:
+        click.echo(f"  Skipping handoff.yaml — could not derive branch: {exc}")
+        return
+
+    handoff = SessionHandoff(
+        uuid=_uuid.uuid4(),
+        session_id=session.id,
+        handoff_at=datetime.now(tz=timezone.utc),
+        handed_off_by="pm",
+        branch=branch,
+    )
+    save_handoff(project_dir, handoff)
+    click.echo(f"  Wrote handoff.yaml (branch: {branch})")
 
 
 @session_cmd.command("logs")

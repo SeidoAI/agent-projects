@@ -32,6 +32,7 @@ from tripwire.cli.templates import templates_cmd
 from tripwire.cli.ui import ui_cmd
 from tripwire.cli.uuid_cmd import uuid_cmd
 from tripwire.cli.validate import validate_cmd
+from tripwire.cli.validate_plan import validate_plan_cmd
 from tripwire.cli.view import view_cmd
 from tripwire.cli.workspace import workspace_cmd
 
@@ -89,6 +90,7 @@ cli.add_command(next_key_cmd)
 cli.add_command(plan_cmd)
 cli.add_command(uuid_cmd)
 cli.add_command(validate_cmd)
+cli.add_command(validate_plan_cmd)
 cli.add_command(lint_cmd)
 cli.add_command(status_cmd)
 cli.add_command(graph_cmd)
