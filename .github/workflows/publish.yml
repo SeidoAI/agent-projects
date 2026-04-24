@@ -13,6 +13,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
+          cache-dependency-path: src/tripwire/ui/frontend/package-lock.json
       - uses: astral-sh/setup-uv@v3
         with:
           python-version: "3.13"
@@ -30,6 +32,19 @@ jobs:
         env:
           TRIPWIRE_SKIP_FRONTEND_BUILD: "1"
         run: uv build
+      # TRIPWIRE_SKIP_FRONTEND_BUILD disabled the hatch hook's internal
+      # index.html sanity check, so re-assert it here before publishing.
+      # Catches a silent emptyOutDir misconfig that would otherwise ship
+      # a wheel with an empty static/ to PyPI.
+      - name: Verify wheel contains frontend bundle
+        run: |
+          set -eu
+          wheel="$(ls dist/*.whl)"
+          if ! unzip -l "$wheel" | grep -q 'tripwire/ui/static/index.html'; then
+            echo "::error::Wheel $wheel is missing tripwire/ui/static/index.html"
+            unzip -l "$wheel"
+            exit 1
+          fi
       - name: Publish
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
