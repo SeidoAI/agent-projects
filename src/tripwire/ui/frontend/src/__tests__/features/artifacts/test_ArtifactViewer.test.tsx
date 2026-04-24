@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ArtifactList } from "@/features/artifacts/ArtifactList";
 import { ArtifactViewer } from "@/features/artifacts/ArtifactViewer";
@@ -13,6 +14,7 @@ import type {
   ArtifactStatus,
 } from "@/lib/api/endpoints/artifacts";
 import { queryKeys } from "@/lib/api/queryKeys";
+import { server } from "../../mocks/server";
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -115,16 +117,8 @@ function prime(opts: {
   return { wrapper, qc };
 }
 
-beforeEach(() => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockImplementation(() => new Promise(() => {})),
-  );
-});
-
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
   toastMocks.success.mockReset();
   toastMocks.error.mockReset();
 });
@@ -239,13 +233,13 @@ describe("ArtifactViewer approval gate", () => {
       mtime: new Date().toISOString(),
     };
 
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(makeStatus("plan", true)), {
-        status: 200,
-        headers: { "content-type": "application/json" },
+    const approveSpy = vi.fn();
+    server.use(
+      http.post("/api/projects/p1/sessions/s1/artifacts/plan/approve", ({ request }) => {
+        approveSpy(request.url, request.method);
+        return HttpResponse.json(makeStatus("plan", true));
       }),
     );
-    vi.stubGlobal("fetch", fetchMock);
 
     const { wrapper } = prime({
       manifest: baseManifest(),
@@ -264,12 +258,11 @@ describe("ArtifactViewer approval gate", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Approve/ }));
 
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/projects/p1/sessions/s1/artifacts/plan/approve",
-        expect.objectContaining({ method: "POST" }),
-      ),
-    );
+    await waitFor(() => expect(approveSpy).toHaveBeenCalled());
+    expect(approveSpy.mock.calls[0]).toEqual([
+      expect.stringContaining("/api/projects/p1/sessions/s1/artifacts/plan/approve"),
+      "POST",
+    ]);
     expect(toastMocks.success).toHaveBeenCalledWith("Artifact approved.");
   });
 
@@ -281,13 +274,13 @@ describe("ArtifactViewer approval gate", () => {
       mtime: new Date().toISOString(),
     };
 
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(makeStatus("plan", true)), {
-        status: 200,
-        headers: { "content-type": "application/json" },
+    const rejectSpy = vi.fn();
+    server.use(
+      http.post("/api/projects/p1/sessions/s1/artifacts/plan/reject", ({ request }) => {
+        rejectSpy(request.url, request.method);
+        return HttpResponse.json(makeStatus("plan", true));
       }),
     );
-    vi.stubGlobal("fetch", fetchMock);
 
     const { wrapper } = prime({
       manifest: baseManifest(),
@@ -310,22 +303,18 @@ describe("ArtifactViewer approval gate", () => {
     // Submit without feedback — should show inline error, no fetch call
     fireEvent.click(sendBtn);
     expect(await screen.findByRole("alert")).toHaveTextContent("Feedback is required");
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      expect.stringContaining("/reject"),
-      expect.anything(),
-    );
+    expect(rejectSpy).not.toHaveBeenCalled();
 
     // Fill in feedback and retry
     const textarea = screen.getByLabelText("Rejection feedback");
     fireEvent.change(textarea, { target: { value: "Please redo this." } });
     fireEvent.click(sendBtn);
 
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/projects/p1/sessions/s1/artifacts/plan/reject",
-        expect.objectContaining({ method: "POST" }),
-      ),
-    );
+    await waitFor(() => expect(rejectSpy).toHaveBeenCalled());
+    expect(rejectSpy.mock.calls[0]).toEqual([
+      expect.stringContaining("/api/projects/p1/sessions/s1/artifacts/plan/reject"),
+      "POST",
+    ]);
   });
 
   it("renders the recorded approval read-only when approval already exists", () => {

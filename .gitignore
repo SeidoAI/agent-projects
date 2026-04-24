@@ -47,6 +47,7 @@ tmp/
 src/tripwire/ui/static/
 src/tripwire/ui/frontend/node_modules/
 src/tripwire/ui/frontend/dist/
+src/tripwire/ui/frontend/coverage/
 
 # Worktrees
 .worktrees/

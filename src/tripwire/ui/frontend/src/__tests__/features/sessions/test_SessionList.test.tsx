@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SessionList } from "@/features/sessions/SessionList";
 import type { SessionSummary } from "@/lib/api/endpoints/sessions";
@@ -44,16 +44,8 @@ function prime(sessions: SessionSummary[]): {
   return { wrapper };
 }
 
-beforeEach(() => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockImplementation(() => new Promise(() => {})),
-  );
-});
-
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
 });
 
 describe("SessionList", () => {

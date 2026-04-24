@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { type ReactNode, useEffect } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type UpdateStatusVariables,
   useUpdateIssueStatus,
@@ -11,6 +12,7 @@ import { KanbanBoard } from "@/features/issues/KanbanBoard";
 import type { EnumDescriptor } from "@/lib/api/endpoints/enums";
 import type { IssueFilterParams, IssueSummary } from "@/lib/api/endpoints/issues";
 import { queryKeys } from "@/lib/api/queryKeys";
+import { server } from "../../mocks/server";
 
 vi.mock("@/app/ProjectShell", () => ({
   useProjectShell: () => ({ projectId: "p1", wsStatus: "open" }),
@@ -85,12 +87,8 @@ function MutationHarness({
 }
 
 describe("KanbanBoard", () => {
-  beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn());
-  });
   afterEach(() => {
     cleanup();
-    vi.unstubAllGlobals();
   });
 
   it("renders one column per enum value in order", () => {
@@ -125,29 +123,19 @@ describe("KanbanBoard", () => {
   });
 
   it("rolls the card back to its original column when the server rejects the move", async () => {
-    // Stubbed fetch: GET returns the seeded list so `invalidateQueries`
-    // after the failed PATCH reconverges to consistent state; PATCH
-    // rejects with the 409 the plan calls out as "invalid transition".
+    // MSW handlers for this test: GET returns the seeded list so
+    // `invalidateQueries` after the failed PATCH reconverges to
+    // consistent state; PATCH rejects with the 409 the plan calls
+    // out as "invalid transition".
     const persisted = [issue("X-1", "todo"), issue("X-2", "doing")];
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
-        const method = (init?.method ?? "GET").toUpperCase();
-        if (method === "PATCH") {
-          return Promise.resolve(
-            new Response(
-              JSON.stringify({ detail: "illegal transition", code: "issue/invalid_transition" }),
-              { status: 409, headers: { "content-type": "application/json" } },
-            ),
-          );
-        }
-        return Promise.resolve(
-          new Response(JSON.stringify(persisted), {
-            status: 200,
-            headers: { "content-type": "application/json" },
-          }),
-        );
-      }),
+    server.use(
+      http.get("/api/projects/p1/issues", () => HttpResponse.json(persisted)),
+      http.patch("/api/projects/p1/issues/:key", () =>
+        HttpResponse.json(
+          { detail: "illegal transition", code: "issue/invalid_transition" },
+          { status: 409 },
+        ),
+      ),
     );
 
     const qc = makeClient();
@@ -206,26 +194,18 @@ describe("KanbanBoard", () => {
     const filters: IssueFilterParams = { status: "todo" };
     const originalList = [issue("X-1", "todo"), issue("X-2", "doing")];
     const originalFiltered = [issue("X-1", "todo")];
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockImplementation((url: string, init?: RequestInit) => {
-        const method = (init?.method ?? "GET").toUpperCase();
-        if (method === "PATCH") {
-          return Promise.resolve(
-            new Response(
-              JSON.stringify({ detail: "illegal transition", code: "issue/invalid_transition" }),
-              { status: 409, headers: { "content-type": "application/json" } },
-            ),
-          );
-        }
-        const body = url.includes("status=todo") ? originalFiltered : originalList;
-        return Promise.resolve(
-          new Response(JSON.stringify(body), {
-            status: 200,
-            headers: { "content-type": "application/json" },
-          }),
-        );
+    server.use(
+      http.get("/api/projects/p1/issues", ({ request }) => {
+        const url = new URL(request.url);
+        const body = url.searchParams.get("status") === "todo" ? originalFiltered : originalList;
+        return HttpResponse.json(body);
       }),
+      http.patch("/api/projects/p1/issues/:key", () =>
+        HttpResponse.json(
+          { detail: "illegal transition", code: "issue/invalid_transition" },
+          { status: 409 },
+        ),
+      ),
     );
 
     const qc = makeClient();

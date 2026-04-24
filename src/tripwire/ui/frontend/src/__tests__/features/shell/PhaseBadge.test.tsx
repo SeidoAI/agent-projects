@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { http } from "msw";
 import type { ReactElement, ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProjectDetail } from "@/lib/api/endpoints/project";
 import { queryKeys } from "@/lib/api/queryKeys";
+import { server } from "../../mocks/server";
 
 vi.mock("@/app/ProjectShell", () => ({
   useProjectShell: () => ({ projectId: "p1", wsStatus: "open" }),
@@ -31,16 +33,8 @@ function withProject(project: ProjectDetail | undefined): {
 }
 
 describe("PhaseBadge", () => {
-  beforeEach(() => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockImplementation(() => new Promise(() => {})),
-    );
-  });
-
   afterEach(() => {
     cleanup();
-    vi.unstubAllGlobals();
   });
 
   it("renders the phase label and applies the phase-specific style", async () => {
@@ -94,6 +88,13 @@ describe("PhaseBadge", () => {
   });
 
   it("renders a loading skeleton while the project query is pending", async () => {
+    // No cache seed + no MSW resolution = useProject stays in
+    // `isLoading: true`. We hold the request open with an
+    // unresolved promise so the assertion runs before any
+    // reconciliation flips the skeleton off.
+    server.use(
+      http.get("/api/projects/p1", () => new Promise<Response>(() => {})),
+    );
     const PhaseBadge = await loadBadge();
     const { wrapper } = withProject(undefined);
 

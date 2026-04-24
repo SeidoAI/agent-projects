@@ -1,14 +1,16 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import type { ReactElement, ReactNode } from "react";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { SessionDetail } from "@/features/sessions/SessionDetail";
 import type { ArtifactManifest, ArtifactStatus } from "@/lib/api/endpoints/artifacts";
 import type { IssueDetail } from "@/lib/api/endpoints/issues";
 import type { SessionDetail as SessionDetailType } from "@/lib/api/endpoints/sessions";
 import { queryKeys } from "@/lib/api/queryKeys";
+import { server } from "../../mocks/server";
 
 function clickTab(el: HTMLElement) {
   // Radix Tabs trigger uses onMouseDown + onClick; jsdom's fireEvent.click
@@ -127,16 +129,8 @@ function prime(opts: {
   return { wrapper };
 }
 
-beforeEach(() => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockImplementation(() => new Promise(() => {})),
-  );
-});
-
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
 });
 
 describe("SessionDetail", () => {
@@ -226,13 +220,9 @@ describe("SessionDetail", () => {
   });
 
   it("renders 'not found' when the session API returns 404", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ detail: "missing", code: "session/not_found" }), {
-          status: 404,
-          headers: { "content-type": "application/json" },
-        }),
+    server.use(
+      http.get("/api/projects/p1/sessions/missing", () =>
+        HttpResponse.json({ detail: "missing", code: "session/not_found" }, { status: 404 }),
       ),
     );
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

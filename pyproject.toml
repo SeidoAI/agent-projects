@@ -76,8 +76,11 @@ indent-style = "space"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+testpaths = ["tests", "src/tripwire/ui/tests"]
+addopts = "-ra --strict-markers -m 'not e2e'"
+markers = [
+    "e2e: end-to-end tests that boot the real CLI/server (opt-in via `-m e2e`)",
+]
 
 [tool.codespell]
 skip = "uv.lock,.venv,*.lock"

@@ -1,13 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { IssueDetail as IssueDetailView } from "@/features/issues/IssueDetail";
 import type { IssueDetail, IssueValidationReport } from "@/lib/api/endpoints/issues";
 import type { ProjectDetail } from "@/lib/api/endpoints/project";
 import { queryKeys } from "@/lib/api/queryKeys";
+import { server } from "../../mocks/server";
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -98,16 +100,8 @@ function prime(
   return { wrapper, qc };
 }
 
-beforeEach(() => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockImplementation(() => new Promise(() => {})),
-  );
-});
-
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
   toastMocks.success.mockReset();
   toastMocks.error.mockReset();
 });
@@ -146,16 +140,13 @@ describe("IssueDetail", () => {
   });
 
   it("renders 'not found' when the API returns 404", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({ detail: "Issue 'KUI-99' not found.", code: "issue/not_found" }),
-            { status: 404, headers: { "content-type": "application/json" } },
-          ),
+    server.use(
+      http.get("/api/projects/p1/issues/KUI-99", () =>
+        HttpResponse.json(
+          { detail: "Issue 'KUI-99' not found.", code: "issue/not_found" },
+          { status: 404 },
         ),
+      ),
     );
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     qc.setQueryData(queryKeys.project("p1"), baseProject());
@@ -179,13 +170,13 @@ describe("IssueDetail", () => {
   });
 
   it("fires the PATCH mutation when a status transition is chosen", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ ...baseIssue(), status: "in_review" }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
+    const patchSpy = vi.fn();
+    server.use(
+      http.patch("/api/projects/p1/issues/KUI-42", async ({ request }) => {
+        patchSpy(request.url, request.method);
+        return HttpResponse.json({ ...baseIssue(), status: "in_review" });
       }),
     );
-    vi.stubGlobal("fetch", fetchMock);
 
     const { wrapper } = prime(baseIssue(), baseProject());
     render(<IssueDetailView />, { wrapper });
@@ -194,25 +185,27 @@ describe("IssueDetail", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: "in_review" }));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/projects/p1/issues/KUI-42",
-        expect.objectContaining({ method: "PATCH" }),
-      );
+      expect(patchSpy).toHaveBeenCalled();
     });
+    expect(patchSpy.mock.calls[0]).toEqual([
+      expect.stringContaining("/api/projects/p1/issues/KUI-42"),
+      "PATCH",
+    ]);
     expect(toastMocks.success).toHaveBeenCalledWith("Status → in_review");
   });
 
   it("shows an error toast when the PATCH returns 409 invalid_transition", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          detail: "Cannot move from in_progress to done.",
-          code: "issue/invalid_transition",
-        }),
-        { status: 409, headers: { "content-type": "application/json" } },
+    server.use(
+      http.patch("/api/projects/p1/issues/KUI-42", () =>
+        HttpResponse.json(
+          {
+            detail: "Cannot move from in_progress to done.",
+            code: "issue/invalid_transition",
+          },
+          { status: 409 },
+        ),
       ),
     );
-    vi.stubGlobal("fetch", fetchMock);
 
     const project = baseProject({ status_transitions: { in_progress: ["done"] } });
     const { wrapper } = prime(baseIssue(), project);
@@ -238,25 +231,24 @@ describe("IssueDetail", () => {
       warnings: [],
       fixed: [],
     };
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(report), {
-        status: 200,
-        headers: { "content-type": "application/json" },
+    const validateSpy = vi.fn();
+    server.use(
+      http.post("/api/projects/p1/issues/KUI-42/validate", ({ request }) => {
+        validateSpy(request.url, request.method);
+        return HttpResponse.json(report);
       }),
     );
-    vi.stubGlobal("fetch", fetchMock);
 
     const { wrapper } = prime(baseIssue(), baseProject());
     render(<IssueDetailView />, { wrapper });
 
     fireEvent.click(screen.getByRole("button", { name: /Validate/ }));
 
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/projects/p1/issues/KUI-42/validate",
-        expect.objectContaining({ method: "POST" }),
-      );
-    });
+    await waitFor(() => expect(validateSpy).toHaveBeenCalled());
+    expect(validateSpy.mock.calls[0]).toEqual([
+      expect.stringContaining("/api/projects/p1/issues/KUI-42/validate"),
+      "POST",
+    ]);
     expect(toastMocks.success).toHaveBeenCalledWith("Validation passed.");
     expect(toastMocks.error).not.toHaveBeenCalled();
   });
@@ -276,14 +268,8 @@ describe("IssueDetail", () => {
       ],
       fixed: [],
     };
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify(report), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }),
-      ),
+    server.use(
+      http.post("/api/projects/p1/issues/KUI-42/validate", () => HttpResponse.json(report)),
     );
 
     const { wrapper } = prime(baseIssue(), baseProject());
@@ -312,14 +298,8 @@ describe("IssueDetail", () => {
       warnings: [{ code: "ref/stale", severity: "warning", message: "..." }],
       fixed: [],
     };
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify(report), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        }),
-      ),
+    server.use(
+      http.post("/api/projects/p1/issues/KUI-42/validate", () => HttpResponse.json(report)),
     );
 
     const { wrapper } = prime(baseIssue(), baseProject());
@@ -354,15 +334,17 @@ describe("IssueDetail", () => {
   });
 
   it("does not call validate on mount", () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
+    const validateSpy = vi.fn();
+    server.use(
+      http.post("/api/projects/p1/issues/KUI-42/validate", () => {
+        validateSpy();
+        return HttpResponse.json({});
+      }),
+    );
 
     const { wrapper } = prime(baseIssue(), baseProject());
     render(<IssueDetailView />, { wrapper });
 
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      expect.stringContaining("/validate"),
-      expect.anything(),
-    );
+    expect(validateSpy).not.toHaveBeenCalled();
   });
 });

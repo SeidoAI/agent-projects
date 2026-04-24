@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import type { ReactElement, ReactNode } from "react";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { NodeDetail as NodeDetailView } from "@/features/nodes/NodeDetail";
 import type {
@@ -13,6 +14,7 @@ import type {
 } from "@/lib/api/endpoints/nodes";
 import type { ProjectDetail } from "@/lib/api/endpoints/project";
 import { queryKeys } from "@/lib/api/queryKeys";
+import { server } from "../../mocks/server";
 
 function baseNode(overrides: Partial<NodeDetail> = {}): NodeDetail {
   return {
@@ -87,16 +89,8 @@ function prime(opts: {
   return { wrapper };
 }
 
-beforeEach(() => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn().mockImplementation(() => new Promise(() => {})),
-  );
-});
-
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
 });
 
 describe("NodeDetail", () => {
@@ -292,13 +286,12 @@ describe("NodeDetail", () => {
   });
 
   it("renders 'not found' when the API returns 404", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ detail: "Node not found", code: "node/not_found" }), {
-          status: 404,
-          headers: { "content-type": "application/json" },
-        }),
+    server.use(
+      http.get("/api/projects/p1/nodes/missing-node", () =>
+        HttpResponse.json(
+          { detail: "Node not found", code: "node/not_found" },
+          { status: 404 },
+        ),
       ),
     );
 
@@ -323,8 +316,17 @@ describe("NodeDetail", () => {
   });
 
   it("does not call the freshness endpoint on mount", () => {
-    const fetchMock = vi.fn().mockImplementation(() => new Promise(() => {}));
-    vi.stubGlobal("fetch", fetchMock);
+    const checkSpy = vi.fn();
+    server.use(
+      http.get("/api/projects/p1/nodes/check", () => {
+        checkSpy();
+        return HttpResponse.json({});
+      }),
+      http.post("/api/projects/p1/nodes/check", () => {
+        checkSpy();
+        return HttpResponse.json({});
+      }),
+    );
 
     const { wrapper } = prime({
       node: baseNode(),
@@ -334,9 +336,6 @@ describe("NodeDetail", () => {
     });
     render(<NodeDetailView />, { wrapper });
 
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      expect.stringContaining("/nodes/check"),
-      expect.anything(),
-    );
+    expect(checkSpy).not.toHaveBeenCalled();
   });
 });
