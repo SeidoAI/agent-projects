@@ -168,6 +168,44 @@ class TestOrphanWorktreeScan:
         assert "Removed orphan" in result.output
         assert not orphan.exists()
 
+    def test_orphan_scan_finds_project_tracking_worktree_not_in_runtime_state(
+        self, tmp_path_project, save_test_session
+    ):
+        """v0.7.4: a project-tracking worktree that leaked — interrupted
+        spawn, pre-runtime_state crash — lives at
+        ``<project_dir>.parent/<project_dir>.name-wt-<sid>``. It's NOT
+        under any registered code-repo clone, so the pre-v0.7.4
+        orphan scan (which only iterated ``proj.repos.items()``) would
+        have missed it. This test proves ``project_dir`` is now
+        included as a scan root."""
+        _init_repo(tmp_path_project)
+        # Orphan project-tracking worktree: sibling of project_dir,
+        # name matches the v0.7.4 convention, NOT in runtime_state.
+        orphan = _add_worktree(
+            tmp_path_project,
+            f"{tmp_path_project.name}-wt-s1",
+            "proj/s1",
+        )
+        assert orphan.is_dir()
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="completed",
+            # Empty runtime_state — orphan was never recorded.
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            ["cleanup", "s1", "--project-dir", str(tmp_path_project)],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Removed orphan" in result.output
+        assert str(orphan) in result.output
+        assert not orphan.exists()
+
     def test_cleanup_removes_both_code_and_project_tracking_worktrees(
         self, tmp_path, tmp_path_project
     ):

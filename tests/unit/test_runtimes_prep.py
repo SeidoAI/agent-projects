@@ -448,6 +448,86 @@ class TestPrepRun:
         # getattr-default "unknown" sink.
         assert prepped.project_slug == "tmp"
 
+    def test_end_to_end_appends_project_tracking_worktree(
+        self, tmp_path, tmp_path_project, save_test_session, write_handoff_yaml
+    ):
+        """v0.7.4 wiring: when ``project_dir`` is a git repo with a
+        remote, ``prep.run()`` must append the project-tracking
+        ``WorktreeEntry`` to the code-repo worktree list that ends up
+        on ``PreppedSession.worktrees``. Guards against someone moving
+        the ``maybe_add_project_tracking_worktree`` call above
+        ``resolve_worktrees`` or forgetting to append."""
+        import yaml as _yaml
+
+        from tripwire.runtimes import RUNTIMES
+        from tripwire.runtimes.prep import run as prep_run
+
+        # Code clone + its own git repo.
+        code_clone = tmp_path / "code-clone"
+        code_clone.mkdir()
+        _init_repo(code_clone)
+
+        # Project dir must itself be a git repo with a remote so the
+        # v0.7.4 helper treats it as project-tracking-capable.
+        _init_repo(tmp_path_project)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(tmp_path_project),
+                "remote",
+                "add",
+                "origin",
+                "git@example.com:x/y.git",
+            ],
+            check=True,
+        )
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            plan=True,
+            status="queued",
+            repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
+        )
+        write_handoff_yaml(tmp_path_project, "s1")
+
+        agents_dir = tmp_path_project / "agents"
+        agents_dir.mkdir(exist_ok=True)
+        (agents_dir / "backend-coder.yaml").write_text(
+            _yaml.safe_dump(
+                {
+                    "id": "backend-coder",
+                    "context": {"skills": ["backend-development"]},
+                }
+            )
+        )
+
+        from tripwire.core.session_store import load_session
+
+        session = load_session(tmp_path_project, "s1")
+
+        with patch(
+            "tripwire.runtimes.prep._resolve_clone_path",
+            return_value=code_clone,
+        ):
+            prepped = prep_run(
+                session=session,
+                project_dir=tmp_path_project,
+                runtime=RUNTIMES["manual"],
+            )
+
+        # Content assertions:
+        assert len(prepped.worktrees) == 2, (
+            "expected code + project-tracking worktree; "
+            f"got {[w.branch for w in prepped.worktrees]}"
+        )
+        code_entry, proj_entry = prepped.worktrees
+        assert code_entry.repo == "SeidoAI/code"
+        assert proj_entry.branch == "proj/s1"
+        assert proj_entry.clone_path == str(tmp_path_project)
+        assert Path(proj_entry.worktree_path).is_dir()
+
 
 class TestResolveWorktreesResume:
     def test_resume_reuses_existing_worktree(

@@ -149,6 +149,103 @@ class TestMaybeAddProjectTrackingWorktree:
         assert first.worktree_path == second.worktree_path
         assert first.branch == second.branch
 
+    def test_bases_proj_branch_on_main_not_operators_checkout(
+        self, tmp_path_project, save_test_session
+    ):
+        """The project-tracking branch must base off the repo's default
+        branch, not whatever the operator has checked out. Before the
+        fix, worktree_add was called with ``"HEAD"`` — so if the
+        operator was on some feature branch when they spawned a
+        session, proj/<sid> inherited that state.
+
+        Here we commit an extra ref on `main`, check out an unrelated
+        branch with a divergent tip, then spawn. The project-tracking
+        worktree must have the `main`-tip commit in its log and NOT
+        the `other-branch`-tip commit.
+        """
+        _init_repo(tmp_path_project)
+        _add_fake_remote(tmp_path_project)
+
+        # Commit something only on main.
+        (tmp_path_project / "main-only.txt").write_text("main\n")
+        subprocess.run(
+            ["git", "-C", str(tmp_path_project), "add", "main-only.txt"],
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(tmp_path_project),
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "commit",
+                "-q",
+                "-m",
+                "main-only commit",
+            ],
+            check=True,
+        )
+        main_tip = subprocess.run(
+            ["git", "-C", str(tmp_path_project), "rev-parse", "main"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+        # Create + switch to a divergent branch with its own commit.
+        subprocess.run(
+            ["git", "-C", str(tmp_path_project), "checkout", "-q", "-b", "other"],
+            check=True,
+        )
+        (tmp_path_project / "other-only.txt").write_text("other\n")
+        subprocess.run(
+            ["git", "-C", str(tmp_path_project), "add", "other-only.txt"],
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(tmp_path_project),
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "commit",
+                "-q",
+                "-m",
+                "other-only commit",
+            ],
+            check=True,
+        )
+
+        save_test_session(tmp_path_project, "tst-base", status="planned")
+        session = load_session(tmp_path_project, "tst-base")
+        entry = maybe_add_project_tracking_worktree(
+            project_dir=tmp_path_project,
+            session=session,
+        )
+        assert entry is not None
+
+        # Content assertion: the project-tracking branch's tip equals
+        # main's tip — proving it was cut off main, not off `other`.
+        proj_tip = subprocess.run(
+            ["git", "-C", str(tmp_path_project), "rev-parse", "proj/tst-base"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        assert proj_tip == main_tip, (
+            f"proj/tst-base tip {proj_tip} should match main tip {main_tip}, "
+            "not `other`'s tip"
+        )
+        # And main-only.txt is in the worktree; other-only.txt isn't.
+        assert (Path(entry.worktree_path) / "main-only.txt").is_file()
+        assert not (Path(entry.worktree_path) / "other-only.txt").exists()
+
     def test_refuses_existing_worktree_without_resume(
         self, tmp_path_project, save_test_session
     ):

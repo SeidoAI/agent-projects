@@ -768,11 +768,13 @@ def session_cleanup_cmd(
             session.runtime_state.worktrees = remaining
             save_session(resolved, session)
 
-        # Orphan-worktree scan: filesystem worktrees matching the
-        # tripwire naming convention (`*-wt-<session-id>`) that weren't
-        # in runtime_state. Happens when a spawn is interrupted before
-        # runtime_state gets written, or when artefacts leaked from a
-        # pre-I5 dry-run.
+        # Orphan-worktree scan: filesystem worktrees matching
+        # `*-wt-<session-id>` that weren't in runtime_state. Happens
+        # when a spawn is interrupted before runtime_state gets
+        # written, or when artefacts leaked from a pre-I5 dry-run.
+        # Scan roots: every registered code-repo clone, plus
+        # project_dir itself (v0.7.4 project-tracking worktrees live
+        # as siblings of project_dir, not under any registered repo).
         recorded_paths = {
             Path(w.worktree_path).resolve() for w in session.runtime_state.worktrees
         }
@@ -782,29 +784,33 @@ def session_cleanup_cmd(
             proj = load_project(resolved)
         except Exception:
             proj = None
+        scan_roots: list[Path] = []
         if proj and proj.repos:
             for _slug, repo_cfg in proj.repos.items():
-                if not repo_cfg.local:
+                if repo_cfg.local:
+                    clone = Path(repo_cfg.local).expanduser()
+                    if clone.exists():
+                        scan_roots.append(clone)
+        if resolved.exists():
+            scan_roots.append(resolved)
+
+        suffix = f"-wt-{session.id}"
+        for clone in scan_roots:
+            for sibling in clone.parent.iterdir():
+                if not sibling.is_dir() or not sibling.name.endswith(suffix):
                     continue
-                clone = Path(repo_cfg.local).expanduser()
-                if not clone.exists():
+                if sibling.resolve() in recorded_paths:
+                    continue  # already handled above
+                if not force and worktree_is_dirty(sibling):
+                    click.echo(
+                        f"  Skipping orphan {sibling} — "
+                        "uncommitted changes (use --force)"
+                    )
                     continue
-                suffix = f"-wt-{session.id}"
-                for sibling in clone.parent.iterdir():
-                    if not sibling.is_dir() or not sibling.name.endswith(suffix):
-                        continue
-                    if sibling.resolve() in recorded_paths:
-                        continue  # already handled above
-                    if not force and worktree_is_dirty(sibling):
-                        click.echo(
-                            f"  Skipping orphan {sibling} — "
-                            "uncommitted changes (use --force)"
-                        )
-                        continue
-                    worktree_remove(clone, sibling)
-                    clones_to_prune.add(str(clone))
-                    cleaned += 1
-                    click.echo(f"  Removed orphan: {sibling}")
+                worktree_remove(clone, sibling)
+                clones_to_prune.add(str(clone))
+                cleaned += 1
+                click.echo(f"  Removed orphan: {sibling}")
 
         # Optionally drop the session's log files. Log files are named
         # <session_id>-<timestamp>.log under a shared {project_slug}

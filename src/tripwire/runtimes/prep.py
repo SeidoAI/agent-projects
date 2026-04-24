@@ -109,30 +109,59 @@ def resolve_worktrees(
     return entries
 
 
+def _resolve_project_default_branch(project_dir: Path) -> str:
+    """Best-effort guess of the project-tracking repo's default branch.
+
+    Tries in order: ``origin/HEAD`` symbolic-ref (set by ``git clone``),
+    then ``main``, then ``master``. Falls back to ``HEAD`` so a fresh
+    repo with neither ``main`` nor ``master`` still produces a branch
+    off whatever is currently checked out. This keeps the project
+    agnostic to default-branch convention while avoiding silently
+    basing ``proj/<sid>`` on an arbitrary feature branch the operator
+    happens to have checked out.
+    """
+    import subprocess
+
+    r = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(project_dir),
+            "symbolic-ref",
+            "--short",
+            "refs/remotes/origin/HEAD",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if r.returncode == 0:
+        ref = r.stdout.strip()
+        if ref.startswith("origin/"):
+            return ref.removeprefix("origin/")
+        if ref:
+            return ref
+    for candidate in ("main", "master"):
+        verify = subprocess.run(
+            ["git", "-C", str(project_dir), "rev-parse", "--verify", candidate],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if verify.returncode == 0:
+            return candidate
+    return "HEAD"
+
+
 def maybe_add_project_tracking_worktree(
     *,
     project_dir: Path,
     session: AgentSession,
     resume: bool = False,
 ) -> WorktreeEntry | None:
-    """Cut a per-session project-tracking worktree when the project dir
-    is a git repo with at least one remote.
-
-    Convention (v0.7.4):
-    - branch: ``proj/<session-slug-lower>`` — matches
-      ``derive_branch_name``'s slug rule so ``session complete`` can
-      push + PR it like any code-repo branch.
-    - path: ``worktree_path_for_session(project_dir, session.id)`` —
-      same sibling-dir convention used for code worktrees, so
-      orphan-scan cleanup logic (PR #19 I6) handles both with one
-      matcher.
-
-    Returns the new ``WorktreeEntry`` for the caller to append to the
-    session's worktree list. Returns ``None`` when ``project_dir``
-    isn't a git repo or has no remote configured — this is a
-    deliberate graceful skip (the feature is opt-in via remote
-    presence), logged at INFO so operators can see why no worktree
-    landed.
+    """Cut a ``proj/<session-slug>`` worktree off ``project_dir`` when
+    it's a git repo with at least one remote. Returns ``None`` (logged
+    INFO) when there's no remote or no ``.git``.
     """
     import subprocess
 
@@ -185,7 +214,8 @@ def maybe_add_project_tracking_worktree(
                 f"Branch '{proj_branch}' already exists in {project_dir}. "
                 f"Delete the branch or pick a different session id."
             )
-        worktree_add(project_dir, proj_wt_path, proj_branch, "HEAD")
+        base_ref = _resolve_project_default_branch(project_dir)
+        worktree_add(project_dir, proj_wt_path, proj_branch, base_ref)
 
     return WorktreeEntry(
         repo=project_dir.name,
