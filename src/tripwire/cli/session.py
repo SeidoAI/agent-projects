@@ -339,7 +339,17 @@ def session_derive_branch_cmd(session_id: str, project_dir: Path) -> None:
     default=".",
     show_default=True,
 )
-def session_queue_cmd(session_id: str, project_dir: Path) -> None:
+@click.option(
+    "--promote-issues",
+    "promote_issues",
+    is_flag=True,
+    default=False,
+    help=(
+        "Before queueing, flip every session issue currently in "
+        "`backlog` status to `todo`. Leaves other statuses alone."
+    ),
+)
+def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) -> None:
     """Validate readiness and transition session to queued."""
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
@@ -353,6 +363,24 @@ def session_queue_cmd(session_id: str, project_dir: Path) -> None:
         raise click.ClickException(
             f"session '{session_id}' is '{session.status}', must be 'planned' to queue"
         )
+
+    if promote_issues:
+        from tripwire.core.store import load_issue, save_issue
+
+        promoted = 0
+        for issue_key in session.issues:
+            try:
+                issue = load_issue(resolved, issue_key)
+            except FileNotFoundError:
+                click.echo(f"  ! issue {issue_key} not found — skipping")
+                continue
+            if issue.status == "backlog":
+                issue.status = "todo"
+                save_issue(resolved, issue)
+                click.echo(f"  {issue_key}: backlog → todo")
+                promoted += 1
+        if promoted == 0:
+            click.echo("  (no issues in backlog to promote)")
 
     report = check_readiness(resolved, session_id, kind="queue")
     if not report.ready:
@@ -445,7 +473,28 @@ def session_spawn_cmd(
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    # Prep (runtime-agnostic): worktrees + skills + CLAUDE.md + kickoff
+    # Dry-run is pure: compute what prep WOULD produce (worktree paths,
+    # runtime, max-turns) without running prep. Prep mutates the
+    # filesystem (git worktree add + skill copy + CLAUDE.md render),
+    # and until v0.7.3 dry-run ran prep first — leaving a worktree on
+    # disk that blocked every subsequent real spawn with "worktree
+    # already exists". Now dry-run just resolves symbolic paths.
+    if dry_run:
+        from tripwire.core.git_helpers import worktree_path_for_session
+
+        click.echo(f"Dry run — would spawn session '{session_id}'")
+        click.echo(f"  Runtime: {runtime.name}")
+        for rb in session.repos:
+            clone = _resolve_clone_path(resolved, rb.repo)
+            if clone is None:
+                click.echo(f"  Worktree: [unresolved: no local clone for {rb.repo}]")
+                continue
+            wt_path = worktree_path_for_session(clone, session.id)
+            click.echo(f"  Worktree (would create): {wt_path}")
+        click.echo(f"  Max turns: {resolved_spawn.config.max_turns}")
+        return
+
+    # Real spawn: now we're committed to mutating the filesystem.
     try:
         prepped = prep_run(
             session=session,
@@ -459,14 +508,6 @@ def session_spawn_cmd(
         )
     except RuntimeError as exc:
         raise click.ClickException(str(exc)) from exc
-
-    if dry_run:
-        click.echo(f"Dry run — would spawn session '{session_id}'")
-        click.echo(f"  Runtime: {runtime.name}")
-        for wt in prepped.worktrees:
-            click.echo(f"  Worktree: {wt.worktree_path}")
-        click.echo(f"  Max turns: {prepped.spawn_defaults.config.max_turns}")
-        return
 
     # Launch via the runtime
     start_result = runtime.start(prepped)
@@ -727,6 +768,44 @@ def session_cleanup_cmd(
             session.runtime_state.worktrees = remaining
             save_session(resolved, session)
 
+        # Orphan-worktree scan: filesystem worktrees matching the
+        # tripwire naming convention (`*-wt-<session-id>`) that weren't
+        # in runtime_state. Happens when a spawn is interrupted before
+        # runtime_state gets written, or when artefacts leaked from a
+        # pre-I5 dry-run.
+        recorded_paths = {
+            Path(w.worktree_path).resolve() for w in session.runtime_state.worktrees
+        }
+        try:
+            from tripwire.core.store import load_project
+
+            proj = load_project(resolved)
+        except Exception:
+            proj = None
+        if proj and proj.repos:
+            for _slug, repo_cfg in proj.repos.items():
+                if not repo_cfg.local:
+                    continue
+                clone = Path(repo_cfg.local).expanduser()
+                if not clone.exists():
+                    continue
+                suffix = f"-wt-{session.id}"
+                for sibling in clone.parent.iterdir():
+                    if not sibling.is_dir() or not sibling.name.endswith(suffix):
+                        continue
+                    if sibling.resolve() in recorded_paths:
+                        continue  # already handled above
+                    if not force and worktree_is_dirty(sibling):
+                        click.echo(
+                            f"  Skipping orphan {sibling} — "
+                            "uncommitted changes (use --force)"
+                        )
+                        continue
+                    worktree_remove(clone, sibling)
+                    clones_to_prune.add(str(clone))
+                    cleaned += 1
+                    click.echo(f"  Removed orphan: {sibling}")
+
         # Optionally drop the session's log files. Log files are named
         # <session_id>-<timestamp>.log under a shared {project_slug}
         # directory, so we glob-match rather than rm -rf the parent
@@ -745,6 +824,190 @@ def session_cleanup_cmd(
         worktree_prune(Path(clone_str))
 
     click.echo(f"Cleaned {cleaned} worktree(s)")
+
+
+@session_cmd.command("scaffold")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Overwrite existing files instead of skipping them.",
+)
+@click.option(
+    "--artifact",
+    "artifact_name",
+    default=None,
+    help=(
+        "Scaffold a specific artifact by file name "
+        "(e.g. `verification-checklist.md`). Default: every planning-"
+        "phase, PM-owned, required artifact from the manifest."
+    ),
+)
+@click.option(
+    "--no-handoff",
+    is_flag=True,
+    default=False,
+    help=(
+        "Skip writing handoff.yaml. Default behaviour: write handoff.yaml "
+        "with a derived branch name if the file does not yet exist."
+    ),
+)
+def session_scaffold_cmd(
+    session_id: str,
+    project_dir: Path,
+    force: bool,
+    artifact_name: str | None,
+    no_handoff: bool,
+) -> None:
+    """Render session planning artifacts from their Jinja templates.
+
+    Before this command existed, PMs copy-pasted
+    ``verification-checklist.md`` from other sessions because there
+    was no scaffolder. Readiness checks that artifact at queue time,
+    so the missing step was a recurring onboarding papercut.
+
+    Default: render every manifest entry where
+    ``produced_at=="planning"``, ``owned_by=="pm"``, and
+    ``required=True``. Pass ``--artifact <file>`` to scaffold a
+    single entry. ``--force`` overwrites existing files.
+    """
+    from tripwire.core.manifest_loader import load_artifact_manifest
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session '{session_id}' not found") from exc
+
+    manifest, _findings = load_artifact_manifest(resolved)
+    if manifest is None:
+        raise click.ClickException(
+            "No artifact manifest found at templates/artifacts/manifest.yaml"
+        )
+
+    if artifact_name:
+        targets = [e for e in manifest.artifacts if e.file == artifact_name]
+        if not targets:
+            raise click.ClickException(
+                f"artifact '{artifact_name}' not declared in manifest"
+            )
+    else:
+        targets = [
+            e
+            for e in manifest.artifacts
+            if e.produced_at == "planning" and e.owned_by == "pm" and e.required
+        ]
+        if not targets:
+            click.echo("No planning-phase PM-owned required artifacts to scaffold.")
+            return
+
+    # Jinja loader pointed at the project's artifacts/templates dir.
+    # init copies the packaged templates here at project-create time,
+    # so scaffold respects whatever the user has customised locally.
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+    templates_root = resolved / "templates" / "artifacts"
+    env = Environment(
+        loader=FileSystemLoader(str(templates_root)),
+        autoescape=select_autoescape(disabled_extensions=("j2", "md")),
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+
+    session_dir = resolved / "sessions" / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+
+    context = {
+        "session": session,
+        "session_id": session_id,
+        "session_name": session.name,
+        "agent": session.agent,
+        "issues": session.issues,
+    }
+
+    wrote = 0
+    for entry in targets:
+        dest = session_dir / entry.file
+        if dest.exists() and not force:
+            click.echo(f"  Skipping {entry.file} — exists (use --force to overwrite)")
+            continue
+        try:
+            tpl = env.get_template(entry.template)
+        except Exception as exc:
+            raise click.ClickException(
+                f"template {entry.template!r} not found under {templates_root}: {exc}"
+            ) from exc
+        rendered = tpl.render(**context)
+        dest.write_text(rendered, encoding="utf-8")
+        click.echo(f"  Wrote {entry.file}")
+        wrote += 1
+
+    if wrote == 0 and not artifact_name:
+        click.echo("  (nothing scaffolded — all targets already existed)")
+
+    # Handoff.yaml — session state, not an artifact (lives outside the
+    # manifest), but conceptually a planning-phase PM-owned file. PMs
+    # should not have to hand-craft it; derive the branch from the
+    # session's primary issue kind and write it here unless suppressed.
+    if not no_handoff and not artifact_name:
+        _scaffold_handoff(resolved, session, force)
+
+
+def _scaffold_handoff(project_dir: Path, session, force: bool) -> None:
+    """Write sessions/<id>/handoff.yaml with a derived branch name.
+
+    Skips silently if the file already exists and `force` is False.
+    Logs a warning (without failing) if branch derivation fails — the
+    PM can still hand-write the file as a fallback.
+    """
+    import uuid as _uuid
+    from datetime import datetime, timezone
+
+    from tripwire.core.branch_naming import BranchNameError, derive_branch_name
+    from tripwire.core.handoff_store import handoff_path, save_handoff
+    from tripwire.core.store import load_issue
+    from tripwire.models.handoff import SessionHandoff
+
+    dest = handoff_path(project_dir, session.id)
+    if dest.exists() and not force:
+        click.echo("  Skipping handoff.yaml — exists (use --force to overwrite)")
+        return
+
+    # Pick the first issue's kind as the branch type. Fallback to "feat"
+    # if no issues are bound or the first issue's kind isn't a valid
+    # branch type for this project.
+    primary_kind = "feat"
+    if session.issues:
+        try:
+            first_issue = load_issue(project_dir, session.issues[0])
+            if first_issue.kind:
+                primary_kind = first_issue.kind
+        except (FileNotFoundError, AttributeError):
+            pass
+
+    try:
+        branch = derive_branch_name(session.id, primary_kind, project_dir=project_dir)
+    except BranchNameError as exc:
+        click.echo(f"  Skipping handoff.yaml — could not derive branch: {exc}")
+        return
+
+    handoff = SessionHandoff(
+        uuid=_uuid.uuid4(),
+        session_id=session.id,
+        handoff_at=datetime.now(tz=timezone.utc),
+        handed_off_by="pm",
+        branch=branch,
+    )
+    save_handoff(project_dir, handoff)
+    click.echo(f"  Wrote handoff.yaml (branch: {branch})")
 
 
 @session_cmd.command("logs")

@@ -49,7 +49,7 @@ pip install "tripwire-pm[projects]"
 - **Agents drift, skip stages, degrade over time, and sometimes lie about their work - worse on bigger projects.** Tripwires fire at workflow checkpoints and inject just-in-time instructions into the agent's *most recent* turn; **LLM recency bias** makes them pay attention. Think sensors, not locks.
 - **Descriptions go stale the moment code moves.** The concept graph anchors every reference: `[[node-id]]` points at a file region with a SHA-256 content hash. Move the code, the graph catches up. Stale refs are *validator errors*, not silent lies.
 - **Every session starts from zero.** Sessions propose graph updates in `insights.yaml`; the PM reviews them at close-out. Knowledge **compounds** instead of evaporating with the chat history.
-- **You can't tell if an agent's work is actually done.** 23-check validator runs in ~50 ms. JSON by default. Artifacts (`developer.md`, `verified.md`) gate status transitions — no handwaving through `in_review`.
+- **You can't tell if an agent's work is actually done.** 23-check validator runs in ~50 ms. Artifacts (`developer.md`, `verified.md`) gate status transitions — no handwaving through `in_review`.
 - **You're babysitting `claude -p` in a terminal.** `queue → spawn → monitor → review → complete` turns each stage into a CLI verb *and* a `/pm-session-*` slash command. Each stage gates the next.
 - **Your methodology is trapped in someone else's cloud.** Issues, nodes, sessions, skills, templates, validation loop — all git. `tw init` ships the PM skill *into the repo*. Fork the project, fork the methodology.
 - **Parallel agents collide on keys.** Dual IDs — UUID + atomic human key (`MP-42`). `tw next-key` is branch-merge safe.
