@@ -67,6 +67,8 @@ class IssueSummary(BaseModel):
     blocked_by: list[str] = Field(default_factory=list)
     is_blocked: bool
     is_epic: bool
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class IssueDetail(IssueSummary):
@@ -94,6 +96,19 @@ class IssueFilters(BaseModel):
 
 def _is_epic(labels: list[str]) -> bool:
     return _EPIC_LABEL in labels
+
+
+def _iso(value: object) -> str | None:
+    """Render a datetime field as an ISO 8601 string, preserving raw str input.
+
+    The core issue model uses `datetime | None`, but YAML round-tripping may
+    leave naive strings behind; accept both to avoid raising at read time.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    return value.isoformat()  # type: ignore[no-any-return]
 
 
 def _stale_node_set(project_dir: Path) -> set[str]:
@@ -205,6 +220,8 @@ def list_issues(
                 blocked_by=list(issue.blocked_by),
                 is_blocked=_derive_is_blocked(issue.blocked_by, status_index),
                 is_epic=_is_epic(issue.labels),
+                created_at=_iso(issue.created_at),
+                updated_at=_iso(issue.updated_at),
             )
         )
     return out
@@ -247,6 +264,8 @@ def get_issue(project_dir: Path, key: str) -> IssueDetail:
         is_epic=_is_epic(issue.labels),
         body=issue.body,
         refs=refs,
+        created_at=_iso(issue.created_at),
+        updated_at=_iso(issue.updated_at),
     )
 
 
