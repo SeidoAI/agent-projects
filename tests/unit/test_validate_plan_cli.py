@@ -165,7 +165,14 @@ class TestValidatePlanCli:
         instead of the full monorepo path."""
         clone = tmp_path_project / "fake-clone"
         existing_file = (
-            clone / "src" / "tripwire" / "ui" / "frontend" / "src" / "app" / "router.tsx"
+            clone
+            / "src"
+            / "tripwire"
+            / "ui"
+            / "frontend"
+            / "src"
+            / "app"
+            / "router.tsx"
         )
         existing_file.parent.mkdir(parents=True, exist_ok=True)
         existing_file.write_text("// router\n")
@@ -217,7 +224,14 @@ class TestValidatePlanCli:
         resolver fix that made the first test pass."""
         clone = tmp_path_project / "fake-clone"
         existing_file = (
-            clone / "src" / "tripwire" / "ui" / "frontend" / "src" / "app" / "router.tsx"
+            clone
+            / "src"
+            / "tripwire"
+            / "ui"
+            / "frontend"
+            / "src"
+            / "app"
+            / "router.tsx"
         )
         existing_file.parent.mkdir(parents=True, exist_ok=True)
         existing_file.write_text("// router\n")

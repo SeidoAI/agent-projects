@@ -125,9 +125,7 @@ class TestMaybeAddProjectTrackingWorktree:
             for rec in caplog.records
         )
 
-    def test_resume_reuses_existing_worktree(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_resume_reuses_existing_worktree(self, tmp_path_project, save_test_session):
         """Idempotent resume: call the helper once, then again with
         resume=True. Second call must succeed without re-creating the
         worktree, returning the same path/branch."""

@@ -79,9 +79,7 @@ class TestListNodes:
         )
         assert [n["id"] for n in r.json()] == ["api-contract"]
 
-    def test_filter_by_stale_true(
-        self, node_client, node_project, node_project_id
-    ):
+    def test_filter_by_stale_true(self, node_client, node_project, node_project_id):
         """v0.7.4 D.1 — route-level wiring for ?stale=true. Service-level
         tests already cover the filter semantics; this one pins the
         route so we notice if the query param gets dropped during a

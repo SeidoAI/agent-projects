@@ -4,7 +4,7 @@
 # Tripwire/Fortra security product). Users install as `pip install tripwire-pm`;
 # the CLI command (`tripwire`, `tw`) and `import tripwire` are unchanged.
 name = "tripwire-pm"
-version = "0.7.3"
+version = "0.7.4"
 description = "Git-native project management with concept graph for AI agents"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10,<3.14"
