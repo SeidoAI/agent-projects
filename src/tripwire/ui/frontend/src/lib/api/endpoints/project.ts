@@ -15,8 +15,12 @@ export interface ProjectDetail {
   id: string;
   name: string;
   key_prefix: string;
+  dir?: string;
   phase: string;
   phase_log?: PhaseLogEntry[];
+  status_transitions?: Record<string, string[]>;
+  repos?: Record<string, { local?: string | null; github?: string | null }>;
+  base_branch?: string;
 }
 
 export const projectApi = {
