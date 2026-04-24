@@ -26,6 +26,10 @@ _DEFAULT_TYPES: tuple[str, ...] = (
     "docs",
     "chore",
     "test",
+    # v0.7.4: `proj/<session-slug>` branches in the project-tracking
+    # repo, cut per-session so parallel sessions don't race on
+    # sessions/<id>/ or issues/<KEY>/developer.md writes.
+    "proj",
 )
 
 # Legacy module-level constant kept for callers that read it (e.g. docstrings
