@@ -32,6 +32,12 @@ class RepoBinding(BaseModel):
     branch: str | None = None
     pr_number: int | None = None
 
+    # Optional sub-tree prefix. When set, plan-file paths in
+    # `**Files:**` blocks resolve relative to `<clone>/<path_prefix>` as
+    # well as `<clone>`. Lets frontend plans say `src/app/router.tsx`
+    # instead of `src/tripwire/ui/frontend/src/app/router.tsx`.
+    path_prefix: str | None = None
+
 
 class WorktreeEntry(BaseModel):
     """One git worktree created for a session spawn."""

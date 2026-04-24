@@ -156,6 +156,118 @@ class TestValidatePlanCli:
         assert result.exit_code == 1, result.output
         assert "plan/modify_target_missing" in result.output
 
+    def test_prefix_set_resolves_sub_tree_path(
+        self, tmp_path_project, save_test_session, save_test_issue
+    ):
+        """When `path_prefix` is set on a repo binding, plan paths
+        resolve relative to `<clone>/<path_prefix>` as well as the
+        clone root. Frontend plans can say `src/app/router.tsx`
+        instead of the full monorepo path."""
+        clone = tmp_path_project / "fake-clone"
+        existing_file = (
+            clone
+            / "src"
+            / "tripwire"
+            / "ui"
+            / "frontend"
+            / "src"
+            / "app"
+            / "router.tsx"
+        )
+        existing_file.parent.mkdir(parents=True, exist_ok=True)
+        existing_file.write_text("// router\n")
+
+        project_yaml = tmp_path_project / "project.yaml"
+        original = project_yaml.read_text()
+        project_yaml.write_text(
+            original + f"\nrepos:\n  SeidoAI/fake:\n    local: {clone}\n"
+        )
+
+        save_test_issue(tmp_path_project, "T-1", kind="feat")
+        save_test_session(
+            tmp_path_project,
+            "s-prefix",
+            status="planned",
+            issues=["T-1"],
+            repos=[
+                {
+                    "repo": "SeidoAI/fake",
+                    "base_branch": "main",
+                    "path_prefix": "src/tripwire/ui/frontend",
+                }
+            ],
+        )
+        _write_plan(
+            tmp_path_project,
+            "s-prefix",
+            "# Plan\n\n"
+            "### Step 1: Update the router\n"
+            "- **Files:** `src/app/router.tsx`\n"
+            "- **Change:** Modify the router to support X.\n",
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            validate_plan_cmd,
+            ["s-prefix", "--project-dir", str(tmp_path_project)],
+        )
+        assert result.exit_code == 0, result.output
+        assert "plan/modify_target_missing" not in result.output
+
+    def test_prefix_unset_produces_modify_target_missing_warning(
+        self, tmp_path_project, save_test_session, save_test_issue
+    ):
+        """Regression guard for the prefix feature: same fixture as
+        the prefix-set case, but without `path_prefix`, the existing
+        file is invisible to the resolver and we get the warning.
+        Proves the prefix is doing the work — not some unrelated
+        resolver fix that made the first test pass."""
+        clone = tmp_path_project / "fake-clone"
+        existing_file = (
+            clone
+            / "src"
+            / "tripwire"
+            / "ui"
+            / "frontend"
+            / "src"
+            / "app"
+            / "router.tsx"
+        )
+        existing_file.parent.mkdir(parents=True, exist_ok=True)
+        existing_file.write_text("// router\n")
+
+        project_yaml = tmp_path_project / "project.yaml"
+        original = project_yaml.read_text()
+        project_yaml.write_text(
+            original + f"\nrepos:\n  SeidoAI/fake:\n    local: {clone}\n"
+        )
+
+        save_test_issue(tmp_path_project, "T-1", kind="feat")
+        save_test_session(
+            tmp_path_project,
+            "s-no-prefix",
+            status="planned",
+            issues=["T-1"],
+            repos=[{"repo": "SeidoAI/fake", "base_branch": "main"}],
+        )
+        _write_plan(
+            tmp_path_project,
+            "s-no-prefix",
+            "# Plan\n\n"
+            "### Step 1: Update the router\n"
+            "- **Files:** `src/app/router.tsx`\n"
+            "- **Change:** Modify the router to support X.\n",
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            validate_plan_cmd,
+            ["s-no-prefix", "--project-dir", str(tmp_path_project)],
+        )
+        assert result.exit_code == 1, result.output
+        assert "plan/modify_target_missing" in result.output
+        assert "src/app/router.tsx" in result.output
+
     def test_json_format_returns_structured(self, tmp_path_project, save_test_session):
         save_test_session(tmp_path_project, "s-json", status="planned")
         _write_plan(

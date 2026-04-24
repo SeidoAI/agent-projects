@@ -125,7 +125,20 @@ def complete_session(
 
 
 def _verify_pr_merged(session) -> None:
-    for wt in session.runtime_state.worktrees:
+    """Require every worktree branch to have a merged PR; raise
+    :class:`CompleteError` naming the unmerged branch(es) otherwise.
+    ``gh`` is invoked from inside each worktree so it picks up the
+    correct remote when worktrees have different origins.
+    """
+    worktrees = list(session.runtime_state.worktrees)
+    if not worktrees:
+        raise CompleteError(
+            "complete/pr_not_merged",
+            "Session has no recorded worktrees; cannot verify any PR merged.",
+        )
+    unmerged: list[str] = []
+    for wt in worktrees:
+        merged = False
         try:
             result = subprocess.run(
                 [
@@ -144,17 +157,25 @@ def _verify_pr_merged(session) -> None:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                cwd=wt.worktree_path,
             )
             if result.returncode == 0 and result.stdout.strip():
                 prs = json.loads(result.stdout)
                 if prs:
-                    return
+                    merged = True
         except (subprocess.SubprocessError, OSError, json.JSONDecodeError):
-            continue
-    raise CompleteError(
-        "complete/pr_not_merged",
-        "No merged PR found for any session branch.",
-    )
+            # Treat "gh errored / timed out / returned garbage" as "not
+            # merged" — conservative: operator can re-run once the
+            # environment is healthy, or pass --force after verifying
+            # manually.
+            pass
+        if not merged:
+            unmerged.append(wt.branch)
+    if unmerged:
+        raise CompleteError(
+            "complete/pr_not_merged",
+            f"No merged PR found for branch(es): {', '.join(unmerged)}",
+        )
 
 
 def _verify_review_ok(project_dir: Path, session) -> None:

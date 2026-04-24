@@ -768,13 +768,13 @@ def session_cleanup_cmd(
             session.runtime_state.worktrees = remaining
             save_session(resolved, session)
 
-        # Orphan-worktree scan: filesystem worktrees matching the
-        # tripwire naming convention (`*-wt-<session-id>`) that weren't
-        # in runtime_state. Happens when a spawn is interrupted before
-        # runtime_state gets written, or when artefacts leaked from a
-        # pre-I5 dry-run. Roots scanned: every registered code-repo
-        # clone, plus project_dir itself (v0.7.4 project-tracking
-        # worktrees live as siblings of project_dir).
+        # Orphan-worktree scan: filesystem worktrees matching
+        # `*-wt-<session-id>` that weren't in runtime_state. Happens
+        # when a spawn is interrupted before runtime_state gets
+        # written, or when artefacts leaked from a pre-I5 dry-run.
+        # Scan roots: every registered code-repo clone, plus
+        # project_dir itself (v0.7.4 project-tracking worktrees live
+        # as siblings of project_dir, not under any registered repo).
         recorded_paths = {
             Path(w.worktree_path).resolve() for w in session.runtime_state.worktrees
         }

@@ -78,22 +78,30 @@ class TestGetEnum:
         body = r.json()
         assert body["code"] == "enum/not_found"
 
-    def test_malformed_uppercase_returns_422(
+    def test_malformed_uppercase_returns_400_envelope(
         self,
         enum_client,
         enum_project_id,
     ):
+        """v0.7.4 D.2 — previously FastAPI's path regex returned 422 on
+        bad names while the rest of the `/api/` surface returned
+        `400 + envelope`. Unified to 400 + `{detail, code}` so the
+        frontend's ApiError helper has one code path."""
         r = enum_client.get(f"/api/projects/{enum_project_id}/enums/ISSUE_STATUS")
-        # FastAPI path regex mismatch → 422.
-        assert r.status_code == 422
+        assert r.status_code == 400
+        body = r.json()
+        assert body["code"] == "enum/bad_name"
+        assert "ISSUE_STATUS" in body["detail"]
 
     def test_hyphen_rejected(self, enum_client, enum_project_id):
         r = enum_client.get(f"/api/projects/{enum_project_id}/enums/issue-status")
-        assert r.status_code == 422
+        assert r.status_code == 400
+        assert r.json()["code"] == "enum/bad_name"
 
     def test_leading_digit_rejected(self, enum_client, enum_project_id):
         r = enum_client.get(f"/api/projects/{enum_project_id}/enums/1status")
-        assert r.status_code == 422
+        assert r.status_code == 400
+        assert r.json()["code"] == "enum/bad_name"
 
 
 class TestOpenAPI:

@@ -31,11 +31,11 @@ describe("AgentStatusBar", () => {
     );
     const status = screen.getByRole("status");
     expect(status).toHaveAccessibleName(
-      "Agent monitoring ships in v2 — requires tripwire.containers",
+      "Agent monitoring ships in v2 — requires session-runtime telemetry",
     );
     expect(status).toHaveAttribute(
       "title",
-      "Agent monitoring ships in v2 — requires tripwire.containers",
+      "Agent monitoring ships in v2 — requires session-runtime telemetry",
     );
   });
 

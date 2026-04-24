@@ -15,15 +15,9 @@ Workflow:
 1. Run `tripwire session check $ARGUMENTS` to verify launch-readiness.
    If exit code is non-zero, report the punch list and stop. Do NOT
    proceed with outstanding errors.
-<<<<<<<< HEAD:src/tripwire/templates/commands/pm-session-launch.md
-2. Run `tripwire lint handoff $ARGUMENTS` and surface findings. Any
-   error-severity finding blocks launch.
-3. Run `tripwire brief` to load project state.
-========
 2. Run `tripwire lint handoff $ARGUMENTS` and surface findings. Any
    error-severity finding blocks queueing.
 3. Run `tripwire brief` to load project state.
->>>>>>>> origin/main:src/tripwire/templates/commands/pm-session-queue.md
 4. Read `sessions/$ARGUMENTS/session.yaml` and `handoff.yaml`.
 5. Run `tripwire session queue $ARGUMENTS`. This validates readiness and
    transitions `planned` → `queued`.
@@ -36,17 +30,10 @@ Workflow:
    `comment_templates/status_change.yaml.j2`. Body: one paragraph
    summarising the handoff — reference `handoff.yaml.branch`, the
    agent type, and any open questions.
-<<<<<<<< HEAD:src/tripwire/templates/commands/pm-session-launch.md
-9. Run `tripwire validate --strict`. Fix any errors.
-10. Commit: `launch: $ARGUMENTS → <agent-type>`.
-11. Report the branch name (from `handoff.yaml.branch`) so the user
-    or orchestration runtime can dispatch the execution agent.
-========
 8. Run `tripwire validate --strict`. Fix any errors.
 9. Commit: `queue: $ARGUMENTS → <agent-type>`.
 10. Report the branch name (from `handoff.yaml.branch`) so the user
     can dispatch the execution agent or run `/pm-session-spawn`.
->>>>>>>> origin/main:src/tripwire/templates/commands/pm-session-queue.md
 
 Do NOT create `task-checklist.md`, `recommended-testing-plan.md`, or
 `post-completion-comments.md`. Per `templates/artifacts/manifest.yaml`

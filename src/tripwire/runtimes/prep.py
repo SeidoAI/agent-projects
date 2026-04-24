@@ -10,10 +10,12 @@ Runs once per spawn before the runtime's ``start``:
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from importlib.resources import files
 from pathlib import Path
 
+from tripwire.core.branch_naming import SESSION_ID_PREFIX
 from tripwire.core.git_helpers import (
     branch_exists,
     worktree_add,
@@ -21,6 +23,8 @@ from tripwire.core.git_helpers import (
 )
 from tripwire.models.session import AgentSession, WorktreeEntry
 from tripwire.runtimes.base import PreppedSession
+
+log = logging.getLogger("tripwire.runtimes.prep")
 
 _MANAGED_EXCLUDES = (".claude/", ".tripwire/")
 
@@ -103,6 +107,122 @@ def resolve_worktrees(
             )
         )
     return entries
+
+
+def _resolve_project_default_branch(project_dir: Path) -> str:
+    """Best-effort guess of the project-tracking repo's default branch.
+
+    Tries in order: ``origin/HEAD`` symbolic-ref (set by ``git clone``),
+    then ``main``, then ``master``. Falls back to ``HEAD`` so a fresh
+    repo with neither ``main`` nor ``master`` still produces a branch
+    off whatever is currently checked out. This keeps the project
+    agnostic to default-branch convention while avoiding silently
+    basing ``proj/<sid>`` on an arbitrary feature branch the operator
+    happens to have checked out.
+    """
+    import subprocess
+
+    r = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(project_dir),
+            "symbolic-ref",
+            "--short",
+            "refs/remotes/origin/HEAD",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if r.returncode == 0:
+        ref = r.stdout.strip()
+        if ref.startswith("origin/"):
+            return ref.removeprefix("origin/")
+        if ref:
+            return ref
+    for candidate in ("main", "master"):
+        verify = subprocess.run(
+            ["git", "-C", str(project_dir), "rev-parse", "--verify", candidate],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if verify.returncode == 0:
+            return candidate
+    return "HEAD"
+
+
+def maybe_add_project_tracking_worktree(
+    *,
+    project_dir: Path,
+    session: AgentSession,
+    resume: bool = False,
+) -> WorktreeEntry | None:
+    """Cut a ``proj/<session-slug>`` worktree off ``project_dir`` when
+    it's a git repo with at least one remote. Returns ``None`` (logged
+    INFO) when there's no remote or no ``.git``.
+    """
+    import subprocess
+
+    if not (project_dir / ".git").exists():
+        log.info(
+            "project_dir %s is not a git repo; skipping project-tracking "
+            "worktree for session %s",
+            project_dir,
+            session.id,
+        )
+        return None
+
+    remote_check = subprocess.run(
+        ["git", "-C", str(project_dir), "remote"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if remote_check.returncode != 0 or not remote_check.stdout.strip():
+        log.info(
+            "project_dir %s has no git remote; skipping project-tracking "
+            "worktree for session %s",
+            project_dir,
+            session.id,
+        )
+        return None
+
+    slug = session.id.removeprefix(SESSION_ID_PREFIX).lower()
+    proj_branch = f"proj/{slug}"
+    proj_wt_path = worktree_path_for_session(project_dir, session.id)
+
+    if proj_wt_path.exists():
+        if not resume:
+            raise RuntimeError(
+                f"Project-tracking worktree {proj_wt_path} already exists. "
+                f"Use 'tripwire session cleanup {session.id}' "
+                f"or re-spawn with --resume."
+            )
+        # resume: reuse existing worktree
+    else:
+        if resume:
+            raise RuntimeError(
+                f"Project-tracking worktree {proj_wt_path} was expected "
+                f"to exist for --resume but does not. Run "
+                f"'tripwire session cleanup {session.id}' then "
+                f"spawn without --resume."
+            )
+        if branch_exists(project_dir, proj_branch):
+            raise RuntimeError(
+                f"Branch '{proj_branch}' already exists in {project_dir}. "
+                f"Delete the branch or pick a different session id."
+            )
+        base_ref = _resolve_project_default_branch(project_dir)
+        worktree_add(project_dir, proj_wt_path, proj_branch, base_ref)
+
+    return WorktreeEntry(
+        repo=project_dir.name,
+        clone_path=str(project_dir),
+        worktree_path=str(proj_wt_path),
+        branch=proj_branch,
+    )
 
 
 def _skills_hash(skill_names: list[str]) -> str:
@@ -402,6 +522,19 @@ def run(
     )
     if not worktrees:
         raise RuntimeError(f"session '{session.id}' has no repos configured")
+
+    # v0.7.4: cut a per-session project-tracking worktree so parallel
+    # sessions don't race on sessions/<id>/ or issues/<KEY>/developer.md
+    # writes. Only applies when project_dir is a git repo with a
+    # remote — otherwise this is a no-op and the session writes into
+    # the shared project_dir like pre-v0.7.4.
+    proj_entry = maybe_add_project_tracking_worktree(
+        project_dir=project_dir,
+        session=session,
+        resume=resume,
+    )
+    if proj_entry is not None:
+        worktrees.append(proj_entry)
 
     code_worktree = Path(worktrees[0].worktree_path)
 

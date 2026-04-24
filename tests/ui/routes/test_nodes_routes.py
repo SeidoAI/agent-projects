@@ -79,6 +79,51 @@ class TestListNodes:
         )
         assert [n["id"] for n in r.json()] == ["api-contract"]
 
+    def test_filter_by_stale_true(self, node_client, node_project, node_project_id):
+        """v0.7.4 D.1 — route-level wiring for ?stale=true. Service-level
+        tests already cover the filter semantics; this one pins the
+        route so we notice if the query param gets dropped during a
+        refactor."""
+        from tripwire.core import graph_cache
+        from tripwire.models.graph import GraphIndex
+
+        # Seed a cache that marks `api-contract` as stale. Service's
+        # `_load_cache_ensuring_fresh` returns this cache verbatim
+        # because it exists — no rebuild runs.
+        graph_cache.save_index(
+            node_project,
+            GraphIndex(version=graph_cache.CACHE_VERSION, stale_nodes=["api-contract"]),
+        )
+
+        r = node_client.get(
+            f"/api/projects/{node_project_id}/nodes",
+            params={"stale": "true"},
+        )
+        assert r.status_code == 200
+        ids = [n["id"] for n in r.json()]
+        assert ids == ["api-contract"]
+
+    def test_filter_by_stale_false_excludes_stale(
+        self, node_client, node_project, node_project_id
+    ):
+        """Companion to the stale=true case — ?stale=false excludes
+        the stale node, leaving the fresh one."""
+        from tripwire.core import graph_cache
+        from tripwire.models.graph import GraphIndex
+
+        graph_cache.save_index(
+            node_project,
+            GraphIndex(version=graph_cache.CACHE_VERSION, stale_nodes=["api-contract"]),
+        )
+
+        r = node_client.get(
+            f"/api/projects/{node_project_id}/nodes",
+            params={"stale": "false"},
+        )
+        assert r.status_code == 200
+        ids = [n["id"] for n in r.json()]
+        assert ids == ["user-model"]
+
 
 class TestGetNode:
     def test_happy_path(self, node_client, node_project_id):

@@ -2,9 +2,9 @@ import { ChevronRight, Users } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-const V2_MESSAGE = "Agent monitoring ships in v2 — requires tripwire.containers";
+const V2_MESSAGE = "Agent monitoring ships in v2 — requires session-runtime telemetry";
 
-// v2: fetch from containersApi.list() and render one card per running container.
+// v2: render one card per running session.
 export function AgentStatusBar() {
   return (
     <Tooltip>

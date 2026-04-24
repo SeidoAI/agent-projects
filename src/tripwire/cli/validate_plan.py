@@ -147,37 +147,43 @@ def _extract_paths(step_text: str) -> list[str]:
     return paths
 
 
-def _resolve_repo_paths(project_dir: Path, session) -> list[Path]:
+def _resolve_repo_paths(project_dir: Path, session) -> list[tuple[Path, str | None]]:
     """Find local clone paths for every code repo bound to this session.
 
     Reuses the same lookup as prep.py — single source of truth for the
-    project.yaml.repos[<slug>].local mapping.
+    project.yaml.repos[<slug>].local mapping. Returns `(clone, path_prefix)`
+    pairs so callers can resolve plan paths at both the clone root and the
+    prefix-rooted sub-tree.
     """
     from tripwire.cli.session import _resolve_clone_path
 
-    paths_: list[Path] = []
+    paths_: list[tuple[Path, str | None]] = []
     for rb in session.repos:
         clone = _resolve_clone_path(project_dir, rb.repo)
         if clone is not None:
-            paths_.append(clone)
+            paths_.append((clone, rb.path_prefix))
     return paths_
 
 
 def _check_target_existence(
     file_paths: list[str],
-    repo_clones: list[Path],
+    repo_clones: list[tuple[Path, str | None]],
     classification: Literal["create", "modify"],
     step_title: str,
 ) -> list[PlanCheckResult]:
     """For each file path, check existence across all repo clone roots.
 
     A path is considered "exists" if it resolves to an existing file or
-    directory under any of the repo clones. Returns warnings for the
-    classification-vs-reality mismatch.
+    directory under any of the repo clones — at the clone root OR at
+    `<clone>/<path_prefix>` when the binding declares a prefix.
     """
     findings: list[PlanCheckResult] = []
     for fp in file_paths:
-        exists_anywhere = any((clone / fp).exists() for clone in repo_clones)
+        exists_anywhere = any(
+            (clone / fp).exists()
+            or (prefix is not None and (clone / prefix / fp).exists())
+            for clone, prefix in repo_clones
+        )
         if classification == "create" and exists_anywhere:
             findings.append(
                 PlanCheckResult(

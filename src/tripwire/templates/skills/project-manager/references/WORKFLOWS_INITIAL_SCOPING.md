@@ -12,6 +12,14 @@ empty `./plans/` subdirectory by default — the user drops raw planning
 docs in there before invoking scoping. Scoping also works from user
 intent alone if `./plans/` is empty or missing.
 
+**Project-tracking repo git remote (v0.7.4+).** If you plan to run
+parallel sessions, configure a git remote on this project-tracking
+repo (`git remote -v` should show at least one entry). `session spawn`
+cuts a per-session `proj/<session-slug>` worktree when a remote is
+present, so parallel agents don't race on `sessions/<id>/` or
+`issues/<KEY>/developer.md` writes. No remote → sessions fall back to
+shared-directory writes (pre-v0.7.4 behaviour).
+
 ## Before you start
 
 **Do not set a target number of issues, nodes, or sessions.** Let the

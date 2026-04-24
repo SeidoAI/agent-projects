@@ -168,6 +168,110 @@ class TestOrphanWorktreeScan:
         assert "Removed orphan" in result.output
         assert not orphan.exists()
 
+    def test_orphan_scan_finds_project_tracking_worktree_not_in_runtime_state(
+        self, tmp_path_project, save_test_session
+    ):
+        """v0.7.4: a project-tracking worktree that leaked — interrupted
+        spawn, pre-runtime_state crash — lives at
+        ``<project_dir>.parent/<project_dir>.name-wt-<sid>``. It's NOT
+        under any registered code-repo clone, so the pre-v0.7.4
+        orphan scan (which only iterated ``proj.repos.items()``) would
+        have missed it. This test proves ``project_dir`` is now
+        included as a scan root."""
+        _init_repo(tmp_path_project)
+        # Orphan project-tracking worktree: sibling of project_dir,
+        # name matches the v0.7.4 convention, NOT in runtime_state.
+        orphan = _add_worktree(
+            tmp_path_project,
+            f"{tmp_path_project.name}-wt-s1",
+            "proj/s1",
+        )
+        assert orphan.is_dir()
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="completed",
+            # Empty runtime_state — orphan was never recorded.
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            ["cleanup", "s1", "--project-dir", str(tmp_path_project)],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Removed orphan" in result.output
+        assert str(orphan) in result.output
+        assert not orphan.exists()
+
+    def test_cleanup_removes_both_code_and_project_tracking_worktrees(
+        self, tmp_path, tmp_path_project
+    ):
+        """v0.7.4: a session may own BOTH a code worktree and a
+        project-tracking worktree (recorded in runtime_state). Cleanup
+        must iterate both and remove them together — not stop after
+        the first."""
+        from tripwire.core.session_store import save_session
+        from tripwire.models import AgentSession
+        from tripwire.models.session import RuntimeState, WorktreeEntry
+
+        code_clone = tmp_path / "code"
+        code_clone.mkdir()
+        _init_repo(code_clone)
+        code_wt = _add_worktree(code_clone, "code-wt-s1", "feat/s1")
+
+        # Project-tracking repo worktree — different clone entirely.
+        proj_clone = tmp_path / "proj-tracking"
+        proj_clone.mkdir()
+        _init_repo(proj_clone)
+        proj_wt = _add_worktree(proj_clone, "proj-tracking-wt-s1", "proj/s1")
+
+        _configure_project_repos(tmp_path_project, "SeidoAI/code", code_clone)
+
+        # Persist a session whose runtime_state records both worktrees.
+        save_session(
+            tmp_path_project,
+            AgentSession.model_validate(
+                {
+                    "id": "s1",
+                    "name": "Test session",
+                    "agent": "backend-coder",
+                    "issues": [],
+                    "repos": [],
+                    "status": "completed",
+                    "runtime_state": RuntimeState(
+                        worktrees=[
+                            WorktreeEntry(
+                                repo="SeidoAI/code",
+                                clone_path=str(code_clone),
+                                worktree_path=str(code_wt),
+                                branch="feat/s1",
+                            ),
+                            WorktreeEntry(
+                                repo="proj-tracking",
+                                clone_path=str(proj_clone),
+                                worktree_path=str(proj_wt),
+                                branch="proj/s1",
+                            ),
+                        ]
+                    ).model_dump(),
+                }
+            ),
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            ["cleanup", "s1", "--project-dir", str(tmp_path_project)],
+        )
+
+        assert result.exit_code == 0, result.output
+        # Content assertion: BOTH worktrees are gone from disk.
+        assert not code_wt.exists(), f"{code_wt} should have been removed"
+        assert not proj_wt.exists(), f"{proj_wt} should have been removed"
+
     def test_cleanup_does_not_touch_non_matching_dirs(
         self, tmp_path, tmp_path_project, save_test_session
     ):

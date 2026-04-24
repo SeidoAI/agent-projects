@@ -91,7 +91,15 @@ class TestAllowedTypes:
             "docs",
             "chore",
             "test",
+            "proj",
         }
+
+    def test_proj_accepted_as_branch_type(self):
+        """v0.7.4: `proj/<session-slug>` is the per-session branch name
+        used in the project-tracking repo — derive_branch_name + the
+        validators must accept it."""
+        assert is_valid_branch_name("proj/infra-gcs") is True
+        assert derive_branch_name("session-infra-gcs", "proj") == "proj/infra-gcs"
 
 
 class TestProjectOverrides:
