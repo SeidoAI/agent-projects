@@ -71,7 +71,10 @@ function ConceptGraphInner() {
   const { projectId } = useProjectShell();
   const navigate = useNavigate();
   const { data, isLoading, isError } = useConceptGraph(projectId);
-  const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set());
+  // `null` means "user hasn't touched the filter yet — treat as all".
+  // Picking a sentinel instead of a mount-time effect avoids a first-
+  // paint flash of zero nodes while the effect waits to run.
+  const [activeTypes, setActiveTypes] = useState<Set<string> | null>(null);
 
   const availableTypes = useMemo(() => {
     if (!data) return [] as string[];
@@ -80,12 +83,18 @@ function ConceptGraphInner() {
     return Array.from(seen).sort();
   }, [data]);
 
+  // The effective set drives both filtering and aria-pressed so the
+  // two can't disagree. Before the first toggle, it's every type;
+  // after, it's exactly what the user has selected.
+  const effectiveActive = useMemo<Set<string>>(
+    () => activeTypes ?? new Set(availableTypes),
+    [activeTypes, availableTypes],
+  );
+
   const filteredNodes = useMemo(() => {
     if (!data) return [] as Node[];
-    const visible =
-      activeTypes.size === 0 ? data.nodes : data.nodes.filter((n) => activeTypes.has(n.type));
-    return visible.map(mapNode);
-  }, [data, activeTypes]);
+    return data.nodes.filter((n) => effectiveActive.has(n.type)).map(mapNode);
+  }, [data, effectiveActive]);
 
   const filteredEdges = useMemo(() => {
     if (!data) return [] as Edge[];
@@ -115,7 +124,9 @@ function ConceptGraphInner() {
 
   const toggleType = (t: string) => {
     setActiveTypes((prev) => {
-      const next = new Set(prev);
+      // First toggle: base off the "all types" view the user actually sees.
+      const base = prev ?? new Set(availableTypes);
+      const next = new Set(base);
       if (next.has(t)) next.delete(t);
       else next.add(t);
       return next;
@@ -135,7 +146,7 @@ function ConceptGraphInner() {
         <h3 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Node types</h3>
         <ul className="space-y-1">
           {availableTypes.map((t) => {
-            const active = activeTypes.size === 0 || activeTypes.has(t);
+            const active = effectiveActive.has(t);
             return (
               <li key={t}>
                 <button

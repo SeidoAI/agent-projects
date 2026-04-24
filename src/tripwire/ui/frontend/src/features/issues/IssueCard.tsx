@@ -35,10 +35,14 @@ export function IssueCard({ issue, refCount }: IssueCardProps) {
       {...listeners}
     >
       <div className="flex items-start justify-between gap-2">
+        {/* No stopPropagation here — dnd-kit's PointerSensor listens on
+            the draggable root (this card) and a child-level stop would
+            swallow `pointerdown` before the sensor ever sees it, which
+            silently breaks drag-from-link-area. The `distance: 5`
+            activation constraint on the sensor already keeps a plain
+            click from registering as a drag. */}
         <Link
           to={`/p/${projectId}/issues/${issue.id}`}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
           className={cn(
             "font-mono text-xs text-muted-foreground hover:text-foreground",
             issue.is_epic && "text-sm font-semibold",

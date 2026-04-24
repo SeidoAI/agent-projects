@@ -26,42 +26,54 @@ export interface UpdateStatusVariables {
   status: string;
 }
 
+interface Snapshot {
+  queryKey: readonly unknown[];
+  data: IssueSummary[];
+}
+
 interface MutationCtx {
-  previous: IssueSummary[] | undefined;
+  snapshots: Snapshot[];
 }
 
 /**
- * Optimistic PATCH for issue status. The mutation:
- *   1. cancels in-flight list fetches so the optimistic write isn't
- *      clobbered by a slower GET,
- *   2. snapshots the current list into `context.previous`,
- *   3. writes the new status into the cache immediately,
- *   4. on error, restores the snapshot (caller surfaces the toast),
- *   5. on success/error alike, invalidates `issues(pid)` so the next
- *      render reflects the authoritative server state.
+ * Optimistic PATCH for issue status. Every cache entry under the
+ * `["issues", pid]` prefix — both `queryKeys.issues(pid)` and every
+ * `queryKeys.issuesFiltered(pid, filters)` — gets the same optimistic
+ * write and the same rollback on error. The dashboard deep-links the
+ * board with `?status=` which will eventually drive the filtered key,
+ * so this hook can't assume a single cache entry.
  */
 export function useUpdateIssueStatus(pid: string) {
   const qc = useQueryClient();
+  const prefix = ["issues", pid] as const;
   return useMutation<IssueSummary, ApiError, UpdateStatusVariables, MutationCtx>({
     mutationFn: ({ key, status }) => issuesApi.patch(pid, key, { status }),
     onMutate: async ({ key, status }) => {
-      await qc.cancelQueries({ queryKey: queryKeys.issues(pid) });
-      const previous = qc.getQueryData<IssueSummary[]>(queryKeys.issues(pid));
-      if (previous) {
+      // Prefix-match cancel covers both the list key and any filtered
+      // variant. Without this, a slower GET can clobber the optimistic
+      // write on whichever view the user is looking at.
+      await qc.cancelQueries({ queryKey: prefix });
+
+      const snapshots: Snapshot[] = [];
+      for (const query of qc.getQueryCache().findAll({ queryKey: prefix })) {
+        const data = query.state.data as IssueSummary[] | undefined;
+        if (!data) continue;
+        snapshots.push({ queryKey: query.queryKey, data });
         qc.setQueryData<IssueSummary[]>(
-          queryKeys.issues(pid),
-          previous.map((i) => (i.id === key ? { ...i, status } : i)),
+          query.queryKey,
+          data.map((i) => (i.id === key ? { ...i, status } : i)),
         );
       }
-      return { previous };
+      return { snapshots };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previous) {
-        qc.setQueryData(queryKeys.issues(pid), ctx.previous);
+      if (!ctx) return;
+      for (const s of ctx.snapshots) {
+        qc.setQueryData(s.queryKey, s.data);
       }
     },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.issues(pid) });
+      qc.invalidateQueries({ queryKey: prefix });
     },
   });
 }
