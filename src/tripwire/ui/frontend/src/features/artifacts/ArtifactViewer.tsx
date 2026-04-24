@@ -28,8 +28,26 @@ function formatMtime(iso: string | null): string | null {
 }
 
 export function ArtifactViewer({ projectId, sessionId, name, status }: ArtifactViewerProps) {
-  const present = status?.present ?? true;
-  const { data: artifact, isLoading, error } = useArtifact(projectId, sessionId, name, present);
+  // While `status` is still loading we don't know whether the artifact exists,
+  // so refuse to fire the detail fetch until the list query resolves. Default
+  // to `false` here instead of `true` — the brief "status-unknown" window is
+  // rendered as a skeleton, not a premature network call.
+  const statusLoading = status === undefined;
+  const present = status?.present ?? false;
+  const {
+    data: artifact,
+    isLoading,
+    error,
+  } = useArtifact(projectId, sessionId, name, !statusLoading && present);
+
+  if (statusLoading) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-5 w-1/3" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   if (!present) {
     const expectedPath = status?.spec.file

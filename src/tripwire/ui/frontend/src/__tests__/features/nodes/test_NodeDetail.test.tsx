@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NodeDetail as NodeDetailView } from "@/features/nodes/NodeDetail";
@@ -227,6 +227,68 @@ describe("NodeDetail", () => {
       "href",
       "https://github.com/SeidoAI/tripwire/blob/main/src/api/auth.py#L45-L82",
     );
+  });
+
+  it("resets reverse-refs pagination to page 1 when nodeId changes", () => {
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+    });
+    const nodeA = baseNode({ id: "node-a", name: "Node A" });
+    const nodeB = baseNode({ id: "node-b", name: "Node B" });
+    qc.setQueryData(queryKeys.node("p1", "node-a"), nodeA);
+    qc.setQueryData(queryKeys.node("p1", "node-b"), nodeB);
+    qc.setQueryData(queryKeys.project("p1"), baseProject());
+    qc.setQueryData(queryKeys.nodes("p1"), []);
+    qc.setQueryData(queryKeys.reverseRefs("p1", "node-a"), {
+      node_id: "node-a",
+      referrers: makeReferrers(25), // 3 pages
+    });
+    qc.setQueryData(queryKeys.reverseRefs("p1", "node-b"), {
+      node_id: "node-b",
+      referrers: makeReferrers(8), // 1 page
+    });
+
+    const GoToB = () => (
+      <Link to="/p/p1/nodes/node-b" data-testid="nav-b">
+        go B
+      </Link>
+    );
+
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={["/p/p1/nodes/node-a"]}>
+          <Routes>
+            <Route
+              path="/p/:projectId/nodes/:nodeId"
+              element={
+                <>
+                  <GoToB />
+                  <NodeDetailView />
+                </>
+              }
+            />
+            <Route path="/p/:projectId/graph" element={<div>Graph stub</div>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    // On Node A: advance to page 3.
+    expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("Page 3 of 3")).toBeInTheDocument();
+
+    // Navigate to Node B. `key={nodeId}` on NodeDetailInner must remount
+    // NodeReverseRefs so its local `page` state resets to 0. Node B only
+    // has 1 page, so the paginator controls are absent — the assertion is
+    // that no "Page 3" label lingers.
+    fireEvent.click(screen.getByTestId("nav-b"));
+
+    expect(screen.queryByText(/Page 3 of/)).not.toBeInTheDocument();
+    // 8 referrers on Node B — all fit on one page, no paginator.
+    expect(screen.queryByRole("button", { name: "Next page" })).not.toBeInTheDocument();
+    expect(screen.getByText("Referenced by (8)")).toBeInTheDocument();
   });
 
   it("renders 'not found' when the API returns 404", async () => {

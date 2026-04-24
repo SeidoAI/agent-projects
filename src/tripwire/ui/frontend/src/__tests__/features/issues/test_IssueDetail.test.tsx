@@ -226,8 +226,18 @@ describe("IssueDetail", () => {
     });
   });
 
-  it("fires validate and shows a success toast when errors=0", async () => {
-    const report: IssueValidationReport = { errors: 0, warnings: 0, codes: [] };
+  it("fires validate and shows a success toast when the report has 0 errors", async () => {
+    // Backend ValidationReport.to_json() shape: errors/warnings are ARRAYS;
+    // numeric counts live under summary.errors / summary.warnings.
+    const report: IssueValidationReport = {
+      version: 1,
+      exit_code: 0,
+      summary: { errors: 0, warnings: 0, fixed: 0 },
+      categories: {},
+      errors: [],
+      warnings: [],
+      fixed: [],
+    };
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(report), {
         status: 200,
@@ -247,7 +257,82 @@ describe("IssueDetail", () => {
         expect.objectContaining({ method: "POST" }),
       );
     });
-    expect(toastMocks.success).toHaveBeenCalled();
+    expect(toastMocks.success).toHaveBeenCalledWith("Validation passed.");
+    expect(toastMocks.error).not.toHaveBeenCalled();
+  });
+
+  it("shows a warning count in the success toast when errors=0 but warnings>0", async () => {
+    const report: IssueValidationReport = {
+      version: 1,
+      exit_code: 1,
+      summary: { errors: 0, warnings: 2, fixed: 0 },
+      categories: {
+        ref: { errors: 0, warnings: 2, fixed: 0 },
+      },
+      errors: [],
+      warnings: [
+        { code: "ref/stale", severity: "warning", message: "..." },
+        { code: "ref/stale", severity: "warning", message: "..." },
+      ],
+      fixed: [],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(report), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+
+    const { wrapper } = prime(baseIssue(), baseProject());
+    render(<IssueDetailView />, { wrapper });
+    fireEvent.click(screen.getByRole("button", { name: /Validate/ }));
+
+    await waitFor(() =>
+      expect(toastMocks.success).toHaveBeenCalledWith("Validation passed (2 warnings)."),
+    );
+    expect(toastMocks.error).not.toHaveBeenCalled();
+  });
+
+  it("shows an error toast with category summary when errors>0", async () => {
+    const report: IssueValidationReport = {
+      version: 1,
+      exit_code: 2,
+      summary: { errors: 2, warnings: 1, fixed: 0 },
+      categories: {
+        ref: { errors: 1, warnings: 1, fixed: 0 },
+        issue_artifact: { errors: 1, warnings: 0, fixed: 0 },
+      },
+      errors: [
+        { code: "ref/dangling", severity: "error", message: "..." },
+        { code: "issue_artifact/missing", severity: "error", message: "..." },
+      ],
+      warnings: [{ code: "ref/stale", severity: "warning", message: "..." }],
+      fixed: [],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(report), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+
+    const { wrapper } = prime(baseIssue(), baseProject());
+    render(<IssueDetailView />, { wrapper });
+    fireEvent.click(screen.getByRole("button", { name: /Validate/ }));
+
+    await waitFor(() => expect(toastMocks.error).toHaveBeenCalled());
+    const msg = toastMocks.error.mock.calls[0]?.[0] as string;
+    expect(msg).toContain("2 errors");
+    expect(msg).toContain("1 warnings");
+    expect(msg).toContain("ref×2");
+    expect(msg).toContain("issue_artifact×1");
+    expect(toastMocks.success).not.toHaveBeenCalled();
   });
 
   it("renders the 'Open in editor' link using the project dir", () => {

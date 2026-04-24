@@ -43,17 +43,37 @@ export interface IssuePatchBody {
   agent?: string;
 }
 
-export interface IssueValidationCode {
+export interface ValidationFinding {
   code: string;
-  count: number;
+  severity: "error" | "warning" | "fixed" | "info";
+  message: string;
+  file?: string | null;
+  line?: number | null;
+  [key: string]: unknown;
 }
 
-export interface IssueValidationReport {
+export interface ValidationSummary {
   errors: number;
   warnings: number;
-  info?: number;
-  codes?: IssueValidationCode[];
-  [key: string]: unknown;
+  fixed: number;
+  cache_rebuilt?: boolean;
+  duration_ms?: number;
+}
+
+export type ValidationCategoryCounts = {
+  errors: number;
+  warnings: number;
+  fixed: number;
+};
+
+export interface IssueValidationReport {
+  version: number;
+  exit_code: number;
+  summary: ValidationSummary;
+  categories: Record<string, ValidationCategoryCounts>;
+  errors: ValidationFinding[];
+  warnings: ValidationFinding[];
+  fixed: ValidationFinding[];
 }
 
 export const issuesApi = {

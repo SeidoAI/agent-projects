@@ -14,7 +14,10 @@ import { NodeSourcePanel } from "./NodeSourcePanel";
 export function NodeDetail() {
   const { projectId, nodeId } = useParams<{ projectId: string; nodeId: string }>();
   if (!projectId || !nodeId) return <NotFound projectId={projectId} />;
-  return <NodeDetailInner projectId={projectId} nodeId={nodeId} />;
+  // `key={nodeId}` remounts the subtree when the URL node id changes so that
+  // NodeReverseRefs' local page state resets to page 1 instead of silently
+  // carrying the previous node's page across the navigation.
+  return <NodeDetailInner key={nodeId} projectId={projectId} nodeId={nodeId} />;
 }
 
 function NodeDetailInner({ projectId, nodeId }: { projectId: string; nodeId: string }) {

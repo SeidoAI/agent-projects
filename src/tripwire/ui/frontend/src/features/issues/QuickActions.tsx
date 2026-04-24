@@ -42,15 +42,24 @@ export function QuickActions({ issue, projectId }: QuickActionsProps) {
   function onValidateClick() {
     validate.mutate(undefined, {
       onSuccess: (report) => {
-        const errors = report.errors ?? 0;
-        const warnings = report.warnings ?? 0;
-        const codeSummary = (report.codes ?? []).map((c) => `${c.code}×${c.count}`).join(", ");
-        const body = codeSummary
-          ? `${errors} errors · ${warnings} warnings — ${codeSummary}`
-          : `${errors} errors · ${warnings} warnings`;
+        const errors = report.summary?.errors ?? 0;
+        const warnings = report.summary?.warnings ?? 0;
+        const categories = report.categories ?? {};
+        const categorySummary = Object.entries(categories)
+          .map(([cat, counts]) => {
+            const total = (counts.errors ?? 0) + (counts.warnings ?? 0);
+            return total > 0 ? `${cat}×${total}` : null;
+          })
+          .filter((s): s is string => s !== null)
+          .join(", ");
         if (errors === 0) {
-          toast.success(body);
+          toast.success(
+            warnings === 0 ? "Validation passed." : `Validation passed (${warnings} warnings).`,
+          );
         } else {
+          const body = categorySummary
+            ? `${errors} errors · ${warnings} warnings — ${categorySummary}`
+            : `${errors} errors · ${warnings} warnings`;
           toast.error(body);
         }
       },

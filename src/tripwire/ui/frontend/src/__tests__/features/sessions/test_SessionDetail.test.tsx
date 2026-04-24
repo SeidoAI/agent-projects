@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SessionDetail } from "@/features/sessions/SessionDetail";
@@ -170,6 +170,59 @@ describe("SessionDetail", () => {
     clickTab(screen.getByRole("tab", { name: "Artifacts" }));
     expect(container.querySelector('[data-tab-name="plan"]')).not.toBeNull();
     expect(container.querySelector('[data-tab-name="task-checklist"]')).not.toBeNull();
+  });
+
+  it("resets the active tab to Plan when the URL :sid changes", async () => {
+    const sessionA = baseSession({ id: "sess-a", name: "Session A" });
+    const sessionB = baseSession({ id: "sess-b", name: "Session B" });
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+    });
+    qc.setQueryData(queryKeys.session("p1", sessionA.id), sessionA);
+    qc.setQueryData(queryKeys.session("p1", sessionB.id), sessionB);
+
+    // A link inside the route tree triggers a client-side navigation so the
+    // `:sid` segment changes while the Router / QueryClient / DOM tree are
+    // all preserved — the exact condition the `key={sid}` fix targets.
+    const GoToB = () => (
+      <Link to={`/p/p1/sessions/${sessionB.id}`} data-testid="nav-b">
+        go B
+      </Link>
+    );
+
+    const { container } = render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={[`/p/p1/sessions/${sessionA.id}`]}>
+          <Routes>
+            <Route
+              path="/p/:projectId/sessions/:sid"
+              element={
+                <>
+                  <GoToB />
+                  <SessionDetail />
+                </>
+              }
+            />
+            <Route path="/p/:projectId/sessions" element={<div>sessions stub</div>} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    // Start on Session A, switch to Repos tab.
+    expect(screen.getByText("Session A")).toBeInTheDocument();
+    clickTab(screen.getByRole("tab", { name: "Repos" }));
+    const activeA = container.querySelector('[role="tab"][data-state="active"]');
+    expect(activeA?.textContent).toMatch(/Repos/);
+
+    // Client-side nav to session B via an in-tree link.
+    fireEvent.click(screen.getByTestId("nav-b"));
+
+    // React re-renders with the new :sid. `key={sid}` on SessionDetailInner
+    // remounts the subtree; the uncontrolled Tabs default ("plan") wins.
+    expect(await screen.findByText("Session B")).toBeInTheDocument();
+    const activeB = container.querySelector('[role="tab"][data-state="active"]');
+    expect(activeB?.textContent).toMatch(/Plan/);
   });
 
   it("renders 'not found' when the session API returns 404", async () => {

@@ -15,7 +15,10 @@ import { TaskProgressBar } from "./TaskProgressBar";
 export function SessionDetail() {
   const { projectId, sid } = useParams<{ projectId: string; sid: string }>();
   if (!projectId || !sid) return <NotFound projectId={projectId} />;
-  return <SessionDetailInner projectId={projectId} sid={sid} />;
+  // `key={sid}` remounts the subtree when the URL session id changes so the
+  // active Radix Tab (uncontrolled) resets to "plan" and any other local
+  // state (e.g. a pending ArtifactList tab) starts fresh.
+  return <SessionDetailInner key={sid} projectId={projectId} sid={sid} />;
 }
 
 function SessionDetailInner({ projectId, sid }: { projectId: string; sid: string }) {
