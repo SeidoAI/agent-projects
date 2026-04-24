@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.12, Click (CLI), Pydantic (models), pytest, git worktrees
 
-**Spec:** `docs/superpowers/specs/2026-04-16-session-spawn-agenda-worktrees-design.md`
+**Spec:** `docs/specs/2026-04-16-session-spawn-agenda-worktrees.md`
 
 ---
 

@@ -163,7 +163,7 @@ Short (~20 lines). Explains how the pieces connect:
 5. **Review** — `/pm-session-review` checks PR vs acceptance criteria; writes `verified.md` + `review.json`.
 6. **Complete** — `/pm-session-complete` gates on merged PR + artifacts + review exit-code; closes issues; cleans worktree; PM reviews insights.
 
-Cite: `docs/superpowers/specs/2026-04-20-v07-unified-design.md` for full detail.
+Cite: `docs/specs/2026-04-20-v07-unified.md` for full detail.
 
 ### Phase 6: Rewrite "How it works"
 
@@ -194,7 +194,7 @@ Drop "Four principles" numbering — these are mechanisms, not principles.
 
 ### Phase 10: Post-refresh verification
 
-- [ ] `grep -rn 'Keel\|keel' README.md` — zero (except in historical filename refs under `docs/superpowers/specs/2026-04-15-*` if referenced).
+- [ ] `grep -rn 'Keel\|keel' README.md` — zero (except in historical filename refs under `docs/specs/2026-04-15-*` if referenced).
 - [ ] Every slash command in the README table appears as a file under `src/tripwire/templates/commands/`.
 - [ ] Project-layout block matches what `tripwire init` actually produces (spot-check against a fresh `tripwire init /tmp/readme-test`).
 - [ ] Version / test-count / check-count / skill-ref-count numbers match live counts.

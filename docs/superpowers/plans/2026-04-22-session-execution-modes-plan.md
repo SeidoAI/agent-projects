@@ -5,7 +5,7 @@
 > correction (2026-04-22 afternoon), and the tmux runtime was
 > reverted to subprocess in the second correction (2026-04-23). Read
 > the spec's correction preambles at
-> `docs/superpowers/specs/2026-04-22-session-execution-modes.md` for
+> `docs/specs/2026-04-22-session-execution-modes.md` for
 > the shipped design. The final implementation is a `SubprocessRuntime`
 > using `claude -p` + log file, with agent-driven PR creation at exit.
 
@@ -17,7 +17,7 @@
 
 **Tech Stack:** Python 3.12, pydantic v2, Click, pytest + Click's CliRunner, Jinja2 (for CLAUDE.md template), `subprocess` for tmux, `gh` CLI for PR creation, `importlib.resources` for package data access.
 
-**Spec:** `docs/superpowers/specs/2026-04-22-session-execution-modes.md`
+**Spec:** `docs/specs/2026-04-22-session-execution-modes.md`
 
 ---
 

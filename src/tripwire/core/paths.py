@@ -97,7 +97,7 @@ HANDOFF_FILENAME = "handoff.yaml"
 # Workspace-level constants (v0.6b).
 # A workspace is a separate git repo containing canonical shared nodes
 # for N member projects. See
-# docs/superpowers/specs/2026-04-15-keel-workspace-design.md.
+# docs/specs/2026-04-15-keel-workspace.md.
 WORKSPACE_YAML = "workspace.yaml"
 WORKSPACE_NODES_DIR = "nodes"  # same name as in-project nodes/, at workspace root
 MERGE_BRIEFS_DIR = ".tripwire/merge-briefs"

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.13, uv, Pydantic, Click, ruff, pytest, Jinja2, GitHub Actions, PyPI.
 
-**Spec:** `docs/superpowers/specs/2026-04-20-v07-unified-design.md` §5-12.
+**Spec:** `docs/specs/2026-04-20-v07-unified.md` §5-12.
 
 **Prerequisite:** v0.7a rename merged (`src/tripwire/` exists, CLI is `tripwire`/`tw`, `tripwire_version` field, `.tripwire.lock` etc.).
 

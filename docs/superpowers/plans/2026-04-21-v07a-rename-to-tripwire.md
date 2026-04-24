@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.13, uv, Pydantic, Click, ruff, pytest.
 
-**Spec:** `docs/superpowers/specs/2026-04-20-v07-unified-design.md` §4.
+**Spec:** `docs/specs/2026-04-20-v07-unified.md` §4.
 
 **Scope:** v0.7a only. v0.7b (8 feature phases) is a separate plan written after this merges.
 
@@ -572,14 +572,14 @@ Text in `docs/`, `README.md`, and `CONTRIBUTING.md` (if present) referring to th
 
 **Files:**
 - Modify: `README.md`
-- Modify: `docs/**/*.md` (except `docs/superpowers/specs/` — those are historical records)
+- Modify: `docs/**/*.md` (except `docs/specs/` — those are historical records)
 - Modify: `docs/superpowers/plans/` except this plan
 
 - [ ] **Step 1: Find `keel` in README and docs**
 
 ```bash
 grep -rln "\bkeel\b\|\.keel\|SeidoAI/keel" README.md docs/ 2>/dev/null | \
-  grep -v "docs/superpowers/specs/" > /tmp/keel-docs.txt
+  grep -v "docs/specs/" > /tmp/keel-docs.txt
 wc -l /tmp/keel-docs.txt
 cat /tmp/keel-docs.txt
 ```
@@ -616,12 +616,12 @@ done < /tmp/keel-docs.txt
 
 - [ ] **Step 4: Historical specs stay as-is**
 
-Files in `docs/superpowers/specs/` are point-in-time design records. Do NOT rewrite them; they reference `keel` because that was the name when they were written. The v0.7 spec itself already uses `tripwire` because it was written after the brainstorm decision.
+Files in `docs/specs/` are point-in-time design records. Do NOT rewrite them; they reference `keel` because that was the name when they were written. The v0.7 spec itself already uses `tripwire` because it was written after the brainstorm decision.
 
 Verify:
 
 ```bash
-grep -l "^name.*tripwire\|^# Tripwire" docs/superpowers/specs/2026-04-20-v07-unified-design.md
+grep -l "^name.*tripwire\|^# Tripwire" docs/specs/2026-04-20-v07-unified.md
 ```
 
 Expected: match. If not, the spec file needs a title update — but that should already have been done when the spec was written.
@@ -872,7 +872,7 @@ gh pr create --title "v0.7a: rename keel → tripwire" --body "$(cat <<'EOF'
 ## Summary
 
 Renames the package from `keel` to `tripwire` per the v0.7 spec
-(§4 of `docs/superpowers/specs/2026-04-20-v07-unified-design.md`).
+(§4 of `docs/specs/2026-04-20-v07-unified.md`).
 
 **Scope — this PR:**
 - Package directory: `src/keel/` → `src/tripwire/`

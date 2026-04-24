@@ -285,7 +285,7 @@ summary.
      (proves it re-read the updated plan).
 
 **Spec + plan fixes**
-- `docs/superpowers/specs/2026-04-22-session-execution-modes.md`:
+- `docs/specs/2026-04-22-session-execution-modes.md`:
   - In the first "Correction (2026-04-22 afternoon)" preamble,
     remove the stale bullet that still lists
     `RuntimeState.tmux_session_name` under "Retained from the
@@ -395,7 +395,7 @@ ships" decision rather than splitting it.
 | `tests/unit/test_session_log_parser.py` | **NEW** + stream-json fixtures (H6). |
 | `scripts/smoke-subprocess-runtime.sh` | **NEW** (H7). |
 | `scripts/smoke-subprocess-resume.sh` | **NEW** (H7). |
-| `docs/superpowers/specs/2026-04-22-session-execution-modes.md` | Stale-bullet fix + process-group note (H7). |
+| `docs/specs/2026-04-22-session-execution-modes.md` | Stale-bullet fix + process-group note (H7). |
 | PR #16 body | Rewrite to match pivot (H9). |
 
 ## Verification

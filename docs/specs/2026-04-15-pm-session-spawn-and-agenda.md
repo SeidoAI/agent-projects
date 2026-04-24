@@ -18,7 +18,7 @@ While running `/pm-scope` on the keel-ui-init project (71 issues across
 "now what?" moment after scoping completed.
 
 **Gap A — no way to launch a planned session locally.** The v0.6 PM
-command surface (per `2026-04-15-keel-workspace-design.md` §5.2) ships:
+command surface (per `2026-04-15-keel-workspace.md` §5.2) ships:
 
 - `/pm-session-create` — create a session for an issue
 - `/pm-session-launch` — transition `planned → queued`, write handoff
@@ -633,7 +633,7 @@ None blocking. To resolve during implementation:
 
 ## 9. Cross-references
 
-- `docs/superpowers/specs/2026-04-15-keel-workspace-design.md` —
+- `docs/specs/2026-04-15-keel-workspace.md` —
   parent v0.6 spec; this addendum extends §4.4 (Missing CLI commands)
   and §5 (PM command surface)
 - `docs/keel-containers.md` — orchestrator runtime; long-term home

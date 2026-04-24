@@ -6,7 +6,7 @@ Shared utility used by:
   the agent's CLAUDE.md so the agent reads them at session start)
 
 The v0.7.3 implementation returns id + node-file path + existence flag.
-The v0.8 spec (`docs/superpowers/specs/2026-04-24-v08-bidirectional-concept-graph.md`
+The v0.8 spec (`docs/specs/2026-04-24-v08-bidirectional-concept-graph.md`
 §7.1) extends this dataclass with `version_pinned`, `current_version`,
 and `is_stale` fields — additive, no consumer breakage.
 """

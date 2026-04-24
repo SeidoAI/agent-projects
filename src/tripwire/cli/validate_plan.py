@@ -13,7 +13,7 @@ v0.7.3 ships four checks:
 - `plan/modify_target_missing` — heuristic: step says "modify X" but X is missing
 
 The v0.8 spec
-(`docs/superpowers/specs/2026-04-24-v08-bidirectional-concept-graph.md` §7.2)
+(`docs/specs/2026-04-24-v08-bidirectional-concept-graph.md` §7.2)
 extends this with version-pin freshness checks. The v0.7.3 implementation
 is designed for clean extension — same dataclass shape, additive fields.
 """

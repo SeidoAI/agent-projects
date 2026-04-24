@@ -461,7 +461,7 @@ fine, it's not security-relevant info.
   developer.md for evidence
 - `2026-04-16-v07-pm-monitor.md` — `pm-session-complete` is the
   hook point for `session.complete` events
-- `2026-04-20-v07-unified-design.md` — v0.7's existing primitives;
+- `2026-04-20-v07-unified.md` — v0.7's existing primitives;
   this spec adds the third
 - `src/tripwire/templates/skills/project-manager/references/ANTI_PATTERNS.md`
   — the fatigue / quality-degradation pattern this primitive
