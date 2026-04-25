@@ -42,9 +42,7 @@ def _init_repo(path: Path) -> None:
     )
 
 
-def test_resolve_worktrees_skips_overlap_with_project_dir(
-    tmp_path, monkeypatch
-):
+def test_resolve_worktrees_skips_overlap_with_project_dir(tmp_path, monkeypatch):
     """When session.repos[0] resolves to project_dir, resolve_worktrees
     must skip that entry (and return zero entries) — the PT pass cuts
     the only worktree."""
@@ -70,9 +68,7 @@ def test_resolve_worktrees_skips_overlap_with_project_dir(
         lambda _proj, _slug: project_dir,
     )
     # Skip draft-PR side effects.
-    monkeypatch.setattr(
-        "tripwire.runtimes.prep._open_draft_pr", lambda **kw: None
-    )
+    monkeypatch.setattr("tripwire.runtimes.prep._open_draft_pr", lambda **kw: None)
 
     entries = resolve_worktrees(
         session=session,
@@ -111,9 +107,7 @@ def test_resolve_worktrees_keeps_non_overlapping_entry(tmp_path, monkeypatch):
         "tripwire.runtimes.prep._resolve_clone_path",
         lambda _proj, _slug: other_clone,
     )
-    monkeypatch.setattr(
-        "tripwire.runtimes.prep._open_draft_pr", lambda **kw: None
-    )
+    monkeypatch.setattr("tripwire.runtimes.prep._open_draft_pr", lambda **kw: None)
 
     entries = resolve_worktrees(
         session=session,
@@ -156,12 +150,8 @@ def test_resolve_worktrees_skips_overlap_among_multi_repo_session(
     def _fake_resolve(_proj, slug):
         return project_dir if slug == "self/repo" else other_clone
 
-    monkeypatch.setattr(
-        "tripwire.runtimes.prep._resolve_clone_path", _fake_resolve
-    )
-    monkeypatch.setattr(
-        "tripwire.runtimes.prep._open_draft_pr", lambda **kw: None
-    )
+    monkeypatch.setattr("tripwire.runtimes.prep._resolve_clone_path", _fake_resolve)
+    monkeypatch.setattr("tripwire.runtimes.prep._open_draft_pr", lambda **kw: None)
 
     entries = resolve_worktrees(
         session=session,

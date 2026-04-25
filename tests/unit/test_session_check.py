@@ -162,7 +162,9 @@ class TestSkeleton:
         )
         results = strict_check(tmp_path_project, "session-clean")
         errors = [r for r in results if r.severity == "error"]
-        assert errors == [], f"expected no errors, got: {[r.error_code for r in errors]}"
+        assert errors == [], (
+            f"expected no errors, got: {[r.error_code for r in errors]}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +183,9 @@ class TestPlanUnfilled:
             save_test_issue,
         )
         # Overwrite plan.md with placeholder content from the scaffold template.
-        (tmp_path_project / "sessions" / "session-plan-placeholder" / "plan.md").write_text(
+        (
+            tmp_path_project / "sessions" / "session-plan-placeholder" / "plan.md"
+        ).write_text(
             "# Plan — <session-id>\n\n## Goal\nWhat is this session trying "
             "to achieve, in one paragraph?\n\n## Issues in scope\n- <KEY>: title\n",
             encoding="utf-8",
@@ -201,7 +205,9 @@ class TestPlanUnfilled:
         )
         # Even without `<>` placeholders, the literal scaffold-doc string
         # "What to read, what to understand" reveals an unfilled plan.
-        (tmp_path_project / "sessions" / "session-plan-scaffold-string" / "plan.md").write_text(
+        (
+            tmp_path_project / "sessions" / "session-plan-scaffold-string" / "plan.md"
+        ).write_text(
             "# Plan — example\n\n## Goal\n"
             + ("Filler text to push past the 200-character body floor. " * 10)
             + "\n\n## Approach\n\n### Phase 1: Investigation\n"
@@ -260,7 +266,10 @@ class TestChecklistUnfilled:
         )
         # Scaffolded task-checklist: every row pending, comments are em-dashes.
         (
-            tmp_path_project / "sessions" / "session-checklist-empty" / "task-checklist.md"
+            tmp_path_project
+            / "sessions"
+            / "session-checklist-empty"
+            / "task-checklist.md"
         ).write_text(
             "# Task Checklist — example\n\n"
             "| # | Task | Status | Comments |\n"
@@ -284,7 +293,10 @@ class TestChecklistUnfilled:
             save_test_issue,
         )
         (
-            tmp_path_project / "sessions" / "session-checklist-commented" / "task-checklist.md"
+            tmp_path_project
+            / "sessions"
+            / "session-checklist-commented"
+            / "task-checklist.md"
         ).write_text(
             "# Task Checklist — example\n\n"
             "| # | Task | Status | Comments |\n"

@@ -28,9 +28,7 @@ import tripwire
 
 
 def _load_default_template() -> str:
-    path = (
-        Path(tripwire.__file__).parent / "templates" / "spawn" / "defaults.yaml"
-    )
+    path = Path(tripwire.__file__).parent / "templates" / "spawn" / "defaults.yaml"
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     return data["prompt_template"]
 
@@ -83,9 +81,7 @@ class TestSelfReviewExplicit:
         # Loose match on the temporal ordering: self-review must be
         # committed (not just authored as a PR comment).
         normalized = tpl.lower()
-        assert (
-            "commit" in normalized and "self-review" in normalized
-        )
+        assert "commit" in normalized and "self-review" in normalized
 
 
 class TestCIAwareExit:

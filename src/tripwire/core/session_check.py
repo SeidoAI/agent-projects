@@ -104,10 +104,7 @@ def _check_plan_unfilled(
             return StrictCheckResult(
                 error_code="check/plan_unfilled",
                 severity="error",
-                message=(
-                    f"plan.md still contains scaffold-template prose: "
-                    f"{needle!r}"
-                ),
+                message=(f"plan.md still contains scaffold-template prose: {needle!r}"),
                 fix_hint="Replace scaffold prose with the real plan content",
             )
 
@@ -228,6 +225,7 @@ def _check_verification_unfilled(
         )
 
     all_unchecked = all(state == " " for state, _ in items)
+
     # "Evidence" heuristic: any item whose body contains a dash-space
     # ("— …" / "- …") with content beyond a few words is treated as
     # evidence. Also any line containing "see " or "verified" in body.
@@ -283,7 +281,9 @@ def _check_repos_overlap(
 
     project_resolved = project_dir.expanduser().resolve()
     for rb in session.repos:
-        repo_cfg = project.repos.get(rb.repo) if isinstance(project.repos, dict) else None
+        repo_cfg = (
+            project.repos.get(rb.repo) if isinstance(project.repos, dict) else None
+        )
         if repo_cfg is None:
             continue
         local = getattr(repo_cfg, "local", None)
@@ -344,9 +344,7 @@ def _check_no_issues(
             error_code="check/no_issues",
             severity="error",
             message="session has no issues attached — no traceability",
-            fix_hint=(
-                "Add at least one issue key to session.yaml under `issues:`"
-            ),
+            fix_hint=("Add at least one issue key to session.yaml under `issues:`"),
         )
     return None
 
@@ -359,9 +357,7 @@ def _check_no_issues(
 # Match `path/to/file.md` (with or without backticks) — must end in a
 # recognised extension. Anchored on `\b` so we don't accidentally match
 # bare KUI-1 keys etc.
-_DOD_PATH_RE = re.compile(
-    r"`?(?P<path>[A-Za-z0-9_./\-]+\.(?:md|yaml|yml|json|txt))`?"
-)
+_DOD_PATH_RE = re.compile(r"`?(?P<path>[A-Za-z0-9_./\-]+\.(?:md|yaml|yml|json|txt))`?")
 
 
 def _check_missing_template(
@@ -511,9 +507,7 @@ _TRIPWIRES = (
 )
 
 
-def strict_check(
-    project_dir: Path, session_id: str
-) -> list[StrictCheckResult]:
+def strict_check(project_dir: Path, session_id: str) -> list[StrictCheckResult]:
     """Run every strict tripwire against ``session_id``.
 
     Raises :class:`FileNotFoundError` if the session doesn't exist.
@@ -534,9 +528,7 @@ def strict_check(
                 StrictCheckResult(
                     error_code="check/internal_error",
                     severity="error",
-                    message=(
-                        f"strict-check tripwire {tw.__name__} crashed: {exc!r}"
-                    ),
+                    message=(f"strict-check tripwire {tw.__name__} crashed: {exc!r}"),
                     fix_hint="File a bug; this is an internal tripwire failure",
                 )
             )

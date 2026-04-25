@@ -70,9 +70,7 @@ class TestSpawnCallsStrictCheckFirst:
 
     def test_no_bypass_flag_exists(self, tmp_path_project):
         runner = CliRunner()
-        result = runner.invoke(
-            session_cmd, ["spawn", "--help"]
-        )
+        result = runner.invoke(session_cmd, ["spawn", "--help"])
         assert result.exit_code == 0
         # Per §A4: no --force, no --skip-* on spawn.
         assert "--force" not in result.output
