@@ -107,7 +107,12 @@ markers = [
 ]
 
 [tool.codespell]
-skip = "uv.lock,.venv,*.lock"
+# package-lock.json carries vendored npm names (devlop, trough, vEw)
+# that codespell flags. afterAll/unparseable/statics are legitimate
+# project terms — Vitest's hook name, our chosen wording, and the
+# noun we use for "static files".
+skip = "uv.lock,.venv,*.lock,*-lock.json"
+ignore-words-list = "afterall,unparseable,statics"
 
 [tool.mypy]
 # Permissive baseline. The goal of the typecheck CI job at this stage
