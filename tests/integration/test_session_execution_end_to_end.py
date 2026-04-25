@@ -78,9 +78,17 @@ def test_subprocess_mode_end_to_end(
         "id: backend-coder\ncontext:\n  skills: [backend-development]\n"
     )
 
-    with patch(
-        "tripwire.runtimes.prep._resolve_clone_path",
-        return_value=clone,
+    # v0.7.5 prep prerequisites: gh-availability + draft-PR creation
+    # are unit-tested separately in tests/unit/test_prep_draft_pr.py.
+    # Bypass them here so this lifecycle test doesn't depend on the CI
+    # runner's gh auth state.
+    with (
+        patch(
+            "tripwire.runtimes.prep._resolve_clone_path",
+            return_value=clone,
+        ),
+        patch("tripwire.runtimes.prep._check_gh_available"),
+        patch("tripwire.runtimes.prep._open_draft_pr", return_value=None),
     ):
         runner = CliRunner()
         spawn_result = runner.invoke(

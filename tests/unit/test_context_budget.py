@@ -43,18 +43,19 @@ def _total_lines(directory: Path) -> int:
 
 
 def test_pm_skill_total_size_under_budget() -> None:
-    """The PM skill (SKILL.md + references + examples) must stay under 145KB.
+    """The PM skill (SKILL.md + references + examples) must stay under 148KB.
 
     v0.2 was ~106KB. v0.6a added BRANCH_NAMING.md + priority hierarchy
-    + handoff.yaml schema + v0.6a error codes + lint section. Budget
-    bumped to 145KB to accommodate; Plan 2 (v0.6b) will add
-    WORKSPACE_SYNC.md and push further — revisit budget then.
+    + handoff.yaml schema + v0.6a error codes + lint section.
+    v0.7.5 adds the "Review feedback cycle" section to
+    WORKFLOWS_REVIEW.md. Budget bumped to 148KB to accommodate; revisit
+    when v0.7.5 PR2 lands "Pattern detection across PRs".
     """
     pm_dir = TEMPLATES_DIR / "skills" / "project-manager"
     total = _total_chars(pm_dir)
-    assert total < 145_000, (
+    assert total < 148_000, (
         f"PM skill is {total:,} chars ({total / 1024:.0f} KB). "
-        f"Budget is 145KB. Consolidate or trim reference docs."
+        f"Budget is 148KB. Consolidate or trim reference docs."
     )
 
 

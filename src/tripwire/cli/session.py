@@ -675,10 +675,160 @@ def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
     if session.status == "executing":
         runtime.abandon(session)
 
+    # v0.7.5 — close any draft PRs that prep opened at session-start so
+    # they don't pile up as orphan drafts on the remote. Best-effort:
+    # the abandon transition lands even if `gh pr close` errors out.
+    for wt in session.runtime_state.worktrees:
+        if not wt.draft_pr_url:
+            continue
+        try:
+            subprocess.run(
+                ["gh", "pr", "close", wt.draft_pr_url],
+                cwd=wt.worktree_path,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except (subprocess.SubprocessError, OSError, FileNotFoundError):
+            # Worktree path may already be gone; abandon doesn't depend
+            # on the close succeeding.
+            pass
+
     session.status = "abandoned"
     session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
     click.echo(f"Session '{session_id}' → abandoned")
+
+
+@session_cmd.command("reopen")
+@click.argument("session_id")
+@click.option(
+    "--reason",
+    required=True,
+    help="Why are you reopening? Recorded in the audit log.",
+)
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_reopen_cmd(session_id: str, reason: str, project_dir: Path) -> None:
+    """Move a completed session back to ``paused`` for PR-fix iteration.
+
+    The companion command to ``session complete``: when a PR review
+    surfaces fixes, the PM runs ``session reopen <id> --reason '...'``
+    to flip the lifecycle back so ``session spawn <id> --resume`` can
+    re-engage the agent. Side-effects:
+
+    - Status: ``completed`` → ``paused`` (the lifecycle slot ``--resume``
+      already accepts).
+    - Each recorded draft PR is flipped ready→draft via
+      ``gh pr ready --undo`` so the "draft while work is happening,
+      ready when merge-ready" contract stays consistent.
+    - A ``## PM follow-up`` section is appended to the session's
+      plan.md if the section is not already present, with a placeholder
+      pointing at the PR URL(s). Closes the "PM forgot to update plan"
+      failure mode.
+    - One JSON line is appended to
+      ``~/.tripwire/logs/<project-slug>/audit.jsonl`` with the reason
+      and timestamp.
+    """
+    import os
+
+    from tripwire.core import paths
+    from tripwire.core.store import load_project
+    from tripwire.ui.services._atomic_write import append_jsonl
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session '{session_id}' not found") from exc
+
+    if session.status != "completed":
+        raise click.ClickException(
+            f"session '{session_id}' is '{session.status}', must be "
+            f"'completed' to reopen"
+        )
+
+    # Flip recorded draft PRs ready → draft. Best-effort: keeps the
+    # reopen transition usable even when gh hiccups.
+    for wt in session.runtime_state.worktrees:
+        if not wt.draft_pr_url:
+            continue
+        try:
+            subprocess.run(
+                ["gh", "pr", "ready", wt.draft_pr_url, "--undo"],
+                cwd=wt.worktree_path,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except (subprocess.SubprocessError, OSError, FileNotFoundError):
+            pass
+
+    # Append a `## PM follow-up` stub to plan.md when missing so the
+    # resumed agent has a place to read PM directives even if the PM
+    # forgot to add one.
+    plan_path = paths.session_plan_path(resolved, session_id)
+    if plan_path.is_file():
+        plan_text = plan_path.read_text(encoding="utf-8")
+        if "## PM follow-up" not in plan_text:
+            pr_lines = [
+                f"- {wt.draft_pr_url}"
+                for wt in session.runtime_state.worktrees
+                if wt.draft_pr_url
+            ]
+            stub_lines = ["", "## PM follow-up", "", f"Reopened: {reason}.", ""]
+            if pr_lines:
+                stub_lines.append("PR(s) under review:")
+                stub_lines.extend(pr_lines)
+                stub_lines.append("")
+            stub_lines.append(
+                "Address each PM finding in priority order; see the "
+                "PR comments for specifics."
+            )
+            stub_lines.append("")
+            sep = "" if plan_text.endswith("\n") else "\n"
+            plan_path.write_text(
+                plan_text + sep + "\n".join(stub_lines), encoding="utf-8"
+            )
+
+    # Status: completed → paused (the slot `spawn --resume` already
+    # accepts).
+    session.status = "paused"
+    session.updated_at = datetime.now(tz=timezone.utc)
+    save_session(resolved, session)
+
+    # Audit-log the reopen so the "how many round trips this session
+    # took" history is queryable later.
+    try:
+        proj = load_project(resolved)
+        proj_slug = proj.name.lower().replace(" ", "-")
+    except Exception:
+        proj_slug = "unknown"
+    override = os.environ.get("TRIPWIRE_LOG_DIR")
+    log_root = Path(override) if override else Path.home() / ".tripwire" / "logs"
+    audit_path = log_root / proj_slug / "audit.jsonl"
+    append_jsonl(
+        audit_path,
+        {
+            "action": "session_reopen",
+            "session_id": session_id,
+            "reason": reason,
+            "timestamp": datetime.now(tz=timezone.utc)
+            .isoformat(timespec="milliseconds")
+            .replace("+00:00", "Z"),
+        },
+    )
+
+    click.echo(f"Session '{session_id}' reopened (→ paused). Reason: {reason}")
+    click.echo(f"Spawn the resumed agent: tripwire session spawn {session_id} --resume")
 
 
 @session_cmd.command("cleanup")

@@ -11,6 +11,8 @@ Runs once per spawn before the runtime's ``start``:
 from __future__ import annotations
 
 import logging
+import shutil
+import subprocess
 from datetime import datetime, timezone
 from importlib.resources import files
 from pathlib import Path
@@ -47,6 +49,118 @@ def _resolve_clone_path(project_dir: Path, repo: str) -> Path | None:
     return _impl(project_dir, repo)
 
 
+def _check_gh_available() -> None:
+    """Fail fast if ``gh`` isn't on PATH or isn't authenticated.
+
+    Called at the top of :func:`run` before any worktree mutation so
+    operators learn at spawn time — not eight minutes in at complete —
+    that the GitHub CLI dependency is missing. The post-v0.7.5 spawn
+    flow opens draft PRs here and flips them to ready at complete; both
+    steps need ``gh``.
+    """
+    if shutil.which("gh") is None:
+        raise RuntimeError(
+            "`gh` (GitHub CLI) is not on PATH. Install gh "
+            "(https://cli.github.com) so spawn can open draft PRs at "
+            "session-start. The complete-time PR flow also needs gh, "
+            "so failing fast here beats failing eight minutes in."
+        )
+    result = subprocess.run(
+        ["gh", "auth", "status"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            "`gh auth status` failed — gh is on PATH but not "
+            "authenticated. Run `gh auth login` and re-spawn."
+        )
+
+
+def _open_draft_pr(
+    *,
+    worktree: Path,
+    branch: str,
+    base_branch: str,
+    session_id: str,
+) -> str | None:
+    """Open a draft PR on ``branch`` against ``base_branch``.
+
+    Sequence per :doc:`spec §2.A <2026-04-24-v075-handoff>`:
+
+      1. Empty marker commit (``git commit --allow-empty``).
+      2. ``git push -u origin <branch>``.
+      3. ``gh pr create --draft``.
+
+    Returns the PR URL on success. Returns ``None`` when the worktree
+    has no git remote (graceful skip — logs a warning and proceeds; the
+    legacy create-PR-at-complete path covers the spawn). Raises
+    :class:`subprocess.CalledProcessError` if a remote is configured
+    but commit/push/gh fails — spawn errors loud rather than silently
+    leaving an orphan branch.
+    """
+    remote_check = subprocess.run(
+        ["git", "-C", str(worktree), "remote"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if remote_check.returncode != 0 or not remote_check.stdout.strip():
+        log.warning(
+            "worktree %s has no git remote; skipping draft PR creation "
+            "(falling back to legacy create-at-complete path)",
+            worktree,
+        )
+        return None
+
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(worktree),
+            "commit",
+            "--allow-empty",
+            "-m",
+            f"session({session_id}): start",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(worktree), "push", "-u", "origin", branch],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    result = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--draft",
+            "--base",
+            base_branch,
+            "--head",
+            branch,
+            "--title",
+            f"session({session_id}): start",
+            "--body",
+            (
+                f"Draft PR for session `{session_id}`. Opened at session-"
+                f"start; will be flipped to ready at "
+                f"`tripwire session complete`."
+            ),
+        ],
+        cwd=str(worktree),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
 def resolve_worktrees(
     *,
     session: AgentSession,
@@ -76,6 +190,7 @@ def resolve_worktrees(
                 f"No local clone for {rb.repo}. Set local path in project.yaml repos."
             )
         wt_path = worktree_path_for_session(clone_path, session.id)
+        draft_pr_url: str | None = None
         if wt_path.exists():
             if not resume:
                 raise RuntimeError(
@@ -83,7 +198,7 @@ def resolve_worktrees(
                     f"Use 'tripwire session cleanup {session.id}' "
                     f"or re-spawn with --resume."
                 )
-            # resume: reuse existing worktree
+            # resume: reuse existing worktree (and any prior draft PR)
         else:
             if resume:
                 raise RuntimeError(
@@ -97,13 +212,21 @@ def resolve_worktrees(
                     f"Branch '{branch}' already exists in {clone_path}. "
                     f"Delete the branch or pick a different name."
                 )
-            worktree_add(clone_path, wt_path, branch, rb.base_branch or base_ref)
+            base_branch = rb.base_branch or base_ref
+            worktree_add(clone_path, wt_path, branch, base_branch)
+            draft_pr_url = _open_draft_pr(
+                worktree=wt_path,
+                branch=branch,
+                base_branch=base_branch,
+                session_id=session.id,
+            )
         entries.append(
             WorktreeEntry(
                 repo=rb.repo,
                 clone_path=str(clone_path),
                 worktree_path=str(wt_path),
                 branch=branch,
+                draft_pr_url=draft_pr_url,
             )
         )
     return entries
@@ -163,8 +286,6 @@ def maybe_add_project_tracking_worktree(
     it's a git repo with at least one remote. Returns ``None`` (logged
     INFO) when there's no remote or no ``.git``.
     """
-    import subprocess
-
     if not (project_dir / ".git").exists():
         log.info(
             "project_dir %s is not a git repo; skipping project-tracking "
@@ -192,6 +313,7 @@ def maybe_add_project_tracking_worktree(
     slug = session.id.removeprefix(SESSION_ID_PREFIX).lower()
     proj_branch = f"proj/{slug}"
     proj_wt_path = worktree_path_for_session(project_dir, session.id)
+    draft_pr_url: str | None = None
 
     if proj_wt_path.exists():
         if not resume:
@@ -200,7 +322,7 @@ def maybe_add_project_tracking_worktree(
                 f"Use 'tripwire session cleanup {session.id}' "
                 f"or re-spawn with --resume."
             )
-        # resume: reuse existing worktree
+        # resume: reuse existing worktree (and any prior draft PR)
     else:
         if resume:
             raise RuntimeError(
@@ -216,12 +338,19 @@ def maybe_add_project_tracking_worktree(
             )
         base_ref = _resolve_project_default_branch(project_dir)
         worktree_add(project_dir, proj_wt_path, proj_branch, base_ref)
+        draft_pr_url = _open_draft_pr(
+            worktree=proj_wt_path,
+            branch=proj_branch,
+            base_branch=base_ref,
+            session_id=session.id,
+        )
 
     return WorktreeEntry(
         repo=project_dir.name,
         clone_path=str(project_dir),
         worktree_path=str(proj_wt_path),
         branch=proj_branch,
+        draft_pr_url=draft_pr_url,
     )
 
 
@@ -500,6 +629,11 @@ def run(
     )
 
     runtime.validate_environment()
+
+    # v0.7.5 — gh-availability is a hard prereq from spawn-start. Check
+    # before the runtime touches the filesystem so a missing/unauthed
+    # gh fails fast rather than eight minutes in at complete-time.
+    _check_gh_available()
 
     handoff = load_handoff(project_dir, session.id)
     if handoff is None:

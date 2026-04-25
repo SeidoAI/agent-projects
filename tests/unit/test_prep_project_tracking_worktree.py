@@ -15,12 +15,27 @@ from __future__ import annotations
 import logging
 import subprocess
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from tripwire.core.git_helpers import worktree_path_for_session
 from tripwire.core.session_store import load_session
 from tripwire.runtimes.prep import maybe_add_project_tracking_worktree
+
+
+@pytest.fixture(autouse=True)
+def _stub_draft_pr():
+    """Bypass v0.7.5 draft-PR creation in this file.
+
+    These tests check worktree-creation behaviour independent of the
+    draft-PR flow. ``test_prep_draft_pr.py`` covers the real call path.
+    """
+    with patch(
+        "tripwire.runtimes.prep._open_draft_pr",
+        return_value="https://github.com/test/proj/pull/0",
+    ) as m:
+        yield m
 
 
 def _init_repo(path: Path) -> None:

@@ -76,6 +76,15 @@ def complete_session(
             f"{sorted(completable)}. Run /pm-session-review first, or pass --force.",
         )
 
+    # v0.7.5 — flip session-start draft PRs to ready so the operator can
+    # merge without manually toggling state in the GH UI. Idempotent:
+    # `gh pr ready` on a non-draft or merged PR is swallowed by
+    # ``check=False``. ``skip_pr_merge_check`` only skips the verify;
+    # the flip still runs because it's a useful state transition. Only
+    # ``--force`` skips both.
+    if not force:
+        _flip_drafts_to_ready(session)
+
     if not skip_pr_merge_check and not force:
         _verify_pr_merged(session)
 
@@ -122,6 +131,49 @@ def complete_session(
                 pass
 
     return result
+
+
+def _flip_drafts_to_ready(session) -> None:
+    """Flip every session-start draft PR to ready (v0.7.5 item A).
+
+    For each worktree with a recorded ``draft_pr_url``, run ``gh pr
+    ready <url>`` from inside that worktree. Idempotent: ``gh pr
+    ready`` on an already-ready or merged PR is harmless and we
+    intentionally pass ``check=False`` so a noisy "PR is not draft"
+    warning doesn't fail the whole complete.
+
+    Worktrees without a ``draft_pr_url`` (legacy in-flight sessions
+    that started before v0.7.5 landed) fall back to ``gh pr create
+    --fill`` so a PR exists to merge against. The fallback is best-
+    effort — if the agent's exit protocol already opened the PR, gh
+    errors with "a PR already exists" which we swallow.
+    """
+    for wt in session.runtime_state.worktrees:
+        if wt.draft_pr_url:
+            subprocess.run(
+                ["gh", "pr", "ready", wt.draft_pr_url],
+                cwd=wt.worktree_path,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        else:
+            subprocess.run(
+                [
+                    "gh",
+                    "pr",
+                    "create",
+                    "--head",
+                    wt.branch,
+                    "--fill",
+                ],
+                cwd=wt.worktree_path,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
 
 
 def _verify_pr_merged(session) -> None:

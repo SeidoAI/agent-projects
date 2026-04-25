@@ -153,6 +153,45 @@ Example commit messages from past reconciles:
 - `reconcile: update concept nodes to match delivered implementation`
 - `reconcile: [[node-service]] body after #9`
 
+## Review feedback cycle
+
+The procedure above describes one review pass. In practice a session
+may need several iterations before merging — and that loop has its
+own canonical shape (v0.7.5 §2.C3):
+
+1. Agent ships PR. Process exits cleanly per the exit protocol. The
+   draft PR (open since spawn-start, v0.7.5 item A) flips to ready at
+   `session complete`.
+2. PM reviews:
+   a. Read the agent's self-review (the four-lens block from the
+      spawn template).
+   b. Walk the verification-checklist independently.
+   c. Run `tripwire validate --strict` against the project repo.
+   d. Optionally dispatch sub-agents for independent bug scans
+      and cross-cutting pattern analysis.
+3. PM writes the structured PR-review artifact (v0.7.5 item D, ships
+   in the follow-up PR).
+4. PM posts findings on the PR — one comment per concern, each with
+   a suggested fix. Mark severity (critical / real bug / nice-to-
+   fix). The artifact is the PM's view; the PR comments are the
+   agent's actionable list.
+5. PM either approves+merges (no findings) **OR**
+   `tripwire session reopen <id> --reason "..."` then
+   `tripwire session spawn <id> --resume`.
+6. Agent (resumed) reads PR comments + plan.md `## PM follow-up`
+   section. Addresses each finding. Pushes. Posts a follow-up comment
+   summarising what they changed per finding.
+7. Loop steps 2–6 until verdict is approve+merge.
+8. `tripwire session complete <id>`. Status → completed. The post-
+   merge node reconciliation in **Procedure step 8** above runs once
+   the cycle is closed — not per iteration.
+
+`session reopen` is the explicit lifecycle slot for this loop
+(rather than loosening the `completed` → `executing` guard in the
+state machine). Each reopen records to
+`~/.tripwire/logs/<project-slug>/audit.jsonl` so round-trip history
+is queryable.
+
 ## Red flags — review-specific rationalizations
 
 | Agent thought | Reality |
