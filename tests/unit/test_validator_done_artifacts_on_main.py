@@ -100,7 +100,7 @@ def test_done_session_missing_self_review_errors(
     tmp_path_project: Path, save_test_session, monkeypatch
 ):
     """The §A1 default `session_required` includes self-review.md and
-    pm-response.md. Missing either → error."""
+    pm-response.yaml. Missing either → error."""
     save_test_session(tmp_path_project, "s1", status="done")
     _stub_main(
         monkeypatch,
@@ -108,7 +108,7 @@ def test_done_session_missing_self_review_errors(
             "sessions/s1/task-checklist.md",
             "sessions/s1/verification-checklist.md",
             "sessions/s1/insights.yaml",
-            # self-review.md and pm-response.md absent
+            # self-review.md and pm-response.yaml absent
         },
     )
 
@@ -117,7 +117,7 @@ def test_done_session_missing_self_review_errors(
     files_mentioned = " ".join(r.message for r in results)
 
     assert "sessions/s1/self-review.md" in files_mentioned
-    assert "sessions/s1/pm-response.md" in files_mentioned
+    assert "sessions/s1/pm-response.yaml" in files_mentioned
     assert all(r.code == "done_implies_artifacts/missing_on_main" for r in results)
 
 
@@ -131,7 +131,7 @@ def test_done_session_with_all_artifacts_passes(
             "sessions/s1/task-checklist.md",
             "sessions/s1/verification-checklist.md",
             "sessions/s1/self-review.md",
-            "sessions/s1/pm-response.md",
+            "sessions/s1/pm-response.yaml",
             "sessions/s1/insights.yaml",
         },
     )

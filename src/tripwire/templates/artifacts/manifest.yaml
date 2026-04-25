@@ -63,3 +63,28 @@ artifacts:
     owned_by: execution-agent
     required: true
     approval_gate: false
+
+  # v0.7.9 §A2 — agent's four-lens self-review committed to the PT
+  # branch BEFORE the PR is opened. The PR-comment self-review is
+  # generated FROM this file.
+  - name: self-review
+    file: self-review.md
+    template: self-review.md.j2
+    produced_at: done
+    produced_by: execution-agent
+    owned_by: execution-agent
+    required: true
+    approval_gate: false
+
+  # v0.7.9 §A3 — PM-side response to the self-review. YAML-format so
+  # the validator can parse `items` programmatically. See validator
+  # rules `pm_response_covers_self_review` and
+  # `pm_response_followups_resolve`.
+  - name: pm-response
+    file: pm-response.yaml
+    template: pm-response.yaml.j2
+    produced_at: done
+    produced_by: pm
+    owned_by: pm
+    required: true
+    approval_gate: false

@@ -59,7 +59,7 @@ def test_artifact_manifest_has_spec_defaults():
         "task-checklist.md",
         "verification-checklist.md",
         "self-review.md",
-        "pm-response.md",
+        "pm-response.yaml",
         "insights.yaml",
     ]
     assert p.artifact_manifest.issue_required == ["developer.md", "verified.md"]
@@ -74,7 +74,7 @@ def test_artifact_manifest_accepts_explicit_spec_defaults():
                 "task-checklist.md",
                 "verification-checklist.md",
                 "self-review.md",
-                "pm-response.md",
+                "pm-response.yaml",
                 "insights.yaml",
             ],
             "issue_required": ["developer.md", "verified.md"],
