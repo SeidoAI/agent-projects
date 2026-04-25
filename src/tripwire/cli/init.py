@@ -32,7 +32,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from rich.console import Console
 from rich.panel import Panel
 
-from tripwire.core import paths
+from tripwire.core import github_client, paths
 from tripwire.templates import get_templates_dir
 
 KEY_PREFIX_PATTERN = re.compile(r"^[A-Z][A-Z0-9]*$")
@@ -427,6 +427,219 @@ def _git_init(target_dir: Path) -> None:
 
 
 # ============================================================================
+# GitHub remote setup (v0.7.6 item A)
+# ============================================================================
+
+
+def _resolve_github_target(
+    target_dir: Path,
+    *,
+    github_owner: str | None,
+    github_repo: str | None,
+    token: str,
+    non_interactive: bool,
+) -> tuple[str, str]:
+    """Resolve `(owner, name)` for the project-tracking repo.
+
+    Defaults: owner = the authenticated user behind ``token``, name =
+    the target directory's basename. Either can be overridden by flag.
+    Interactive mode confirms the result via prompt.
+    """
+    name = github_repo or target_dir.name
+    owner = github_owner or github_client._authenticated_owner(token) or ""
+
+    if non_interactive:
+        if not owner:
+            raise InitError(
+                "Could not determine GitHub owner. Pass --github-owner "
+                "explicitly or check that your token has user-read scope."
+            )
+        return owner, name
+
+    full = click.prompt(
+        "GitHub project-tracking repo (<owner>/<name>)",
+        default=f"{owner}/{name}" if owner else "",
+        type=str,
+    ).strip()
+    if "/" not in full:
+        raise InitError(
+            f"Invalid GitHub slug {full!r}; expected `<owner>/<name>` (e.g. "
+            "alice/my-project)."
+        )
+    owner, name = full.split("/", 1)
+    if not owner or not name:
+        raise InitError(f"Invalid GitHub slug {full!r}; both parts required.")
+    return owner, name
+
+
+def _setup_github_remote(
+    target_dir: Path,
+    *,
+    no_github_repo: bool,
+    no_push: bool,
+    public: bool,
+    github_owner: str | None,
+    github_repo: str | None,
+    non_interactive: bool,
+) -> str | None:
+    """Create or attach the GitHub project-tracking repo and configure git.
+
+    Implements v0.7.6 spec §2.A.1 steps 2-5:
+
+    1. Resolve the GitHub target (owner + name).
+    2. Check whether the repo exists.
+    3. Create it if missing (unless ``no_github_repo``).
+    4. Add the remote.
+    5. Push the initial commit (unless ``no_push``).
+
+    Returns the SSH URL the remote was configured with, or None if the
+    flow short-circuited (caller already handled ``--no-remote``).
+    """
+    token = github_client.resolve_token()
+    if token is None:
+        raise InitError(
+            "No GitHub token found. Set GITHUB_TOKEN, run `gh auth login`, "
+            "or pass --no-remote to skip remote setup."
+        )
+
+    owner, name = _resolve_github_target(
+        target_dir,
+        github_owner=github_owner,
+        github_repo=github_repo,
+        token=token,
+        non_interactive=non_interactive,
+    )
+
+    ssh_url = f"git@github.com:{owner}/{name}.git"
+
+    if no_github_repo:
+        # Operator pre-created the repo (Terraform / manual / org policy).
+        # Skip the API check and the create call; just wire git up.
+        console.print(
+            f"  [dim]· Skipping GitHub API check (--no-github-repo); using "
+            f"{owner}/{name}[/dim]"
+        )
+    else:
+        if github_client.repo_exists(owner, name, token=token):
+            console.print(
+                f"  [dim]✓ Using existing GitHub repo {owner}/{name}[/dim]"
+            )
+        else:
+            visibility = "public" if public else "private"
+            console.print(
+                f"  [green]+[/green] Creating {visibility} GitHub repo "
+                f"{owner}/{name}"
+            )
+            response = github_client.create_repo(
+                owner,
+                name,
+                private=not public,
+                description=f"Tripwire project-tracking repo for {name}",
+                token=token,
+            )
+            # Prefer the API-returned ssh_url so we honour any host
+            # variation the caller has on their GitHub Enterprise install.
+            ssh_url = response.get("ssh_url") or ssh_url
+
+    # Step 4: add the remote (idempotent — `git remote set-url` if it
+    # already points somewhere).
+    _git_set_remote(target_dir, ssh_url)
+
+    # Step 5: push the initial commit, unless opted out.
+    if not no_push:
+        _git_initial_commit_and_push(target_dir)
+
+    return ssh_url
+
+
+def _git_set_remote(target_dir: Path, ssh_url: str) -> None:
+    """Add the `origin` remote, switching url if already set.
+
+    Robust to operators who ran `git remote add origin ...` themselves
+    before re-running init — `set-url` overwrites without complaint.
+    """
+    existing = subprocess.run(
+        ["git", "remote", "get-url", "origin"],
+        cwd=target_dir,
+        capture_output=True,
+        check=False,
+    )
+    if existing.returncode == 0:
+        subprocess.run(
+            ["git", "remote", "set-url", "origin", ssh_url],
+            cwd=target_dir,
+            check=False,
+            capture_output=True,
+        )
+    else:
+        subprocess.run(
+            ["git", "remote", "add", "origin", ssh_url],
+            cwd=target_dir,
+            check=False,
+            capture_output=True,
+        )
+
+
+def _git_initial_commit_and_push(target_dir: Path) -> None:
+    """Create the initial commit (if absent) and push to `origin/main`.
+
+    `git init` + `git add .` already happened in `_git_init`; we just
+    need to seal it with a commit and push. Failures are surfaced as
+    warnings, not errors — the operator can finish manually if push
+    fails for network reasons.
+    """
+    # Skip the commit if HEAD already points somewhere (re-runs).
+    head = subprocess.run(
+        ["git", "rev-parse", "--verify", "HEAD"],
+        cwd=target_dir,
+        capture_output=True,
+        check=False,
+    )
+    if head.returncode != 0:
+        commit = subprocess.run(
+            ["git", "commit", "-m", "Initial tripwire scaffold"],
+            cwd=target_dir,
+            capture_output=True,
+            check=False,
+        )
+        if commit.returncode != 0:
+            console.print(
+                "[yellow]Warning:[/yellow] initial commit failed "
+                f"({commit.stderr.decode(errors='replace').strip()}). "
+                "Commit and push manually: "
+                "`git commit -m 'init' && git push -u origin main`."
+            )
+            return
+
+    push = subprocess.run(
+        ["git", "push", "-u", "origin", "main"],
+        cwd=target_dir,
+        capture_output=True,
+        check=False,
+    )
+    if push.returncode != 0:
+        console.print(
+            "[yellow]Warning:[/yellow] git push failed "
+            f"({push.stderr.decode(errors='replace').strip()}). "
+            "Push manually: `git push -u origin main`."
+        )
+
+
+def _record_repo_url_in_project_yaml(target_dir: Path, ssh_url: str) -> None:
+    """Write `project_repo_url: <url>` into the freshly-stamped project.yaml.
+
+    The Jinja template emits the line conditionally on the context dict;
+    by the time we know the URL, the file is already written. Append
+    rather than re-render to keep the change minimal and side-effect-free.
+    """
+    from tripwire.core.store import load_project, save_project
+
+    cfg = load_project(target_dir)
+    cfg = cfg.model_copy(update={"project_repo_url": ssh_url})
+    save_project(target_dir, cfg)
+
+
+# ============================================================================
 # The command
 # ============================================================================
 
@@ -607,6 +820,56 @@ def _git_head_short(repo_dir: Path) -> str:
         "after linking. Only valid with --workspace."
     ),
 )
+@click.option(
+    "--no-github-repo",
+    is_flag=True,
+    help=(
+        "Don't create the GitHub project-tracking repo via the API. "
+        "The remote is still configured (operator pre-created the repo, "
+        "e.g. via Terraform)."
+    ),
+)
+@click.option(
+    "--no-remote",
+    is_flag=True,
+    help=(
+        "Skip GitHub remote setup entirely (pre-v0.7.6 behaviour). "
+        "Useful for local-only / experimental projects."
+    ),
+)
+@click.option(
+    "--no-push",
+    is_flag=True,
+    help=(
+        "Configure the GitHub remote but don't push the initial commit. "
+        "Leaves origin cold; useful when network is flaky."
+    ),
+)
+@click.option(
+    "--public",
+    is_flag=True,
+    help=(
+        "Create the project-tracking repo as public. Default is private "
+        "(project-tracking repos contain raw plans / decisions / agent "
+        "transcripts)."
+    ),
+)
+@click.option(
+    "--github-owner",
+    default=None,
+    help=(
+        "GitHub owner (user or org) for the project-tracking repo. "
+        "Defaults to the authenticated user."
+    ),
+)
+@click.option(
+    "--github-repo",
+    default=None,
+    help=(
+        "GitHub repo name for the project-tracking repo. "
+        "Defaults to the target directory's basename."
+    ),
+)
 def init_cmd(
     target: Path,
     name: str | None,
@@ -619,6 +882,12 @@ def init_cmd(
     non_interactive: bool,
     workspace_path: Path | None,
     copy_nodes: str | None,
+    no_github_repo: bool,
+    no_remote: bool,
+    no_push: bool,
+    public: bool,
+    github_owner: str | None,
+    github_repo: str | None,
 ) -> None:
     """Initialise a new tripwire in TARGET (or the current directory).
 
@@ -711,6 +980,9 @@ def init_cmd(
         "repos_locals": repos_locals,
         "created_at": datetime.now().replace(microsecond=0).isoformat(),
         "tripwire_version": _tripwire_version,
+        # Filled in below by `_setup_github_remote` if remote setup runs.
+        # The Jinja template emits the field conditionally, so None ⇒ omit.
+        "project_repo_url": None,
     }
 
     # ------------------------------------------------------------------
@@ -755,8 +1027,26 @@ def init_cmd(
         console.print("  [dim](skipped git init)[/dim]")
 
     # ------------------------------------------------------------------
-    # Next steps
+    # GitHub remote setup (v0.7.6 item A)
     # ------------------------------------------------------------------
+
+    # Remote setup needs git to be initialised. `--no-git` or `--no-remote`
+    # both skip cleanly.
+    if do_git and not no_remote:
+        ssh_url = _setup_github_remote(
+            target_dir,
+            no_github_repo=no_github_repo,
+            no_push=no_push,
+            public=public,
+            github_owner=github_owner,
+            github_repo=github_repo,
+            non_interactive=non_interactive,
+        )
+        if ssh_url:
+            _record_repo_url_in_project_yaml(target_dir, ssh_url)
+            console.print(f"  [green]+[/green] origin {ssh_url}")
+    elif no_remote:
+        console.print("  [dim](skipped GitHub remote setup --no-remote)[/dim]")
 
     # ------------------------------------------------------------------
     # Workspace link (v0.6b)

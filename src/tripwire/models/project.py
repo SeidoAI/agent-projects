@@ -152,5 +152,11 @@ class ProjectConfig(BaseModel):
     # time and used by the generated `.github/workflows/tripwire.yml`.
     tripwire_version: str | None = None
 
+    # v0.7.6: SSH URL of the project-tracking repo on GitHub (the repo that
+    # holds this project.yaml). Recorded by `tripwire init` after auto-creating
+    # the repo; absent on pre-v0.7.6 projects. Disambiguates from `repos:`
+    # (code repos) and powers the UI's "open in GitHub" affordance.
+    project_repo_url: str | None = None
+
     # Free-form per-project metadata, never used by the package itself.
     metadata: dict[str, Any] = Field(default_factory=dict)

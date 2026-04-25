@@ -22,6 +22,9 @@ def _init_args(target, **overrides):
         "--base-branch",
         overrides.get("base_branch", "main"),
         "--non-interactive",
+        # v0.7.6: avoid touching GitHub from tests; workspace tests don't
+        # care about the project-tracking remote.
+        "--no-remote",
     ]
     if "workspace" in overrides:
         args.extend(["--workspace", str(overrides["workspace"])])

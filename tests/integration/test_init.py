@@ -385,6 +385,9 @@ class TestGitInit:
 
         target = tmp_path / "p"
         # Drop the default --no-git from the helper by building args manually.
+        # --no-remote keeps GitHub auto-create out of the test path; the
+        # remote-setup happy path is exercised separately in
+        # tests/unit/test_init_github_remote.py.
         args = [
             "init",
             str(target),
@@ -395,6 +398,7 @@ class TestGitInit:
             "--base-branch",
             "main",
             "--non-interactive",
+            "--no-remote",
         ]
         result = runner.invoke(cli, args)
         assert result.exit_code == 0, result.output

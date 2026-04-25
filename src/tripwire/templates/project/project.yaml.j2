@@ -90,3 +90,8 @@ created_at: "{{ created_at }}"
 # Pinned tripwire version — read by `tripwire ci install` to pin the
 # generated `.github/workflows/tripwire.yml` workflow.
 tripwire_version: "{{ tripwire_version }}"
+{% if project_repo_url %}
+# SSH URL of this project-tracking repo on GitHub. Set by `tripwire init`
+# (v0.7.6) when the GitHub repo is auto-created or an existing one is wired up.
+project_repo_url: {{ project_repo_url }}
+{% endif %}
