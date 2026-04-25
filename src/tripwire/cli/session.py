@@ -135,8 +135,25 @@ def session_list_cmd(project_dir: Path, output_format: str) -> None:
     default="text",
     show_default=True,
 )
-def session_show_cmd(session_id: str, project_dir: Path, output_format: str) -> None:
-    """Print one session's YAML (text) or structured data (json)."""
+@click.option(
+    "--full",
+    "full",
+    is_flag=True,
+    default=False,
+    help=(
+        "Expand self-review.md and pm-response.yaml inline. Default "
+        "shows a one-line presence summary so the output stays readable."
+    ),
+)
+def session_show_cmd(
+    session_id: str, project_dir: Path, output_format: str, full: bool
+) -> None:
+    """Print one session's YAML (text) or structured data (json).
+
+    In `text` format, appends a brief review-artifact summary noting
+    whether ``self-review.md`` and ``pm-response.yaml`` are committed
+    to the session directory. ``--full`` expands them inline.
+    """
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
@@ -153,6 +170,28 @@ def session_show_cmd(session_id: str, project_dir: Path, output_format: str) -> 
 
     yaml_path = session_yaml_path(resolved, session_id)
     click.echo(yaml_path.read_text(encoding="utf-8"))
+
+    sdir = resolved / "sessions" / session_id
+    sr_path = sdir / "self-review.md"
+    pr_path = sdir / "pm-response.yaml"
+
+    click.echo("Review artifacts:")
+    for label, path in (("self-review.md", sr_path), ("pm-response.yaml", pr_path)):
+        if path.is_file():
+            click.echo(f"  {label}: present")
+        else:
+            click.echo(f"  {label}: missing")
+
+    if full:
+        for label, path in (
+            ("self-review.md", sr_path),
+            ("pm-response.yaml", pr_path),
+        ):
+            if not path.is_file():
+                continue
+            click.echo()
+            click.echo(f"--- {label} ---")
+            click.echo(path.read_text(encoding="utf-8"))
 
 
 @session_cmd.command("check")
