@@ -9,8 +9,10 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: actions/checkout@v6
+      # setup-uv pinned to v8.1.0 (point release) — v8 dropped the
+      # floating major tag per its immutable-tag policy.
+      - uses: astral-sh/setup-uv@v8.1.0
         with:
           python-version: "3.13"
       - name: Install tripwire

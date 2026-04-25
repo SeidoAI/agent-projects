@@ -101,3 +101,32 @@ class TestSessionStatusEnumTemplate:
         case where wheel packaging strips it accidentally."""
         path: Path = get_templates_dir() / "enums" / "session_status.yaml"
         assert path.is_file(), f"Missing packaged template: {path}"
+
+
+class TestCIWorkflowTemplate:
+    """`templates/project/.github/workflows/tripwire.yml.j2` is what
+    `tripwire init` stamps as the project's CI gate. The action
+    versions need to match v0.7.6 §2.E.1 — Node 20 is being removed
+    from runners 2026-09-16 and `setup-uv@v3` rejects `python-version`
+    after a schema change."""
+
+    def test_uses_pinned_action_versions(self) -> None:
+        path = (
+            get_templates_dir()
+            / "project"
+            / ".github"
+            / "workflows"
+            / "tripwire.yml.j2"
+        )
+        contents = path.read_text(encoding="utf-8")
+        # `actions/checkout@v6` — bumped from v4 (Node 20 deprecation).
+        assert "actions/checkout@v6" in contents, contents
+        # `astral-sh/setup-uv@v8.1.0` — point release, not floating @v8.
+        assert "astral-sh/setup-uv@v8.1.0" in contents, contents
+        # And nothing's still on the old majors.
+        assert "actions/checkout@v4" not in contents, (
+            "checkout@v4 leaked back in"
+        )
+        assert "astral-sh/setup-uv@v3" not in contents, (
+            "setup-uv@v3 leaked back in"
+        )
