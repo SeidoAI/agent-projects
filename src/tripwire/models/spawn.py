@@ -22,6 +22,14 @@ class SpawnInvocation(BaseModel):
     log_path_template: str = (
         "~/.tripwire/logs/{project_slug}/{session_id}-{timestamp}.log"
     )
+    # v0.7.9 §A7 — fork an in-flight monitor process alongside the
+    # agent. Set false to opt out (e.g. on perf-sensitive hosts or in
+    # tests that don't exercise the monitor). Default on; the monitor
+    # is the enforcement layer for cost / quota / push-loop tripwires.
+    monitor: bool = True
+    monitor_log_path_template: str = (
+        "~/.tripwire/logs/{project_slug}/{session_id}-{timestamp}.monitor.log"
+    )
 
 
 class SpawnConfigValues(BaseModel):

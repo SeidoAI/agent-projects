@@ -675,9 +675,15 @@ class TestBuildClaudeArgsResumePropagation:
 
         fake_proc = MagicMock()
         fake_proc.pid = 12345
-        with patch(
-            "tripwire.runtimes.subprocess._sp.Popen", return_value=fake_proc
-        ) as mock_popen:
+        with (
+            patch(
+                "tripwire.runtimes.subprocess._sp.Popen", return_value=fake_proc
+            ) as mock_popen,
+            patch(
+                "tripwire.runtimes.subprocess.spawn_monitor_runner",
+                return_value=None,
+            ),
+        ):
             SubprocessRuntime().start(prepped)
 
         argv = mock_popen.call_args[0][0]

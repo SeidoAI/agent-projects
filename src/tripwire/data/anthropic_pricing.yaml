@@ -1,0 +1,60 @@
+# Anthropic API pricing — USD per million tokens.
+#
+# Refresh manually; we don't fetch live (no public pricing API exists
+# at time of writing). Used by the cost-overrun monitor (tripwire #12)
+# to compute cumulative session cost from per-message usage in
+# stream-json events.
+#
+# Source: https://docs.anthropic.com/en/docs/about-claude/pricing
+# Last verified: 2026-04-25
+#
+# Match strategy: when an `assistant` event arrives with a `model`
+# field, the longest substring key in `models:` that the model name
+# contains wins. e.g. "claude-opus-4-7-20260101" matches
+# "claude-opus-4-7" first; if no key matches, `default:` is used.
+#
+# Token categories:
+#   input         — non-cached input tokens (prompt portion)
+#   output        — generated tokens
+#   cache_read    — input tokens served from prompt cache
+#   cache_write   — input tokens written to prompt cache (5m TTL)
+models:
+  claude-opus-4-7:
+    input: 15.00
+    output: 75.00
+    cache_read: 1.50
+    cache_write: 18.75
+  claude-opus-4-6:
+    input: 15.00
+    output: 75.00
+    cache_read: 1.50
+    cache_write: 18.75
+  claude-opus-4-5:
+    input: 15.00
+    output: 75.00
+    cache_read: 1.50
+    cache_write: 18.75
+  claude-sonnet-4-6:
+    input: 3.00
+    output: 15.00
+    cache_read: 0.30
+    cache_write: 3.75
+  claude-sonnet-4-5:
+    input: 3.00
+    output: 15.00
+    cache_read: 0.30
+    cache_write: 3.75
+  claude-haiku-4-5:
+    input: 0.80
+    output: 4.00
+    cache_read: 0.08
+    cache_write: 1.00
+
+# Fallback for any unrecognised model name. Erring high so the
+# budget enforcer is conservative — better a false-positive halt
+# than letting an unknown model run unbounded.
+default:
+  input: 15.00
+  output: 75.00
+  cache_read: 1.50
+  cache_write: 18.75

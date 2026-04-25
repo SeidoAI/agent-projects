@@ -63,9 +63,12 @@ def test_start_invokes_popen_with_expected_argv(tmp_path):
     fake_proc = MagicMock()
     fake_proc.pid = 12345
 
-    with patch(
-        "tripwire.runtimes.subprocess._sp.Popen", return_value=fake_proc
-    ) as mock_popen:
+    with (
+        patch(
+            "tripwire.runtimes.subprocess._sp.Popen", return_value=fake_proc
+        ) as mock_popen,
+        patch("tripwire.runtimes.subprocess.spawn_monitor_runner", return_value=None),
+    ):
         result = SubprocessRuntime().start(prepped)
 
     mock_popen.assert_called_once()
@@ -94,15 +97,63 @@ def test_start_with_resume_uses_resume_flag_not_session_id(tmp_path):
     fake_proc = MagicMock()
     fake_proc.pid = 67890
 
-    with patch(
-        "tripwire.runtimes.subprocess._sp.Popen", return_value=fake_proc
-    ) as mock_popen:
+    with (
+        patch(
+            "tripwire.runtimes.subprocess._sp.Popen", return_value=fake_proc
+        ) as mock_popen,
+        patch("tripwire.runtimes.subprocess.spawn_monitor_runner", return_value=None),
+    ):
         SubprocessRuntime().start(prepped)
 
     argv = mock_popen.call_args[0][0]
     assert "--resume" in argv
     assert argv[argv.index("--resume") + 1] == "uuid-1"
     assert "--session-id" not in argv
+
+
+def test_start_spawns_monitor_runner_with_agent_pid(tmp_path):
+    """The monitor runner is spawned as a detached subprocess with the
+    just-launched agent pid. Tripwire #12-#14 enforcement depends on
+    this — without the runner, there is no in-flight cost cap."""
+    prepped = _prepped(tmp_path)
+    fake_proc = MagicMock()
+    fake_proc.pid = 4242
+
+    with (
+        patch("tripwire.runtimes.subprocess._sp.Popen", return_value=fake_proc),
+        patch(
+            "tripwire.runtimes.subprocess.spawn_monitor_runner",
+            return_value=9999,
+        ) as mock_spawn_monitor,
+    ):
+        SubprocessRuntime().start(prepped)
+
+    assert mock_spawn_monitor.called
+    cfg = mock_spawn_monitor.call_args.kwargs.get("cfg") or (
+        mock_spawn_monitor.call_args.args[0]
+        if mock_spawn_monitor.call_args.args
+        else None
+    )
+    assert cfg is not None
+    assert cfg.pid == 4242
+    assert cfg.session_id == "s1"
+
+
+def test_start_skips_monitor_when_disabled_in_invocation(tmp_path):
+    """spawn_defaults.invocation.monitor=False → no monitor process."""
+    prepped = _prepped(tmp_path)
+    prepped.spawn_defaults.invocation.monitor = False
+    fake_proc = MagicMock()
+    fake_proc.pid = 1
+    with (
+        patch("tripwire.runtimes.subprocess._sp.Popen", return_value=fake_proc),
+        patch(
+            "tripwire.runtimes.subprocess.spawn_monitor_runner",
+            return_value=None,
+        ) as mock_spawn_monitor,
+    ):
+        SubprocessRuntime().start(prepped)
+    assert not mock_spawn_monitor.called
 
 
 def test_pause_sigterms_live_pid(tmp_path):

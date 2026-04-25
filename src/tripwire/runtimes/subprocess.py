@@ -28,6 +28,7 @@ from tripwire.runtimes.base import (
     RuntimeStartResult,
     RuntimeStatus,
 )
+from tripwire.runtimes.monitor_runner import RunnerConfig, spawn_monitor_runner
 
 
 def _render_log_path(prepped: PreppedSession) -> Path:
@@ -40,6 +41,52 @@ def _render_log_path(prepped: PreppedSession) -> Path:
         timestamp=ts,
     )
     return Path(raw).expanduser()
+
+
+def _render_monitor_log_path(prepped: PreppedSession) -> Path:
+    template = prepped.spawn_defaults.invocation.monitor_log_path_template
+    ts = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%S")
+    raw = template.format(
+        project_slug=prepped.project_slug,
+        session_id=prepped.session_id,
+        timestamp=ts,
+    )
+    return Path(raw).expanduser()
+
+
+def _build_runner_config(
+    prepped: PreppedSession, agent_pid: int, agent_log_path: Path
+) -> RunnerConfig:
+    """Bundle everything the standalone monitor process needs to operate."""
+    cfg_values = prepped.spawn_defaults.config
+    # Code worktree is the agent's cwd; PT worktree is whichever entry
+    # is NOT the code worktree (best-effort — None if not present).
+    code_wt = prepped.code_worktree
+    pt_wt: Path | None = None
+    for wt in prepped.worktrees:
+        wt_path = Path(wt.worktree_path)
+        if wt_path != code_wt:
+            pt_wt = wt_path
+            break
+    return RunnerConfig(
+        session_id=prepped.session_id,
+        pid=agent_pid,
+        log_path=agent_log_path,
+        code_worktree=code_wt,
+        pt_worktree=pt_wt,
+        project_dir=prepped.project_dir,
+        max_budget_usd=float(cfg_values.max_budget_usd),
+        monitor_log_path=_render_monitor_log_path(prepped),
+        model_name=cfg_values.model,
+        key_files=list(prepped.session.key_files),
+        # Conservative default: required artifact for #9 is the
+        # session's self-review.md committed under sessions/<sid>/.
+        # Project-side artifact manifest (KUI-87) drives the broader
+        # set; exposing it here would require a project-yaml load
+        # we don't otherwise need at start time.
+        required_artifacts=["self-review.md"],
+        poll_interval=2.0,
+    )
 
 
 class SubprocessRuntime:
@@ -74,6 +121,13 @@ class SubprocessRuntime:
             )
         finally:
             log_fh.close()
+
+        # v0.7.9 §A7 — fork the in-flight monitor so cost / quota /
+        # push-loop tripwires fire even after the spawning CLI exits.
+        # Failure to spawn the monitor is logged but does not abort
+        # the agent launch (degraded mode > no-launch).
+        if prepped.spawn_defaults.invocation.monitor:
+            spawn_monitor_runner(cfg=_build_runner_config(prepped, proc.pid, log_path))
 
         return RuntimeStartResult(
             claude_session_id=prepped.claude_session_id,

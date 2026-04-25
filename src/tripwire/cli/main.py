@@ -36,6 +36,7 @@ from tripwire.cli.uuid_cmd import uuid_cmd
 from tripwire.cli.validate import validate_cmd
 from tripwire.cli.validate_plan import validate_plan_cmd
 from tripwire.cli.view import view_cmd
+from tripwire.cli.watch import watch_cmd
 from tripwire.cli.workspace import workspace_cmd
 
 # Verbose count → logging level. -v = INFO, -vv = DEBUG, default = WARNING.
@@ -108,6 +109,7 @@ cli.add_command(artifacts_cmd)
 cli.add_command(completion_cmd)
 cli.add_command(ui_cmd)
 cli.add_command(view_cmd)
+cli.add_command(watch_cmd)
 cli.add_command(workspace_cmd)
 
 
