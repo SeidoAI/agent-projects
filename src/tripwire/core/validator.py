@@ -2375,6 +2375,164 @@ def check_done_implies_artifacts_on_main(
     return results
 
 
+def check_pm_response_covers_self_review(
+    ctx: ValidationContext,
+) -> list[CheckResult]:
+    """v0.7.9 §A3 — every self-review.md bullet must have a matching
+    quote_excerpt in pm-response.yaml.
+
+    Substring match (case-insensitive, both directions). Strict
+    enough to catch "PM skipped read entirely," loose enough to not
+    be a transcription chore.
+
+    Codes:
+      - ``pm_response/missing_file`` — self-review present, pm-response absent
+      - ``pm_response/parse_error``  — pm-response.yaml unparseable
+      - ``pm_response/incomplete_coverage`` — bullet has no matching quote_excerpt
+    """
+    from tripwire.core.session_review_artifacts import (
+        parse_pm_response_items,
+        parse_self_review_items,
+    )
+
+    results: list[CheckResult] = []
+
+    for entity in ctx.sessions:
+        sid = entity.model.id
+        sdir = ctx.project_dir / "sessions" / sid
+        sr_path = sdir / "self-review.md"
+        if not sr_path.is_file():
+            # Presence is enforced by done_implies_artifacts_on_main.
+            continue
+
+        try:
+            sr_items = parse_self_review_items(sr_path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            results.append(
+                CheckResult(
+                    code="pm_response/io_error",
+                    severity="error",
+                    file=f"sessions/{sid}/self-review.md",
+                    message=f"Could not read self-review.md: {exc}",
+                )
+            )
+            continue
+        if not sr_items:
+            continue
+
+        pr_path = sdir / "pm-response.yaml"
+        if not pr_path.is_file():
+            results.append(
+                CheckResult(
+                    code="pm_response/missing_file",
+                    severity="error",
+                    file=f"sessions/{sid}/pm-response.yaml",
+                    message=(
+                        f"Session {sid!r} has self-review.md but no "
+                        "pm-response.yaml; PM has not recorded a response."
+                    ),
+                    fix_hint=(
+                        "Author sessions/<sid>/pm-response.yaml from "
+                        "templates/artifacts/pm-response.yaml.j2 "
+                        "(`tripwire session scaffold <sid> "
+                        "--artifact pm-response.yaml`)."
+                    ),
+                )
+            )
+            continue
+
+        try:
+            pm_items = parse_pm_response_items(pr_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            results.append(
+                CheckResult(
+                    code="pm_response/parse_error",
+                    severity="error",
+                    file=f"sessions/{sid}/pm-response.yaml",
+                    message=f"pm-response.yaml could not be parsed: {exc}",
+                    fix_hint="Check YAML syntax against the template.",
+                )
+            )
+            continue
+
+        excerpts_lower = [(it.quote_excerpt or "").strip().lower() for it in pm_items]
+        for sr in sr_items:
+            sr_lower = sr.text.lower()
+            covered = any(
+                e and (e in sr_lower or sr_lower in e) for e in excerpts_lower
+            )
+            if covered:
+                continue
+            results.append(
+                CheckResult(
+                    code="pm_response/incomplete_coverage",
+                    severity="error",
+                    file=f"sessions/{sid}/pm-response.yaml",
+                    message=(
+                        f"Self-review item under Lens {sr.lens} has no "
+                        f"matching quote_excerpt in pm-response.yaml: "
+                        f"{sr.text!r}"
+                    ),
+                    fix_hint=(
+                        "Add an items[] entry to pm-response.yaml with a "
+                        "quote_excerpt that contains a substring of this "
+                        "self-review bullet."
+                    ),
+                )
+            )
+
+    return results
+
+
+def check_pm_response_followups_resolve(
+    ctx: ValidationContext,
+) -> list[CheckResult]:
+    """v0.7.9 §A3 — every ``items[].follow_up: KUI-XX`` in pm-response.yaml
+    must reference an existing issue.
+
+    Code: ``pm_response/missing_followup``.
+    """
+    from tripwire.core.session_review_artifacts import parse_pm_response_items
+
+    known_issue_ids = {entity.model.id for entity in ctx.issues}
+
+    results: list[CheckResult] = []
+    for entity in ctx.sessions:
+        sid = entity.model.id
+        pr_path = ctx.project_dir / "sessions" / sid / "pm-response.yaml"
+        if not pr_path.is_file():
+            continue
+        try:
+            pm_items = parse_pm_response_items(pr_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            # parse_error reported by check_pm_response_covers_self_review
+            continue
+
+        for item in pm_items:
+            if not item.follow_up:
+                continue
+            if item.follow_up in known_issue_ids:
+                continue
+            results.append(
+                CheckResult(
+                    code="pm_response/missing_followup",
+                    severity="error",
+                    file=f"sessions/{sid}/pm-response.yaml",
+                    message=(
+                        f"pm-response.yaml references follow_up "
+                        f"{item.follow_up!r}, but no such issue exists."
+                    ),
+                    fix_hint=(
+                        "Either create the follow-up issue (`tripwire "
+                        "next-key --type issue`) or change follow_up to "
+                        "an existing issue id."
+                    ),
+                )
+            )
+
+    return results
+
+
 ALL_CHECKS = [
     check_uuid_present,
     check_uuid_v4_version,
@@ -2400,6 +2558,8 @@ ALL_CHECKS = [
     check_session_issue_coherence,
     check_issue_artifact_presence,
     check_done_implies_artifacts_on_main,
+    check_pm_response_covers_self_review,
+    check_pm_response_followups_resolve,
 ]
 
 

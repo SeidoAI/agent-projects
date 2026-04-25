@@ -53,3 +53,9 @@ src/tripwire/ui/frontend/coverage/
 
 # Worktrees
 .worktrees/
+
+# Tripwire session-local files (gitignored per project convention)
+.claude/
+.tripwire/
+CLAUDE.md
+

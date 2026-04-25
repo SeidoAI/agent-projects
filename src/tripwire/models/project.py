@@ -116,7 +116,7 @@ class ArtifactManifestRequirements(BaseModel):
             "task-checklist.md",
             "verification-checklist.md",
             "self-review.md",
-            "pm-response.md",
+            "pm-response.yaml",
             "insights.yaml",
         ]
     )
