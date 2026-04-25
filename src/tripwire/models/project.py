@@ -100,6 +100,31 @@ class ProjectWorkspacePointer(BaseModel):
         return self
 
 
+class ArtifactManifestRequirements(BaseModel):
+    """`project.yaml.artifact_manifest` — the v0.7.9 correctness contract.
+
+    Lists the files that MUST exist on the merged-main snapshot of the PT
+    repo whenever a session or issue reaches ``status: done``. Validated
+    by the ``done_implies_artifacts_on_main`` rule. Defaults match
+    spec §A1.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    session_required: list[str] = Field(
+        default_factory=lambda: [
+            "task-checklist.md",
+            "verification-checklist.md",
+            "self-review.md",
+            "pm-response.md",
+            "insights.yaml",
+        ]
+    )
+    issue_required: list[str] = Field(
+        default_factory=lambda: ["developer.md", "verified.md"]
+    )
+
+
 class ProjectConfig(BaseModel):
     """The project's root config, parsed from `<project>/project.yaml`."""
 
@@ -132,6 +157,13 @@ class ProjectConfig(BaseModel):
 
     # v0.6b: optional workspace link. Absence means standalone project.
     workspace: ProjectWorkspacePointer | None = None
+
+    # v0.7.9 (§A1): the correctness contract. Required artifacts that
+    # must exist on merged main for any session/issue with status==done.
+    # Enforced by validator rule `done_implies_artifacts_on_main`.
+    artifact_manifest: ArtifactManifestRequirements = Field(
+        default_factory=ArtifactManifestRequirements
+    )
 
     # v0.7b: per-project artifact manifest overrides layered on top of
     # templates/artifacts/manifest.yaml. Useful for adding project-specific

@@ -76,6 +76,21 @@ orchestration:
   plan_approval_required: false
   auto_merge_on_pass: false
 
+# v0.7.9 — required artifacts (the correctness contract). Sessions and
+# issues with `status: done` must have every file below committed to the
+# merged-main snapshot of the project tracking repo. Validator rule
+# `done_implies_artifacts_on_main` enforces this. See spec §A1.
+artifact_manifest:
+  session_required:
+    - task-checklist.md
+    - verification-checklist.md
+    - self-review.md
+    - pm-response.md
+    - insights.yaml
+  issue_required:
+    - developer.md
+    - verified.md
+
 # Sequential key counters. Do NOT edit by hand — use `tripwire next-key`.
 next_issue_number: 1
 next_session_number: 1

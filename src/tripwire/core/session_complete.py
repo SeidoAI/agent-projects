@@ -1,9 +1,13 @@
 """Session complete orchestration.
 
 Gates session close-out behind: (a) session in a completable status,
-(b) at least one merged PR for the session's branches, (c) every
-required issue artifact present. Then closes issues, transitions the
-session to `done`, and removes worktrees.
+(b) every worktree branch has a merged PR, (c) every required issue
+artifact present, (d) most recent review exit_code ≤ 1. Then closes
+issues, transitions the session to `done`, and removes worktrees.
+
+v0.7.9 §A4: every gate is mandatory. There are no bypass flags. A
+session that can't pass these gates should be `tripwire session
+abandon`-ed, which is a terminal status that does not claim success.
 
 Insights application is out-of-scope here — the PM's
 `/pm-session-complete` runs `tripwire session insights apply/reject`
@@ -49,19 +53,18 @@ def complete_session(
     session_id: str,
     *,
     dry_run: bool = False,
-    force: bool = False,
-    force_review: bool = False,
-    skip_artifact_check: bool = False,
-    skip_worktree_cleanup: bool = False,
-    skip_pr_merge_check: bool = False,
 ) -> CompleteResult:
     """Run the close-out gates then transition the session to `done`.
 
-    Gates per spec §11.2:
-      1. Status in {in_review, verified} (unless --force).
-      2. PR merged (unless --force).
-      3. Per-issue required artifacts present (no override; §7.3).
-      4. Most recent review exit_code ≤ 1 (unless --force-review).
+    Gates per spec §11.2 (v0.7.9 §A4: no bypass flags):
+      1. Status in {in_review, verified}.
+      2. Every worktree branch has a merged PR.
+      3. Per-issue required artifacts present.
+      4. Most recent review exit_code ≤ 1.
+
+    If a session can't pass these gates, the right move is
+    ``tripwire session abandon`` (terminal status that does not claim
+    success), not a bypass flag.
     """
     session = load_session(project_dir, session_id)
     result = CompleteResult(session_id=session_id)
@@ -69,31 +72,24 @@ def complete_session(
     # Spec §11.2 step 1 — narrow status gate. `in_progress`, `executing`,
     # `active` must go through /pm-session-review first.
     completable = {"in_review", "verified"}
-    if session.status not in completable and not force:
+    if session.status not in completable:
         raise CompleteError(
             "complete/not_active",
             f"Session status is {session.status!r}; expected one of "
-            f"{sorted(completable)}. Run /pm-session-review first, or pass --force.",
+            f"{sorted(completable)}. Run /pm-session-review first. "
+            "If the session can't legitimately reach `done`, run "
+            "`tripwire session abandon` instead.",
         )
 
     # v0.7.5 — flip session-start draft PRs to ready so the operator can
-    # merge without manually toggling state in the GH UI. Idempotent:
-    # `gh pr ready` on a non-draft or merged PR is swallowed by
-    # ``check=False``. ``skip_pr_merge_check`` only skips the verify;
-    # the flip still runs because it's a useful state transition. Only
-    # ``--force`` skips both.
-    if not force:
-        _flip_drafts_to_ready(session)
+    # merge without toggling state in the GH UI. Idempotent: `gh pr
+    # ready` on a non-draft or merged PR is swallowed by ``check=False``.
+    # Always runs (v0.7.9 §A4: no bypass flags).
+    _flip_drafts_to_ready(session)
 
-    if not skip_pr_merge_check and not force:
-        _verify_pr_merged(session)
-
-    if not skip_artifact_check:
-        _verify_issue_artifacts(project_dir, session)
-
-    # Spec §11.2 step 4 — review exit-code gate.
-    if not force and not force_review:
-        _verify_review_ok(project_dir, session)
+    _verify_pr_merged(session)
+    _verify_issue_artifacts(project_dir, session)
+    _verify_review_ok(project_dir, session)
 
     result.node_diffs = _compute_node_diffs(project_dir, session)
 
@@ -120,15 +116,14 @@ def complete_session(
             last.outcome = "completed"
     save_session(project_dir, session)
 
-    if not skip_worktree_cleanup:
-        from tripwire.core.git_helpers import worktree_remove
+    from tripwire.core.git_helpers import worktree_remove
 
-        for wt in session.runtime_state.worktrees:
-            try:
-                worktree_remove(Path(wt.clone_path), Path(wt.worktree_path))
-                result.worktrees_removed.append(wt.worktree_path)
-            except (subprocess.SubprocessError, OSError):
-                pass
+    for wt in session.runtime_state.worktrees:
+        try:
+            worktree_remove(Path(wt.clone_path), Path(wt.worktree_path))
+            result.worktrees_removed.append(wt.worktree_path)
+        except (subprocess.SubprocessError, OSError):
+            pass
 
     return result
 
@@ -217,9 +212,9 @@ def _verify_pr_merged(session) -> None:
                     merged = True
         except (subprocess.SubprocessError, OSError, json.JSONDecodeError):
             # Treat "gh errored / timed out / returned garbage" as "not
-            # merged" — conservative: operator can re-run once the
-            # environment is healthy, or pass --force after verifying
-            # manually.
+            # merged" — conservative: operator re-runs once the
+            # environment is healthy, or `tripwire session abandon` if
+            # the session genuinely shouldn't ship.
             pass
         if not merged:
             unmerged.append(wt.branch)
@@ -234,15 +229,15 @@ def _verify_review_ok(project_dir: Path, session) -> None:
     """Spec §11.2 step 4: most recent review exit_code must be ≤ 1.
 
     Reads ``sessions/<id>/review.json`` produced by ``session review``.
-    Missing file means review never ran → refuse unless --force-review.
+    Missing file means review never ran → refuse. The session needs to
+    actually go through review before claiming done.
     """
     review_path = paths.session_dir(project_dir, session.id) / "review.json"
     if not review_path.is_file():
         raise CompleteError(
             "complete/no_review",
             f"No review.json for session {session.id!r} — run "
-            f"`tripwire session review {session.id}` first, "
-            f"or pass --force-review to bypass.",
+            f"`tripwire session review {session.id}` first.",
         )
     try:
         data = json.loads(review_path.read_text(encoding="utf-8"))
@@ -262,7 +257,7 @@ def _verify_review_ok(project_dir: Path, session) -> None:
         raise CompleteError(
             "complete/review_failed",
             f"Last review reported verdict={verdict!r} (exit_code={exit_code}). "
-            f"Fix findings and re-review, or pass --force-review.",
+            f"Fix findings and re-review.",
         )
 
 

@@ -172,7 +172,10 @@ class TestFlipDraftsToReady:
 class TestCompleteSessionInvokesFlip:
     """End-to-end sanity: ``complete_session`` runs ``_flip_drafts_to_ready``
     so v0.7.5 sessions actually have their drafts flipped at complete-time.
-    The verify steps stay green via existing skip-flags."""
+
+    Drives through the real state machine — review.json present, issue
+    artifacts present, PR-merged gate stubbed. v0.7.9 §A4: there are no
+    bypass flags to take the shortcut path."""
 
     def test_complete_invokes_flip_drafts_to_ready(
         self,
@@ -181,6 +184,8 @@ class TestCompleteSessionInvokesFlip:
         save_test_issue,
         monkeypatch,
     ):
+        import json
+
         from tripwire.core.session_complete import complete_session
 
         save_test_issue(tmp_path_project, "TMP-1", status="in_review")
@@ -204,23 +209,33 @@ class TestCompleteSessionInvokesFlip:
                 ]
             },
         )
+        # review.json (gate 4) must be present and exit_code <= 1.
+        review_path = tmp_path_project / "sessions" / "s1" / "review.json"
+        review_path.parent.mkdir(parents=True, exist_ok=True)
+        review_path.write_text(
+            json.dumps(
+                {
+                    "session_id": "s1",
+                    "verdict": "approved",
+                    "exit_code": 0,
+                    "pr_number": None,
+                    "head_sha": None,
+                    "timestamp": "2026-04-25T00:00:00+00:00",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        # PR-merged gate: stubbed to a no-op (the gate that needs gh).
+        monkeypatch.setattr(mod, "_verify_pr_merged", lambda _session: None)
 
         called: list = []
 
         def fake_flip(session):
             called.append(session.id)
 
-        monkeypatch.setattr(
-            "tripwire.core.session_complete._flip_drafts_to_ready", fake_flip
-        )
+        monkeypatch.setattr(mod, "_flip_drafts_to_ready", fake_flip)
 
-        complete_session(
-            tmp_path_project,
-            "s1",
-            dry_run=True,
-            skip_pr_merge_check=True,
-            force_review=True,
-            skip_artifact_check=True,
-        )
+        complete_session(tmp_path_project, "s1", dry_run=True)
 
         assert called == ["s1"]

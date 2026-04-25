@@ -51,6 +51,7 @@ from pydantic import ValidationError
 from tripwire.core import freshness as freshness_mod
 from tripwire.core import paths
 from tripwire.core.enum_loader import EnumRegistry, load_enums
+from tripwire.core.git_helpers import MainTreeUnavailable, list_paths_on_main
 from tripwire.core.id_generator import parse_key
 from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.parser import ParseError, parse_frontmatter_body
@@ -2276,6 +2277,104 @@ def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
     return results
 
 
+def check_done_implies_artifacts_on_main(
+    ctx: ValidationContext,
+) -> list[CheckResult]:
+    """v0.7.9 §A1 — `status: done` ⇒ required artifacts exist on origin/main.
+
+    The correctness contract. For every session and issue with
+    ``status: done``, every file listed in
+    ``project.yaml.artifact_manifest`` must be present on the
+    merged-main snapshot of the project tracking repo (``origin/main``).
+    "On main" is the only state that counts; worktree files don't.
+
+    Online-first. We don't ``git fetch`` from inside validate (would
+    hit the network on every run). If ``origin/main`` is unreadable
+    (no remote, no fetch yet, repo isn't a git checkout), emit a
+    single ``done_implies_artifacts/main_unavailable`` warning and
+    skip the per-entity checks — the operator can re-run after a
+    fetch.
+    """
+    if ctx.project_config is None:
+        return []
+
+    done_sessions = [e for e in ctx.sessions if e.model.status == "done"]
+    done_issues = [e for e in ctx.issues if e.model.status == "done"]
+    if not done_sessions and not done_issues:
+        return []
+
+    try:
+        on_main = list_paths_on_main(ctx.project_dir)
+    except MainTreeUnavailable as exc:
+        return [
+            CheckResult(
+                code="done_implies_artifacts/main_unavailable",
+                severity="warning",
+                file=PROJECT_CONFIG_FILENAME,
+                message=(
+                    f"Cannot read origin/main; `done` ⇒ artifact rule "
+                    f"unverified ({exc})."
+                ),
+                fix_hint=(
+                    "Run `git fetch origin` in the project tracking repo, "
+                    "then re-run validate. Network-isolated environments "
+                    "can ignore this warning."
+                ),
+            )
+        ]
+
+    manifest = ctx.project_config.artifact_manifest
+    results: list[CheckResult] = []
+
+    for entity in done_sessions:
+        session = entity.model
+        for fname in manifest.session_required:
+            rel = f"sessions/{session.id}/{fname}"
+            if rel in on_main:
+                continue
+            results.append(
+                CheckResult(
+                    code="done_implies_artifacts/missing_on_main",
+                    severity="error",
+                    file=entity.rel_path,
+                    message=(
+                        f"Session {session.id!r} is `done` but required "
+                        f"artifact {rel!r} is not on origin/main."
+                    ),
+                    fix_hint=(
+                        f"Commit {rel} to the project tracking branch and "
+                        "merge to main, OR transition the session to "
+                        "`abandoned` if the work didn't actually complete."
+                    ),
+                )
+            )
+
+    for entity in done_issues:
+        issue = entity.model
+        for fname in manifest.issue_required:
+            rel = f"issues/{issue.id}/{fname}"
+            if rel in on_main:
+                continue
+            results.append(
+                CheckResult(
+                    code="done_implies_artifacts/missing_on_main",
+                    severity="error",
+                    file=entity.rel_path,
+                    message=(
+                        f"Issue {issue.id!r} is `done` but required "
+                        f"artifact {rel!r} is not on origin/main."
+                    ),
+                    fix_hint=(
+                        f"Commit {rel} to the project tracking branch and "
+                        "merge to main, OR transition the issue back to "
+                        "an in-progress status."
+                    ),
+                )
+            )
+
+    return results
+
+
 ALL_CHECKS = [
     check_uuid_present,
     check_uuid_v4_version,
@@ -2300,6 +2399,7 @@ ALL_CHECKS = [
     check_quality_consistency,
     check_session_issue_coherence,
     check_issue_artifact_presence,
+    check_done_implies_artifacts_on_main,
 ]
 
 

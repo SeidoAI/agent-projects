@@ -1,4 +1,4 @@
-"""session_complete gate logic (spec §11.2)."""
+"""session_complete gate logic (spec §11.2, v0.7.9 §A4: no bypass flags)."""
 
 import json
 from pathlib import Path
@@ -28,17 +28,31 @@ def _write_review_json(
     )
 
 
+@pytest.fixture
+def stub_pr_merged(monkeypatch):
+    """Stub `_verify_pr_merged` to be a no-op; gates downstream of it
+    (artifact + review) are what each test wants to exercise. Tests
+    that need to assert PR-merge behaviour should NOT use this fixture
+    and instead drive `_verify_pr_merged` directly (see TestVerifyPrMerged
+    below)."""
+    from tripwire.core import session_complete as mod
+
+    monkeypatch.setattr(mod, "_verify_pr_merged", lambda _session: None)
+
+
 def test_complete_refuses_non_completable_status(
-    tmp_path_project: Path, save_test_session
+    tmp_path_project: Path, save_test_session, stub_pr_merged
 ):
-    """Spec §11.2 step 1 — only {in_review, verified} complete without --force."""
+    """Spec §11.2 step 1 — only {in_review, verified} are completable."""
     save_test_session(tmp_path_project, "s1", status="planned")
     with pytest.raises(CompleteError) as exc:
         complete_session(tmp_path_project, "s1", dry_run=True)
     assert exc.value.code == "complete/not_active"
 
 
-def test_complete_refuses_in_progress_status(tmp_path_project: Path, save_test_session):
+def test_complete_refuses_in_progress_status(
+    tmp_path_project: Path, save_test_session, stub_pr_merged
+):
     """`in_progress`, `executing`, `active` require going through review first."""
     save_test_session(tmp_path_project, "s1", status="executing")
     with pytest.raises(CompleteError) as exc:
@@ -46,8 +60,19 @@ def test_complete_refuses_in_progress_status(tmp_path_project: Path, save_test_s
     assert exc.value.code == "complete/not_active"
 
 
+def test_complete_error_message_points_at_abandon(
+    tmp_path_project: Path, save_test_session, stub_pr_merged
+):
+    """The error for an unfit-to-complete session must mention the
+    abandon escape hatch — that's the v0.7.9 §A4 design intent."""
+    save_test_session(tmp_path_project, "s1", status="planned")
+    with pytest.raises(CompleteError) as exc:
+        complete_session(tmp_path_project, "s1", dry_run=True)
+    assert "abandon" in str(exc.value)
+
+
 def test_complete_refuses_without_artifacts(
-    tmp_path_project: Path, save_test_session, save_test_issue
+    tmp_path_project: Path, save_test_session, save_test_issue, stub_pr_merged
 ):
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
     save_test_session(
@@ -57,20 +82,14 @@ def test_complete_refuses_without_artifacts(
         issues=["TMP-1"],
     )
     with pytest.raises(CompleteError) as exc:
-        complete_session(
-            tmp_path_project,
-            "s1",
-            dry_run=True,
-            skip_pr_merge_check=True,
-            force_review=True,
-        )
+        complete_session(tmp_path_project, "s1", dry_run=True)
     assert exc.value.code == "complete/missing_artifacts"
 
 
-def test_complete_refuses_without_review_unless_force_review(
-    tmp_path_project: Path, save_test_session, save_test_issue
+def test_complete_refuses_without_review(
+    tmp_path_project: Path, save_test_session, save_test_issue, stub_pr_merged
 ):
-    """Spec §11.2 step 4 — review.json is required."""
+    """Spec §11.2 step 4 — review.json is required, no bypass available."""
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
     (tmp_path_project / "issues" / "TMP-1" / "developer.md").write_text(
         "# notes\n", encoding="utf-8"
@@ -81,29 +100,13 @@ def test_complete_refuses_without_review_unless_force_review(
         status="in_review",
         issues=["TMP-1"],
     )
-    # Without review.json → refuse with complete/no_review.
     with pytest.raises(CompleteError) as exc:
-        complete_session(
-            tmp_path_project,
-            "s1",
-            dry_run=True,
-            skip_pr_merge_check=True,
-        )
+        complete_session(tmp_path_project, "s1", dry_run=True)
     assert exc.value.code == "complete/no_review"
-
-    # --force-review bypasses.
-    result = complete_session(
-        tmp_path_project,
-        "s1",
-        dry_run=True,
-        skip_pr_merge_check=True,
-        force_review=True,
-    )
-    assert result.session_id == "s1"
 
 
 def test_complete_refuses_on_failed_review(
-    tmp_path_project: Path, save_test_session, save_test_issue
+    tmp_path_project: Path, save_test_session, save_test_issue, stub_pr_merged
 ):
     """Spec §11.2 step 4 — exit_code > 1 blocks complete."""
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
@@ -119,17 +122,12 @@ def test_complete_refuses_on_failed_review(
     _write_review_json(tmp_path_project, "s1", exit_code=2, verdict="rejected")
 
     with pytest.raises(CompleteError) as exc:
-        complete_session(
-            tmp_path_project,
-            "s1",
-            dry_run=True,
-            skip_pr_merge_check=True,
-        )
+        complete_session(tmp_path_project, "s1", dry_run=True)
     assert exc.value.code == "complete/review_failed"
 
 
 def test_complete_dry_run_passes_when_gates_satisfied(
-    tmp_path_project: Path, save_test_session, save_test_issue
+    tmp_path_project: Path, save_test_session, save_test_issue, stub_pr_merged
 ):
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
     (tmp_path_project / "issues" / "TMP-1" / "developer.md").write_text(
@@ -143,18 +141,15 @@ def test_complete_dry_run_passes_when_gates_satisfied(
     )
     _write_review_json(tmp_path_project, "s1", exit_code=0, verdict="approved")
 
-    result = complete_session(
-        tmp_path_project,
-        "s1",
-        dry_run=True,
-        skip_pr_merge_check=True,
-    )
+    result = complete_session(tmp_path_project, "s1", dry_run=True)
     assert result.session_id == "s1"
 
 
 def test_complete_closes_issues_and_transitions_session(
-    tmp_path_project: Path, save_test_session, save_test_issue
+    tmp_path_project: Path, save_test_session, save_test_issue, stub_pr_merged
 ):
+    """Real (non-dry-run) close-out: every gate passes, transitions
+    happen. Worktree cleanup is a no-op here (empty runtime_state)."""
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
     (tmp_path_project / "issues" / "TMP-1" / "developer.md").write_text(
         "# notes\n", encoding="utf-8"
@@ -167,12 +162,7 @@ def test_complete_closes_issues_and_transitions_session(
     )
     _write_review_json(tmp_path_project, "s1", exit_code=0, verdict="approved")
 
-    result = complete_session(
-        tmp_path_project,
-        "s1",
-        skip_pr_merge_check=True,
-        skip_worktree_cleanup=True,
-    )
+    result = complete_session(tmp_path_project, "s1")
     assert "TMP-1" in result.issues_closed
 
     from tripwire.core.session_store import load_session
@@ -184,17 +174,24 @@ def test_complete_closes_issues_and_transitions_session(
     assert session.status == "done"
 
 
-def test_complete_force_bypasses_gates(tmp_path_project: Path, save_test_session):
-    save_test_session(tmp_path_project, "s1", status="planned")
-    result = complete_session(
-        tmp_path_project,
-        "s1",
-        force=True,
-        dry_run=True,
-        skip_pr_merge_check=True,
-        skip_artifact_check=True,
-    )
-    assert result.session_id == "s1"
+def test_complete_signature_has_no_bypass_flags():
+    """Regression guard for v0.7.9 §A4: the keyword-arg surface of
+    `complete_session` must not grow back the bypass flags. A drift
+    here is the kind of regression that would let a future PR sneak
+    a flag back in."""
+    import inspect
+
+    from tripwire.core import session_complete as mod
+
+    params = set(inspect.signature(mod.complete_session).parameters)
+    forbidden = {
+        "force",
+        "force_review",
+        "skip_artifact_check",
+        "skip_worktree_cleanup",
+        "skip_pr_merge_check",
+    }
+    assert params & forbidden == set(), f"bypass flags returned: {params & forbidden}"
 
 
 class TestVerifyPrMerged:

@@ -101,3 +101,38 @@ def worktree_is_dirty(wt_path: Path) -> bool:
         text=True,
     )
     return bool(result.stdout.strip())
+
+
+class MainTreeUnavailable(RuntimeError):
+    """Raised when `origin/main` can't be read.
+
+    Either the directory isn't a git repo, no `origin` remote exists,
+    or `origin/main` isn't a known ref. Distinct from the "main is
+    empty" case (an empty repo would still return zero paths cleanly).
+    """
+
+
+def list_paths_on_main(repo_dir: Path) -> set[str]:
+    """Return every file path tracked on ``origin/main`` of ``repo_dir``.
+
+    Used by the ``done_implies_artifacts_on_main`` validator rule. One
+    `git ls-tree -r --name-only origin/main` call covers the whole repo
+    — way cheaper than ``git show origin/main:<path>`` per artifact.
+
+    The caller is expected to call ``git fetch origin`` before this if
+    they want a fresh view; we deliberately don't fetch from inside the
+    validator (network on every `tripwire validate` call would be
+    unfriendly).
+
+    Raises :class:`MainTreeUnavailable` if origin/main isn't readable.
+    """
+    result = subprocess.run(
+        ["git", "-C", str(repo_dir), "ls-tree", "-r", "--name-only", "origin/main"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise MainTreeUnavailable(
+            (result.stderr or "git ls-tree origin/main failed").strip()
+        )
+    return {line for line in result.stdout.splitlines() if line}
