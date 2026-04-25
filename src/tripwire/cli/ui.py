@@ -15,6 +15,14 @@ import click
 _UI_MODULES = frozenset({"fastapi", "uvicorn", "watchdog", "websockets"})
 
 
+def _find_project_root(start: Path) -> Path | None:
+    """Walk up from *start* looking for a directory containing ``project.yaml``."""
+    for candidate in (start, *start.parents):
+        if (candidate / "project.yaml").is_file():
+            return candidate
+    return None
+
+
 @click.command(name="ui")
 @click.option(
     "--project-dir",
@@ -70,6 +78,8 @@ def ui_cmd(
     # 3. Resolve project directories.
     if project_dir is not None:
         project_dirs = [project_dir.expanduser().resolve()]
+    elif (cwd_project := _find_project_root(Path.cwd())) is not None:
+        project_dirs = [cwd_project]
     else:
         from tripwire.ui.services.project_service import discover_projects
 
