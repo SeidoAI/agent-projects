@@ -87,23 +87,16 @@ _TASK_CHECKLIST_FILENAME = "task-checklist.md"
 
 # Match a Markdown table row with a status cell.
 # Example: `| #1 | Do thing | done |` → status = "done"
-# Also accepts checkbox-style bullets: `- [x] done thing`.
 _TABLE_ROW_RE = re.compile(r"^\s*\|\s*(?P<cols>.*?)\s*\|?\s*$")
-_BULLET_ROW_RE = re.compile(r"^\s*[-*]\s*\[(?P<mark>[ xX])\]\s+")
 
 
 def _parse_task_checklist(text: str) -> TaskProgress:
     """Parse a ``task-checklist.md`` body into completed + total row counts.
 
-    Accepts two formats:
-
-    **Table** — one row per task, with a final ``status`` cell containing
-    values like ``todo`` / ``in_progress`` / ``done``. The status enum
-    is project-specific; we count ``done`` (case-insensitive) as complete.
-    The header + separator lines are skipped.
-
-    **Checkbox list** — markdown bullets like ``- [x] finished`` and
-    ``- [ ] pending``. Counts the checked ones as complete.
+    Expects a Markdown table — one row per task, with a final ``status``
+    cell containing values like ``todo`` / ``in_progress`` / ``done``.
+    The status enum is project-specific; we count ``done``
+    (case-insensitive) as complete. Header + separator lines are skipped.
 
     Returns ``TaskProgress(done=0, total=0)`` when the file has no
     recognisable rows.
@@ -126,7 +119,6 @@ def _parse_task_checklist(text: str) -> TaskProgress:
     # Strip the header if the second row is all dashes in the original.
     # Simpler heuristic: treat first row as header if the rest share an
     # "in_progress" / "done" / "todo" token in the last column.
-    parsed_any = False
     if len(table_rows) >= 2:
         header = [c.lower() for c in table_rows[0]]
         data_rows = table_rows[1:]
@@ -148,19 +140,6 @@ def _parse_task_checklist(text: str) -> TaskProgress:
             total += 1
             if cell == "done":
                 done += 1
-            parsed_any = True
-
-    if parsed_any:
-        return TaskProgress(done=done, total=total)
-
-    # Fallback: checkbox bullets.
-    for line in text.splitlines():
-        m = _BULLET_ROW_RE.match(line)
-        if m is None:
-            continue
-        total += 1
-        if m.group("mark").lower() == "x":
-            done += 1
 
     return TaskProgress(done=done, total=total)
 
