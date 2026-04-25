@@ -8,7 +8,6 @@ from . import (
     branch_convention,  # noqa: F401
     concept_drift,  # noqa: F401
     gap_analysis,  # noqa: F401
-    orphan_concepts,  # noqa: F401
     session_stale,  # noqa: F401
     stale_workspace_nodes,  # noqa: F401
     unpushed_promotions,  # noqa: F401

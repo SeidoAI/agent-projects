@@ -98,20 +98,6 @@ branch: not-valid-branch
         assert not any(f.code == "lint/branch_convention" for f in findings)
 
 
-class TestOrphanConcepts:
-    def test_warns_on_unreferenced_term(self, save_test_issue, tmp_path_project):
-        save_test_issue(
-            tmp_path_project,
-            key="TMP-1",
-            kind="feat",
-            title="Integrate with Stripe",
-            body="## Context\nWe integrate with Stripe's payment API.\n",
-        )
-        linter = Linter(project_dir=tmp_path_project)
-        findings = list(linter.run_stage("scoping"))
-        assert any(f.code == "lint/issue_body_orphan_concepts" for f in findings)
-
-
 class TestUnpushedPromotions:
     def test_unpushed_promotions_no_op_in_v0_6a(self, save_test_node, tmp_path_project):
         """Without v0.6b's origin/scope fields, the rule defaults to no-op
