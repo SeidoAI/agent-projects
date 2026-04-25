@@ -67,17 +67,15 @@ prompt_template: |
   in v0.7.3 used that exact rationalization; we caught it. Don't
   repeat it.
 
-  Exit protocol — how you signal you're done:
+  Exit protocol — how you signal you're done. THIS IS UNCONDITIONAL.
 
-  CLAUDE.md lists your worktrees. For every worktree that has commits
-  ahead of its base branch, before you stop:
-
-  1. `git push origin <branch>` from that worktree.
-  2. `gh pr create --repo <repo> --base <base-branch> --head <branch>
-     --title '{branch_type}({session_id}): {session_name}' --body ...`
-     where <body> summarises the work in that worktree.
-  3. If there are two PRs (code + project-tracking), cross-link them
-     in the PR bodies.
+  Both the code PR AND the project-tracking PR MUST exist. Both must
+  be cross-linked in their bodies. The PT PR contains the required
+  session artifacts (task-checklist.md, verification-checklist.md,
+  self-review.md, insights.yaml — pm-response.md is PM-side, not
+  yours). Opening the code PR without the PT PR + all artifacts
+  committed is a protocol violation. There is no "if there are two
+  PRs" — there are always two.
 
   Commit cadence during execution:
   - After each numbered plan step, commit your changes with message
@@ -86,12 +84,37 @@ prompt_template: |
     unreviewable. The PM gets natural rollback points. Squash on
     merge is the PR's job, not yours.
 
-  PR-open is your exit signal. Once every dirty worktree has a PR, you
-  are done. The PM reviews and merges; `tripwire session complete`
-  verifies the merges and closes the session.
+  Per-worktree exit sequence. CLAUDE.md lists your worktrees. For
+  every worktree that has commits ahead of its base branch:
 
-  Before you push the PR, post a self-review comment on it titled
-  "Self-review" applying these four lenses. Be specific — soft yeses
+  1. Self-review BEFORE pushing the PT PR. Write your self-review to
+     `sessions/{session_id}/self-review.md` per the four-lens
+     template at `templates/sessions/self-review.md.j2` (i.e. the
+     four-lens analysis below). Commit it. The PR-comment version is
+     generated FROM this file — not authored fresh on the PR.
+  2. `git push origin <branch>` from that worktree.
+  3. `gh pr create --repo <repo> --base <base-branch> --head <branch>
+     --title '{branch_type}({session_id}): {session_name}' --body ...`
+     where <body> summarises the work in that worktree AND
+     cross-links the sibling PR.
+  4. After PR-open, poll its CI: `gh pr checks <pr-number> --watch`.
+     When all checks pass, you're done. If a check fails, push a fix
+     commit and `--watch` again. After 3 failed-fix attempts, write
+     the failure summary as plain text and stop — the PM will take
+     over. Do not loop a 4th time. The 3-attempt cap is a circuit
+     breaker for flaky tests and infra issues that the agent cannot
+     diagnose without human context.
+
+  Cross-link the two PRs in their bodies — the code PR body links the
+  PT PR URL and vice versa.
+
+  PR-open + CI-green is your exit signal. Once every dirty worktree
+  has a PR with green checks (or has hit the 3-attempt cap and
+  surfaced the stop), you are done. The PM reviews and merges;
+  `tripwire session complete` verifies the merges and closes the
+  session.
+
+  Self-review is the four-lens template. Be specific — soft yeses
   help no one:
 
   1. AC met but not really — walk every [x] in your
