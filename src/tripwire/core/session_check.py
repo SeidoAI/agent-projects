@@ -24,7 +24,6 @@ from tripwire.core.spawn_config import load_resolved_spawn_config
 from tripwire.core.store import load_issue, load_project
 from tripwire.models.session import AgentSession
 
-
 # ---------------------------------------------------------------------------
 # Result shape
 # ---------------------------------------------------------------------------
@@ -171,7 +170,10 @@ def _check_checklist_unfilled(
         )
 
     # All rows pending AND every Comments cell is empty/em-dash → unfilled.
-    EMPTY_COMMENTS = {"", "—", "-", "–"}
+    # The shipped task-checklist.md.j2 emits em-dash (U+2014); plain
+    # hyphen-minus is also accepted to defend against minor template
+    # edits.
+    EMPTY_COMMENTS = {"", "—", "-"}
     statuses = [r[2].lower() if len(r) > 2 else "" for r in rows]
     comments = [r[3] if len(r) > 3 else "" for r in rows]
     all_pending = all(s == "pending" for s in statuses)

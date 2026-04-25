@@ -39,7 +39,6 @@ from tripwire.core.git_helpers import (
 )
 from tripwire.core.process_helpers import is_alive
 from tripwire.core.session_check import (
-    StrictCheckResult,
     any_blocking_error,
     strict_check,
 )

@@ -117,14 +117,14 @@ class TestTemplateStillRenders:
     branch_type / plan."""
 
     def test_renders_with_expected_keys(self):
+        # Load defaults via the real resolver against a fresh tmp dir
+        # so we don't depend on a project context.
+        import tempfile
+
         from tripwire.core.spawn_config import (
             load_resolved_spawn_config,
             render_prompt,
         )
-
-        # Load defaults via the real resolver against a fresh tmp dir
-        # so we don't depend on a project context.
-        import tempfile
 
         with tempfile.TemporaryDirectory() as td:
             resolved = load_resolved_spawn_config(Path(td), session=None)
