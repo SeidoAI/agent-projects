@@ -16,7 +16,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from tripwire.ui.dependencies import ProjectContext, get_project
-from tripwire.ui.routes._v2_stub import raise_v2_not_implemented
+from tripwire.ui.routes._v2_stub import V2_RESPONSES, raise_v2_not_implemented
 from tripwire.ui.services.pm_review_service import (
     PmReviewDetail,
     PmReviewSummary,
@@ -33,14 +33,14 @@ _DETAIL = (
 )
 
 
-@router.get("", response_model=list[PmReviewSummary])
+@router.get("", response_model=list[PmReviewSummary], responses=V2_RESPONSES)
 async def list_pm_reviews(
     project: ProjectContext = Depends(get_project),  # noqa: B008
 ) -> list[PmReviewSummary]:
     raise_v2_not_implemented(_DETAIL)
 
 
-@router.get("/{pr_number}", response_model=PmReviewDetail)
+@router.get("/{pr_number}", response_model=PmReviewDetail, responses=V2_RESPONSES)
 async def get_pm_review(
     pr_number: int,
     project: ProjectContext = Depends(get_project),  # noqa: B008
@@ -48,7 +48,7 @@ async def get_pm_review(
     raise_v2_not_implemented(_DETAIL)
 
 
-@router.post("/{pr_number}/run", response_model=PmReviewDetail)
+@router.post("/{pr_number}/run", response_model=PmReviewDetail, responses=V2_RESPONSES)
 async def run_pm_review(
     pr_number: int,
     project: ProjectContext = Depends(get_project),  # noqa: B008
