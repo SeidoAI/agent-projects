@@ -37,9 +37,7 @@ def _stub_main_unavailable(monkeypatch, message: str = "no remote") -> None:
     def _raise(_project_dir):
         raise git_helpers.MainTreeUnavailable(message)
 
-    monkeypatch.setattr(
-        done_implies_artifacts_on_main, "list_paths_on_main", _raise
-    )
+    monkeypatch.setattr(done_implies_artifacts_on_main, "list_paths_on_main", _raise)
 
 
 def test_no_done_entities_returns_empty(
@@ -58,9 +56,7 @@ def test_no_done_entities_returns_empty(
 
     from tripwire.core.validator.lint import done_implies_artifacts_on_main
 
-    monkeypatch.setattr(
-        done_implies_artifacts_on_main, "list_paths_on_main", _spy
-    )
+    monkeypatch.setattr(done_implies_artifacts_on_main, "list_paths_on_main", _spy)
 
     ctx = load_context(tmp_path_project)
     results = check_done_implies_artifacts_on_main(ctx)

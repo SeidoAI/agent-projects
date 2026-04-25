@@ -84,11 +84,7 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
         return []
 
     sessions_by_id = {entity.model.id: entity.model for entity in ctx.sessions}
-    base = (
-        ctx.project_config.base_branch
-        if ctx.project_config is not None
-        else "main"
-    )
+    base = ctx.project_config.base_branch if ctx.project_config is not None else "main"
 
     results: list[CheckResult] = []
     for branch in branches:

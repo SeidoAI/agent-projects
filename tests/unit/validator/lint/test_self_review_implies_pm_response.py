@@ -25,9 +25,7 @@ def _stub_main_unavailable(monkeypatch, message: str = "no remote") -> None:
     def _raise(_project_dir):
         raise git_helpers.MainTreeUnavailable(message)
 
-    monkeypatch.setattr(
-        self_review_implies_pm_response, "list_paths_on_main", _raise
-    )
+    monkeypatch.setattr(self_review_implies_pm_response, "list_paths_on_main", _raise)
 
 
 def test_self_review_without_pm_response_errors(
@@ -61,9 +59,7 @@ def test_self_review_with_pm_response_passes(
     assert self_review_implies_pm_response.check(ctx) == []
 
 
-def test_no_self_review_passes(
-    tmp_path_project: Path, save_test_session, monkeypatch
-):
+def test_no_self_review_passes(tmp_path_project: Path, save_test_session, monkeypatch):
     """No self-review.md on main → rule has nothing to assert about
     pm-response.md → no findings (regardless of session status)."""
     save_test_session(tmp_path_project, "s1", status="executing")
@@ -73,9 +69,7 @@ def test_no_self_review_passes(
     assert self_review_implies_pm_response.check(ctx) == []
 
 
-def test_only_iterates_known_sessions(
-    tmp_path_project: Path, monkeypatch
-):
+def test_only_iterates_known_sessions(tmp_path_project: Path, monkeypatch):
     """A self-review.md path on main for a session that doesn't exist
     in the project is ignored — the rule cares about live sessions."""
     _stub_main(

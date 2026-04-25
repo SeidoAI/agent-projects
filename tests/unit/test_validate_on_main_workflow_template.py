@@ -17,9 +17,7 @@ def _render_template(version: str = "0.7.9") -> str:
         loader=FileSystemLoader(str(template_root)),
         keep_trailing_newline=True,
     )
-    return env.get_template("validate-on-main.yml.j2").render(
-        tripwire_version=version
-    )
+    return env.get_template("validate-on-main.yml.j2").render(tripwire_version=version)
 
 
 def test_template_renders_to_valid_yaml():

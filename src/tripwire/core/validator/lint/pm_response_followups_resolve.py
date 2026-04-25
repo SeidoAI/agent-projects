@@ -46,9 +46,7 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
                     code="pm_response_followups_resolve/parse_error",
                     severity="warning",
                     file=rel,
-                    message=(
-                        f"Could not parse {rel!r} as frontmatter+body: {exc}"
-                    ),
+                    message=(f"Could not parse {rel!r} as frontmatter+body: {exc}"),
                     fix_hint=(
                         "Ensure the file starts with `---` and contains "
                         "valid YAML frontmatter."

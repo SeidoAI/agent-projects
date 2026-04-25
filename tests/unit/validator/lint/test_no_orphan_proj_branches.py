@@ -29,9 +29,7 @@ def _stub_empty(monkeypatch, empty_branches: set[str]) -> None:
     )
 
 
-def test_orphan_branch_errors(
-    tmp_path_project: Path, save_test_session, monkeypatch
-):
+def test_orphan_branch_errors(tmp_path_project: Path, save_test_session, monkeypatch):
     """proj/ghost has no matching session → 1 error."""
     save_test_session(tmp_path_project, "alive")
     _stub_branches(monkeypatch, ["proj/alive", "proj/ghost"])
@@ -116,9 +114,7 @@ def test_multiple_orphans_each_reported(
     save_test_session(tmp_path_project, "kept", status="executing")
     save_test_session(tmp_path_project, "code-ci-cleanup", status="queued")
     save_test_session(tmp_path_project, "v075-agent-loop", status="queued")
-    save_test_session(
-        tmp_path_project, "v076-concept-drift-lint", status="queued"
-    )
+    save_test_session(tmp_path_project, "v076-concept-drift-lint", status="queued")
     _stub_branches(
         monkeypatch,
         [
@@ -142,11 +138,14 @@ def test_multiple_orphans_each_reported(
 
     assert len(results) == 3
     flagged = sorted(
-        b for r in results for b in (
+        b
+        for r in results
+        for b in (
             "proj/code-ci-cleanup",
             "proj/v075-agent-loop",
             "proj/v076-concept-drift-lint",
-        ) if b in r.message
+        )
+        if b in r.message
     )
     assert flagged == [
         "proj/code-ci-cleanup",
@@ -162,9 +161,7 @@ def test_local_proj_branches_returns_empty_on_non_repo(tmp_path: Path):
 
 def test_branch_is_empty_returns_false_on_non_repo(tmp_path: Path):
     """Bare temp dir → can't compute → assume non-empty (don't fire)."""
-    assert (
-        no_orphan_proj_branches.branch_is_empty(tmp_path, "any", "main") is False
-    )
+    assert no_orphan_proj_branches.branch_is_empty(tmp_path, "any", "main") is False
 
 
 def test_local_proj_branches_real_git_repo(tmp_path: Path):
@@ -184,12 +181,8 @@ def test_local_proj_branches_real_git_repo(tmp_path: Path):
             "PATH": "/usr/bin:/bin:/usr/local/bin",
         },
     )
-    subprocess.run(
-        ["git", "-C", str(tmp_path), "branch", "proj/foo"], check=True
-    )
-    subprocess.run(
-        ["git", "-C", str(tmp_path), "branch", "feat/x"], check=True
-    )
+    subprocess.run(["git", "-C", str(tmp_path), "branch", "proj/foo"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "branch", "feat/x"], check=True)
 
     branches = no_orphan_proj_branches.local_proj_branches(tmp_path)
     assert branches == ["proj/foo"]

@@ -21,9 +21,7 @@ def _wt(repo: str, clone: str, path: str, branch: str) -> dict:
     }
 
 
-def test_two_sessions_same_path_errors(
-    tmp_path_project: Path, save_test_session
-):
+def test_two_sessions_same_path_errors(tmp_path_project: Path, save_test_session):
     """Same worktree_path on two sessions → 1 error per shared path."""
     shared = "/tmp/repo-wt-shared"
     save_test_session(
@@ -61,16 +59,12 @@ def test_distinct_paths_pass(tmp_path_project: Path, save_test_session):
     save_test_session(
         tmp_path_project,
         "s1",
-        runtime_state={
-            "worktrees": [_wt("o/r", "/tmp/repo", "/tmp/wt-1", "feat/s1")]
-        },
+        runtime_state={"worktrees": [_wt("o/r", "/tmp/repo", "/tmp/wt-1", "feat/s1")]},
     )
     save_test_session(
         tmp_path_project,
         "s2",
-        runtime_state={
-            "worktrees": [_wt("o/r", "/tmp/repo", "/tmp/wt-2", "feat/s2")]
-        },
+        runtime_state={"worktrees": [_wt("o/r", "/tmp/repo", "/tmp/wt-2", "feat/s2")]},
     )
 
     ctx = load_context(tmp_path_project)
@@ -118,9 +112,7 @@ def test_path_normalization(tmp_path_project: Path, save_test_session):
     save_test_session(
         tmp_path_project,
         "s2",
-        runtime_state={
-            "worktrees": [_wt("o/r", "/tmp/repo", "/tmp/wt/x", "feat/s2")]
-        },
+        runtime_state={"worktrees": [_wt("o/r", "/tmp/repo", "/tmp/wt/x", "feat/s2")]},
     )
 
     ctx = load_context(tmp_path_project)
@@ -129,9 +121,7 @@ def test_path_normalization(tmp_path_project: Path, save_test_session):
     assert results[0].code == "worktree_paths_unique/collision"
 
 
-def test_three_sessions_one_collision(
-    tmp_path_project: Path, save_test_session
-):
+def test_three_sessions_one_collision(tmp_path_project: Path, save_test_session):
     """Three sessions claiming the same path → 1 collision finding
     naming all three."""
     shared = "/tmp/wt-shared"
