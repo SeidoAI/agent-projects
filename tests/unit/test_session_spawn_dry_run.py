@@ -73,6 +73,7 @@ class TestDryRunPure:
         tmp_path,
         tmp_path_project,
         save_test_session,
+        save_test_issue,
         write_handoff_yaml,
         monkeypatch,
     ):
@@ -81,11 +82,13 @@ class TestDryRunPure:
         clone.mkdir()
         _init_repo(clone)
 
+        save_test_issue(tmp_path_project, key="TMP-1")
         save_test_session(
             tmp_path_project,
             "s1",
             plan=True,
             status="queued",
+            issues=["TMP-1"],
             repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
         )
         write_handoff_yaml(tmp_path_project, "s1")
@@ -121,6 +124,7 @@ class TestDryRunPure:
         tmp_path,
         tmp_path_project,
         save_test_session,
+        save_test_issue,
         write_handoff_yaml,
         monkeypatch,
     ):
@@ -128,11 +132,13 @@ class TestDryRunPure:
         clone = tmp_path / "clone"
         clone.mkdir()
         _init_repo(clone)
+        save_test_issue(tmp_path_project, key="TMP-1")
         save_test_session(
             tmp_path_project,
             "s1",
             plan=True,
             status="queued",
+            issues=["TMP-1"],
             repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
         )
         write_handoff_yaml(tmp_path_project, "s1")
@@ -164,6 +170,7 @@ class TestDryRunPure:
         tmp_path,
         tmp_path_project,
         save_test_session,
+        save_test_issue,
         write_handoff_yaml,
         monkeypatch,
     ):
@@ -178,11 +185,13 @@ class TestDryRunPure:
         (tmp_path_project / "agents" / "backend-coder.yaml").write_text(
             "id: backend-coder\ncontext:\n  skills: []\n"
         )
+        save_test_issue(tmp_path_project, key="TMP-1")
         save_test_session(
             tmp_path_project,
             "s1",
             plan=True,
             status="queued",
+            issues=["TMP-1"],
             repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
         )
         write_handoff_yaml(tmp_path_project, "s1")
@@ -226,7 +235,12 @@ class TestDryRunPure:
         assert expected_wt.exists()
 
     def test_dry_run_shows_unresolved_for_missing_local(
-        self, tmp_path_project, save_test_session, write_handoff_yaml, monkeypatch
+        self,
+        tmp_path_project,
+        save_test_session,
+        save_test_issue,
+        write_handoff_yaml,
+        monkeypatch,
     ):
         """Repo slug with no `local:` in project.yaml — dry-run reports
         it as unresolved rather than crashing."""
@@ -238,11 +252,13 @@ class TestDryRunPure:
         (bin_dir / "claude").chmod(0o755)
         monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
 
+        save_test_issue(tmp_path_project, key="TMP-1")
         save_test_session(
             tmp_path_project,
             "s1",
             plan=True,
             status="queued",
+            issues=["TMP-1"],
             repos=[{"repo": "SeidoAI/missing", "base_branch": "main"}],
         )
         write_handoff_yaml(tmp_path_project, "s1")

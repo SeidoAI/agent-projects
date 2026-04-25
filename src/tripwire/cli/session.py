@@ -38,6 +38,10 @@ from tripwire.core.git_helpers import (
     worktree_remove,
 )
 from tripwire.core.process_helpers import is_alive
+from tripwire.core.session_check import (
+    any_blocking_error,
+    strict_check,
+)
 from tripwire.core.session_readiness import check_readiness
 from tripwire.core.session_store import list_sessions, load_session, save_session
 from tripwire.core.task_checklist import parse_task_checklist
@@ -210,23 +214,40 @@ def session_show_cmd(
     show_default=True,
 )
 def session_check_cmd(session_id: str, project_dir: Path, output_format: str) -> None:
-    """Report launch-readiness for a session — no state transition."""
+    """Report launch-readiness + strict-check tripwires for a session.
+
+    No state transition. Two parallel views are returned:
+
+    - **Readiness items** (artifact presence, blocked-by, handoff.yaml)
+      from :func:`tripwire.core.session_readiness.check_readiness`.
+    - **Strict tripwires** (placeholder content, repos overlap,
+      effort/model mismatch) from
+      :func:`tripwire.core.session_check.strict_check` — the gates
+      ``session spawn`` enforces with no bypass.
+
+    Exit code is non-zero when *either* surface has an error.
+    """
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
     try:
         report = check_readiness(resolved, session_id, kind="check")
+        strict_results = strict_check(resolved, session_id)
     except FileNotFoundError as exc:
         raise click.ClickException(str(exc)) from exc
     items = report.items
     errors = [i for i in items if not i.passing and i.severity == "error"]
+    strict_errors = [r for r in strict_results if r.severity == "error"]
+    strict_warnings = [r for r in strict_results if r.severity == "warning"]
+    launch_ready = not errors and not strict_errors
 
     if output_format == "json":
         click.echo(
             json.dumps(
                 {
                     "session_id": session_id,
-                    "launch_ready": len(errors) == 0,
+                    "launch_ready": launch_ready,
                     "items": [asdict(i) for i in items],
+                    "strict_checks": [asdict(r) for r in strict_results],
                 },
                 indent=2,
             )
@@ -239,11 +260,25 @@ def session_check_cmd(session_id: str, project_dir: Path, output_format: str) ->
             if not item.passing and item.fix_hint:
                 click.echo(f"    → {item.fix_hint}")
         click.echo()
-        if errors:
-            click.echo(f"{len(errors)} must-fix. Not launch-ready.")
-        else:
+        if strict_results:
+            click.echo("Strict checks (§A6):")
+            for r in strict_results:
+                mark = "✗" if r.severity == "error" else "!"
+                click.echo(f"  {mark} {r.error_code}: {r.message}")
+                if r.fix_hint:
+                    click.echo(f"    → {r.fix_hint}")
+            click.echo()
+        if launch_ready:
             click.echo("Launch-ready.")
-    if errors:
+        else:
+            blocking = len(errors) + len(strict_errors)
+            warn_note = (
+                f" ({len(strict_warnings)} warning(s) — non-blocking)"
+                if strict_warnings
+                else ""
+            )
+            click.echo(f"{blocking} must-fix. Not launch-ready.{warn_note}")
+    if not launch_ready:
         raise click.exceptions.Exit(1)
 
 
@@ -509,6 +544,26 @@ def session_spawn_cmd(
 
     if not shutil.which("claude"):
         raise click.ClickException("claude CLI not found on PATH")
+
+    # v0.7.9 §A6: strict pre-spawn check. No bypass — if anything fires,
+    # the operator fixes it and re-runs. Skipped on --resume because the
+    # session was already accepted on initial spawn; resuming should not
+    # be re-blocked on artifact content that may have evolved during
+    # execution.
+    if not resume_flag:
+        strict_results = strict_check(resolved, session_id)
+        if any_blocking_error(strict_results):
+            click.echo(
+                f"session '{session_id}' fails {sum(1 for r in strict_results if r.severity == 'error')} "
+                f"strict check(s); refusing to spawn:",
+                err=True,
+            )
+            for r in strict_results:
+                if r.severity == "error":
+                    click.echo(f"  ✗ {r.error_code}: {r.message}", err=True)
+                    if r.fix_hint:
+                        click.echo(f"    → {r.fix_hint}", err=True)
+            raise click.exceptions.Exit(1)
 
     # Resolve runtime from spawn config
     resolved_spawn = load_resolved_spawn_config(resolved, session=session)

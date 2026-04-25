@@ -183,12 +183,34 @@ def resolve_worktrees(
     paths or branches raise RuntimeError.
     """
     entries: list[WorktreeEntry] = []
+    project_resolved = project_dir.expanduser().resolve()
     for rb in session.repos:
         clone_path = _resolve_clone_path(project_dir, rb.repo)
         if clone_path is None:
             raise RuntimeError(
                 f"No local clone for {rb.repo}. Set local path in project.yaml repos."
             )
+        # v0.7.9 §A6 #4: if this repo's clone path resolves to project_dir,
+        # skip — `maybe_add_project_tracking_worktree` cuts a worktree
+        # off project_dir unconditionally and a second create at the same
+        # path would explode with "worktree path already exists". The
+        # strict pre-spawn check `check/repos_overlap` blocks this
+        # configuration upstream; this is the defence-in-depth so an
+        # operator who manages to slip past the check (or a future caller
+        # that bypasses the CLI) doesn't get the cryptic git error.
+        try:
+            clone_resolved = clone_path.expanduser().resolve()
+        except OSError:
+            clone_resolved = clone_path
+        if clone_resolved == project_resolved:
+            log.warning(
+                "session %s: repo %s clone path overlaps project_dir (%s); "
+                "skipping redundant code-side worktree (PT pass will create it)",
+                session.id,
+                rb.repo,
+                project_resolved,
+            )
+            continue
         wt_path = worktree_path_for_session(clone_path, session.id)
         draft_pr_url: str | None = None
         if wt_path.exists():
@@ -654,8 +676,6 @@ def run(
         base_ref="HEAD",
         resume=resume,
     )
-    if not worktrees:
-        raise RuntimeError(f"session '{session.id}' has no repos configured")
 
     # v0.7.4: cut a per-session project-tracking worktree so parallel
     # sessions don't race on sessions/<id>/ or issues/<KEY>/developer.md
@@ -669,6 +689,12 @@ def run(
     )
     if proj_entry is not None:
         worktrees.append(proj_entry)
+
+    # v0.7.9 §A6 #4: emptiness check moved here from after resolve_worktrees
+    # so the PT-only case (every session.repo overlapped with project_dir
+    # and was skipped) still resolves to one valid worktree.
+    if not worktrees:
+        raise RuntimeError(f"session '{session.id}' has no repos configured")
 
     code_worktree = Path(worktrees[0].worktree_path)
 

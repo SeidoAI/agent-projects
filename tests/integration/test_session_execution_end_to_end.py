@@ -56,6 +56,7 @@ def test_subprocess_mode_end_to_end(
     tmp_path,
     tmp_path_project,
     save_test_session,
+    save_test_issue,
     write_handoff_yaml,
     monkeypatch,
 ):
@@ -65,11 +66,13 @@ def test_subprocess_mode_end_to_end(
     clone.mkdir()
     _init_repo(clone)
 
+    save_test_issue(tmp_path_project, key="TMP-1")
     save_test_session(
         tmp_path_project,
         "s1",
         plan=True,
         status="queued",
+        issues=["TMP-1"],
         repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
     )
     write_handoff_yaml(tmp_path_project, "s1")

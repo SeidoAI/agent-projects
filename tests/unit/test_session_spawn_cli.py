@@ -57,17 +57,24 @@ class TestSessionSpawn:
         assert "queued" in result.output.lower() or "status" in result.output.lower()
 
     def test_spawn_dry_run_no_side_effects(
-        self, tmp_path, tmp_path_project, save_test_session, write_handoff_yaml
+        self,
+        tmp_path,
+        tmp_path_project,
+        save_test_session,
+        save_test_issue,
+        write_handoff_yaml,
     ):
         clone = tmp_path / "clone"
         clone.mkdir()
         _init_repo(clone)
 
+        save_test_issue(tmp_path_project, key="TMP-1")
         save_test_session(
             tmp_path_project,
             "s1",
             plan=True,
             status="queued",
+            issues=["TMP-1"],
             repos=[{"repo": "SeidoAI/tripwire", "base_branch": "main"}],
         )
         write_handoff_yaml(tmp_path_project, "s1")
@@ -87,17 +94,24 @@ class TestSessionSpawn:
         assert s.status == "queued"
 
     def test_spawn_creates_worktree(
-        self, tmp_path, tmp_path_project, save_test_session, write_handoff_yaml
+        self,
+        tmp_path,
+        tmp_path_project,
+        save_test_session,
+        save_test_issue,
+        write_handoff_yaml,
     ):
         clone = tmp_path / "clone"
         clone.mkdir()
         _init_repo(clone)
 
+        save_test_issue(tmp_path_project, key="TMP-1")
         save_test_session(
             tmp_path_project,
             "s1",
             plan=True,
             status="queued",
+            issues=["TMP-1"],
             repos=[
                 {"repo": "SeidoAI/tripwire", "base_branch": "main", "branch": "feat/s1"}
             ],
@@ -132,17 +146,20 @@ class TestSpawnRuntimeDispatch:
         tmp_path,
         tmp_path_project,
         save_test_session,
+        save_test_issue,
         write_handoff_yaml,
     ):
         clone = tmp_path / "clone"
         clone.mkdir()
         _init_repo(clone)
 
+        save_test_issue(tmp_path_project, key="TMP-1")
         save_test_session(
             tmp_path_project,
             "s1",
             plan=True,
             status="queued",
+            issues=["TMP-1"],
             repos=[{"repo": "SeidoAI/tripwire", "base_branch": "main"}],
             spawn_config={"invocation": {"runtime": "manual"}},
         )
@@ -183,17 +200,20 @@ class TestSpawnRuntimeDispatch:
         tmp_path,
         tmp_path_project,
         save_test_session,
+        save_test_issue,
         write_handoff_yaml,
     ):
         clone = tmp_path / "clone"
         clone.mkdir()
         _init_repo(clone)
 
+        save_test_issue(tmp_path_project, key="TMP-1")
         save_test_session(
             tmp_path_project,
             "s1",
             plan=True,
             status="queued",
+            issues=["TMP-1"],
             repos=[{"repo": "SeidoAI/tripwire", "base_branch": "main"}],
         )
         write_handoff_yaml(tmp_path_project, "s1")

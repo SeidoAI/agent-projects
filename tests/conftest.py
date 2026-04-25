@@ -102,8 +102,22 @@ def save_test_session():
         fm.update(kwargs)
         save_session(project_dir, AgentSession.model_validate(fm))
         if plan:
+            # Substantive plan content so the v0.7.9 strict pre-spawn
+            # check (`check/plan_unfilled`) doesn't fire for tests that
+            # only care about lifecycle / runtime mechanics. Tests that
+            # specifically exercise the strict check should overwrite
+            # plan.md with a placeholder body of their own.
             paths.session_plan_path(project_dir, session_id).write_text(
-                "# Plan\n", encoding="utf-8"
+                "# Plan — test session\n\n"
+                "## Goal\n"
+                "Drive the lifecycle path under test end to end. This "
+                "stub is long enough to clear the strict-check body "
+                "floor (200 chars) so tests that don't care about plan "
+                "content can ignore the v0.7.9 pre-spawn gates.\n\n"
+                "## Approach\n"
+                "Phase 1: read fixtures. Phase 2: invoke the CLI under "
+                "test. Phase 3: assert observable side effects.\n",
+                encoding="utf-8",
             )
 
     return _factory

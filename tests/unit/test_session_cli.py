@@ -104,6 +104,7 @@ class TestSessionCheck:
             tmp_path_project,
             session_id="session-setup",
             issues=["TMP-1"],
+            repos=[{"repo": "example/code", "base_branch": "main"}],
             plan=True,
             status="planned",
         )

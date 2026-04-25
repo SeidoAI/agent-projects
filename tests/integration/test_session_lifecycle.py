@@ -60,14 +60,28 @@ name: Ship v0.6a
 agent: pm
 status: planned
 issues: [TMP-1]
-repos: []
+repos:
+  - repo: example/code
+    base_branch: main
 ---
 """,
         encoding="utf-8",
     )
-    (sess / "plan.md").write_text("# Plan\n", encoding="utf-8")
+    # v0.7.9 §A6: plan.md must clear placeholder + body-floor checks.
+    (sess / "plan.md").write_text(
+        "# Plan — Ship v0.6a\n\n## Goal\n"
+        "Drive the lifecycle integration test through CLI surfaces. "
+        "The body must be long enough to clear the v0.7.9 strict check "
+        "body floor of 200 chars; this stub gives us breathing room and "
+        "states intent clearly enough that PM review wouldn't reject it "
+        "as a scaffold-only plan.\n",
+        encoding="utf-8",
+    )
     (sess / "verification-checklist.md").write_text(
-        "# Verification\n", encoding="utf-8"
+        "# Verification — Ship v0.6a\n\n"
+        "## Acceptance criteria\n"
+        "- [x] CLI lifecycle exercises clean — see this test\n",
+        encoding="utf-8",
     )
 
     # Derive the branch name. Session keys from `tripwire next-key --type

@@ -53,7 +53,12 @@ def _create_claude_shim(tmp_path: Path) -> Path:
 
 class TestSpawnLifecycle:
     def test_queue_spawn_pause_cleanup(
-        self, tmp_path, tmp_path_project, save_test_session, write_handoff_yaml
+        self,
+        tmp_path,
+        tmp_path_project,
+        save_test_session,
+        save_test_issue,
+        write_handoff_yaml,
     ):
         """Full lifecycle: queue → spawn → pause → cleanup."""
         clone = tmp_path / "clone"
@@ -63,11 +68,13 @@ class TestSpawnLifecycle:
         _create_claude_shim(tmp_path)
         env = {**os.environ, "PATH": f"{tmp_path}:{os.environ.get('PATH', '')}"}
 
+        save_test_issue(tmp_path_project, key="TMP-1")
         save_test_session(
             tmp_path_project,
             "lifecycle-test",
             plan=True,
             status="planned",
+            issues=["TMP-1"],
             repos=[{"repo": "SeidoAI/test", "base_branch": "main"}],
             spawn_config={"invocation": {"runtime": "manual"}},
         )
