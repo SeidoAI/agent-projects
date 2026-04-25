@@ -18,6 +18,10 @@ dependencies = [
     "pyyaml>=6.0,<7.0",
     "rich>=13.0,<14.0",
     "jinja2>=3.1,<4.0",
+    # GitHub REST client used by `tripwire init` to auto-create the
+    # project-tracking repo. Already pulled in transitively via
+    # `fastapi[testclient]`; declared here so the dep is explicit.
+    "httpx>=0.24,<1.0",
     # UI
     "fastapi>=0.115,<1.0",
     "uvicorn[standard]>=0.30,<1.0",
