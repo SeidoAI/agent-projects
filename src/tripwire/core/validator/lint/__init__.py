@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 from . import (
     done_implies_artifacts_on_main,
+    no_orphan_proj_branches,
     pm_response_followups_resolve,
     self_review_implies_pm_response,
     worktree_paths_unique,
@@ -33,4 +34,5 @@ LINT_CHECKS: list[CheckFunc] = [
     self_review_implies_pm_response.check,
     pm_response_followups_resolve.check,
     worktree_paths_unique.check,
+    no_orphan_proj_branches.check,
 ]
