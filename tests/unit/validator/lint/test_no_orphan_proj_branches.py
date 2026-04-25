@@ -20,6 +20,15 @@ def _stub_branches(monkeypatch, branches: list[str]) -> None:
     )
 
 
+def _stub_empty(monkeypatch, empty_branches: set[str]) -> None:
+    """Mark the named branches as having 0 commits ahead of base."""
+    monkeypatch.setattr(
+        no_orphan_proj_branches,
+        "branch_is_empty",
+        lambda _repo, branch, _base: branch in empty_branches,
+    )
+
+
 def test_orphan_branch_errors(
     tmp_path_project: Path, save_test_session, monkeypatch
 ):
@@ -39,8 +48,54 @@ def test_orphan_branch_errors(
 def test_branch_with_session_passes(
     tmp_path_project: Path, save_test_session, monkeypatch
 ):
-    save_test_session(tmp_path_project, "alive")
+    save_test_session(tmp_path_project, "alive", status="executing")
     _stub_branches(monkeypatch, ["proj/alive"])
+    _stub_empty(monkeypatch, set())
+
+    ctx = load_context(tmp_path_project)
+    assert no_orphan_proj_branches.check(ctx) == []
+
+
+def test_queued_session_empty_branch_errors(
+    tmp_path_project: Path, save_test_session, monkeypatch
+):
+    """Spawn created branch, agent never started — session.status is
+    queued AND branch has no commits ahead of base → orphan."""
+    save_test_session(tmp_path_project, "lazy", status="queued")
+    _stub_branches(monkeypatch, ["proj/lazy"])
+    _stub_empty(monkeypatch, {"proj/lazy"})
+
+    ctx = load_context(tmp_path_project)
+    results = no_orphan_proj_branches.check(ctx)
+
+    assert len(results) == 1
+    assert results[0].code == "no_orphan_proj_branches/empty_queued"
+    assert results[0].severity == "error"
+    assert "proj/lazy" in results[0].message
+
+
+def test_queued_session_with_commits_passes(
+    tmp_path_project: Path, save_test_session, monkeypatch
+):
+    """Queued session whose branch has commits — agent did start work
+    but the runtime didn't flip the status. Not an orphan; a different
+    kind of drift."""
+    save_test_session(tmp_path_project, "started", status="queued")
+    _stub_branches(monkeypatch, ["proj/started"])
+    _stub_empty(monkeypatch, set())
+
+    ctx = load_context(tmp_path_project)
+    assert no_orphan_proj_branches.check(ctx) == []
+
+
+def test_executing_session_empty_branch_passes(
+    tmp_path_project: Path, save_test_session, monkeypatch
+):
+    """A just-spawned executing session may have an empty branch
+    momentarily. Don't fire."""
+    save_test_session(tmp_path_project, "fresh", status="executing")
+    _stub_branches(monkeypatch, ["proj/fresh"])
+    _stub_empty(monkeypatch, {"proj/fresh"})
 
     ctx = load_context(tmp_path_project)
     assert no_orphan_proj_branches.check(ctx) == []
@@ -48,6 +103,7 @@ def test_branch_with_session_passes(
 
 def test_no_proj_branches_passes(tmp_path_project: Path, monkeypatch):
     _stub_branches(monkeypatch, [])
+    _stub_empty(monkeypatch, set())
     ctx = load_context(tmp_path_project)
     assert no_orphan_proj_branches.check(ctx) == []
 
@@ -55,9 +111,14 @@ def test_no_proj_branches_passes(tmp_path_project: Path, monkeypatch):
 def test_multiple_orphans_each_reported(
     tmp_path_project: Path, save_test_session, monkeypatch
 ):
-    """Today's actual orphans on tripwire-v0:
-    proj/code-ci-cleanup, proj/v075-agent-loop, proj/v076-concept-drift-lint."""
-    save_test_session(tmp_path_project, "kept")
+    """Today's actual orphans on tripwire-v0: queued sessions whose
+    proj/ branches have zero commits ahead of main."""
+    save_test_session(tmp_path_project, "kept", status="executing")
+    save_test_session(tmp_path_project, "code-ci-cleanup", status="queued")
+    save_test_session(tmp_path_project, "v075-agent-loop", status="queued")
+    save_test_session(
+        tmp_path_project, "v076-concept-drift-lint", status="queued"
+    )
     _stub_branches(
         monkeypatch,
         [
@@ -66,6 +127,14 @@ def test_multiple_orphans_each_reported(
             "proj/v075-agent-loop",
             "proj/v076-concept-drift-lint",
         ],
+    )
+    _stub_empty(
+        monkeypatch,
+        {
+            "proj/code-ci-cleanup",
+            "proj/v075-agent-loop",
+            "proj/v076-concept-drift-lint",
+        },
     )
 
     ctx = load_context(tmp_path_project)
@@ -89,6 +158,13 @@ def test_multiple_orphans_each_reported(
 def test_local_proj_branches_returns_empty_on_non_repo(tmp_path: Path):
     """The git helper degrades gracefully — bare temp dir → []."""
     assert no_orphan_proj_branches.local_proj_branches(tmp_path) == []
+
+
+def test_branch_is_empty_returns_false_on_non_repo(tmp_path: Path):
+    """Bare temp dir → can't compute → assume non-empty (don't fire)."""
+    assert (
+        no_orphan_proj_branches.branch_is_empty(tmp_path, "any", "main") is False
+    )
 
 
 def test_local_proj_branches_real_git_repo(tmp_path: Path):
