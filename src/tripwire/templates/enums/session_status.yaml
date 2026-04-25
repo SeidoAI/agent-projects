@@ -6,44 +6,19 @@ values:
     color: gray
   - id: queued
     label: Queued
-    color: cyan
-  # executing: local spawn via `tripwire session spawn` (v0.6c)
+    color: gray
   - id: executing
     label: Executing
     color: blue
-  # active: orchestrator-managed sessions (container runtime)
-  - id: active
-    label: Active
-    color: blue
-  - id: waiting_for_ci
-    label: Waiting for CI
-    color: yellow
-  - id: waiting_for_review
-    label: Waiting for Review
-    color: yellow
-  - id: waiting_for_deploy
-    label: Waiting for Deploy
-    color: yellow
-  - id: re_engaged
-    label: Re-engaged
-    color: orange
-  # in_review: session PR opened, PM reviewing (v0.7b)
-  - id: in_review
-    label: In Review
-    color: purple
-  # verified: PR verified (PM fills the QA role until a QA agent ships) (v0.7b)
-  - id: verified
-    label: Verified
-    color: green
-  - id: completed
-    label: Completed
-    color: green
-  - id: failed
-    label: Failed
-    color: red
   - id: paused
     label: Paused
     color: yellow
-  - id: abandoned
-    label: Abandoned
-    color: gray
+  - id: failed
+    label: Failed
+    color: red
+  - id: completed
+    label: Completed
+    color: green
+  - id: done
+    label: Done
+    color: green

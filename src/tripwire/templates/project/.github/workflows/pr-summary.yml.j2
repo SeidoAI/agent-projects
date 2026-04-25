@@ -1,0 +1,37 @@
+name: PR summary
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.13"
+      - name: Install tripwire
+        run: uv tool install "tripwire-pm>={{ tripwire_version }}"
+{% raw %}      - name: Compute summary
+        id: summary
+        run: |
+          tripwire pr-summary \
+            --base "origin/${{ github.base_ref }}" \
+            --head HEAD > /tmp/summary.md
+      - name: Post / update PR comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: /tmp/summary.md
+          edit-mode: replace
+          body-includes: "<!-- tripwire-pr-summary -->"
+{% endraw %}

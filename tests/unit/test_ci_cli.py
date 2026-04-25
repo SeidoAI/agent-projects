@@ -21,7 +21,8 @@ def test_ci_install_writes_workflow(tmp_path_project: Path):
     assert wf.is_file()
     text = wf.read_text(encoding="utf-8")
     assert "tripwire-pm==0.7.0" in text
-    assert "actions/checkout@v4" in text
+    # v0.7.6 §2.E.1: bumped from @v4 (Node 20 deprecated 2026-09-16).
+    assert "actions/checkout@v6" in text
 
 
 def test_ci_install_falls_back_to_installed_version(tmp_path_project: Path):

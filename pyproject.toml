@@ -18,6 +18,10 @@ dependencies = [
     "pyyaml>=6.0,<7.0",
     "rich>=13.0,<14.0",
     "jinja2>=3.1,<4.0",
+    # GitHub REST client used by `tripwire init` to auto-create the
+    # project-tracking repo. Already pulled in transitively via
+    # `fastapi[testclient]`; declared here so the dep is explicit.
+    "httpx>=0.24,<1.0",
     # UI
     "fastapi>=0.115,<1.0",
     "uvicorn[standard]>=0.30,<1.0",
@@ -49,6 +53,8 @@ dev = [
     "pre-commit>=3.0,<5.0",
     "pytest-cov>=7.1.0",
     "pytest-asyncio>=1.3.0",
+    "mypy>=1.10,<2.0",
+    "types-pyyaml>=6.0",
 ]
 
 [build-system]
@@ -105,4 +111,42 @@ markers = [
 ]
 
 [tool.codespell]
-skip = "uv.lock,.venv,*.lock"
+# package-lock.json carries vendored npm names (devlop, trough, vEw)
+# that codespell flags. afterAll/unparseable/statics are legitimate
+# project terms — Vitest's hook name, our chosen wording, and the
+# noun we use for "static files".
+skip = "uv.lock,.venv,*.lock,*-lock.json"
+ignore-words-list = "afterall,unparseable,statics"
+
+[tool.mypy]
+# Permissive baseline. The goal of the typecheck CI job at this stage
+# is to catch syntax-level type errors and obvious mistakes — not to
+# enforce strict typing across a codebase that wasn't written for it.
+# The disabled error codes below are categories that surface real but
+# deferred-fix issues; they will be re-enabled and addressed
+# incrementally in follow-up PRs. See KUI-83.
+python_version = "3.10"
+ignore_missing_imports = true
+follow_imports = "silent"
+warn_unused_ignores = false
+check_untyped_defs = false
+disallow_untyped_defs = false
+disable_error_code = [
+    "arg-type",
+    "assignment",
+    "attr-defined",
+    "call-arg",
+    "list-item",
+    "operator",
+    "return-value",
+    "valid-type",
+    "misc",
+]
+
+[tool.coverage.report]
+# Coverage floor enforced in CI via `pytest --cov-fail-under`. The flag
+# stays the source of truth for the gate; this section documents the
+# expected baseline so a drop is visible to anyone reading the config.
+# Current measured coverage is ~88% (2026-04); floor is set 2pp below
+# that to absorb routine churn. Bump up when sustained coverage rises.
+fail_under = 86

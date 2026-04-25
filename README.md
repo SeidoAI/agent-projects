@@ -328,6 +328,21 @@ See [`learnings.md`](https://github.com/SeidoAI/tripwire-workspace/blob/main/doc
 
 ---
 
+## Dev setup
+
+Clone the repo and run the pre-commit install once so ruff, codespell,
+mypy, and the basic file-hygiene checks fire on every commit:
+
+```bash
+uv sync
+make pre-commit-install
+```
+
+`make pre-commit-run` runs the same hooks across the whole repo, and
+`make check` runs the full quality gate (lint + format + tests).
+
+---
+
 ## License
 
 MIT. See `LICENSE`.

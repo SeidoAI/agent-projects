@@ -8,6 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v8.1.0
@@ -20,12 +21,26 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check
       - name: Pytest
-        run: uv run pytest tests/ -q --cov=src/tripwire --cov-report=term-missing
+        run: uv run pytest tests/ -q --cov=src/tripwire --cov-report=term-missing --cov-fail-under=86
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.13"
+      - name: Sync
+        run: uv sync
+      - name: Mypy
+        run: uv run mypy src/tripwire
 
   frontend-build:
     # Smoke-test the React build on every PR so broken Vite/TS configs
     # surface before the release workflow runs them.
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -42,6 +57,7 @@ jobs:
 
   frontend-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: src/tripwire/ui/frontend
@@ -57,8 +73,37 @@ jobs:
       - name: Vitest + coverage
         run: npm run test:coverage
 
+  wheel-smoke:
+    # Mirror the verification publish.yml runs at release time so a
+    # broken hatch hook or empty static/ bundle surfaces on the PR
+    # rather than during the tag push.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: src/tripwire/ui/frontend/package-lock.json
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.13"
+      - name: Build wheel (hatch hook drives frontend build)
+        run: uv build
+      - name: Verify wheel contains frontend bundle
+        run: |
+          set -eu
+          wheel="$(ls dist/*.whl)"
+          if ! unzip -l "$wheel" | grep -q 'tripwire/ui/static/index.html'; then
+            echo "::error::Wheel $wheel is missing tripwire/ui/static/index.html"
+            unzip -l "$wheel"
+            exit 1
+          fi
+
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [test, frontend-test]
     steps:
       - uses: actions/checkout@v6

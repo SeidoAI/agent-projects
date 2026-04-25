@@ -45,7 +45,8 @@ class TestGracefulDegradation:
 
 
 class TestNoProjects:
-    def test_no_projects_found_prints_hint(self, tmp_path: Path):
+    def test_no_projects_found_prints_hint(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         with patch(
             "tripwire.ui.services.project_service.discover_projects",
             return_value=[],
@@ -54,6 +55,51 @@ class TestNoProjects:
         assert result.exit_code == 1
         assert "No projects found" in result.output
         assert "tripwire init" in result.output
+
+
+class TestCwdAutodetect:
+    """Running `tripwire ui` from inside a project picks that project."""
+
+    def test_cwd_with_project_yaml_is_used(self, tmp_path: Path, monkeypatch):
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        (proj / "project.yaml").write_text(
+            "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
+        )
+        monkeypatch.chdir(proj)
+        with patch("tripwire.ui.server.start_server") as mock_start:
+            result = runner.invoke(cli, ["ui"])
+        assert result.exit_code == 0
+        assert mock_start.call_args.kwargs["project_dirs"] == [proj.resolve()]
+
+    def test_cwd_subdir_walks_up_to_project_root(self, tmp_path: Path, monkeypatch):
+        proj = tmp_path / "proj"
+        (proj / "issues" / "KUI-1").mkdir(parents=True)
+        (proj / "project.yaml").write_text(
+            "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
+        )
+        monkeypatch.chdir(proj / "issues" / "KUI-1")
+        with patch("tripwire.ui.server.start_server") as mock_start:
+            result = runner.invoke(cli, ["ui"])
+        assert result.exit_code == 0
+        assert mock_start.call_args.kwargs["project_dirs"] == [proj.resolve()]
+
+    def test_explicit_project_dir_overrides_cwd(self, tmp_path: Path, monkeypatch):
+        cwd_proj = tmp_path / "cwd_proj"
+        cwd_proj.mkdir()
+        (cwd_proj / "project.yaml").write_text(
+            "name: cwd\nkey_prefix: CWD\nnext_issue_number: 1\nnext_session_number: 1\n"
+        )
+        explicit = tmp_path / "explicit"
+        explicit.mkdir()
+        (explicit / "project.yaml").write_text(
+            "name: exp\nkey_prefix: EXP\nnext_issue_number: 1\nnext_session_number: 1\n"
+        )
+        monkeypatch.chdir(cwd_proj)
+        with patch("tripwire.ui.server.start_server") as mock_start:
+            result = runner.invoke(cli, ["ui", "--project-dir", str(explicit)])
+        assert result.exit_code == 0
+        assert mock_start.call_args.kwargs["project_dirs"] == [explicit.resolve()]
 
 
 class TestServerLaunch:

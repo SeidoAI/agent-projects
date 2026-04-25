@@ -1,4 +1,4 @@
-# Pre-commit hooks for keel.
+# Pre-commit hooks for tripwire.
 #
 # Install once per clone:
 #     make pre-commit-install
@@ -8,7 +8,8 @@
 #
 # Pinned versions are bumped manually when the in-project tooling moves
 # in pyproject.toml. NO pytest hook — too slow per commit; gate via CI
-# or `make check`.
+# or `make check`. mypy runs as a local hook so it picks up the project
+# venv and the same config CI uses (pyproject.toml [tool.mypy]).
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Keep this in sync with the ruff version in pyproject.toml so the
@@ -32,16 +33,35 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        # img/ holds shipped logo/icon assets; we don't rewrite their
+        # bytes on a whitespace policy.
+        exclude: ^img/
       - id: end-of-file-fixer
+        exclude: ^img/
       - id: check-yaml
         # Many shipped templates and examples are frontmatter+body files
         # (delimited with `---`), which the YAML parser interprets as
-        # multi-document. Allow that, and skip Jinja2 templates entirely.
+        # multi-document. Allow that, and skip Jinja2 templates entirely
+        # along with example YAMLs whose body is markdown rather than
+        # parseable YAML.
         args: [--allow-multiple-documents]
         exclude: |
           (?x)^(
-            src/keel/templates/.*\.j2|
-            src/keel/templates/skills/project-manager/examples/.*\.yaml|
-            src/keel/templates/agent_templates/.*\.yaml
+            src/tripwire/templates/.*\.j2|
+            src/tripwire/templates/skills/project-manager/examples/.*\.yaml|
+            src/tripwire/templates/agent_templates/.*\.yaml
           )$
       - id: check-added-large-files
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (local)
+        # Local hook so mypy runs in the project venv with full deps
+        # available and the same config CI uses. Restricted to staged
+        # files under src/tripwire to keep the per-commit cost low.
+        entry: uv run mypy
+        language: system
+        types: [python]
+        files: ^src/tripwire/
+        require_serial: true

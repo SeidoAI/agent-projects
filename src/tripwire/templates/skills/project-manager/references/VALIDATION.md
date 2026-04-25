@@ -242,7 +242,7 @@ Exit codes: 0 (info-only), 1 (warning present), 2 (error present).
 | Rule | Stage | Severity |
 |---|---|---|
 | `lint/gap_analysis_row_density` | scoping | warning |
-| `lint/issue_body_orphan_concepts` | scoping | warning |
+| `lint/concept_drift` | scoping | warning |
 | `lint/unpushed_promotion_candidates` | scoping | info (warning when workspace linked — v0.6b) |
 | `lint/branch_convention` | handoff | error |
 | `lint/session_stale` | session | warning |
