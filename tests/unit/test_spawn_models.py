@@ -17,7 +17,7 @@ def test_spawn_defaults_load_from_shipped():
 
     assert defaults.config.model == "opus"
     assert defaults.config.fallback_model == "sonnet"
-    assert defaults.config.max_budget_usd == 50
+    assert defaults.config.max_budget_usd == 100
     assert defaults.config.disallowed_tools == [
         "Agent",
         "AskUserQuestion",
