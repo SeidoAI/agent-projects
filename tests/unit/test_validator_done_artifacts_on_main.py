@@ -118,9 +118,7 @@ def test_done_session_missing_self_review_errors(
 
     assert "sessions/s1/self-review.md" in files_mentioned
     assert "sessions/s1/pm-response.md" in files_mentioned
-    assert all(
-        r.code == "done_implies_artifacts/missing_on_main" for r in results
-    )
+    assert all(r.code == "done_implies_artifacts/missing_on_main" for r in results)
 
 
 def test_done_session_with_all_artifacts_passes(

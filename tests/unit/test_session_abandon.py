@@ -39,18 +39,14 @@ def test_abandon_planned_session_transitions_status(
     assert session.status == "abandoned"
 
 
-def test_abandon_refuses_already_terminal(
-    tmp_path_project: Path, save_test_session
-):
+def test_abandon_refuses_already_terminal(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1", status="done")
     with pytest.raises(AbandonError) as exc:
         abandon_session(tmp_path_project, "s1")
     assert exc.value.code == "abandon/already_terminal"
 
 
-def test_abandon_refuses_already_abandoned(
-    tmp_path_project: Path, save_test_session
-):
+def test_abandon_refuses_already_abandoned(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1", status="abandoned")
     with pytest.raises(AbandonError) as exc:
         abandon_session(tmp_path_project, "s1")
@@ -64,9 +60,7 @@ def test_abandon_does_not_close_issues_as_done(
     issues `done`. The whole point of `abandoned` is that the work
     didn't ship."""
     save_test_issue(tmp_path_project, "TMP-1", status="in_progress")
-    save_test_session(
-        tmp_path_project, "s1", status="planned", issues=["TMP-1"]
-    )
+    save_test_session(tmp_path_project, "s1", status="planned", issues=["TMP-1"])
 
     abandon_session(tmp_path_project, "s1")
 
@@ -88,7 +82,9 @@ def test_abandon_paused_session_skips_runtime_kill(
 
     from tripwire.core import session_abandon as mod
 
-    monkeypatch.setattr(mod, "_close_pr_for_branch", lambda *a, **k: mod._PrCloseVerdict())
+    monkeypatch.setattr(
+        mod, "_close_pr_for_branch", lambda *a, **k: mod._PrCloseVerdict()
+    )
 
     result = abandon_session(tmp_path_project, "s1")
     assert result.runtime_killed is False
@@ -207,9 +203,7 @@ def test_abandon_pr_close_failure_is_recorded_not_raised(
     assert load_session(tmp_path_project, "s1").status == "abandoned"
 
 
-def test_abandon_records_engagement_outcome(
-    tmp_path_project: Path, save_test_session
-):
+def test_abandon_records_engagement_outcome(tmp_path_project: Path, save_test_session):
     from datetime import datetime, timezone
 
     save_test_session(
@@ -237,9 +231,7 @@ def test_abandon_records_engagement_outcome(
 # ----------------------------------------------------------------------------
 
 
-def test_cli_abandon_happy_path(
-    tmp_path_project: Path, save_test_session
-):
+def test_cli_abandon_happy_path(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1", status="planned")
     runner = CliRunner()
     result = runner.invoke(
@@ -259,9 +251,7 @@ def test_cli_abandon_unknown_session(tmp_path_project: Path):
     assert "not found" in result.output.lower()
 
 
-def test_cli_abandon_already_done_refuses(
-    tmp_path_project: Path, save_test_session
-):
+def test_cli_abandon_already_done_refuses(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1", status="done")
     runner = CliRunner()
     result = runner.invoke(

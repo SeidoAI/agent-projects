@@ -125,9 +125,7 @@ def abandon_session(
             worktree_remove(Path(wt.clone_path), wt_path)
             result.worktrees_removed.append(wt.worktree_path)
         except (subprocess.SubprocessError, OSError) as exc:
-            result.errors.append(
-                f"worktree remove failed for {wt_path}: {exc}"
-            )
+            result.errors.append(f"worktree remove failed for {wt_path}: {exc}")
 
     # 4. Transition. This step always happens — it's the contract.
     now = datetime.now(tz=timezone.utc)
