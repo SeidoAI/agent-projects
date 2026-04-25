@@ -9,8 +9,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
         with:
           python-version: "3.13"
       - name: Sync
@@ -27,8 +27,8 @@ jobs:
     # surface before the release workflow runs them.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: "npm"
@@ -46,8 +46,8 @@ jobs:
       run:
         working-directory: src/tripwire/ui/frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: "npm"
@@ -61,13 +61,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test, frontend-test]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: "npm"
           cache-dependency-path: src/tripwire/ui/frontend/package-lock.json
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v8.1.0
         with:
           python-version: "3.13"
       - name: Sync python deps
