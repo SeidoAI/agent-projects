@@ -40,6 +40,7 @@ from tripwire.core.git_helpers import (
 from tripwire.core.process_helpers import is_alive
 from tripwire.core.session_readiness import check_readiness
 from tripwire.core.session_store import list_sessions, load_session, save_session
+from tripwire.core.task_checklist import parse_task_checklist
 from tripwire.models.session import EngagementEntry
 
 console = Console()
@@ -208,13 +209,17 @@ def session_check_cmd(session_id: str, project_dir: Path, output_format: str) ->
 
 
 def _parse_task_checklist(path: Path) -> tuple[int, int]:
-    """Count ``- [ ]`` and ``- [x]`` checkboxes in a task-checklist markdown."""
+    """Read a task-checklist file and return (total, done) row counts.
+
+    Delegates to :func:`tripwire.core.task_checklist.parse_task_checklist`
+    so CLI and UI agree on what counts as a task. The canonical template
+    emits a Markdown table with a status column; legacy checkbox-form
+    files report (0, 0) and should migrate.
+    """
     if not path.is_file():
         return 0, 0
-    text = path.read_text(encoding="utf-8")
-    total = text.count("- [ ]") + text.count("- [x]") + text.count("- [X]")
-    done = text.count("- [x]") + text.count("- [X]")
-    return total, done
+    progress = parse_task_checklist(path.read_text(encoding="utf-8"))
+    return progress.total, progress.done
 
 
 def _days_since(when: datetime | None) -> int:

@@ -28,6 +28,21 @@ gh pr checkout <number>
 This puts you in the PR branch. You can now run CLI commands against
 the PR's state.
 
+### 2.5. Write per-issue `verified.md` artifacts
+```bash
+tripwire session review <session-id> --write-verified
+```
+
+This generates a `verified.md` file under `docs/issues/<KEY>/` for
+every issue closed by the session, summarising the on-disk evidence
+(diff, tests, AC walk) the PM observed during review. It must run
+**before** approve/merge — once the branch is gone, the per-issue
+evidence cannot be reconstructed without re-checking-out the PR. The
+post-merge reconciliation in step 8 reads these `verified.md` files
+to understand which nodes the shipped behaviour diverged from;
+skipping this step leaves step 8 with nothing to read and node
+freshness drifts silently.
+
 ### 3. Run the validation gate
 ```bash
 tripwire validate --strict
@@ -143,6 +158,7 @@ Example commit messages from past reconciles:
 |---|---|
 | "The PR passes validate so it must be correct" | Validate is necessary but not sufficient. Check that the changes match the issue scope and the concept graph is coherent. |
 | "I'll approve this with a note to fix the warnings later" | Do not approve with warnings. Request changes. Warnings in `--strict` mode are errors. |
+| "I'll skip `--write-verified` and reconcile straight from the diff post-merge" | Step 8 has no per-issue evidence to reconcile against once the branch is gone; node freshness drifts silently. Run step 2.5 every review. |
 
 ## See also
 

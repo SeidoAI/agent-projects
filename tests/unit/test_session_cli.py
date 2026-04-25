@@ -201,7 +201,12 @@ class TestSessionProgress:
         )
         checklist = tmp_path_project / "sessions" / "session-x" / "task-checklist.md"
         checklist.write_text(
-            "- [x] one\n- [x] two\n- [ ] three\n- [ ] four\n",
+            "| # | Task  | Status      |\n"
+            "|---|-------|-------------|\n"
+            "| 1 | one   | done        |\n"
+            "| 2 | two   | done        |\n"
+            "| 3 | three | in_progress |\n"
+            "| 4 | four  | todo        |\n",
             encoding="utf-8",
         )
         runner = CliRunner()

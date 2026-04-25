@@ -15,7 +15,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 _NI_MESSAGE = (
-    "tripwire.containers is not yet implemented (v2). See docs/tripwire-containers.md."
+    "tripwire.containers is not yet implemented (v2). See docs/agent-containers.md."
 )
 
 

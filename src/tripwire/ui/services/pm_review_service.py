@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 _NI_MESSAGE = (
     "tripwire.ui PM-review feature is not yet implemented (v2). "
-    "See docs/tripwire-containers.md."
+    "See docs/agent-containers.md."
 )
 
 

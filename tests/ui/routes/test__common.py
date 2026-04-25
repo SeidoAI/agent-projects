@@ -162,8 +162,10 @@ class TestAppIntegration:
 
         app = create_app(dev_mode=True)
         client = TestClient(app)
-        # Any v2 stub endpoint — /api/messages/unread takes no args.
-        r = client.get("/api/messages/unread")
+        # Any v2 stub endpoint — /api/containers takes no required args.
+        # /api/messages/unread is intentionally NOT used here: it returns
+        # 200 with {"count": 0} in v1 (KUI-73).
+        r = client.get("/api/containers")
         assert r.status_code == 501
         body = r.json()
         assert isinstance(body.get("detail"), dict)

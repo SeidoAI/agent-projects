@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 _NI_MESSAGE = (
     "tripwire.ui GitHub integration is not yet implemented (v2). "
-    "See docs/tripwire-containers.md."
+    "See docs/agent-containers.md."
 )
 
 

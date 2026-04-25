@@ -36,10 +36,6 @@ class TestParseTaskChecklist:
         )
         assert _parse_task_checklist(text) == TaskProgress(done=2, total=3)
 
-    def test_checkbox_form(self):
-        text = "- [x] finished\n- [ ] pending\n- [x] also done\n"
-        assert _parse_task_checklist(text) == TaskProgress(done=2, total=3)
-
     def test_zero_zero_when_unrecognisable(self):
         text = "# Just a heading\nSome prose.\n"
         assert _parse_task_checklist(text) == TaskProgress(done=0, total=0)

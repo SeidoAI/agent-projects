@@ -37,8 +37,15 @@ class TestMessageRoutes501:
             )
         )
 
-    def test_unread(self, client):
-        assert_v2_envelope(client.get("/api/messages/unread"))
+
+class TestUnreadV1:
+    def test_returns_zero_count(self, client):
+        # v1 has no agent containers, so /unread is the one v2-stub
+        # endpoint that can answer truthfully: there is no inbox, the
+        # count is always 0. (KUI-73)
+        r = client.get("/api/messages/unread")
+        assert r.status_code == 200
+        assert r.json() == {"count": 0}
 
 
 class TestMessagesOpenAPI:
