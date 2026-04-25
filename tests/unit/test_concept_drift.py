@@ -89,9 +89,7 @@ class TestNoiseStripping:
                 title=f"Stub {i}",
                 body="see https://example.com/Some/Marker/Path now.\n",
             )
-        assert all(
-            "Marker Path" not in f.message for f in _findings(tmp_path_project)
-        )
+        assert all("Marker Path" not in f.message for f in _findings(tmp_path_project))
 
 
 # ---------------------------------------------------------------------------
@@ -114,9 +112,7 @@ class TestCandidateExtraction:
         msgs = [f.message for f in _findings(tmp_path_project)]
         assert any("WebSocket Hub" in m for m in msgs)
 
-    def test_kebab_case_repeated_flagged(
-        self, save_test_issue, tmp_path_project
-    ):
+    def test_kebab_case_repeated_flagged(self, save_test_issue, tmp_path_project):
         """kebab-case in prose strongly suggests a missing-bracket ref,
         but on real-world spec content single mentions are mostly
         implementation-detail noise. Require ≥2 occurrences (across or
@@ -192,9 +188,7 @@ class TestNodeFiltering:
     def test_exact_node_name_filtered(
         self, save_test_issue, save_test_node, tmp_path_project
     ):
-        save_test_node(
-            tmp_path_project, node_id="websocket-hub", name="WebSocket Hub"
-        )
+        save_test_node(tmp_path_project, node_id="websocket-hub", name="WebSocket Hub")
         for i in range(1, 4):
             save_test_issue(
                 tmp_path_project,
@@ -209,9 +203,7 @@ class TestNodeFiltering:
         self, save_test_issue, save_test_node, tmp_path_project
     ):
         """`Project Shell` in prose should match the `project-shell` node."""
-        save_test_node(
-            tmp_path_project, node_id="project-shell", name="Project Shell"
-        )
+        save_test_node(tmp_path_project, node_id="project-shell", name="Project Shell")
         for i in range(1, 4):
             save_test_issue(
                 tmp_path_project,
@@ -226,9 +218,7 @@ class TestNodeFiltering:
         self, save_test_issue, save_test_node, tmp_path_project
     ):
         """Bare kebab-case `project-shell` should also match the node id."""
-        save_test_node(
-            tmp_path_project, node_id="project-shell", name="Project Shell"
-        )
+        save_test_node(tmp_path_project, node_id="project-shell", name="Project Shell")
         save_test_issue(
             tmp_path_project,
             key="TMP-1",
@@ -262,9 +252,7 @@ class TestAllowlist:
         msgs = [f.message for f in _findings(tmp_path_project)]
         assert not any("WebSocket Hub" in m for m in msgs)
 
-    def test_malformed_allowlist_propagates(
-        self, save_test_issue, tmp_path_project
-    ):
+    def test_malformed_allowlist_propagates(self, save_test_issue, tmp_path_project):
         """If the allowlist is malformed, the lint run errors out — fail
         loudly rather than silently bypass the file."""
         allow = tmp_path_project / "lint" / "concept-allowlist.yaml"

@@ -21,7 +21,7 @@ Pipeline:
    single-mention kebab terms are dropped.
 4. Filter against existing nodes (id / name / fuzzy normalised match) and
    the per-project allowlist.
-5. Emit one finding per term (not per term × issue), ranked by total
+5. Emit one finding per term (not per term-by-issue), ranked by total
    mention count, capped at MAX_FINDINGS overall.
 
 Tunings (raise to make the rule quieter, lower to widen recall):
@@ -42,7 +42,6 @@ After this calibration: 16 findings, ≥80% subjective precision.
 from __future__ import annotations
 
 import re
-from collections import defaultdict
 from dataclasses import dataclass, field
 
 from tripwire.core.lint_allowlist import load_concept_allowlist
@@ -319,7 +318,6 @@ _KEBAB_ADJECTIVE_SEGMENTS = frozenset(
         "deep",
         "shallow",
         # time / order
-        "first",
         "last",
         "next",
         "prev",
@@ -388,7 +386,6 @@ _KEBAB_ADJECTIVE_SEGMENTS = frozenset(
         "clipboard",
         "dir",
         "value",
-        "case",
         "key",
         "keys",
         "id",
@@ -417,7 +414,6 @@ _KEBAB_ADJECTIVE_SEGMENTS = frozenset(
         "well",
         "known",
         "unknown",
-        "level",
         "completing",
         "tripwire",  # appears in tripwire-v0, project-tripwire-ui-init etc.
         "v0",
@@ -572,13 +568,11 @@ def _signal_label(c: _Candidate) -> str:
     if c.is_kebab:
         bits.append("kebab-case (likely missing `[[…]]` brackets)")
     cross_min = MIN_KEBAB_CROSS_ISSUE_FREQ if c.is_kebab else MIN_CROSS_ISSUE_FREQ
-    within_min = (
-        MIN_KEBAB_WITHIN_ISSUE_FREQ if c.is_kebab else MIN_WITHIN_ISSUE_FREQ
-    )
+    within_min = MIN_KEBAB_WITHIN_ISSUE_FREQ if c.is_kebab else MIN_WITHIN_ISSUE_FREQ
     if c.cross_issue_freq >= cross_min:
         bits.append(f"cross-issue: {c.cross_issue_freq} issues")
     if c.max_within_issue >= within_min:
-        bits.append(f"within-issue: {c.max_within_issue}× in one issue")
+        bits.append(f"within-issue: {c.max_within_issue}x in one issue")
     return "; ".join(bits) or "weak"
 
 

@@ -38,9 +38,7 @@ def test_terms_normalised_to_lowercase(tmp_path_project: Path) -> None:
     allowlist_path = tmp_path_project / "lint" / "concept-allowlist.yaml"
     allowlist_path.parent.mkdir(parents=True)
     allowlist_path.write_text(
-        "allowlist:\n"
-        '  - term: "WebSocket Hub"\n'
-        '    reason: "Mentioned once."\n',
+        'allowlist:\n  - term: "WebSocket Hub"\n    reason: "Mentioned once."\n',
         encoding="utf-8",
     )
     assert load_concept_allowlist(tmp_path_project) == {"websocket hub"}
@@ -51,7 +49,7 @@ def test_missing_reason_raises(tmp_path_project: Path) -> None:
     allowlist_path = tmp_path_project / "lint" / "concept-allowlist.yaml"
     allowlist_path.parent.mkdir(parents=True)
     allowlist_path.write_text(
-        "allowlist:\n  - term: \"Stripe\"\n",
+        'allowlist:\n  - term: "Stripe"\n',
         encoding="utf-8",
     )
     with pytest.raises(AllowlistError, match="reason"):

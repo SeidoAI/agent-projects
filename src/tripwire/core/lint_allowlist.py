@@ -57,9 +57,7 @@ def load_concept_allowlist(project_dir: Path) -> set[str]:
         term = entry.get("term")
         reason = entry.get("reason")
         if not term or not isinstance(term, str):
-            raise AllowlistError(
-                f"{path}: entry #{i + 1} is missing required `term`"
-            )
+            raise AllowlistError(f"{path}: entry #{i + 1} is missing required `term`")
         if not reason or not isinstance(reason, str) or not reason.strip():
             raise AllowlistError(
                 f"{path}: entry #{i + 1} ({term!r}) is missing required "
