@@ -41,6 +41,8 @@ function issue(id: string, status: string, overrides: Partial<IssueSummary> = {}
     blocked_by: [],
     is_blocked: false,
     is_epic: false,
+    created_at: null,
+    updated_at: null,
     ...overrides,
   };
 }

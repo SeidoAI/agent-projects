@@ -43,7 +43,9 @@ coverage.xml
 # Project-specific
 tmp/
 
-# UI frontend build artifacts
+# UI frontend build artifacts — the bundle is built into
+# src/tripwire/ui/static/ on release (hatch_build.py hook) and is not
+# checked in. The server tolerates a missing static/ dir at runtime.
 src/tripwire/ui/static/
 src/tripwire/ui/frontend/node_modules/
 src/tripwire/ui/frontend/dist/

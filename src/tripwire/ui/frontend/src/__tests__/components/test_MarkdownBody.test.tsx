@@ -69,6 +69,25 @@ describe("MarkdownBody", () => {
       );
     });
 
+    it("routes session refs to /sessions/ when the backend resolves them", () => {
+      // The regex can't tell a session slug from a node slug — the backend
+      // tells us via resolves_as. Without this routing, session refs 404.
+      const refs: Reference[] = [{ token: "static-bundling", resolves_as: "session" }];
+      renderMarkdown("See [[static-bundling]].", { refs });
+      expect(screen.getByRole("link", { name: "static-bundling" })).toHaveAttribute(
+        "href",
+        "/p/test-project/sessions/static-bundling",
+      );
+    });
+
+    it("routes to /nodes/ when no backend ref is supplied", () => {
+      renderMarkdown("See [[some-slug]].");
+      expect(screen.getByRole("link", { name: "some-slug" })).toHaveAttribute(
+        "href",
+        "/p/test-project/nodes/some-slug",
+      );
+    });
+
     it("leaves unmatched tokens as plain text", () => {
       renderMarkdown("See [[invalid token]] here.");
       expect(screen.queryByRole("link", { name: "invalid token" })).toBeNull();

@@ -4,7 +4,7 @@ import { SKIP, visit } from "unist-util-visit";
 
 export interface Reference {
   token: string;
-  resolves_as?: "node" | "issue" | "dangling";
+  resolves_as?: "node" | "issue" | "session" | "dangling";
   is_stale?: boolean;
 }
 
@@ -39,8 +39,21 @@ const remarkTripwireRefs: Plugin<[RemarkTripwireRefsOptions], Root> = (options) 
           children.push({ type: "text", value: node.value.slice(lastEnd, start) });
         }
 
+        const ref = refMap.get(token);
         const isIssue = ISSUE_KEY_RE.test(token);
-        const href = isIssue ? `/p/${projectId}/issues/${token}` : `/p/${projectId}/nodes/${token}`;
+
+        // Prefer the backend's resolved kind when provided — issue keys and
+        // node/session slugs can look identical to the regex, and only the
+        // server knows whether a lowercase token is a node or a session.
+        let segment: "issues" | "nodes" | "sessions";
+        if (ref?.resolves_as === "session") {
+          segment = "sessions";
+        } else if (ref?.resolves_as === "issue" || isIssue) {
+          segment = "issues";
+        } else {
+          segment = "nodes";
+        }
+        const href = `/p/${projectId}/${segment}/${token}`;
 
         const link: Link = {
           type: "link",
@@ -48,7 +61,6 @@ const remarkTripwireRefs: Plugin<[RemarkTripwireRefsOptions], Root> = (options) 
           children: [{ type: "text", value: token }],
         };
 
-        const ref = refMap.get(token);
         if (ref?.resolves_as === "dangling" || ref?.is_stale) {
           const resolveStatus = ref.resolves_as === "dangling" ? "dangling" : "stale";
           link.data = {

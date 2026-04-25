@@ -21,3 +21,21 @@ jobs:
         run: uv run ruff format --check
       - name: Pytest
         run: uv run pytest tests/ -q --cov=src/tripwire --cov-report=term-missing
+
+  frontend-build:
+    # Smoke-test the React build on every PR so broken Vite/TS configs
+    # surface before the release workflow runs them.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: src/tripwire/ui/frontend/package-lock.json
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: src/tripwire/ui/frontend
+      - name: Build frontend
+        run: npm run build
+        working-directory: src/tripwire/ui/frontend
