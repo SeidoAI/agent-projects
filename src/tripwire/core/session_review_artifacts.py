@@ -125,9 +125,7 @@ def parse_pm_response_items(body: str) -> list[PmResponseItem]:
                     str(raw["decision"]) if raw.get("decision") is not None else None
                 ),
                 follow_up=(
-                    str(raw["follow_up"])
-                    if raw.get("follow_up") is not None
-                    else None
+                    str(raw["follow_up"]) if raw.get("follow_up") is not None else None
                 ),
                 fix_commit=(
                     str(raw["fix_commit"])

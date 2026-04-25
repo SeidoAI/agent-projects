@@ -146,9 +146,7 @@ class TestBuildReport:
         assert report.pairs[0].pm_response.decision == "deferred"
         assert report.unaddressed == []
 
-    def test_unaddressed_self_review_item_flagged(
-        self, tmp_path: Path
-    ) -> None:
+    def test_unaddressed_self_review_item_flagged(self, tmp_path: Path) -> None:
         from tripwire.core.session_review_artifacts import build_report
 
         sdir = tmp_path / "sessions" / "s1"
@@ -169,9 +167,7 @@ class TestBuildReport:
         assert len(report.unaddressed) == 1
         assert report.unaddressed[0].text == "beta thing"
 
-    def test_missing_self_review_marks_absent_no_crash(
-        self, tmp_path: Path
-    ) -> None:
+    def test_missing_self_review_marks_absent_no_crash(self, tmp_path: Path) -> None:
         from tripwire.core.session_review_artifacts import build_report
 
         # No files at all in sessions/s1/
@@ -183,9 +179,7 @@ class TestBuildReport:
         assert not report.pm_response_present
         assert report.pairs == []
 
-    def test_missing_pm_response_with_self_review_present(
-        self, tmp_path: Path
-    ) -> None:
+    def test_missing_pm_response_with_self_review_present(self, tmp_path: Path) -> None:
         from tripwire.core.session_review_artifacts import build_report
 
         sdir = tmp_path / "sessions" / "s1"

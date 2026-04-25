@@ -65,9 +65,7 @@ class TestSessionReviewArtifactsHuman:
         assert "accepted" in result.output
         assert "deferred" in result.output
 
-    def test_marks_unaddressed_items(
-        self, tmp_path_project, save_test_session
-    ) -> None:
+    def test_marks_unaddressed_items(self, tmp_path_project, save_test_session) -> None:
         save_test_session(tmp_path_project, "s1", status="executing")
         _write_self_review(
             tmp_path_project,
@@ -77,9 +75,7 @@ class TestSessionReviewArtifactsHuman:
         _write_pm_response(
             tmp_path_project,
             "s1",
-            "items:\n"
-            '  - quote_excerpt: "covered"\n'
-            "    decision: accepted\n",
+            'items:\n  - quote_excerpt: "covered"\n    decision: accepted\n',
         )
 
         runner = CliRunner()
@@ -132,9 +128,7 @@ class TestSessionReviewArtifactsJson:
         _write_pm_response(
             tmp_path_project,
             "s1",
-            "items:\n"
-            '  - quote_excerpt: "mypy"\n'
-            "    decision: accepted\n",
+            'items:\n  - quote_excerpt: "mypy"\n    decision: accepted\n',
         )
 
         runner = CliRunner()

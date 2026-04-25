@@ -2406,9 +2406,7 @@ def check_pm_response_covers_self_review(
             continue
 
         try:
-            sr_items = parse_self_review_items(
-                sr_path.read_text(encoding="utf-8")
-            )
+            sr_items = parse_self_review_items(sr_path.read_text(encoding="utf-8"))
         except OSError as exc:
             results.append(
                 CheckResult(
@@ -2444,9 +2442,7 @@ def check_pm_response_covers_self_review(
             continue
 
         try:
-            pm_items = parse_pm_response_items(
-                pr_path.read_text(encoding="utf-8")
-            )
+            pm_items = parse_pm_response_items(pr_path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             results.append(
                 CheckResult(
@@ -2459,9 +2455,7 @@ def check_pm_response_covers_self_review(
             )
             continue
 
-        excerpts_lower = [
-            (it.quote_excerpt or "").strip().lower() for it in pm_items
-        ]
+        excerpts_lower = [(it.quote_excerpt or "").strip().lower() for it in pm_items]
         for sr in sr_items:
             sr_lower = sr.text.lower()
             covered = any(
@@ -2509,9 +2503,7 @@ def check_pm_response_followups_resolve(
         if not pr_path.is_file():
             continue
         try:
-            pm_items = parse_pm_response_items(
-                pr_path.read_text(encoding="utf-8")
-            )
+            pm_items = parse_pm_response_items(pr_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             # parse_error reported by check_pm_response_covers_self_review
             continue

@@ -22,9 +22,7 @@ def _write_files(project_dir: Path, sid: str) -> None:
         "## Lens 1: AC\n- something\n", encoding="utf-8"
     )
     (sdir / "pm-response.yaml").write_text(
-        "items:\n"
-        '  - quote_excerpt: "something"\n'
-        "    decision: accepted\n",
+        'items:\n  - quote_excerpt: "something"\n    decision: accepted\n',
         encoding="utf-8",
     )
 

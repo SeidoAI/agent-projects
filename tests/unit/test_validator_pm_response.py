@@ -45,11 +45,7 @@ class TestPmResponseCoversSelfReview:
         _seed_session_artifacts(
             tmp_path_project,
             "s1",
-            self_review=(
-                "## Lens 1: AC met\n"
-                "- alpha thing\n"
-                "- beta thing\n"
-            ),
+            self_review=("## Lens 1: AC met\n- alpha thing\n- beta thing\n"),
             pm_response=(
                 "items:\n"
                 '  - quote_excerpt: "alpha"\n'

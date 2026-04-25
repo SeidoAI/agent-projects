@@ -15,9 +15,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 import tripwire
 
-PACKAGE_TEMPLATE_DIR = (
-    Path(tripwire.__file__).parent / "templates" / "artifacts"
-)
+PACKAGE_TEMPLATE_DIR = Path(tripwire.__file__).parent / "templates" / "artifacts"
 
 
 def _render_template(name: str, **ctx: object) -> str:
