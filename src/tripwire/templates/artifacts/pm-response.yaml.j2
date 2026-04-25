@@ -1,0 +1,31 @@
+# PM response — {{ session_id | default("<session-id>") }}
+#
+# Authored by the PM after reading sessions/<sid>/self-review.md.
+# Each entry pairs a quote_excerpt from the self-review with a
+# decision; the validator checks that every self-review bullet has
+# at least one matching quote_excerpt (substring match).
+#
+# decision values: accepted | deferred | re-engaged | rejected
+#   - accepted   — issue noted, no further action.
+#   - deferred   — follow_up: KUI-XX is required and must reference
+#                  an existing issue.
+#   - re-engaged — agent was asked to fix; fix_commit: <sha> required.
+#   - rejected   — deliberately not actioned; explain in note.
+
+read_at: {{ read_at | default("<iso-8601 timestamp>") }}
+read_by: {{ read_by | default("pm") }}
+items:
+  - quote_excerpt: "<copy a phrase from self-review.md item>"
+    decision: accepted
+    note: "<one-line rationale>"
+  # - quote_excerpt: "<another phrase from self-review.md>"
+  #   decision: deferred
+  #   follow_up: KUI-XXXX
+  #   note: "<why this slips to the follow-up issue>"
+  # - quote_excerpt: "<phrase>"
+  #   decision: re-engaged
+  #   fix_commit: <sha>
+  #   note: "<what was fixed>"
+  # - quote_excerpt: "<phrase>"
+  #   decision: rejected
+  #   note: "<rationale for not actioning>"
