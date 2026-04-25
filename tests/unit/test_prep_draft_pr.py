@@ -21,20 +21,23 @@ import pytest
 
 def _init_repo(path: Path) -> None:
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=path, check=True)
+    # Persist identity on the repo (not via per-command `-c`) so any
+    # worktree cut off this repo inherits the config — `_open_draft_pr`
+    # makes a real `git commit --allow-empty` on the worktree and would
+    # otherwise fail on CI runners with no global gitconfig.
+    subprocess.run(["git", "-C", str(path), "config", "user.name", "t"], check=True)
+    subprocess.run(["git", "-C", str(path), "config", "user.email", "t@t"], check=True)
     subprocess.run(
         [
             "git",
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@t",
+            "-C",
+            str(path),
             "commit",
             "--allow-empty",
             "-q",
             "-m",
             "init",
         ],
-        cwd=path,
         check=True,
     )
 

@@ -387,22 +387,25 @@ class TestRenderKickoff:
         assert kickoff.read_text() == "do the thing"
 
 
+@pytest.fixture(autouse=True)
+def _stub_v075_prereqs():
+    """Bypass v0.7.5 spawn-time gh + draft-PR prerequisites for every
+    test in this file.
+
+    These tests exercise the prep orchestration (``prep.run`` end-to-
+    end, resume flows, etc.); the gh/draft-PR mechanics are unit-tested
+    separately in ``test_prep_draft_pr.py``. Stubbing module-wide keeps
+    the suite green on CI runners where ``gh`` is on PATH but
+    unauthenticated.
+    """
+    with (
+        patch("tripwire.runtimes.prep._check_gh_available"),
+        patch("tripwire.runtimes.prep._open_draft_pr", return_value=None),
+    ):
+        yield
+
+
 class TestPrepRun:
-    @pytest.fixture(autouse=True)
-    def _stub_v075_prereqs(self):
-        """Bypass v0.7.5 spawn-time gh + draft-PR prerequisites.
-
-        These end-to-end tests exercise the prep orchestration; the
-        gh/draft-PR mechanics are unit-tested separately in
-        ``test_prep_draft_pr.py``.
-        """
-        with patch("tripwire.runtimes.prep._check_gh_available"):
-            with patch(
-                "tripwire.runtimes.prep._open_draft_pr",
-                return_value=None,
-            ):
-                yield
-
     def test_end_to_end(
         self, tmp_path, tmp_path_project, save_test_session, write_handoff_yaml
     ):

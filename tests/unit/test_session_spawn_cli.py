@@ -4,10 +4,23 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 
 from tripwire.cli.session import session_cmd
 from tripwire.core.session_store import load_session
+
+
+@pytest.fixture(autouse=True)
+def _stub_v075_prereqs():
+    """Bypass v0.7.5 spawn-time gh + draft-PR prerequisites. These
+    tests exercise the spawn CLI; gh/draft-PR mechanics are unit-
+    tested separately in ``test_prep_draft_pr.py``."""
+    with (
+        patch("tripwire.runtimes.prep._check_gh_available"),
+        patch("tripwire.runtimes.prep._open_draft_pr", return_value=None),
+    ):
+        yield
 
 
 def _init_repo(path: Path) -> None:

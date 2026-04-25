@@ -85,8 +85,15 @@ class TestSpawnLifecycle:
         assert result.exit_code == 0, result.output
         assert load_session(tmp_path_project, "lifecycle-test").status == "queued"
 
-        # Spawn (with mocked clone resolution)
-        with patch("tripwire.cli.session._resolve_clone_path", return_value=clone):
+        # Spawn (with mocked clone resolution). v0.7.5 prep prereqs
+        # (gh-availability + draft-PR creation) are unit-tested in
+        # `tests/unit/test_prep_draft_pr.py`; bypass them here so the
+        # lifecycle flow doesn't depend on the CI runner's gh auth.
+        with (
+            patch("tripwire.cli.session._resolve_clone_path", return_value=clone),
+            patch("tripwire.runtimes.prep._check_gh_available"),
+            patch("tripwire.runtimes.prep._open_draft_pr", return_value=None),
+        ):
             result = runner.invoke(
                 session_cmd, ["spawn", "lifecycle-test", "--project-dir", pdir]
             )
