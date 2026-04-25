@@ -72,6 +72,45 @@ class TestInitBasics:
         # colocated issue artifacts under issues/<KEY>/ instead).
         assert not (target / "docs" / "issues").exists()
 
+    def test_writes_initial_readme_with_marker(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """Init runs `readme generate` once so the project's GitHub repo
+        page has something useful from day zero rather than a generic
+        scaffold. The marker on line 1 lets future tooling recognise the
+        file as auto-generated."""
+        target = tmp_path / "with-readme"
+        result = runner.invoke(cli, _init_args(target))
+        assert result.exit_code == 0, result.output
+
+        readme = target / "README.md"
+        assert readme.is_file(), "init should produce README.md"
+        content = readme.read_text(encoding="utf-8")
+        assert content.startswith("<!-- tripwire-readme-auto -->")
+        # Section structure carries through.
+        assert "## Session graph" in content
+        assert "```mermaid" in content
+        # No leftover Jinja markers.
+        assert "{{" not in content
+        assert "}}" not in content
+
+    def test_writes_readme_cd_workflow(self, runner: CliRunner, tmp_path: Path) -> None:
+        """The CD workflow file gets stamped at .github/workflows/readme.yml
+        so push-to-main triggers the regen on the first merge."""
+        target = tmp_path / "with-workflow"
+        result = runner.invoke(cli, _init_args(target))
+        assert result.exit_code == 0, result.output
+
+        wf = target / ".github" / "workflows" / "readme.yml"
+        assert wf.is_file()
+        content = wf.read_text(encoding="utf-8")
+        # All three guardrails must survive into the rendered file.
+        assert (
+            "!startsWith(github.event.head_commit.message, 'docs(readme):')" in content
+        )
+        assert "[skip ci]" in content
+        assert "git diff --quiet README.md" in content
+
     def test_project_yaml_has_rendered_fields(
         self, runner: CliRunner, tmp_path: Path
     ) -> None:

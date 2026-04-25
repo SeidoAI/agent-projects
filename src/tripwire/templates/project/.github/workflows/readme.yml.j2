@@ -1,0 +1,57 @@
+name: README
+
+# Auto-regenerates README.md on every push to main.
+#
+# Three guardrails defend against feedback loops:
+#   1. The job's `if:` skips runs whose head commit was made by us
+#      (commit message starts with `docs(readme):`).
+#   2. The push commit body carries `[skip ci]` so any workflow that
+#      doesn't have its own filter still won't fire on our commit.
+#   3. `git diff --quiet` short-circuits the push when the rendered
+#      content is identical to what's already on disk.
+#
+# Branch protection: the default GITHUB_TOKEN works only when `main`
+# accepts bot pushes. If your branch protection requires PR reviews,
+# create a fine-grained PAT with bypass rights and store it as
+# `README_BOT_PAT` in repo secrets — the workflow falls back to it
+# automatically.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+{% raw %}    if: ${{ !startsWith(github.event.head_commit.message, 'docs(readme):') }}
+{% endraw %}    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+{% raw %}          token: ${{ secrets.README_BOT_PAT || secrets.GITHUB_TOKEN }}
+{% endraw %}
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.13"
+
+      - name: Install tripwire
+        run: uv tool install "tripwire-pm>={{ tripwire_version }}"
+
+      - name: Regenerate README
+        run: tripwire readme generate
+
+      - name: Commit + push if changed
+        run: |
+          if git diff --quiet README.md; then
+            echo "README unchanged; skipping commit."
+            exit 0
+          fi
+          git config user.name "tripwire-bot"
+          git config user.email "tripwire-bot@users.noreply.github.com"
+          git add README.md
+          git commit -m "docs(readme): auto-update $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+          git push

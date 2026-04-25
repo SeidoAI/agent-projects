@@ -749,6 +749,28 @@ def _link_to_workspace(
             console.print(f"[dim]✓ Copied {copied} node(s) from workspace[/dim]")
 
 
+def _write_initial_readme(target_dir: Path) -> None:
+    """Render the initial README for a freshly-init'd project.
+
+    Failures are logged as warnings, not errors — a broken render
+    shouldn't break init. Subsequent pushes to main will retry via the
+    CD workflow.
+    """
+    from tripwire.core.readme_renderer import render
+
+    try:
+        rendered = render(target_dir, recent_merges=None)
+    except Exception as exc:
+        console.print(
+            f"[yellow]Warning:[/yellow] could not render initial README ({exc}). "
+            "The CD workflow will populate it on first push to main."
+        )
+        return
+    readme_path = target_dir / "README.md"
+    readme_path.write_text(rendered, encoding="utf-8")
+    console.print(f"  [green]+[/green] {readme_path.relative_to(target_dir)}")
+
+
 def _git_head_short(repo_dir: Path) -> str:
     """Return short SHA of HEAD in a git repo."""
     import subprocess as _subprocess
@@ -1060,6 +1082,14 @@ def init_cmd(
             project_name=name,
             copy_nodes=copy_nodes,
         )
+
+    # ------------------------------------------------------------------
+    # Initial README — render once so the project's GitHub repo page
+    # carries something useful from day zero, not the (now-missing)
+    # default README scaffold.
+    # ------------------------------------------------------------------
+
+    _write_initial_readme(target_dir)
 
     # ------------------------------------------------------------------
     # Next steps

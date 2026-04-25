@@ -1,0 +1,104 @@
+<!-- tripwire-readme-auto -->
+# {{ project_name }}
+
+> {{ project_description or "Tripwire project" }}
+>
+> **Status:** {{ health_badge }} · {{ session_summary }} · {{ issue_summary }}
+>
+> *Auto-regenerated {{ regenerated_at }}{% if tripwire_version %} via tripwire v{{ tripwire_version }}{% endif %}*
+
+## At a glance
+
+| Validation | Sessions | Issues | Critical path |
+|---|---|---|---|
+| {{ validation_label }} | {{ session_in_flight }} in flight, {{ session_done }} done | {{ issue_open }} open, {{ issue_closed }} closed | {{ critical_path_len }} sessions |
+
+## Session graph
+
+```mermaid
+{{ session_mermaid }}
+```
+
+## Active sessions
+
+{% if active_sessions %}
+| Session | Status | Issues |
+|---|---|---|
+{% for s in active_sessions %}| `{{ s.id }}` | {{ s.status }} | {{ s.issues | join(", ") if s.issues else "—" }} |
+{% endfor %}
+{% else %}
+*No sessions in flight.*
+{% endif %}
+
+## Recent merges
+
+{% if recent_merges %}
+{% for m in recent_merges %}- {{ m }}
+{% endfor %}
+{% else %}
+*No recent merges captured. Set `RECENT_MERGES_LIMIT` in the workflow to populate.*
+{% endif %}
+
+## Critical path
+
+{% if critical_path %}
+{{ critical_path | join(" → ") }}
+{% else %}
+*No critical path computed.*
+{% endif %}
+
+## Roadmap
+
+{% if launchable %}
+{% for r in launchable %}- **`{{ r.session_id }}`** — {{ r.rationale }}
+{% endfor %}
+{% else %}
+*No launchable sessions.*
+{% endif %}
+
+## Workspace
+
+{% if workspace_path %}
+Linked to workspace at `{{ workspace_path }}`.
+{% else %}
+*Standalone project (no workspace link).*
+{% endif %}
+
+<details>
+<summary><b>Issues</b> ({{ total_issues }} total)</summary>
+
+{% if issues_by_status %}
+
+| Status | Count |
+|---|---|
+{% for entry in issues_by_status %}| {{ entry.status }} | {{ entry.count }} |
+{% endfor %}
+{% else %}
+*No issues yet.*
+{% endif %}
+
+</details>
+
+<details>
+<summary><b>All sessions</b> ({{ total_sessions }})</summary>
+
+{% if all_sessions %}
+
+| Session | Status |
+|---|---|
+{% for s in all_sessions %}| `{{ s.id }}` | {{ s.status }} |
+{% endfor %}
+{% else %}
+*No sessions yet.*
+{% endif %}
+
+</details>
+
+## Links
+
+{% if links %}
+{% for link in links %}- {{ link.label }}: [{{ link.target }}]({{ link.target }})
+{% endfor %}
+{% else %}
+*No repos registered. Set `repos:` in `project.yaml`.*
+{% endif %}
