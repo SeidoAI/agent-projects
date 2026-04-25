@@ -23,6 +23,7 @@ from . import (
     done_implies_artifacts_on_main,
     pm_response_followups_resolve,
     self_review_implies_pm_response,
+    worktree_paths_unique,
 )
 
 CheckFunc = Callable[["ValidationContext"], "list[CheckResult]"]
@@ -31,4 +32,5 @@ LINT_CHECKS: list[CheckFunc] = [
     done_implies_artifacts_on_main.check,
     self_review_implies_pm_response.check,
     pm_response_followups_resolve.check,
+    worktree_paths_unique.check,
 ]
