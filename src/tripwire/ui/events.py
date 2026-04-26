@@ -191,6 +191,40 @@ class ApprovalPendingEvent(Event):
 
 
 # ---------------------------------------------------------------------------
+# v1 — process_event broadcast notifications (KUI-100)
+# ---------------------------------------------------------------------------
+
+
+ProcessEventKind = Literal[
+    "tripwire_fire",
+    "validator_pass",
+    "validator_fail",
+    "artifact_rejected",
+    "pm_review_opened",
+    "pm_review_closed",
+    "status_transition",
+]
+
+
+class ProcessEvent(Event):
+    """A `.tripwire/events/<kind>/<sid>/<n>.json` write classified by file_watcher.
+
+    The on-disk payload (per `core.event_emitter.FileEmitter`) is the
+    canonical record; this WS notification is a thin pointer carrying
+    just enough for the UI to invalidate its `/api/events` query and
+    optionally fetch `/api/events/<event_id>` for the full body. See
+    `docs/specs/2026-04-26-v08-handoff.md` §2.4.
+    """
+
+    type: Literal["process_event"] = "process_event"
+    project_id: str
+    event_id: str
+    kind: ProcessEventKind
+    session_id: str
+    fired_at: str
+
+
+# ---------------------------------------------------------------------------
 # Discriminated union + parse helper
 # ---------------------------------------------------------------------------
 
@@ -201,6 +235,7 @@ TripwireUiEvent = Annotated[
         FileChangedEvent
         | ArtifactUpdatedEvent
         | ValidationCompletedEvent
+        | ProcessEvent
         | PingEvent
         | PongEvent
         # v2 stubs
@@ -238,6 +273,8 @@ __all__ = [
     "PingEvent",
     "PmReviewCompletedEvent",
     "PongEvent",
+    "ProcessEvent",
+    "ProcessEventKind",
     "StatusUpdateEvent",
     "TripwireUiEvent",
     "ValidationCompletedEvent",
