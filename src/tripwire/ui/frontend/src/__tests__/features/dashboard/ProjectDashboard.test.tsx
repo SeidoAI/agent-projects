@@ -6,7 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectDashboard } from "@/features/dashboard/ProjectDashboard";
 import type { EnumDescriptor } from "@/lib/api/endpoints/enums";
-import type { EventsResponse } from "@/lib/api/endpoints/events";
+import type { EventsResponse, ProcessEvent } from "@/lib/api/endpoints/events";
+import type { IssueSummary } from "@/lib/api/endpoints/issues";
 import type { ProjectDetail } from "@/lib/api/endpoints/project";
 import type { SessionSummary } from "@/lib/api/endpoints/sessions";
 import { queryKeys } from "@/lib/api/queryKeys";
@@ -17,10 +18,41 @@ vi.mock("@/app/ProjectShell", () => ({
 
 interface Seed {
   project?: ProjectDetail;
-  issues?: unknown[];
+  issues?: IssueSummary[];
   statusEnum?: EnumDescriptor;
   sessions?: SessionSummary[];
   events?: EventsResponse;
+}
+
+function issue(id: string, status: string): IssueSummary {
+  return {
+    id,
+    title: `Issue ${id}`,
+    status,
+    priority: "medium",
+    executor: "ai",
+    verifier: "required",
+    kind: null,
+    agent: null,
+    labels: [],
+    parent: null,
+    repo: null,
+    blocked_by: [],
+    is_blocked: false,
+    is_epic: false,
+    created_at: null,
+    updated_at: null,
+  };
+}
+
+function event(kind: ProcessEvent["kind"], extras: Partial<ProcessEvent> = {}): ProcessEvent {
+  return {
+    id: `evt-${kind}-${Math.random().toString(36).slice(2, 7)}`,
+    kind,
+    fired_at: "2026-04-26T10:00:00Z",
+    session_id: "sess-x",
+    ...extras,
+  };
 }
 
 function seed(data: Seed) {
@@ -156,5 +188,127 @@ describe("ProjectDashboard", () => {
     render(<ProjectDashboard />, { wrapper: Wrap });
     // Falls back to the project id as the heading until the API resolves.
     expect(screen.getByRole("heading", { name: /p1/ })).toBeInTheDocument();
+  });
+
+  it("renders status counts in the Project Vitals column with deep-link hrefs", () => {
+    const wrapper = seed({
+      project: { id: "p1", name: "Demo", key_prefix: "DEMO", phase: "executing" },
+      issues: [
+        issue("X-1", "todo"),
+        issue("X-2", "todo"),
+        issue("X-3", "doing"),
+        issue("X-4", "done"),
+      ],
+      statusEnum: ENUM,
+      sessions: [],
+    });
+    render(<ProjectDashboard />, { wrapper });
+    const todo = screen.getByLabelText(/2 issues in status To do/i);
+    expect(todo).toHaveAttribute("href", "/p/p1/board?status=todo");
+    expect(screen.getByLabelText(/1 issues in status Doing/i)).toHaveAttribute(
+      "href",
+      "/p/p1/board?status=doing",
+    );
+  });
+
+  it.each([
+    ["scoping", /defining what needs to be built/i],
+    ["scoped", /ready for execution/i],
+    ["executing", /sessions in flight/i],
+    ["reviewing", /under review/i],
+  ])("renders the per-phase tagline for phase=%s", (phase, expected) => {
+    const wrapper = seed({
+      project: { id: "p1", name: "Demo", key_prefix: "DEMO", phase },
+      issues: [issue("X-1", "todo")],
+      statusEnum: ENUM,
+      sessions: [],
+    });
+    render(<ProjectDashboard />, { wrapper });
+    expect(screen.getByText(expected)).toBeInTheDocument();
+  });
+
+  it("falls back to a phase-less tagline for an unknown phase", () => {
+    const wrapper = seed({
+      project: { id: "p1", name: "Demo", key_prefix: "DEMO", phase: "made-up-phase" },
+      issues: [issue("X-1", "todo")],
+      statusEnum: ENUM,
+      sessions: [],
+    });
+    render(<ProjectDashboard />, { wrapper });
+    // The default branch in describeProject prints just the issue clause.
+    expect(screen.getByText(/1 issues across the project\./i)).toBeInTheDocument();
+  });
+
+  it("uses the 'no issues yet' clause when total is zero", () => {
+    const wrapper = seed({
+      project: { id: "p1", name: "Demo", key_prefix: "DEMO", phase: "scoping" },
+      issues: [],
+      statusEnum: ENUM,
+      sessions: [],
+    });
+    render(<ProjectDashboard />, { wrapper });
+    expect(screen.getByText(/no issues yet/i)).toBeInTheDocument();
+  });
+
+  it("renders the singular 'session' label when exactly one session is open", () => {
+    const wrapper = seed({
+      project: { id: "p1", name: "Demo", key_prefix: "DEMO", phase: "executing" },
+      issues: [],
+      statusEnum: ENUM,
+      sessions: [session("sessA", "executing")],
+    });
+    render(<ProjectDashboard />, { wrapper });
+    expect(screen.getByText(/^1 session$/)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["tripwire_fire", /fired on sess-x/i],
+    ["validator_fail", /failed on sess-x/i],
+    ["validator_pass", /passed on sess-x/i],
+    ["artifact_rejected", /rejected on sess-x/i],
+    ["pm_review_opened", /pm review opened on sess-x/i],
+    ["pm_review_closed", /pm review closed on sess-x/i],
+    ["status_transition", /status transition on sess-x/i],
+  ] as const)("renders the %s event row with the right summary phrase", (kind, phrase) => {
+    const wrapper = seed({
+      project: { id: "p1", name: "Demo", key_prefix: "DEMO", phase: "executing" },
+      issues: [],
+      statusEnum: ENUM,
+      sessions: [],
+      events: { events: [event(kind)], next_cursor: null },
+    });
+    render(<ProjectDashboard />, { wrapper });
+    // The summary phrase always names the session id; the stamp above
+    // uses the event-kind verbatim with underscores converted to
+    // spaces, so anchoring on "...on <sid>" disambiguates the two.
+    expect(screen.getByText(phrase)).toBeInTheDocument();
+  });
+
+  it("renders evidence text under tripwire/validator events when supplied", () => {
+    const wrapper = seed({
+      project: { id: "p1", name: "Demo", key_prefix: "DEMO", phase: "executing" },
+      issues: [],
+      statusEnum: ENUM,
+      sessions: [],
+      events: {
+        events: [event("validator_fail", { evidence: "[[auth-token]] is stale" })],
+        next_cursor: null,
+      },
+    });
+    render(<ProjectDashboard />, { wrapper });
+    expect(screen.getByText(/auth-token.*stale/)).toBeInTheDocument();
+  });
+
+  it("renders an empty Project Vitals column when no statuses are configured", () => {
+    const wrapper = seed({
+      project: { id: "p1", name: "Demo", key_prefix: "DEMO", phase: "executing" },
+      issues: [],
+      // No statusEnum seeded — useProjectStats returns an empty
+      // statusCounts list, which the vitals column renders as an empty
+      // state instead of an empty grid.
+      sessions: [],
+    });
+    render(<ProjectDashboard />, { wrapper });
+    expect(screen.getByText(/no statuses configured/i)).toBeInTheDocument();
   });
 });
