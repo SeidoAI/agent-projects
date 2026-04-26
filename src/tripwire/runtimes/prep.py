@@ -663,10 +663,7 @@ def install_pre_push_hook(
 
     project = load_project(project_dir)
     tripwires_cfg = getattr(project, "tripwires", None)
-    if (
-        tripwires_cfg is not None
-        and getattr(tripwires_cfg, "enabled", True) is False
-    ):
+    if tripwires_cfg is not None and getattr(tripwires_cfg, "enabled", True) is False:
         log.info(
             "session %s: project.yaml.tripwires.enabled is False; skipping "
             "pre-push hook install",

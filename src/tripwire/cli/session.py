@@ -1930,8 +1930,7 @@ def session_log_cmd(
 
     if web:
         click.echo(
-            f"Tripwire Log: http://localhost:8000/tripwires"
-            f"?session_id={session_id}"
+            f"Tripwire Log: http://localhost:8000/tripwires?session_id={session_id}"
         )
 
     if not fire_dir.is_dir():
@@ -1957,9 +1956,7 @@ def session_log_cmd(
         event = payload.get("event", "?")
         escalated = payload.get("escalated", False)
 
-        marker_path = (
-            resolved / ".tripwire" / "acks" / f"{tw_id}-{session_id}.json"
-        )
+        marker_path = resolved / ".tripwire" / "acks" / f"{tw_id}-{session_id}.json"
         ack_status = "unacked"
         ack_detail = ""
         if marker_path.is_file():
@@ -1976,8 +1973,7 @@ def session_log_cmd(
 
         flag = " ESCALATED" if escalated else ""
         click.echo(
-            f"  {fired_at}  {tw_id}  on={event}  status={ack_status}"
-            f"{ack_detail}{flag}"
+            f"  {fired_at}  {tw_id}  on={event}  status={ack_status}{ack_detail}{flag}"
         )
 
         if reveal and pm_mode:
@@ -2117,8 +2113,7 @@ def session_complete_cmd(
 
     if web:
         click.echo(
-            f"  Tripwire Log: http://localhost:8000/tripwires"
-            f"?session_id={session_id}"
+            f"  Tripwire Log: http://localhost:8000/tripwires?session_id={session_id}"
         )
 
 
@@ -2148,9 +2143,7 @@ def _write_tripwire_ack(
             "marker substantiveness check would reject an empty ack."
         )
 
-    marker = (
-        project_dir / ".tripwire" / "acks" / f"{tripwire_id}-{session_id}.json"
-    )
+    marker = project_dir / ".tripwire" / "acks" / f"{tripwire_id}-{session_id}.json"
     marker.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "tripwire_id": tripwire_id,
@@ -2162,9 +2155,7 @@ def _write_tripwire_ack(
     marker.write_text(_json.dumps(payload, indent=2), encoding="utf-8")
 
 
-def _record_tripwire_bypass(
-    *, project_dir: Path, session_id: str, event: str
-) -> None:
+def _record_tripwire_bypass(*, project_dir: Path, session_id: str, event: str) -> None:
     """Append a one-line audit entry when `--no-tripwires` is used.
 
     The audit log is the only durable record of the bypass — without

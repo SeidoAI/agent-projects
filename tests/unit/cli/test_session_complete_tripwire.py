@@ -132,7 +132,9 @@ def test_ack_without_substance_rejected(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code != 0
-    assert "fix-commit" in result.output.lower() or "no-findings" in result.output.lower()
+    assert (
+        "fix-commit" in result.output.lower() or "no-findings" in result.output.lower()
+    )
 
 
 def test_no_tripwires_bypass_skips_fire(tmp_path: Path) -> None:

@@ -112,9 +112,7 @@ def _instantiate(entry: dict, *, project_dir: Path) -> Tripwire:
         spec.loader.exec_module(module)
         cls = _find_tripwire_class(module, entry.get("id"))
     else:
-        raise ValueError(
-            f"tripwire entry must declare `class` or `module`: {entry!r}"
-        )
+        raise ValueError(f"tripwire entry must declare `class` or `module`: {entry!r}")
 
     if not isinstance(cls, type) or not issubclass(cls, Tripwire):
         raise TypeError(f"{cls!r} is not a Tripwire subclass")
@@ -142,7 +140,7 @@ def _find_tripwire_class(module: Any, declared_id: str | None) -> type[Tripwire]
     )
 
 
-def _read_tripwires_block(project: "ProjectConfig") -> dict:
+def _read_tripwires_block(project: ProjectConfig) -> dict:
     """Read the un-typed ``tripwires:`` block from ``project.yaml``.
 
     The :class:`ProjectConfig` model uses ``extra="forbid"``, so a new

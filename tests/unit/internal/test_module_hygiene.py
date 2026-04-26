@@ -23,7 +23,6 @@ from pathlib import Path
 
 import tripwire
 
-
 _TRIPWIRE_SRC = Path(tripwire.__file__).parent
 _INTERNAL_TRIPWIRES = _TRIPWIRE_SRC / "_internal" / "tripwires"
 _TEMPLATES = _TRIPWIRE_SRC / "templates"
@@ -86,6 +85,6 @@ def test_skill_loader_skips_internal() -> None:
     # The function must scope itself to templates/skills.
     assert "templates" in prep_src and "skills" in prep_src
     # And must not reach into _internal.
-    assert (
-        not re.search(r"_internal[\\/]tripwires", prep_src)
-    ), "runtimes/prep.py references _internal/tripwires — that's the leak."
+    assert not re.search(r"_internal[\\/]tripwires", prep_src), (
+        "runtimes/prep.py references _internal/tripwires — that's the leak."
+    )

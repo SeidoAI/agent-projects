@@ -41,9 +41,7 @@ def _project(tmp_path: Path) -> None:
 
 
 def _write_substantive_marker(tmp_path: Path, sid: str) -> Path:
-    ctx = TripwireContext(
-        project_dir=tmp_path, session_id=sid, project_id="fixture"
-    )
+    ctx = TripwireContext(project_dir=tmp_path, session_id=sid, project_id="fixture")
     marker = ctx.ack_path("self-review")
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text(json.dumps({"fix_commits": ["c4f81e2"]}), encoding="utf-8")
@@ -54,17 +52,13 @@ def test_first_call_blocks_second_call_after_ack_proceeds(tmp_path: Path) -> Non
     _project(tmp_path)
     sid = "fixture-1"
 
-    first = fire_event(
-        project_dir=tmp_path, event="session.complete", session_id=sid
-    )
+    first = fire_event(project_dir=tmp_path, event="session.complete", session_id=sid)
     assert first.blocked is True
     assert len(first.prompts) == 1
 
     _write_substantive_marker(tmp_path, sid)
 
-    second = fire_event(
-        project_dir=tmp_path, event="session.complete", session_id=sid
-    )
+    second = fire_event(project_dir=tmp_path, event="session.complete", session_id=sid)
     assert second.blocked is False
     assert second.prompts == []
 
@@ -73,16 +67,12 @@ def test_marker_requires_substance(tmp_path: Path) -> None:
     """Empty marker doesn't satisfy the substantiveness check."""
     _project(tmp_path)
     sid = "fixture-1"
-    ctx = TripwireContext(
-        project_dir=tmp_path, session_id=sid, project_id="fixture"
-    )
+    ctx = TripwireContext(project_dir=tmp_path, session_id=sid, project_id="fixture")
     marker = ctx.ack_path("self-review")
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text("{}", encoding="utf-8")
 
-    result = fire_event(
-        project_dir=tmp_path, event="session.complete", session_id=sid
-    )
+    result = fire_event(project_dir=tmp_path, event="session.complete", session_id=sid)
     # Marker exists but isn't substantive → still blocked.
     assert result.blocked is True
 
@@ -110,15 +100,9 @@ def test_loop_safety_third_fire_escalates(tmp_path: Path) -> None:
     """3rd fire of the same tripwire on same session escalates."""
     _project(tmp_path)
     sid = "fixture-loop"
-    r1 = fire_event(
-        project_dir=tmp_path, event="session.complete", session_id=sid
-    )
-    r2 = fire_event(
-        project_dir=tmp_path, event="session.complete", session_id=sid
-    )
-    r3 = fire_event(
-        project_dir=tmp_path, event="session.complete", session_id=sid
-    )
+    r1 = fire_event(project_dir=tmp_path, event="session.complete", session_id=sid)
+    r2 = fire_event(project_dir=tmp_path, event="session.complete", session_id=sid)
+    r3 = fire_event(project_dir=tmp_path, event="session.complete", session_id=sid)
     assert r1.escalated is False
     assert r2.escalated is False
     assert r3.escalated is True

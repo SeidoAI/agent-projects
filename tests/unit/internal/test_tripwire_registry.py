@@ -54,15 +54,9 @@ def test_tripwire_context_ack_path_layout(tmp_path: Path) -> None:
 
 
 def test_tripwire_context_variation_index_deterministic(tmp_path: Path) -> None:
-    ctx_a = TripwireContext(
-        project_dir=tmp_path, session_id="alpha", project_id="proj"
-    )
-    ctx_b = TripwireContext(
-        project_dir=tmp_path, session_id="alpha", project_id="proj"
-    )
-    ctx_c = TripwireContext(
-        project_dir=tmp_path, session_id="beta", project_id="proj"
-    )
+    ctx_a = TripwireContext(project_dir=tmp_path, session_id="alpha", project_id="proj")
+    ctx_b = TripwireContext(project_dir=tmp_path, session_id="alpha", project_id="proj")
+    ctx_c = TripwireContext(project_dir=tmp_path, session_id="beta", project_id="proj")
     assert ctx_a.variation_index(3) == ctx_b.variation_index(3)
     # Different session_id likely picks a different variation; assert at
     # least that the function maps deterministically.
@@ -143,12 +137,8 @@ def test_fire_event_session_opt_out(tmp_path: Path) -> None:
 
 def test_fire_event_third_fire_escalates(tmp_path: Path) -> None:
     _write_project_yaml(tmp_path)
-    fire_event(
-        project_dir=tmp_path, event="session.complete", session_id="fixture-1"
-    )
-    fire_event(
-        project_dir=tmp_path, event="session.complete", session_id="fixture-1"
-    )
+    fire_event(project_dir=tmp_path, event="session.complete", session_id="fixture-1")
+    fire_event(project_dir=tmp_path, event="session.complete", session_id="fixture-1")
     result = fire_event(
         project_dir=tmp_path, event="session.complete", session_id="fixture-1"
     )

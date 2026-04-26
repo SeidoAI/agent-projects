@@ -40,9 +40,7 @@ def test_tripwires_list_lists_registered_tripwires(
 ) -> None:
     _project(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["tripwires", "list", "--project-dir", str(tmp_path)]
-    )
+    result = runner.invoke(cli, ["tripwires", "list", "--project-dir", str(tmp_path)])
     assert result.exit_code == 0, result.output
     assert "self-review" in result.output
     assert "session.complete" in result.output
@@ -50,9 +48,7 @@ def test_tripwires_list_lists_registered_tripwires(
     assert "AC met but not really" not in result.output
 
 
-def test_tripwires_list_reveal_shows_prompt(
-    tmp_path: Path, pm_role: Path
-) -> None:
+def test_tripwires_list_reveal_shows_prompt(tmp_path: Path, pm_role: Path) -> None:
     _project(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
@@ -75,11 +71,11 @@ def test_tripwires_list_disabled_project_says_disabled(
 ) -> None:
     _project(tmp_path, {"enabled": False})
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["tripwires", "list", "--project-dir", str(tmp_path)]
-    )
+    result = runner.invoke(cli, ["tripwires", "list", "--project-dir", str(tmp_path)])
     assert result.exit_code == 0, result.output
-    assert "disabled" in result.output.lower() or "no tripwires" in result.output.lower()
+    assert (
+        "disabled" in result.output.lower() or "no tripwires" in result.output.lower()
+    )
 
 
 def test_tripwires_list_requires_pm_role(
@@ -92,9 +88,7 @@ def test_tripwires_list_requires_pm_role(
     monkeypatch.setenv("TRIPWIRE_HOME", str(role_dir))
     monkeypatch.delenv("TRIPWIRE_ROLE", raising=False)
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["tripwires", "list", "--project-dir", str(tmp_path)]
-    )
+    result = runner.invoke(cli, ["tripwires", "list", "--project-dir", str(tmp_path)])
     assert result.exit_code != 0
     assert "pm" in result.output.lower() or "role" in result.output.lower()
 
@@ -108,7 +102,5 @@ def test_tripwires_list_role_via_env(
     # Avoid bleed-through from prior fixtures.
     monkeypatch.delenv("TRIPWIRE_HOME", raising=False)
     runner = CliRunner()
-    result = runner.invoke(
-        cli, ["tripwires", "list", "--project-dir", str(tmp_path)]
-    )
+    result = runner.invoke(cli, ["tripwires", "list", "--project-dir", str(tmp_path)])
     assert result.exit_code == 0, result.output

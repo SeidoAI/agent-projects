@@ -30,9 +30,7 @@ def _project(tmp_path: Path) -> None:
 def _write_event(tmp_path: Path, sid: str, n: int, payload: dict) -> None:
     fire_dir = tmp_path / ".tripwire" / "events" / "firings" / sid
     fire_dir.mkdir(parents=True, exist_ok=True)
-    (fire_dir / f"{n:04d}.json").write_text(
-        json.dumps(payload), encoding="utf-8"
-    )
+    (fire_dir / f"{n:04d}.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
 def test_session_log_no_events_says_so(tmp_path: Path) -> None:
@@ -49,7 +47,10 @@ def test_session_log_no_events_says_so(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    assert "no tripwire fires" in result.output.lower() or "0 fires" in result.output.lower()
+    assert (
+        "no tripwire fires" in result.output.lower()
+        or "0 fires" in result.output.lower()
+    )
 
 
 def test_session_log_lists_fires_with_timestamps(tmp_path: Path) -> None:
@@ -111,9 +112,7 @@ def test_session_log_ack_status_shown(tmp_path: Path) -> None:
     # Write the ack marker for fixture-1.
     marker = tmp_path / ".tripwire" / "acks" / "self-review-fixture-1.json"
     marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text(
-        json.dumps({"fix_commits": ["abc123"]}), encoding="utf-8"
-    )
+    marker.write_text(json.dumps({"fix_commits": ["abc123"]}), encoding="utf-8")
     runner = CliRunner()
     result = runner.invoke(
         cli,
