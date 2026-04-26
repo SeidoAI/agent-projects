@@ -3,7 +3,7 @@ orphan worktrees that aren't recorded in runtime_state.
 
 Before I6, cleanup iterated only `session.runtime_state.worktrees`.
 Any worktree on disk matching the tripwire naming convention
-(``<clone-name>-wt-<session-id>``) that wasn't in runtime_state —
+(``worktree-<clone-name>-<session-id>``) that wasn't in runtime_state —
 e.g. from an interrupted spawn, or from a pre-I5 dry-run — was
 left behind. PMs had to ``git worktree remove`` by hand.
 

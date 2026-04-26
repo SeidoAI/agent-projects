@@ -2,7 +2,7 @@
 id: backend-coder
 name: "Backend Coding Agent"
 description: "Implements backend issues in Python repos"
-runtime: claude-code
+runtime: claude
 skill: backend-development
 
 # GitHub identity — each agent gets its own bot account or app installation.

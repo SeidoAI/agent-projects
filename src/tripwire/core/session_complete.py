@@ -116,6 +116,26 @@ def complete_session(
             last.outcome = "completed"
     save_session(project_dir, session)
 
+    # KUI-96 §E4 — append a row to the project's routing telemetry log
+    # so analyze-routing can compare $/merged-PR per route over time.
+    # Cost computation reads the session's stream-json log; failure is
+    # non-fatal — telemetry is observability, not part of the gate.
+    try:
+        from tripwire.core.routing_telemetry import (
+            append_telemetry_row,
+            build_telemetry_row,
+        )
+        from tripwire.core.session_cost import compute_session_cost
+
+        cost = compute_session_cost(project_dir, session_id).total_usd
+        row = build_telemetry_row(project_dir, session, cost_usd=cost)
+        append_telemetry_row(project_dir, row)
+    except OSError:
+        # Worst case: cost log moved or telemetry file is unwritable.
+        # The session-complete gates have already passed; surfacing
+        # this as a hard failure would block a legitimate done.
+        pass
+
     from tripwire.core.git_helpers import worktree_remove
 
     for wt in session.runtime_state.worktrees:

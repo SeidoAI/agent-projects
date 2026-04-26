@@ -1,0 +1,146 @@
+# Codex code review on demand.
+#
+# A maintainer comments `@codex review` on any PR; this workflow boots a
+# headless OpenAI Codex CLI run against the PR diff and posts the
+# structured review back as a PR comment. Single-shot — Codex doesn't
+# author code, only reads the diff.
+#
+# Prerequisites (operator):
+#   - `OPENAI_API_KEY` set in the repo's Actions secrets. Codex CLI's
+#     auth gate fails closed without it, so a missing secret is a hard
+#     fail rather than a silent no-op.
+#   - The repo grants `pull-requests: write` and `issues: write` on the
+#     workflow token (configured below).
+#
+# Trigger guard:
+#   - `github.event.issue.pull_request` filters out comments on plain
+#     issues — issue_comment fires on both PRs and issues; we only want
+#     PR comments.
+#   - `contains(...comment.body, '@codex')` matches any comment that
+#     mentions `@codex` (review, fix, etc.). For v0.7.10 we only invoke
+#     review; future hooks can branch on the verb inside the run step.
+name: Codex review
+
+on:
+  issue_comment:
+    types: [created]
+
+# Per-PR concurrency: a maintainer who posts `@codex review` twice in
+# quick succession (e.g. typo fix) cancels the in-flight run. Without
+# this the two runs race to post comments on the same PR.
+{% raw %}concurrency:
+  group: codex-review-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: ${{ github.event.issue.pull_request && contains(github.event.comment.body, '@codex') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # gh pr comment uses the workflow token; issue_comment events
+      # downgrade the default token to read-only on PR/issue resources,
+      # so we re-grant explicitly.
+      pull-requests: write
+      issues: write
+      contents: read
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v6
+        with:
+          # The workflow runs on the default branch when the comment
+          # fires; gh pr diff resolves the PR number itself, so we only
+          # need a shallow checkout for the gh CLI to find the repo.
+          fetch-depth: 1
+
+      - name: Setup Node (codex CLI host)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Codex CLI
+        # Pinned to the npm-distributed binary the rest of v0.7.10 has
+        # been verified against. Floating @latest would mean review
+        # output drifts silently when OpenAI ships a new version.
+        run: npm install -g @openai/codex
+
+      - name: Capture PR diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > pr-diff.patch
+          echo "diff bytes: $(wc -c < pr-diff.patch)"
+
+      - name: Run Codex review
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          # Empty diff → write a stub review and exit; saves an API
+          # call and avoids feeding Codex an empty prompt.
+          if [ ! -s pr-diff.patch ]; then
+            printf 'No changes detected on PR #%s — nothing to review.\n' \
+              "$PR_NUMBER" > review.md
+            exit 0
+          fi
+
+          # Codex review prompt: read the diff, post issues + severity
+          # + code references per docs/codex-review-protocol.md. The
+          # protocol doc lives in the project repo; we inline a brief
+          # version here so the workflow is self-contained.
+          {
+            echo "You are a code reviewer. Read the unified diff below and"
+            echo "post a structured review with these sections:"
+            echo ""
+            echo "1. Summary (one sentence)"
+            echo "2. Issues — group by severity (blocking / major / minor / nit)"
+            echo "   each as a bullet, prefixed with file:line"
+            echo "3. Out-of-scope nice-to-haves (optional)"
+            echo ""
+            echo "Skip stylistic nits (formatting, naming) unless they hide"
+            echo "a bug. If the diff has no issues worth flagging, say so"
+            echo "in one line."
+            echo ""
+            echo "--- DIFF ---"
+            cat pr-diff.patch
+          } > codex-prompt.txt
+
+          codex exec --json \
+            -m gpt-5-codex \
+            -c model_reasoning_effort='"high"' \
+            --sandbox read-only \
+            "$(cat codex-prompt.txt)" \
+            > codex-output.jsonl
+
+          # Codex emits JSONL; the final assistant message is the
+          # review. Extract it with jq — every JSONL line that has
+          # `.msg.type == "agent_message"` carries the response text.
+          jq -r 'select(.msg.type == "agent_message") | .msg.message' \
+            codex-output.jsonl \
+            | tail -n +1 > review.md
+
+          # Fallback: if extraction produced nothing, surface the raw
+          # JSONL so the maintainer can debug rather than seeing an
+          # empty comment.
+          if [ ! -s review.md ]; then
+            {
+              echo "Codex produced no agent_message events; raw output:"
+              echo ""
+              echo '```'
+              cat codex-output.jsonl
+              echo '```'
+            } > review.md
+          fi
+
+      - name: Post review as PR comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          {
+            echo "🤖 Codex review (gpt-5-codex, effort=high)"
+            echo ""
+            cat review.md
+          } | gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file -
+{% endraw %}

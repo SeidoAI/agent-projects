@@ -36,7 +36,7 @@ def _ws(**kw) -> WatchedSession:
         "code_branch": "feat/s1",
         "code_pr_number": 42,
         "code_pr_opened_at": datetime(2026, 4, 25, 12, 0, tzinfo=timezone.utc),
-        "pt_repo": "SeidoAI/tripwire-v0",
+        "pt_repo": "ExampleOrg/example-project",
         "pt_branch": "proj/s1",
         "pt_pr_number": None,
         "required_artifacts": [
@@ -192,7 +192,7 @@ def test_pt_pr_missing_artifact_emits_comment_and_reengage():
     assert len(comments) == 1
     assert "sessions/s1/insights.yaml" in comments[0].body
     assert comments[0].pr_number == 99
-    assert comments[0].repo == "SeidoAI/tripwire-v0"
+    assert comments[0].repo == "ExampleOrg/example-project"
     assert any(isinstance(a, ReengageAgent) for a in actions)
 
 

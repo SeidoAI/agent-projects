@@ -6,7 +6,7 @@ import pytest
 def test_registry_has_subprocess_and_manual():
     from tripwire.runtimes import RUNTIMES
 
-    assert "subprocess" in RUNTIMES
+    assert "claude" in RUNTIMES
     assert "manual" in RUNTIMES
 
 
@@ -16,7 +16,7 @@ def test_get_runtime_unknown_raises_with_valid_options():
     with pytest.raises(ValueError) as exc_info:
         get_runtime("tmux")
     assert "tmux" in str(exc_info.value)
-    assert "subprocess" in str(exc_info.value)
+    assert "claude" in str(exc_info.value)
     assert "manual" in str(exc_info.value)
 
 

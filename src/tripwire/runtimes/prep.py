@@ -384,6 +384,39 @@ def _skills_hash(skill_names: list[str]) -> str:
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 
+def inline_skills_for_codex(skill_names: list[str]) -> str:
+    """Concatenate named skills' SKILL.md content into a single block.
+
+    Codex sessions don't have a ``.claude/skills`` discovery mechanism;
+    the agent only sees what's in the prompt. This helper reads each
+    declared skill from ``tripwire.templates.skills.<name>/SKILL.md``
+    and returns a markdown block prefixed with ``## Skills`` so the
+    prep step can prepend it to the rendered ``{plan}`` prompt.
+
+    Empty input → empty string (no header). Unknown skill names are
+    silently dropped — copy_skills is the source of truth for skill
+    existence and would have raised earlier in the prep pipeline; we
+    don't double-validate here so re-prep cycles stay idempotent.
+    """
+    if not skill_names:
+        return ""
+    source_root = files("tripwire.templates.skills")
+    chunks: list[str] = ["## Skills", ""]
+    found_any = False
+    for name in skill_names:
+        skill_md = source_root / name / "SKILL.md"
+        if not skill_md.is_file():
+            continue
+        found_any = True
+        chunks.append(f"### {name}")
+        chunks.append("")
+        chunks.append(skill_md.read_text(encoding="utf-8"))
+        chunks.append("")
+    if not found_any:
+        return ""
+    return "\n".join(chunks)
+
+
 def copy_skills(*, worktree: Path, skill_names: list[str]) -> None:
     """Copy each named skill from tripwire.templates.skills into
     <worktree>/.claude/skills/<name>/.
@@ -765,6 +798,15 @@ def run(
             session_name=session.name,
             branch_type=branch_type,
         )
+
+    # KUI-94 skill-inlining: codex has no `.claude/skills/` discovery,
+    # so the prompt is the only channel for skill content. Prepend a
+    # `## Skills` block when the agent declares skills and the resolved
+    # provider is codex.
+    if resolved.config.provider == "codex" and skill_names:
+        skills_block = inline_skills_for_codex(skill_names)
+        if skills_block:
+            prompt = f"{skills_block}\n\n---\n\n{prompt}"
 
     system_append = render_system_append(
         resolved,

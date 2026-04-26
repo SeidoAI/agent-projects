@@ -164,9 +164,9 @@ def test_build_claude_args_resume_false_uses_session_id():
 # -------- runtime field (T1) --------
 
 
-def test_runtime_defaults_to_subprocess(tmp_path_project):
+def test_runtime_defaults_to_claude(tmp_path_project):
     resolved = load_resolved_spawn_config(tmp_path_project)
-    assert resolved.invocation.runtime == "subprocess"
+    assert resolved.invocation.runtime == "claude"
 
 
 def test_runtime_session_override_beats_default(tmp_path_project, save_test_session):

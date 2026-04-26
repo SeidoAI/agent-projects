@@ -248,6 +248,6 @@ class TestSpawnRuntimeDispatch:
 
         assert result.exit_code == 0, result.output
         s = load_session(tmp_path_project, "s1")
-        # Default runtime is subprocess — pid populated, no tmux field.
+        # Default runtime is claude — pid populated, no tmux field.
         assert s.runtime_state.pid is not None
         assert s.runtime_state.log_path is not None

@@ -2,7 +2,7 @@
 id: frontend-coder
 name: "Frontend Coding Agent"
 description: "Implements frontend issues in TypeScript/React repos"
-runtime: claude-code
+runtime: claude
 skill: frontend-development
 
 github_identity:

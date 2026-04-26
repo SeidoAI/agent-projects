@@ -1,4 +1,4 @@
-"""Tests for SubprocessRuntime."""
+"""Tests for ClaudeRuntime."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from tripwire.models.session import (
     WorktreeEntry,
 )
 from tripwire.models.spawn import SpawnDefaults
-from tripwire.runtimes import SubprocessRuntime
+from tripwire.runtimes import ClaudeRuntime
 from tripwire.runtimes.base import (
     AttachExec,
     AttachInstruction,
@@ -55,7 +55,7 @@ def _prepped(tmp_path: Path, *, resume: bool = False) -> PreppedSession:
 
 
 def test_validate_environment_is_noop():
-    SubprocessRuntime().validate_environment()
+    ClaudeRuntime().validate_environment()
 
 
 def test_start_invokes_popen_with_expected_argv(tmp_path):
@@ -65,11 +65,11 @@ def test_start_invokes_popen_with_expected_argv(tmp_path):
 
     with (
         patch(
-            "tripwire.runtimes.subprocess._sp.Popen", return_value=fake_proc
+            "tripwire.runtimes.claude._sp.Popen", return_value=fake_proc
         ) as mock_popen,
-        patch("tripwire.runtimes.subprocess.spawn_monitor_runner", return_value=None),
+        patch("tripwire.runtimes.claude.spawn_monitor_runner", return_value=None),
     ):
-        result = SubprocessRuntime().start(prepped)
+        result = ClaudeRuntime().start(prepped)
 
     mock_popen.assert_called_once()
     argv = mock_popen.call_args[0][0]
@@ -99,11 +99,11 @@ def test_start_with_resume_uses_resume_flag_not_session_id(tmp_path):
 
     with (
         patch(
-            "tripwire.runtimes.subprocess._sp.Popen", return_value=fake_proc
+            "tripwire.runtimes.claude._sp.Popen", return_value=fake_proc
         ) as mock_popen,
-        patch("tripwire.runtimes.subprocess.spawn_monitor_runner", return_value=None),
+        patch("tripwire.runtimes.claude.spawn_monitor_runner", return_value=None),
     ):
-        SubprocessRuntime().start(prepped)
+        ClaudeRuntime().start(prepped)
 
     argv = mock_popen.call_args[0][0]
     assert "--resume" in argv
@@ -120,13 +120,13 @@ def test_start_spawns_monitor_runner_with_agent_pid(tmp_path):
     fake_proc.pid = 4242
 
     with (
-        patch("tripwire.runtimes.subprocess._sp.Popen", return_value=fake_proc),
+        patch("tripwire.runtimes.claude._sp.Popen", return_value=fake_proc),
         patch(
-            "tripwire.runtimes.subprocess.spawn_monitor_runner",
+            "tripwire.runtimes.claude.spawn_monitor_runner",
             return_value=9999,
         ) as mock_spawn_monitor,
     ):
-        SubprocessRuntime().start(prepped)
+        ClaudeRuntime().start(prepped)
 
     assert mock_spawn_monitor.called
     cfg = mock_spawn_monitor.call_args.kwargs.get("cfg") or (
@@ -146,13 +146,13 @@ def test_start_skips_monitor_when_disabled_in_invocation(tmp_path):
     fake_proc = MagicMock()
     fake_proc.pid = 1
     with (
-        patch("tripwire.runtimes.subprocess._sp.Popen", return_value=fake_proc),
+        patch("tripwire.runtimes.claude._sp.Popen", return_value=fake_proc),
         patch(
-            "tripwire.runtimes.subprocess.spawn_monitor_runner",
+            "tripwire.runtimes.claude.spawn_monitor_runner",
             return_value=None,
         ) as mock_spawn_monitor,
     ):
-        SubprocessRuntime().start(prepped)
+        ClaudeRuntime().start(prepped)
     assert not mock_spawn_monitor.called
 
 
@@ -168,13 +168,13 @@ def test_pause_sigterms_live_pid(tmp_path):
     # dead → return cleanly.
     with (
         patch(
-            "tripwire.runtimes.subprocess.is_alive",
+            "tripwire.runtimes.claude.is_alive",
             side_effect=[True, False],
         ),
-        patch("tripwire.runtimes.subprocess.send_sigterm") as mock_sigterm,
-        patch("tripwire.runtimes.subprocess.time.sleep"),
+        patch("tripwire.runtimes.claude.send_sigterm") as mock_sigterm,
+        patch("tripwire.runtimes.claude.time.sleep"),
     ):
-        SubprocessRuntime().pause(session)
+        ClaudeRuntime().pause(session)
 
     mock_sigterm.assert_called_once_with(999)
 
@@ -187,10 +187,10 @@ def test_pause_noop_on_dead_pid():
         runtime_state=RuntimeState(pid=999, claude_session_id="uuid-1"),
     )
     with (
-        patch("tripwire.runtimes.subprocess.is_alive", return_value=False),
-        patch("tripwire.runtimes.subprocess.send_sigterm") as mock_sigterm,
+        patch("tripwire.runtimes.claude.is_alive", return_value=False),
+        patch("tripwire.runtimes.claude.send_sigterm") as mock_sigterm,
     ):
-        SubprocessRuntime().pause(session)
+        ClaudeRuntime().pause(session)
 
     mock_sigterm.assert_not_called()
 
@@ -209,13 +209,13 @@ def test_pause_waits_for_exit():
     alive_iter = iter([True, True, True, False])
     with (
         patch(
-            "tripwire.runtimes.subprocess.is_alive",
+            "tripwire.runtimes.claude.is_alive",
             side_effect=lambda _pid: next(alive_iter),
         ),
-        patch("tripwire.runtimes.subprocess.send_sigterm"),
-        patch("tripwire.runtimes.subprocess.time.sleep") as mock_sleep,
+        patch("tripwire.runtimes.claude.send_sigterm"),
+        patch("tripwire.runtimes.claude.time.sleep") as mock_sleep,
     ):
-        SubprocessRuntime().pause(session)
+        ClaudeRuntime().pause(session)
 
     # Two sleeps between the three "alive" poll responses — proves the
     # loop actually polls rather than returning immediately after SIGTERM.
@@ -238,16 +238,16 @@ def test_pause_raises_when_sigterm_ignored():
     # past the 2s window so the loop exits with the process still alive.
     times = iter([0.0, 0.1, 3.0, 3.0])
     with (
-        patch("tripwire.runtimes.subprocess.is_alive", return_value=True),
-        patch("tripwire.runtimes.subprocess.send_sigterm"),
-        patch("tripwire.runtimes.subprocess.time.sleep"),
+        patch("tripwire.runtimes.claude.is_alive", return_value=True),
+        patch("tripwire.runtimes.claude.send_sigterm"),
+        patch("tripwire.runtimes.claude.time.sleep"),
         patch(
-            "tripwire.runtimes.subprocess.time.monotonic",
+            "tripwire.runtimes.claude.time.monotonic",
             side_effect=lambda: next(times),
         ),
     ):
         with _pytest.raises(RuntimeError, match="SIGTERM not honoured"):
-            SubprocessRuntime().pause(session)
+            ClaudeRuntime().pause(session)
 
 
 def test_status_reflects_is_alive():
@@ -257,16 +257,16 @@ def test_status_reflects_is_alive():
         agent="a",
         runtime_state=RuntimeState(pid=999, claude_session_id="uuid-1"),
     )
-    with patch("tripwire.runtimes.subprocess.is_alive", return_value=True):
-        assert SubprocessRuntime().status(session) == "running"
+    with patch("tripwire.runtimes.claude.is_alive", return_value=True):
+        assert ClaudeRuntime().status(session) == "running"
 
-    with patch("tripwire.runtimes.subprocess.is_alive", return_value=False):
-        assert SubprocessRuntime().status(session) == "exited"
+    with patch("tripwire.runtimes.claude.is_alive", return_value=False):
+        assert ClaudeRuntime().status(session) == "exited"
 
 
 def test_status_unknown_when_no_pid():
     session = AgentSession(id="s1", name="t", agent="a")
-    assert SubprocessRuntime().status(session) == "unknown"
+    assert ClaudeRuntime().status(session) == "unknown"
 
 
 def test_abandon_sigkills_stubborn_process():
@@ -278,12 +278,12 @@ def test_abandon_sigkills_stubborn_process():
     )
     # is_alive returns True the whole way → forces the SIGKILL branch.
     with (
-        patch("tripwire.runtimes.subprocess.is_alive", return_value=True),
-        patch("tripwire.runtimes.subprocess.send_sigterm"),
-        patch("tripwire.runtimes.subprocess.time.sleep"),
+        patch("tripwire.runtimes.claude.is_alive", return_value=True),
+        patch("tripwire.runtimes.claude.send_sigterm"),
+        patch("tripwire.runtimes.claude.time.sleep"),
         patch("os.kill") as mock_os_kill,
     ):
-        SubprocessRuntime().abandon(session)
+        ClaudeRuntime().abandon(session)
 
     mock_os_kill.assert_called_once()
     import signal
@@ -310,7 +310,7 @@ def test_attach_command_returns_tail_f_on_log():
         ),
     )
 
-    cmd = SubprocessRuntime().attach_command(session)
+    cmd = ClaudeRuntime().attach_command(session)
 
     assert isinstance(cmd, AttachExec)
     assert cmd.argv == ["tail", "-f", "/tmp/tripwire-logs/s1-xyz.log"]
@@ -318,7 +318,7 @@ def test_attach_command_returns_tail_f_on_log():
 
 def test_attach_command_returns_instruction_when_no_log_path():
     session = AgentSession(id="s1", name="t", agent="a")
-    cmd = SubprocessRuntime().attach_command(session)
+    cmd = ClaudeRuntime().attach_command(session)
     assert isinstance(cmd, AttachInstruction)
     assert (
         "never spawned" in cmd.message.lower() or "no log_path" in cmd.message.lower()

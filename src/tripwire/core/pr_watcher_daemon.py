@@ -45,7 +45,19 @@ from tripwire.core.session_store import list_sessions
 logger = logging.getLogger(__name__)
 
 
-_ACTIVE_STATUSES = {"executing", "paused"}
+# Statuses the watch daemon polls. Includes inactive ones (in_review,
+# verified, completed, done) so the v0.7.10 §B2 post-merge CI failure
+# tripwire can re-engage agents whose merge regressed CI on main. The
+# other tripwires are guarded by their own conditions (#15 only fires
+# on open PRs, #17 only on executing) so widening the set here is safe.
+_ACTIVE_STATUSES = {
+    "executing",
+    "paused",
+    "in_review",
+    "verified",
+    "completed",
+    "done",
+}
 
 
 @dataclass

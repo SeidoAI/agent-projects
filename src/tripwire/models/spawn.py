@@ -17,7 +17,14 @@ class SpawnInvocation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     command: str = "claude"
-    runtime: Literal["subprocess", "manual"] = "subprocess"
+    runtime: Literal["claude", "codex", "manual"] = "claude"
+    # Sandbox policy passed to `codex exec --sandbox …`. Ignored by the
+    # claude runtime. read-only is the safe default for review-class
+    # codex sessions; danger-full-access is required for codex sessions
+    # that need to write files (planning sessions, eventual code work).
+    codex_sandbox: Literal["read-only", "workspace-write", "danger-full-access"] = (
+        "read-only"
+    )
     background: bool = True
     log_path_template: str = (
         "~/.tripwire/logs/{project_slug}/{session_id}-{timestamp}.log"
@@ -35,6 +42,11 @@ class SpawnInvocation(BaseModel):
 class SpawnConfigValues(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    # The model provider. claude=Anthropic CLI, codex=OpenAI Codex CLI.
+    # Drives provider-aware validation in spawn_config (warn-and-drop on
+    # claude-only flags for codex sessions); the actual runtime dispatch
+    # is by `invocation.runtime` (a parallel single-axis field).
+    provider: Literal["claude", "codex"] = "claude"
     model: str = "opus"
     fallback_model: str = "sonnet"
     effort: str = "xhigh"
@@ -49,6 +61,10 @@ class SpawnConfigValues(BaseModel):
     max_turns: int = 200
     max_budget_usd: int = 100
     output_format: str = "stream-json"
+    # v0.7.10 §3.A2 — pick a route from `templates/spawn/routing.yaml`.
+    # Empty string falls back to the routing table's `default:` route
+    # (`agentic_loop` ⇒ opus xhigh, matching the existing baseline).
+    task_kind: str = ""
 
 
 class SpawnDefaults(BaseModel):

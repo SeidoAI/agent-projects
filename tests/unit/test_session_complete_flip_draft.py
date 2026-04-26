@@ -54,7 +54,7 @@ class TestFlipDraftsToReady:
                     "draft_pr_url": "https://github.com/test/code/pull/10",
                 },
                 {
-                    "repo": "tripwire-v0",
+                    "repo": "example-project",
                     "clone_path": str(tmp_path / "proj"),
                     "worktree_path": str(tmp_path / "proj-wt-s1"),
                     "branch": "proj/s1",
@@ -150,7 +150,7 @@ class TestFlipDraftsToReady:
                     "draft_pr_url": "https://github.com/test/code/pull/10",
                 },
                 {
-                    "repo": "tripwire-v0",
+                    "repo": "example-project",
                     "clone_path": str(tmp_path / "proj"),
                     "worktree_path": str(tmp_path / "proj-wt-s1"),
                     "branch": "proj/s1",

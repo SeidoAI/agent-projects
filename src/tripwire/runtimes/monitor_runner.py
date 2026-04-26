@@ -1,6 +1,6 @@
 """Long-lived monitor process runner.
 
-Spawned by :class:`SubprocessRuntime` as a detached subprocess so the
+Spawned by :class:`ClaudeRuntime` (and :class:`CodexRuntime`) as a detached subprocess so the
 in-flight monitor outlives the CLI invocation that launched the
 agent. Owns:
 

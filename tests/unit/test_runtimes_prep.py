@@ -631,13 +631,13 @@ class TestResolveWorktreesResume:
 
 class TestBuildClaudeArgsResumePropagation:
     def test_subprocess_runtime_passes_resume_flag(self, tmp_path):
-        """SubprocessRuntime.start must thread resume through
+        """ClaudeRuntime.start must thread resume through
         build_claude_args so claude -p --resume <uuid> is invoked."""
         from unittest.mock import MagicMock
 
         from tripwire.models.session import AgentSession, WorktreeEntry
         from tripwire.models.spawn import SpawnDefaults
-        from tripwire.runtimes import SubprocessRuntime
+        from tripwire.runtimes import ClaudeRuntime
         from tripwire.runtimes.base import PreppedSession
 
         wt_dir = tmp_path / "wt"
@@ -677,14 +677,14 @@ class TestBuildClaudeArgsResumePropagation:
         fake_proc.pid = 12345
         with (
             patch(
-                "tripwire.runtimes.subprocess._sp.Popen", return_value=fake_proc
+                "tripwire.runtimes.claude._sp.Popen", return_value=fake_proc
             ) as mock_popen,
             patch(
-                "tripwire.runtimes.subprocess.spawn_monitor_runner",
+                "tripwire.runtimes.claude.spawn_monitor_runner",
                 return_value=None,
             ),
         ):
-            SubprocessRuntime().start(prepped)
+            ClaudeRuntime().start(prepped)
 
         argv = mock_popen.call_args[0][0]
         assert "--resume" in argv

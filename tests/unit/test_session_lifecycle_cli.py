@@ -430,7 +430,7 @@ class TestSessionPauseDispatch:
                 tmp_path_project,
                 "s1",
                 status="executing",
-                spawn_config={"invocation": {"runtime": "subprocess"}},
+                spawn_config={"invocation": {"runtime": "claude"}},
                 runtime_state={
                     "claude_session_id": "uuid-1",
                     "pid": proc.pid,
@@ -462,7 +462,7 @@ class TestSessionAbandonDispatch:
                 tmp_path_project,
                 "s1",
                 status="executing",
-                spawn_config={"invocation": {"runtime": "subprocess"}},
+                spawn_config={"invocation": {"runtime": "claude"}},
                 runtime_state={
                     "claude_session_id": "uuid-1",
                     "pid": proc.pid,
@@ -555,7 +555,7 @@ class TestCleanupKillsRuntime:
                 tmp_path_project,
                 "s1",
                 status="completed",
-                spawn_config={"invocation": {"runtime": "subprocess"}},
+                spawn_config={"invocation": {"runtime": "claude"}},
                 runtime_state={
                     "claude_session_id": "uuid-1",
                     "pid": proc.pid,

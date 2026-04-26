@@ -45,7 +45,7 @@ class TestSessionAttach:
             tmp_path_project,
             "s1",
             status="executing",
-            spawn_config={"invocation": {"runtime": "subprocess"}},
+            spawn_config={"invocation": {"runtime": "claude"}},
             runtime_state={
                 "claude_session_id": "uuid-1",
                 "log_path": "/tmp/tripwire/s1-xyz.log",
@@ -90,7 +90,7 @@ class TestSessionAttach:
             tmp_path_project,
             "s1",
             status="executing",
-            spawn_config={"invocation": {"runtime": "subprocess"}},
+            spawn_config={"invocation": {"runtime": "claude"}},
             runtime_state={"claude_session_id": "uuid-1"},
         )
 

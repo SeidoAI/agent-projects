@@ -2,7 +2,7 @@
 id: pm
 name: "Project Manager Agent"
 description: "Orchestrates coding agents, reviews project-repo PRs, maintains the concept graph"
-runtime: claude-code
+runtime: claude
 skill: project-manager
 
 github_identity:

@@ -37,67 +37,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml
+from tripwire.core.session_cost import cost_for_usage as _cost_for_usage
 
 logger = logging.getLogger(__name__)
-
-
-# ---------- Pricing ------------------------------------------------------
-
-
-_PRICING_PATH = Path(__file__).parent.parent / "data" / "anthropic_pricing.yaml"
-
-
-@dataclass(frozen=True)
-class _ModelRates:
-    input: float
-    output: float
-    cache_read: float
-    cache_write: float
-
-
-_pricing_cache: dict[str, _ModelRates] | None = None
-_default_rates_cache: _ModelRates | None = None
-
-
-def _load_pricing() -> tuple[dict[str, _ModelRates], _ModelRates]:
-    """Read ``anthropic_pricing.yaml`` once and memoise."""
-    global _pricing_cache, _default_rates_cache
-    if _pricing_cache is not None and _default_rates_cache is not None:
-        return _pricing_cache, _default_rates_cache
-    raw = yaml.safe_load(_PRICING_PATH.read_text(encoding="utf-8"))
-    models = {
-        name: _ModelRates(**rates) for name, rates in (raw.get("models") or {}).items()
-    }
-    default = _ModelRates(**raw["default"])
-    _pricing_cache = models
-    _default_rates_cache = default
-    return models, default
-
-
-def _rate_for(model_name: str) -> _ModelRates:
-    """Pick the longest-key prefix match for ``model_name``, else default."""
-    models, default = _load_pricing()
-    matches = [k for k in models if k in model_name]
-    if not matches:
-        return default
-    best = max(matches, key=len)
-    return models[best]
-
-
-def _cost_for_usage(model_name: str, usage: dict[str, Any]) -> float:
-    """Compute USD cost for a single ``usage`` payload."""
-    rates = _rate_for(model_name)
-    inp = int(usage.get("input_tokens") or 0)
-    out = int(usage.get("output_tokens") or 0)
-    crd = int(usage.get("cache_read_input_tokens") or 0)
-    cwr = int(usage.get("cache_creation_input_tokens") or 0)
-    return (
-        inp * rates.input
-        + out * rates.output
-        + crd * rates.cache_read
-        + cwr * rates.cache_write
-    ) / 1_000_000
 
 
 # ---------- Action types --------------------------------------------------
@@ -136,7 +78,48 @@ class InjectFollowUp:
     target: str = "plan.md"
 
 
-MonitorAction = LogWarning | SigtermProcess | TransitionStatus | InjectFollowUp
+@dataclass
+class SuspendProcess:
+    """Freeze the agent process via SIGSTOP — used during CI-wait
+    (v0.7.10 §B4) so token-burn drops to ~0 while the agent polls a
+    PR's CI status.
+
+    The executor SIGSTOPs the pid, schedules a defensive 30-min
+    SIGCONT timer, and (when ``pr_number`` is set) starts a daemon
+    poll thread that runs ``gh pr view <num> --json statusCheckRollup``
+    every 30s and SIGCONTs the moment all checks are completed. The
+    poll thread runs from ``code_worktree`` so ``gh`` inherits the
+    agent's git remote without needing a ``--repo`` flag.
+
+    ``pr_number=None`` means the bash command was a CI-poll but the
+    PR number couldn't be parsed (shell variable, unusual quoting);
+    in that case the defensive 30-min timer is the only resume path.
+    """
+
+    tripwire_id: str
+    pid: int
+    reason: str
+    pr_number: int | None = None
+    code_worktree: Path | None = None
+
+
+@dataclass
+class ResumeProcess:
+    """Wake a SIGSTOP-frozen agent process via SIGCONT."""
+
+    tripwire_id: str
+    pid: int
+    reason: str
+
+
+MonitorAction = (
+    LogWarning
+    | SigtermProcess
+    | TransitionStatus
+    | InjectFollowUp
+    | SuspendProcess
+    | ResumeProcess
+)
 
 
 # ---------- Context -------------------------------------------------------
@@ -273,6 +256,10 @@ class RuntimeMonitor:
         self._final_text = ""
         self._session_complete_text_seen = False
         self._quota_error_fired = False
+        # B4 — CI-wait suspend dedup: re-firing while suspended races
+        # against the resume side and re-suspends an already-frozen
+        # pid. One Suspend per cycle.
+        self._suspended_pending = False
 
     # --- public surface -------------------------------------------------
 
@@ -337,6 +324,9 @@ class RuntimeMonitor:
         # #10 — `gh pr create` from code worktree
         if cmd and self._is_pr_create(cmd):
             self._check_code_pr_no_pt(actions)
+        # B4 — CI-wait suspend
+        if cmd and self._is_ci_poll(cmd):
+            self._maybe_fire_ci_wait_suspend(cmd, actions)
 
     def _handle_user(self, event: dict[str, Any], actions: list[MonitorAction]) -> None:
         message = event.get("message") or {}
@@ -538,6 +528,63 @@ class RuntimeMonitor:
         return "gh pr create" in cmd
 
     @staticmethod
+    def _is_ci_poll(cmd: str) -> bool:
+        """True if ``cmd`` is one of the CI-wait poll variants from §B1.
+
+        Two shapes the spawn template supports:
+          - ``gh pr checks <num> --watch`` (single blocking poll)
+          - ``gh pr view <num> --json statusCheckRollup`` (loop variant
+            with ``sleep 30`` between iterations)
+
+        ``gh pr view --json title`` and similar non-CI uses must NOT
+        match — only the statusCheckRollup form indicates CI-wait.
+        """
+        if "gh pr checks" in cmd and "--watch" in cmd:
+            return True
+        if "gh pr view" in cmd and "statusCheckRollup" in cmd:
+            return True
+        return False
+
+    @staticmethod
+    def _extract_pr_number(cmd: str) -> int | None:
+        """Pull the PR number out of a `gh pr checks|view <num> ...` command.
+
+        Returns the first all-digits token following ``checks`` or
+        ``view``. Returns ``None`` if the number is a shell variable
+        or otherwise unparseable — the executor falls back to the
+        defensive 30-min timer in that case.
+        """
+        tokens = cmd.split()
+        for keyword in ("checks", "view"):
+            try:
+                idx = tokens.index(keyword)
+            except ValueError:
+                continue
+            if idx + 1 < len(tokens) and tokens[idx + 1].isdigit():
+                return int(tokens[idx + 1])
+        return None
+
+    def _maybe_fire_ci_wait_suspend(
+        self, cmd: str, actions: list[MonitorAction]
+    ) -> None:
+        if self._suspended_pending:
+            return
+        self._suspended_pending = True
+        actions.append(
+            SuspendProcess(
+                tripwire_id="monitor/ci_wait_suspend",
+                pid=self.ctx.pid,
+                reason=(
+                    "Agent entered CI-wait poll (§B1). SIGSTOP'ing to "
+                    "drop token-burn to ~0; GH-polling resume + "
+                    "defensive 30-min SIGCONT scheduled by the executor."
+                ),
+                pr_number=self._extract_pr_number(cmd),
+                code_worktree=self.ctx.code_worktree,
+            )
+        )
+
+    @staticmethod
     def _stringify_tool_result(content: Any) -> str:
         if content is None:
             return ""
@@ -661,7 +708,9 @@ __all__ = [
     "MonitorAction",
     "MonitorContext",
     "MonitorThread",
+    "ResumeProcess",
     "RuntimeMonitor",
     "SigtermProcess",
+    "SuspendProcess",
     "TransitionStatus",
 ]

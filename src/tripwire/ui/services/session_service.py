@@ -65,6 +65,9 @@ class SessionSummary(BaseModel):
     current_state: str | None = None
     re_engagement_count: int = 0
     task_progress: TaskProgress = Field(default_factory=TaskProgress)
+    # KUI-96 §E2 — running session cost in USD. 0.0 for sessions that
+    # have never spawned (no recorded ``runtime_state.log_path``).
+    cost_usd: float = 0.0
 
 
 class SessionDetail(SessionSummary):
@@ -156,6 +159,25 @@ def _flatten_repo(repo: CoreRepoBinding) -> RepoBinding:
     )
 
 
+def _session_cost_usd(session: AgentSession) -> float:
+    """Compute total USD spend for a session by walking its persisted log.
+
+    Returns 0.0 when no ``runtime_state.log_path`` is recorded — useful
+    for newly-scoped or freshly-cleaned-up sessions. Errors are not
+    propagated; the UI grid should not 500 on a corrupt log line.
+    """
+    log_path_str = session.runtime_state.log_path
+    if not log_path_str:
+        return 0.0
+    from tripwire.core.session_cost import compute_cost_from_log
+
+    try:
+        return compute_cost_from_log(Path(log_path_str).expanduser()).total_usd
+    except OSError as exc:
+        logger.warning("session_cost: log read failed for %s: %s", session.id, exc)
+        return 0.0
+
+
 def _build_summary(
     project_dir: Path,
     session: AgentSession,
@@ -172,6 +194,7 @@ def _build_summary(
         current_state=session.current_state,
         re_engagement_count=max(len(session.engagements) - 1, 0),
         task_progress=_read_task_progress(project_dir, session.id),
+        cost_usd=_session_cost_usd(session),
     )
 
 

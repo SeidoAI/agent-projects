@@ -189,7 +189,7 @@ def test_post_pr_watcher_e2e_reengages_on_missing_pt_pr_after_10_min(
     with (
         patch(
             "tripwire.core.pr_watcher_daemon._project_repo_slug",
-            return_value="SeidoAI/tripwire-v0",
+            return_value="ExampleOrg/example-project",
         ),
         patch("tripwire.core.pr_watcher_executor.subprocess.run") as mock_run,
     ):

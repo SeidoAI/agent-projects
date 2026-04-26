@@ -1,6 +1,6 @@
 """SessionRuntime protocol and shared types.
 
-Each runtime implementation (subprocess, manual, future: container) owns
+Each runtime implementation (claude, codex, manual, future: container) owns
 the lifecycle for one session: start, pause, abandon, status, attach.
 The prep pipeline runs before ``start`` and is runtime-agnostic.
 """

@@ -51,7 +51,7 @@ def test_build_watched_sessions_filters_inactive(project: Path, save_test_sessio
     )
     with patch(
         "tripwire.core.pr_watcher_daemon._project_repo_slug",
-        return_value="SeidoAI/tripwire-v0",
+        return_value="ExampleOrg/example-project",
     ):
         sessions = build_watched_sessions(project)
     ids = {ws.session_id for ws in sessions}
@@ -61,7 +61,7 @@ def test_build_watched_sessions_filters_inactive(project: Path, save_test_sessio
     assert s.code_repo == "SeidoAI/code"
     assert s.code_pr_number == 42
     assert s.code_branch == "feat/s_active"
-    assert s.pt_repo == "SeidoAI/tripwire-v0"
+    assert s.pt_repo == "ExampleOrg/example-project"
     assert s.pt_branch == "proj/s_active"
     # required_artifacts populated from project.yaml manifest, prefixed
     # with the session-specific path so file-list comparisons work.
@@ -118,7 +118,7 @@ def test_daemon_one_tick_invokes_watcher_and_executor(project: Path, save_test_s
 
     with patch(
         "tripwire.core.pr_watcher_daemon._project_repo_slug",
-        return_value="SeidoAI/tripwire-v0",
+        return_value="ExampleOrg/example-project",
     ):
         daemon.tick(now=datetime.now(tz=timezone.utc))
 
@@ -139,7 +139,7 @@ def test_daemon_run_forever_respects_stop_event(project: Path):
     stopper.start()
     with patch(
         "tripwire.core.pr_watcher_daemon._project_repo_slug",
-        return_value="SeidoAI/tripwire-v0",
+        return_value="ExampleOrg/example-project",
     ):
         daemon.run_forever()
     stopper.cancel()

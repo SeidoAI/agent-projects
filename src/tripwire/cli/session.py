@@ -25,6 +25,7 @@ import subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
@@ -58,6 +59,8 @@ class SessionSummary:
     status: str
     issue_count: int
     repo_count: int
+    cost_usd: float = 0.0
+    over_budget: bool = False
 
 
 @click.group(name="session")
@@ -81,21 +84,32 @@ def session_cmd() -> None:
 )
 def session_list_cmd(project_dir: Path, output_format: str) -> None:
     """List every session in the project."""
+    from tripwire.core.session_cost import compute_cost_from_log
+
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
     sessions = list_sessions(resolved)
-    summaries = [
-        SessionSummary(
-            id=s.id,
-            name=s.name,
-            agent=s.agent,
-            status=s.status,
-            issue_count=len(s.issues),
-            repo_count=len(s.repos),
+    summaries: list[SessionSummary] = []
+    for s in sessions:
+        # KUI-96 §E2 — cost column. Walk the persisted log if any; a
+        # session that never spawned has no log_path → zero cost.
+        log_path_str = s.runtime_state.log_path
+        cost = 0.0
+        if log_path_str:
+            cost = compute_cost_from_log(Path(log_path_str).expanduser()).total_usd
+        summaries.append(
+            SessionSummary(
+                id=s.id,
+                name=s.name,
+                agent=s.agent,
+                status=s.status,
+                issue_count=len(s.issues),
+                repo_count=len(s.repos),
+                cost_usd=cost,
+                over_budget=s.runtime_state.cost_overrun_at is not None,
+            )
         )
-        for s in sessions
-    ]
 
     if output_format == "json":
         click.echo(json.dumps([asdict(s) for s in summaries], indent=2))
@@ -112,14 +126,20 @@ def session_list_cmd(project_dir: Path, output_format: str) -> None:
     table.add_column("status")
     table.add_column("issues", justify="right")
     table.add_column("repos", justify="right")
+    table.add_column("cost", justify="right")
     for s in summaries:
+        # v0.7.10 §3.A4 — flag budget-driven pauses next to status so a
+        # human reading `session list` can tell apart manual pauses
+        # from monitor-driven cost-overrun pauses.
+        status_cell = f"{s.status} (over budget)" if s.over_budget else s.status
         table.add_row(
             s.id,
             s.name,
             s.agent,
-            s.status,
+            status_cell,
             str(s.issue_count),
             str(s.repo_count),
+            f"${s.cost_usd:.4f}" if s.cost_usd else "—",
         )
     console.print(table)
 
@@ -174,6 +194,23 @@ def session_show_cmd(
 
     yaml_path = session_yaml_path(resolved, session_id)
     click.echo(yaml_path.read_text(encoding="utf-8"))
+
+    # v0.7.10 §3.A2 — show the resolved (provider, model, effort) so a
+    # human can confirm the route before launch.
+    from tripwire.core.spawn_config import load_resolved_spawn_config
+    from tripwire.core.spawn_routing import UnknownTaskKindError, resolve_route
+
+    spawn_defaults = load_resolved_spawn_config(resolved, session=session)
+    task_kind = spawn_defaults.config.task_kind
+    click.echo("Routing:")
+    try:
+        route = resolve_route(task_kind, resolved)
+        click.echo(f"  task_kind: {route.task_kind}")
+        click.echo(f"  provider: {route.provider}")
+        click.echo(f"  model: {route.model}")
+        click.echo(f"  effort: {route.effort}")
+    except UnknownTaskKindError as exc:
+        click.echo(f"  task_kind: {task_kind!r} — UNKNOWN ({exc})")
 
     sdir = resolved / "sessions" / session_id
     sr_path = sdir / "self-review.md"
@@ -637,6 +674,62 @@ def session_spawn_cmd(
         click.echo(f"  Log: {start_result.log_path}")
         click.echo(f"\n  tripwire session attach {session_id}")
     click.echo(f"  Claude session: {start_result.claude_session_id}")
+
+
+@session_cmd.command("batch-spawn")
+@click.argument("session_ids", nargs=-1, required=True)
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+@click.option(
+    "--prime/--no-prime",
+    "prime",
+    default=True,
+    show_default=True,
+    help=(
+        "Send a no-op claude call with shared system content before "
+        "the first spawn so subsequent spawns hit the warm prompt cache."
+    ),
+)
+def session_batch_spawn_cmd(
+    session_ids: tuple[str, ...],
+    project_dir: Path,
+    prime: bool,
+) -> None:
+    """Spawn N sessions in quick succession after priming the prompt cache.
+
+    The shared system content for priming defaults to the project's
+    ``CLAUDE.md``. Batches of one skip priming — the no-op call is not
+    free.
+    """
+    from tripwire.core import batch_spawn as bs
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+
+    report = bs.batch_spawn(
+        resolved,
+        list(session_ids),
+        prime=prime,
+        prime_runner=bs.default_prime_runner,
+        spawn_runner=bs.default_spawn_runner,
+    )
+    if report.primed:
+        click.echo("Cache primed: ✓")
+    elif prime and len(session_ids) > 1:
+        click.echo(
+            "Cache priming was attempted but did not succeed; "
+            "sessions will spawn without warm-cache benefit."
+        )
+    for sid in report.spawned:
+        click.echo(f"Spawned: {sid}")
+    for sid, reason in report.failed:
+        click.echo(f"Failed:  {sid} ({reason})", err=True)
+    if report.failed:
+        raise click.exceptions.Exit(1)
 
 
 @session_cmd.command("attach")
@@ -1469,6 +1562,199 @@ def session_summary_cmd(
         click.echo(_json.dumps(payload, indent=2))
     else:
         click.echo(format_text(summary))
+
+
+@session_cmd.command("cost")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    show_default=True,
+)
+def session_cost_cmd(
+    session_id: str,
+    project_dir: Path,
+    output_format: str,
+) -> None:
+    """Sum the per-token-category cost for a session's stream-json log.
+
+    Pricing comes from ``data/anthropic_pricing.yaml`` (refresh
+    manually). Sessions that have never spawned (no recorded
+    ``runtime_state.log_path``) report a zero breakdown rather than
+    erroring — useful for the ``Cost`` column in ``session list``.
+    """
+    from tripwire.core.session_cost import compute_session_cost
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        breakdown = compute_session_cost(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session '{session_id}' not found") from exc
+
+    if output_format == "json":
+        payload = {"session_id": session_id, **breakdown.as_dict()}
+        click.echo(json.dumps(payload, indent=2))
+        return
+
+    table = Table(title=f"Cost: {session_id}", show_header=True)
+    table.add_column("category")
+    table.add_column("tokens", justify="right")
+    table.add_column("usd", justify="right")
+    rows: list[tuple[str, int, float]] = [
+        ("input", breakdown.input_tokens, breakdown.input_usd),
+        ("output", breakdown.output_tokens, breakdown.output_usd),
+        ("cache_read", breakdown.cache_read_tokens, breakdown.cache_read_usd),
+        ("cache_write", breakdown.cache_write_tokens, breakdown.cache_write_usd),
+    ]
+    for label, tokens, usd in rows:
+        table.add_row(label, f"{tokens:,}", f"${usd:.4f}")
+    table.add_row("[bold]total[/bold]", "", f"[bold]${breakdown.total_usd:.4f}[/bold]")
+    console.print(table)
+    if breakdown.models_used:
+        console.print(f"[dim]models seen: {', '.join(breakdown.models_used)}[/dim]")
+
+
+@session_cmd.command("analyze-routing")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json"]),
+    default="table",
+    show_default=True,
+)
+def session_analyze_routing_cmd(project_dir: Path, output_format: str) -> None:
+    """Aggregate ``.routing_telemetry.jsonl`` rows by (provider, model, effort, task_kind).
+
+    Produces ``$/merged-PR`` per route plus sample size + total cost.
+    Manual interpretation today; auto-tuning the routing table is
+    v0.8 scope. Routes with zero merged sessions report
+    ``cost_per_merged_pr`` as ``null`` rather than infinity so the JSON
+    stays consumable by downstream tools.
+    """
+    from tripwire.core.routing_telemetry import read_telemetry
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+
+    rows = read_telemetry(resolved)
+
+    @dataclass
+    class _RouteAgg:
+        provider: str
+        model: str
+        effort: str
+        task_kind: str | None
+        n: int = 0
+        merged: int = 0
+        total_cost_usd: float = 0.0
+        total_duration_min: int = 0
+        re_engages: int = 0
+        ci_failures: int = 0
+
+    agg: dict[tuple, _RouteAgg] = {}
+    for r in rows:
+        key = (
+            r.get("provider", "claude"),
+            r.get("model", "opus"),
+            r.get("effort", "xhigh"),
+            r.get("task_kind"),
+        )
+        if key not in agg:
+            agg[key] = _RouteAgg(
+                provider=key[0], model=key[1], effort=key[2], task_kind=key[3]
+            )
+        bucket = agg[key]
+        bucket.n += 1
+        if r.get("merged"):
+            bucket.merged += 1
+        bucket.total_cost_usd += float(r.get("cost_usd") or 0.0)
+        bucket.total_duration_min += int(r.get("duration_min") or 0)
+        bucket.re_engages += int(r.get("re_engages") or 0)
+        bucket.ci_failures += int(r.get("ci_failures") or 0)
+
+    routes_payload: list[dict[str, Any]] = []
+    for bucket in agg.values():
+        cost_per_merged = (
+            bucket.total_cost_usd / bucket.merged if bucket.merged else None
+        )
+        routes_payload.append(
+            {
+                "provider": bucket.provider,
+                "model": bucket.model,
+                "effort": bucket.effort,
+                "task_kind": bucket.task_kind,
+                "n": bucket.n,
+                "merged": bucket.merged,
+                "total_cost_usd": round(bucket.total_cost_usd, 4),
+                "cost_per_merged_pr": (
+                    round(cost_per_merged, 4) if cost_per_merged is not None else None
+                ),
+                "avg_duration_min": (
+                    round(bucket.total_duration_min / bucket.n, 1) if bucket.n else 0.0
+                ),
+                "total_re_engages": bucket.re_engages,
+                "total_ci_failures": bucket.ci_failures,
+            }
+        )
+
+    routes_payload.sort(
+        key=lambda x: (x["cost_per_merged_pr"] is None, x["cost_per_merged_pr"] or 0)
+    )
+
+    if output_format == "json":
+        click.echo(
+            json.dumps(
+                {"total_sessions": len(rows), "routes": routes_payload}, indent=2
+            )
+        )
+        return
+
+    if not routes_payload:
+        click.echo("No routing telemetry yet. Run a session through to completion.")
+        return
+
+    table = Table(title="Routing analysis", show_header=True)
+    table.add_column("provider")
+    table.add_column("model")
+    table.add_column("effort")
+    table.add_column("task_kind")
+    table.add_column("n", justify="right")
+    table.add_column("merged", justify="right")
+    table.add_column("$/merged", justify="right")
+    table.add_column("avg dur", justify="right")
+    table.add_column("re-eng", justify="right")
+    for r in routes_payload:
+        table.add_row(
+            r["provider"],
+            r["model"],
+            r["effort"],
+            r["task_kind"] or "—",
+            str(r["n"]),
+            str(r["merged"]),
+            (
+                f"${r['cost_per_merged_pr']:.2f}"
+                if r["cost_per_merged_pr"] is not None
+                else "—"
+            ),
+            f"{r['avg_duration_min']:.1f}m",
+            str(r["total_re_engages"]),
+        )
+    console.print(table)
 
 
 @session_cmd.command("agenda")

@@ -2,7 +2,7 @@
 id: verifier
 name: "Verification Agent"
 description: "Verifies that a coding agent's PR meets every acceptance criterion"
-runtime: claude-code
+runtime: claude
 skill: verification
 
 github_identity:

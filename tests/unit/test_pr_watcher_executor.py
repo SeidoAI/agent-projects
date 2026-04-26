@@ -77,14 +77,14 @@ def test_execute_comment_on_pr_calls_github_api(project: Path):
     with patch("tripwire.core.pr_watcher_executor.post_pr_comment") as mock_post:
         executor.execute(
             CommentOnPR(
-                repo="SeidoAI/tripwire-v0",
+                repo="ExampleOrg/example-project",
                 pr_number=99,
                 tripwire_id="watcher/pt_pr_missing_artifacts",
                 body="missing self-review.md",
             )
         )
     mock_post.assert_called_once_with(
-        "SeidoAI/tripwire-v0",
+        "ExampleOrg/example-project",
         99,
         "missing self-review.md",
         token="ghp_xxx",
@@ -97,7 +97,7 @@ def test_execute_comment_on_pr_skipped_when_no_token(project: Path):
     with patch("tripwire.core.pr_watcher_executor.post_pr_comment") as mock_post:
         executor.execute(
             CommentOnPR(
-                repo="SeidoAI/tripwire-v0",
+                repo="ExampleOrg/example-project",
                 pr_number=99,
                 tripwire_id="watcher/pt_pr_missing_artifacts",
                 body="missing self-review.md",

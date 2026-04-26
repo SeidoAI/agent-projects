@@ -25,10 +25,12 @@ def branch_exists(repo_path: Path, branch_name: str) -> bool:
 def worktree_path_for_session(clone_path: Path, session_slug: str) -> Path:
     """Compute the worktree path for a session.
 
-    Convention: ``<repo-parent>/<repo-name>-wt-<session-slug>/``
+    Convention: ``<repo-parent>/worktree-<repo-name>-<session-slug>/``
+    The ``worktree-`` prefix mirrors the project/workspace prefix convention
+    so a glance at any directory tells you what it is.
     """
     clone_resolved = clone_path.resolve()
-    return clone_resolved.parent / f"{clone_resolved.name}-wt-{session_slug}"
+    return clone_resolved.parent / f"worktree-{clone_resolved.name}-{session_slug}"
 
 
 def worktree_add(
