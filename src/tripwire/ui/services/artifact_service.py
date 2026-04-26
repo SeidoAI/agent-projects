@@ -411,9 +411,7 @@ def _emit_rejection(
     """Emit one `artifact_rejected` event under `rejections/`."""
     if isinstance(emitter, NullEmitter):
         return
-    fired_at = (
-        datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    )
+    fired_at = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     excerpt = feedback.strip()
     if len(excerpt) > _FEEDBACK_EXCERPT_MAX:
         excerpt = excerpt[: _FEEDBACK_EXCERPT_MAX - 1] + "…"

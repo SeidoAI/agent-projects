@@ -130,9 +130,7 @@ def _emit_status_transition(
     """Emit one `status_transition` event under `status_transitions/`."""
     fired_at = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     payload = {
-        "id": (
-            f"evt-{fired_at}-status-{session_id}-{from_status}-to-{to_status}"
-        ),
+        "id": (f"evt-{fired_at}-status-{session_id}-{from_status}-to-{to_status}"),
         "kind": "status_transition",
         "fired_at": fired_at,
         "session_id": session_id,

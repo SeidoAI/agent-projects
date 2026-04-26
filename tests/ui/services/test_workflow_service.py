@@ -63,9 +63,7 @@ def test_build_workflow_uses_default_stations_when_project_has_none(
 
 
 def test_build_workflow_respects_project_statuses(tmp_path: Path) -> None:
-    project_dir = _write_project(
-        tmp_path, statuses=["a", "b", "c"]
-    )
+    project_dir = _write_project(tmp_path, statuses=["a", "b", "c"])
     graph = build_workflow(project_dir, project_id="x", is_pm_role=False)
     stations = graph["lifecycle"]["stations"]
     assert [s["id"] for s in stations] == ["a", "b", "c"]

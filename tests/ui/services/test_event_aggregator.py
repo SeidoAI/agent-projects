@@ -180,9 +180,7 @@ class TestListEvents:
                 "fired_at": "2026-04-26T12:00:00Z",
             },
         )
-        page = list_events(
-            tmp_path, kinds=["tripwire_fire", "artifact_rejected"]
-        )
+        page = list_events(tmp_path, kinds=["tripwire_fire", "artifact_rejected"])
         assert sorted(e["id"] for e in page.events) == ["evt-fire", "evt-rej"]
 
     def test_filter_by_since(self, tmp_path: Path) -> None:

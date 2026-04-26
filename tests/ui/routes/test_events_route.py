@@ -1,6 +1,6 @@
 """Tests for `GET /api/projects/{pid}/events` and `/events/{event_id}`.
 
-KUI-100 — see `docs/specs/2026-04-26-v08-handoff.md` §2.2–§2.3.
+KUI-100 - see `docs/specs/2026-04-26-v08-handoff.md` §2.2-§2.3.
 """
 
 from __future__ import annotations
@@ -182,9 +182,7 @@ def test_get_event_detail(
     assert body["blocks"] is True
 
 
-def test_get_event_404_when_missing(
-    seeded_client: TestClient, project_id: str
-) -> None:
+def test_get_event_404_when_missing(seeded_client: TestClient, project_id: str) -> None:
     encoded = encode_event_id("firings", "s1", 999)
     resp = seeded_client.get(f"/api/projects/{project_id}/events/{encoded}")
     assert resp.status_code == 404, resp.text

@@ -11,7 +11,7 @@ synthetic encoding that captures the on-disk location. The producer-set
 this module's URL-safe id (encoded by `encode_event_id`) is what callers
 use to look up a single event because it tells us which file to open
 without scanning every kind dir again. See
-`docs/specs/2026-04-26-v08-handoff.md` §2.2–§2.3.
+`docs/specs/2026-04-26-v08-handoff.md` §2.2-§2.3.
 """
 
 from __future__ import annotations

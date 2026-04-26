@@ -10,7 +10,7 @@ Reads from `<project_dir>/.tripwire/events/<kind>/<sid>/<n>.json` via
 no-op here: validator and artifact-rejection events are public; only
 tripwire prompts (in `/api/workflow`) need PM-gating.
 
-See `docs/specs/2026-04-26-v08-handoff.md` §2.2–§2.3.
+See `docs/specs/2026-04-26-v08-handoff.md` §2.2-§2.3.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/projects/{project_id}", tags=["events"])
 async def list_events_route(
     project: ProjectContext = Depends(get_project),  # noqa: B008
     session_id: str | None = Query(None),
-    kind: list[str] | None = Query(None),
+    kind: list[str] | None = Query(None),  # noqa: B008
     since: str | None = Query(None),
     limit: int = Query(DEFAULT_LIMIT, ge=1),
     cursor: str | None = Query(None),
