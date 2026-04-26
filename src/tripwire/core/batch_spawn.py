@@ -20,12 +20,32 @@ The runners are dependency-injected so the orchestration logic
 fails) is unit-testable without shelling out to ``claude`` or
 running real prep.
 
-Why ship despite an unverified 1h-TTL flag: ``claude -p`` already
-exposes prompt caching with the standard 5-min ephemeral TTL.
-Sessions launched within 5 min of priming will hit the warm cache
-even without the longer TTL. Plumbing the 1h cache_control through
-``claude -p`` is a separate research item — we ship the orchestration
-now and tighten the TTL once verified. See decisions.md.
+Cache TTL ceiling — investigation summary (full version in
+``decisions.md`` §E3):
+
+  Avenue 1: ``claude --help`` (v2.1.119) has no ``--cache-ttl``-
+  style flag. ``--betas extended-cache-ttl-2025-04-11`` is rejected
+  for OAuth/Max users with "Custom betas are only available for API
+  key users. Ignoring provided betas." Even under API-key auth, the
+  CLI emits ``cache_control: {type: "ephemeral"}`` with no explicit
+  ``ttl`` — interpreted as 5 min by the API. Header alone does not
+  change behaviour.
+
+  Avenue 2: ``--settings '{cache: {ttl: 1h}}'`` is silently ignored
+  (the settings schema has no cache-TTL key).
+
+  Avenue 3: An SDK direct-call wrapper for the prime is feasible
+  but doesn't help — the prompt cache is keyed on the request's
+  system-prefix bytes, and ``claude -p`` prepends the proprietary
+  Claude Code default system prompt that we cannot replicate from
+  the SDK. SDK-primed cache entries are never read by subsequent
+  ``claude -p`` spawns. Both prime AND spawn would need to bypass
+  ``claude -p`` to fix this, which is out of scope for KUI-96.
+
+  Conclusion: 5 min is the ceiling for the ``claude -p`` runtime.
+  Tightly-spaced batches (within 5 min of prime) hit warm cache;
+  staggered launches re-pay cache-creation cost — no worse than
+  the pre-E3 baseline.
 """
 
 from __future__ import annotations
