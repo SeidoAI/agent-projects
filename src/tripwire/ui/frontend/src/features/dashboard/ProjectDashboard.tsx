@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import { useProjectShell } from "@/app/ProjectShell";
 import { LifecycleWire } from "@/components/ui/lifecycle-wire";
@@ -78,7 +78,13 @@ export function ProjectDashboard() {
         </div>
       </header>
 
-      <div className="mt-6 rounded-(--radius-card) border border-(--color-edge) bg-(--color-paper-2) px-6 pt-5 pb-3">
+      <IssueStatusGrid
+        statusCounts={stats.statusCounts}
+        totalIssues={stats.totalIssues}
+        projectId={projectId}
+      />
+
+      <div className="mt-4 rounded-(--radius-card) border border-(--color-edge) bg-(--color-paper-2) px-6 pt-5 pb-3">
         <div className="mb-2 flex items-baseline justify-between">
           <SectionTitle sub="every session, where it sits in the flow">
             Sessions across the lifecycle
@@ -87,10 +93,9 @@ export function ProjectDashboard() {
         <LifecycleWire stations={LIFECYCLE_STATIONS} counts={counts} height={96} />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[480px_1fr_320px]">
-        <OpenWorkColumn sessions={sessions} projectId={projectId} />
-        <RecentActivityColumn events={events.data?.events ?? []} projectId={projectId} />
-        <ProjectVitalsColumn statusCounts={stats.statusCounts} totalIssues={stats.totalIssues} />
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1fr]">
+        <LiveNowColumn sessions={sessions} projectId={projectId} />
+        <ReviewsAndChecksColumn events={events.data?.events ?? []} projectId={projectId} />
       </div>
     </div>
   );
@@ -126,23 +131,17 @@ function SectionTitle({ children, sub }: { children: React.ReactNode; sub?: stri
   );
 }
 
-function OpenWorkColumn({
-  sessions,
-  projectId,
-}: {
-  sessions: SessionSummary[];
-  projectId: string;
-}) {
+function LiveNowColumn({ sessions, projectId }: { sessions: SessionSummary[]; projectId: string }) {
   return (
     <section className="rounded-(--radius-card) border border-(--color-edge) bg-(--color-paper-2) p-4">
       <div className="mb-3 flex items-baseline justify-between">
-        <SectionTitle sub="currently in flight">Open work</SectionTitle>
+        <SectionTitle>Live now</SectionTitle>
         <span className="font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
           {sessions.length} session{sessions.length === 1 ? "" : "s"}
         </span>
       </div>
       {sessions.length === 0 ? (
-        <Empty>no open sessions</Empty>
+        <Empty>no sessions running</Empty>
       ) : (
         <ul className="flex flex-col gap-2">
           {sessions.map((s) => (
@@ -179,7 +178,7 @@ function SessionRow({ session, projectId }: { session: SessionSummary; projectId
   );
 }
 
-function RecentActivityColumn({
+function ReviewsAndChecksColumn({
   events,
   projectId,
 }: {
@@ -189,7 +188,7 @@ function RecentActivityColumn({
   return (
     <section className="rounded-(--radius-card) border border-(--color-edge) bg-(--color-paper-2) p-4">
       <div className="mb-3 flex items-baseline justify-between">
-        <SectionTitle sub="last 6 process events">Recent activity</SectionTitle>
+        <SectionTitle>Reviews &amp; checks</SectionTitle>
         <Link
           to={`/p/${projectId}/tripwires`}
           className="font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em] hover:text-(--color-ink)"
@@ -274,29 +273,50 @@ function eventSummary(event: ProcessEvent): string {
   }
 }
 
-function ProjectVitalsColumn({
+/**
+ * Issue status — full-width horizontal grid of status pills, one per
+ * enum value. Replaces the right-column "Project vitals" treatment;
+ * matches `dashboard.jsx`'s IssueStatusGrid (full-width card, internal
+ * row of pills). Each pill links to the board filtered to that status.
+ *
+ * `auto-fit + minmax` so the row stays comfortable across however many
+ * statuses the project's `issue_status` enum exposes today (currently
+ * 7 — backlog/todo/in_progress/in_review/verified/done/canceled), plus
+ * any custom statuses a project might add later.
+ */
+function IssueStatusGrid({
   statusCounts,
   totalIssues,
+  projectId,
 }: {
   statusCounts: ReturnType<typeof useProjectStats>["statusCounts"];
   totalIssues: number;
+  projectId: string;
 }) {
-  const { projectId } = useParams();
   return (
-    <section className="rounded-(--radius-card) border border-(--color-edge) bg-(--color-paper-2) p-4">
-      <div className="mb-3">
-        <SectionTitle sub={`${totalIssues} issues across the project`}>Project vitals</SectionTitle>
+    <section className="mt-6 rounded-(--radius-card) border border-(--color-edge) bg-(--color-paper-2) px-6 pt-5 pb-5">
+      <div className="mb-3 flex items-baseline justify-between">
+        <SectionTitle sub={`${totalIssues} issues across the project`}>Issue status</SectionTitle>
+        <Link
+          to={`/p/${projectId}/board`}
+          className="font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em] hover:text-(--color-ink)"
+        >
+          jump to board →
+        </Link>
       </div>
       {statusCounts.length === 0 ? (
         <Empty>no statuses configured</Empty>
       ) : (
-        <ul className="grid grid-cols-2 gap-2">
+        <ul
+          className="grid gap-2.5"
+          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))" }}
+        >
           {statusCounts.map((c) => (
             <li key={c.value}>
               <Link
                 to={`/p/${projectId}/board?status=${encodeURIComponent(c.value)}`}
                 aria-label={`${c.count} issues in status ${c.label}`}
-                className="block rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-3 py-2 transition-colors hover:border-(--color-ink-3)"
+                className="block rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-3 py-2.5 transition-colors hover:border-(--color-ink-3)"
               >
                 <div className="flex items-center justify-between">
                   <span

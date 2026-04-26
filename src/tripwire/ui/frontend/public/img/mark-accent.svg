@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 24 455 180">
+  
+  
+  <path d="M 24 156 L 118 156 Q 133 144 148 156 L 428 156" stroke="#c83d2e" stroke-width="2.2" fill="none" stroke-linecap="round"></path>
+  <text x="24" y="132" font-size="110" fill="#1a1815" letter-spacing="-3">tri</text>
+  <g transform="rotate(8 133 156)">
+    <text x="107" y="132" font-size="110" fill="#1a1815" letter-spacing="-3">p</text>
+  </g>
+  <text x="159" y="132" font-size="110" fill="#1a1815" letter-spacing="-3">wire</text>
+</svg>

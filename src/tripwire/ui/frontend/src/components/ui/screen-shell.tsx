@@ -57,9 +57,12 @@ function SideRail({ projectId }: { projectId: string }) {
   return (
     <aside className="flex w-52 shrink-0 flex-col border-(--color-edge) border-r bg-(--color-paper-2)">
       <div className="px-5 pt-5 pb-4">
-        <span className="font-sans text-[20px] font-semibold tracking-tight text-(--color-ink)">
-          tri<span className="text-(--color-rule)">p</span>wire
-        </span>
+        {/* The brand mark from the canonical tripwire logo set
+            (img/mark-accent.svg in the repo). The SVG ships with its
+            own colours (cream paper inside the letterforms + accent
+            ink); set as a fixed-height image so it tracks the rail
+            width naturally. */}
+        <img src="/img/mark-accent.svg" alt="tripwire" className="block h-[28px] w-auto" />
       </div>
       <ProjectChip projectId={projectId} />
       <nav className="relative mt-2 flex flex-1 flex-col">

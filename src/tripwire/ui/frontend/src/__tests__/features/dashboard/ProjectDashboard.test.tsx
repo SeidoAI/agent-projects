@@ -166,7 +166,7 @@ describe("ProjectDashboard", () => {
       sessions: [],
     });
     render(<ProjectDashboard />, { wrapper });
-    expect(screen.getByText(/no open sessions/i)).toBeInTheDocument();
+    expect(screen.getByText(/no sessions running/i)).toBeInTheDocument();
     expect(screen.getByText(/no recent activity/i)).toBeInTheDocument();
   });
 
