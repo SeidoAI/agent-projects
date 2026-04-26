@@ -643,6 +643,72 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
     save_session(resolved, session)
 
 
+# Allowed session-status transitions. Tight by design: agents shouldn't
+# be able to skip review (`executing → done`) or jump arbitrary terminal
+# states. PMs that need a manual override can edit session.yaml directly.
+# v0.8 candidate to extract to a configurable matrix if it grows.
+_ALLOWED_TRANSITIONS: dict[str, set[str]] = {
+    "planned": {"queued", "abandoned"},
+    "queued": {"executing", "abandoned"},
+    "executing": {"in_review", "paused", "failed", "abandoned"},
+    "paused": {"executing", "abandoned"},
+    "failed": {"executing", "abandoned"},
+    "in_review": {"verified", "executing", "abandoned"},
+    "verified": {"done", "in_review", "abandoned"},
+}
+
+
+@session_cmd.command("transition")
+@click.argument("session_id")
+@click.argument("target_status")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_transition_cmd(
+    session_id: str, target_status: str, project_dir: Path
+) -> None:
+    """Transition a session's status. Strict: rejects unknown statuses
+    and disallowed jumps.
+
+    Primary caller is the agent at exit time, flipping
+    ``executing → in_review`` once the PR is open and self-reviewed —
+    this is what unblocks ``tripwire session complete``. Other allowed
+    flips cover the resume/review/abandon happy paths; everything else
+    requires a direct yaml edit.
+    """
+    from tripwire.models.enums import SessionStatus
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+
+    valid_statuses = {s.value for s in SessionStatus}
+    if target_status not in valid_statuses:
+        raise click.ClickException(
+            f"unknown status {target_status!r}; expected one of "
+            f"{sorted(valid_statuses)}"
+        )
+
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session '{session_id}' not found") from exc
+
+    allowed = _ALLOWED_TRANSITIONS.get(session.status, set())
+    if target_status not in allowed:
+        raise click.ClickException(
+            f"transition {session.status!r} → {target_status!r} not allowed; "
+            f"allowed targets from {session.status!r}: {sorted(allowed) or '<none>'}"
+        )
+
+    session.status = target_status
+    session.updated_at = datetime.now(tz=timezone.utc)
+    save_session(resolved, session)
+    click.echo(f"Session '{session_id}' → {target_status}")
+
+
 @session_cmd.command("abandon")
 @click.argument("session_id")
 @click.option(

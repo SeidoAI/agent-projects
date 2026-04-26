@@ -92,8 +92,12 @@ class TestSessionTransition:
         assert load_session(tmp_path_project, "s1").status == "executing"
 
     def test_updated_at_advances(self, tmp_path_project, save_test_session):
-        save_test_session(tmp_path_project, "s1", status="executing")
-        before = load_session(tmp_path_project, "s1").updated_at
+        from datetime import datetime, timedelta, timezone
+
+        old = datetime.now(tz=timezone.utc) - timedelta(hours=1)
+        save_test_session(
+            tmp_path_project, "s1", status="executing", updated_at=old
+        )
         runner = CliRunner()
         result = runner.invoke(
             session_cmd,
@@ -101,4 +105,4 @@ class TestSessionTransition:
         )
         assert result.exit_code == 0, result.output
         after = load_session(tmp_path_project, "s1").updated_at
-        assert after > before
+        assert after > old
