@@ -16,6 +16,11 @@ values:
   - id: failed
     label: Failed
     color: red
+  # `completed` is deprecated post-v0.7.9 — `done` is now the canonical
+  # terminal-success state (written by `tripwire session complete`).
+  # `completed` is kept here so existing tripwire-v0 data continues to
+  # validate; `core/session_readiness.py` accepts both. v0.7.10 candidate
+  # to remove this row entirely after a one-shot data migration.
   - id: completed
     label: Completed
     color: green

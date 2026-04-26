@@ -137,7 +137,12 @@ def check_readiness(
                 )
             )
             continue
-        if dep.status != "completed":
+        # `complete_session` writes status=`done` (post-v0.7.9). Older
+        # sessions and `session.yaml` snapshots may still carry
+        # `completed`; `verified` is the post-review pre-`done` slot.
+        # Accept all three terminal-success states. v0.7.10 candidate to
+        # collapse `completed` → `done` via a one-shot migration.
+        if dep.status not in {"completed", "done", "verified"}:
             items.append(
                 ReadinessItem(
                     label=f"blocked_by_sessions: {dep_id} ({dep.status})",

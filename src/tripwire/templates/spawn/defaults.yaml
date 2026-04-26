@@ -87,6 +87,10 @@ prompt_template: |
   Per-worktree exit sequence. CLAUDE.md lists your worktrees. For
   every worktree that has commits ahead of its base branch:
 
+  0. Pre-push gate: run `uv run ruff format && uv run ruff format
+     --check && uv run ruff check`. If anything fails, fix or commit
+     any reformatted files BEFORE pushing. CI runs `ruff format
+     --check` and will fail the PR otherwise.
   1. Self-review BEFORE pushing the PT PR. Write your self-review to
      `sessions/{session_id}/self-review.md` per the four-lens
      template at `templates/sessions/self-review.md.j2` (i.e. the
@@ -126,6 +130,12 @@ prompt_template: |
   4. Quality degradation over time — compare your last commit to your
      first. Same care, test density, naming hygiene?
 
+  After the PR is open and the self-review comment is posted, run
+  `tripwire session transition {session_id} in_review` as the FINAL
+  step of the exit protocol. This is the explicit signal that the work
+  is ready for PM review; without it, `tripwire session complete`
+  refuses to run because session.status is still `executing`.
+
   Before you end the session: ask honestly — did you learn anything future
   agents in this area would benefit from inheriting? Not "what did I do"
   (that's developer.md) but "what insight would I want the next agent
@@ -143,8 +153,12 @@ resume_prompt_template: |
   1. PR comments on your PR — read every PM comment posted since
      your last commit. Each PM comment may include specific bug
      findings with suggested fixes; address each one explicitly.
-  2. The plan at {plan_path} — re-read any `## PM follow-up`
-     section the PM may have added.
+  2. Re-read the plan.md at `{plan_path}` for any `## PM follow-up`
+     section. The path passed in `{plan_path}` is the canonical
+     main-PT path. Do NOT grep the project-tracking worktree
+     (`<base>/projects/<sid>-wt-<sid>/sessions/<sid>/plan.md`) — that
+     copy is a stale snapshot from spawn time and the PM updates the
+     main-PT version.
 
   Your previous conversation is preserved — you have the full
   context of what you've already tried. Continue from where you

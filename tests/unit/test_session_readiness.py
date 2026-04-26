@@ -55,6 +55,44 @@ class TestCheckReadiness:
         report = check_readiness(tmp_path_project, "s1", kind="queue")
         assert report.ready
 
+    def test_done_blocker_accepted(
+        self, tmp_path_project, save_test_session, write_handoff_yaml
+    ):
+        """`session complete` writes status=`done` (post-v0.7.9). A
+        downstream queue check must accept that as a satisfied blocker;
+        otherwise we get a contradictory "wait for X to complete" error
+        for sessions that already shipped."""
+        save_test_session(tmp_path_project, "dep", plan=True, status="done")
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            plan=True,
+            blocked_by_sessions=["dep"],
+        )
+        write_handoff_yaml(tmp_path_project, "s1")
+        report = check_readiness(tmp_path_project, "s1", kind="queue")
+        assert report.ready, [
+            (i.label, i.severity) for i in report.items if not i.passing
+        ]
+
+    def test_verified_blocker_accepted(
+        self, tmp_path_project, save_test_session, write_handoff_yaml
+    ):
+        """`verified` is the post-review pre-`done` terminal-success
+        state; queue must accept it too."""
+        save_test_session(tmp_path_project, "dep", plan=True, status="verified")
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            plan=True,
+            blocked_by_sessions=["dep"],
+        )
+        write_handoff_yaml(tmp_path_project, "s1")
+        report = check_readiness(tmp_path_project, "s1", kind="queue")
+        assert report.ready, [
+            (i.label, i.severity) for i in report.items if not i.passing
+        ]
+
     def test_spawn_checks_claude_on_path(
         self, tmp_path_project, save_test_session, write_handoff_yaml
     ):

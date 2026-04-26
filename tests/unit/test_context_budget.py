@@ -78,17 +78,20 @@ def test_pm_skill_md_under_budget() -> None:
 
 
 def test_total_templates_under_budget() -> None:
-    """Everything `tripwire init` copies must stay under 305KB total.
+    """Everything `tripwire init` copies must stay under 310KB total.
 
     v0.2 was ~217KB. v0.6a bumped to 275KB. v0.7b bumped to 285KB for
     spawn/defaults.yaml + issue_artifacts + /pm-issue-artifact. v0.7.2
     bumped to 295KB for pm-session-review expansion + spawn defaults
-    resume_prompt_template / disallowed_tools additions. v0.7.8 bumps
+    resume_prompt_template / disallowed_tools additions. v0.7.8 bumped
     to 305KB for the auto-README template + CD workflow template.
+    v0.7.9 bumps to 310KB for the spawn-template rewrite (per-worktree
+    exit sequence + ruff gate + transition step) plus the runtime
+    monitor invocation fields.
     """
     total = _total_chars(TEMPLATES_DIR)
-    assert total < 305_000, (
-        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 305KB."
+    assert total < 310_000, (
+        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 310KB."
     )
 
 
