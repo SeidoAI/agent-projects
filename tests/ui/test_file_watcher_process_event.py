@@ -18,9 +18,7 @@ def test_should_not_ignore_event_files(tmp_path: Path) -> None:
     """Event files MUST survive the ignore filter even though `.tripwire/`
     starts with a dot — the rest of `.tripwire/` (locks, cache files,
     etc.) still gets ignored, but `events/` is whitelisted."""
-    event_path = (
-        tmp_path / ".tripwire" / "events" / "firings" / "s1" / "0001.json"
-    )
+    event_path = tmp_path / ".tripwire" / "events" / "firings" / "s1" / "0001.json"
     assert _should_ignore(event_path, tmp_path) is False
 
 
