@@ -26,6 +26,7 @@ def register_routes(app: FastAPI) -> None:
         artifacts,
         containers,
         enums,
+        events,
         github,
         graph,
         health,
@@ -52,6 +53,7 @@ def register_routes(app: FastAPI) -> None:
         enums,
         orchestration,
         actions,
+        events,
         ws,
         # v2 stubs
         messages,
