@@ -17,9 +17,7 @@ from tripwire.core.session_store import load_session
 
 
 class TestSessionTransition:
-    def test_executing_to_in_review_succeeds(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_executing_to_in_review_succeeds(self, tmp_path_project, save_test_session):
         save_test_session(tmp_path_project, "s1", status="executing")
         runner = CliRunner()
         result = runner.invoke(
@@ -30,9 +28,7 @@ class TestSessionTransition:
         s = load_session(tmp_path_project, "s1")
         assert s.status == "in_review"
 
-    def test_in_review_to_verified_succeeds(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_in_review_to_verified_succeeds(self, tmp_path_project, save_test_session):
         save_test_session(tmp_path_project, "s1", status="in_review")
         runner = CliRunner()
         result = runner.invoke(
@@ -78,9 +74,7 @@ class TestSessionTransition:
         )
         assert result.exit_code != 0
 
-    def test_paused_to_executing_succeeds(
-        self, tmp_path_project, save_test_session
-    ):
+    def test_paused_to_executing_succeeds(self, tmp_path_project, save_test_session):
         """Resume after a pause is the canonical paused→executing flip."""
         save_test_session(tmp_path_project, "s1", status="paused")
         runner = CliRunner()
@@ -95,9 +89,7 @@ class TestSessionTransition:
         from datetime import datetime, timedelta, timezone
 
         old = datetime.now(tz=timezone.utc) - timedelta(hours=1)
-        save_test_session(
-            tmp_path_project, "s1", status="executing", updated_at=old
-        )
+        save_test_session(tmp_path_project, "s1", status="executing", updated_at=old)
         runner = CliRunner()
         result = runner.invoke(
             session_cmd,
