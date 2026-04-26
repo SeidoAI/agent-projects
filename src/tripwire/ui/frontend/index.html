@@ -1,9 +1,32 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tripwire UI</title>
+    <!-- Preload the body weights we hit on first paint to avoid FOUT.
+         (Bricolage 400/600 + Geist Mono 400 per spec §3.1 C0.2.) -->
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      crossorigin
+      href="/node_modules/@fontsource/bricolage-grotesque/files/bricolage-grotesque-latin-400-normal.woff2"
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      crossorigin
+      href="/node_modules/@fontsource/bricolage-grotesque/files/bricolage-grotesque-latin-600-normal.woff2"
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      crossorigin
+      href="/node_modules/@fontsource/geist-mono/files/geist-mono-latin-400-normal.woff2"
+    />
   </head>
   <body>
     <div id="root"></div>
