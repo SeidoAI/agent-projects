@@ -1,73 +1,111 @@
+/* Self-hosted fonts (per dec-cream-paper-canonical / spec §3.1 C0.2).
+ * Bricolage = body/headings (400/500/600/700).
+ * Instrument Serif italic = annotations/voice (400 italic).
+ * Geist Mono = stamps/IDs/timestamps (400/500/600).
+ *
+ * @import must precede @plugin/@theme/etc. per CSS spec; biome flags
+ * any out-of-order @import as an error. */
+@import "@fontsource/bricolage-grotesque/400.css";
+@import "@fontsource/bricolage-grotesque/500.css";
+@import "@fontsource/bricolage-grotesque/600.css";
+@import "@fontsource/bricolage-grotesque/700.css";
+@import "@fontsource/instrument-serif/400-italic.css";
+@import "@fontsource/geist-mono/400.css";
+@import "@fontsource/geist-mono/500.css";
+@import "@fontsource/geist-mono/600.css";
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
 @theme {
-  /* Greys — slate scale */
-  --color-background: oklch(0.12 0 0);
-  --color-foreground: oklch(0.96 0 0);
-  --color-muted: oklch(0.2 0 0);
-  --color-muted-foreground: oklch(0.68 0 0);
-  --color-border: oklch(0.22 0 0);
-  --color-card: oklch(0.15 0 0);
-  --color-card-foreground: oklch(0.96 0 0);
+  /* Paper — cream palette per dec-cream-paper-canonical. */
+  --color-paper: #f0eee9;
+  --color-paper-2: #faf8f3;
+  --color-paper-3: #e8e4dc;
+  --color-edge: #c9bfae;
 
-  /* Accent — blue for primary actions */
-  --color-primary: oklch(0.62 0.18 255);
-  --color-primary-foreground: oklch(0.98 0 0);
+  /* Ink — three weights, no slate-grey. */
+  --color-ink: #1a1815;
+  --color-ink-2: #4a453d;
+  --color-ink-3: #7a7368;
 
-  /* Secondary — muted for non-primary actions */
-  --color-secondary: oklch(0.2 0 0);
-  --color-secondary-foreground: oklch(0.96 0 0);
+  /* The rule — used ONLY for tripwires + lifecycle wire + intervention surfaces. */
+  --color-rule: #c83d2e;
+  --color-rule-soft: color-mix(in oklch, #c83d2e 6%, transparent);
 
-  /* Destructive — red for danger actions */
-  --color-destructive: oklch(0.55 0.2 25);
-  --color-destructive-foreground: oklch(0.98 0 0);
+  /* Mood badges (gate validators / tripwires / informational). */
+  --color-gate: #2d5a3d;
+  --color-tripwire: #b8741a;
+  --color-info: #2d3a7c;
 
-  /* Accent — hover/focus backgrounds */
-  --color-accent: oklch(0.2 0 0);
-  --color-accent-foreground: oklch(0.96 0 0);
+  /* Map shadcn semantic tokens onto the cream palette so existing
+   * components (button, card, input, dialog) inherit the new look
+   * without a rewrite of every consumer. */
+  --color-background: var(--color-paper);
+  --color-foreground: var(--color-ink);
+  --color-card: var(--color-paper-2);
+  --color-card-foreground: var(--color-ink);
+  --color-popover: var(--color-paper-2);
+  --color-popover-foreground: var(--color-ink);
+  --color-muted: var(--color-paper-3);
+  --color-muted-foreground: var(--color-ink-3);
+  --color-accent: var(--color-paper-3);
+  --color-accent-foreground: var(--color-ink);
+  --color-border: var(--color-edge);
+  --color-input: var(--color-edge);
+  --color-ring: var(--color-rule);
+  --color-primary: var(--color-ink);
+  --color-primary-foreground: var(--color-paper);
+  --color-secondary: var(--color-paper-3);
+  --color-secondary-foreground: var(--color-ink);
+  --color-destructive: var(--color-rule);
+  --color-destructive-foreground: var(--color-paper);
 
-  /* Popover — same as card */
-  --color-popover: oklch(0.15 0 0);
-  --color-popover-foreground: oklch(0.96 0 0);
+  /* Type scale (px-pinned per spec). */
+  --text-xs: 11px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 20px;
+  --text-base: 15px;
+  --text-base--line-height: 24px;
+  --text-md: 17px;
+  --text-md--line-height: 26px;
+  --text-lg: 22px;
+  --text-lg--line-height: 30px;
+  --text-xl: 30px;
+  --text-xl--line-height: 38px;
 
-  /* Input border + focus ring */
-  --color-input: oklch(0.22 0 0);
-  --color-ring: oklch(0.62 0.18 255);
-
-  /* Radius */
+  /* Two radii. */
+  --radius-stamp: 4px;
+  --radius-card: 8px;
   --radius: 0.5rem;
 
-  /* Status colours — map to issue_status enum */
-  --color-status-backlog: oklch(0.22 0 0);
-  --color-status-todo: oklch(0.55 0.15 255);
-  --color-status-in-progress: oklch(0.7 0.18 80);
-  --color-status-verifying: oklch(0.7 0.15 140);
-  --color-status-reviewing: oklch(0.7 0.15 140);
-  --color-status-testing: oklch(0.7 0.15 140);
-  --color-status-ready: oklch(0.7 0.18 140);
-  --color-status-updating: oklch(0.7 0.18 60);
-  --color-status-done: oklch(0.55 0.2 140);
-  --color-status-canceled: oklch(0.45 0 0);
+  /* Fonts (loaded above via @fontsource). */
+  --font-sans: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Instrument Serif", "EB Garamond", serif;
+  --font-mono: "Geist Mono", ui-monospace, "JetBrains Mono", monospace;
 
-  /* Node types (for concept graph) */
-  --color-node-endpoint: oklch(0.65 0.17 250);
-  --color-node-model: oklch(0.7 0.17 180);
-  --color-node-decision: oklch(0.7 0.2 45);
-  --color-node-contract: oklch(0.7 0.15 310);
-  --color-node-config: oklch(0.65 0.1 100);
-  --color-node-schema: oklch(0.7 0.14 200);
-  --color-node-service: oklch(0.65 0.15 160);
-  --color-node-custom: oklch(0.55 0 0);
+  /* Status colours — kept for the existing kanban/status-dot consumers
+   * until the Board redesign in S2 swaps them for cream-palette equivalents. */
+  --color-status-backlog: #9a9285;
+  --color-status-todo: #2d3a7c;
+  --color-status-in-progress: #b8741a;
+  --color-status-verifying: #2d5a3d;
+  --color-status-reviewing: #2d5a3d;
+  --color-status-testing: #2d5a3d;
+  --color-status-ready: #2d5a3d;
+  --color-status-updating: #b8741a;
+  --color-status-done: #2d5a3d;
+  --color-status-canceled: #7a7368;
 
-  /* Phase badge — reflects project.phase */
-  --color-phase-scoping: oklch(0.62 0.15 250);
-  --color-phase-scoped: oklch(0.6 0.18 140);
-  --color-phase-executing: oklch(0.65 0.2 60);
-  --color-phase-reviewing: oklch(0.65 0.15 315);
+  /* Phase badge — reflects project.phase. */
+  --color-phase-scoping: #2d3a7c;
+  --color-phase-scoped: #2d5a3d;
+  --color-phase-executing: #c83d2e;
+  --color-phase-reviewing: #b8741a;
 }
 
 html {
-  background: var(--color-background);
-  color: var(--color-foreground);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
 }

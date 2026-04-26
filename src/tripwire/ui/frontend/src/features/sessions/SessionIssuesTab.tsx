@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-import { Badge } from "@/components/ui/badge";
+import { Stamp } from "@/components/ui/stamp";
 import {
   Table,
   TableBody,
@@ -47,9 +47,7 @@ function IssueRow({ projectId, issueKey }: IssueRowProps) {
         {isLoading ? (
           <span className="text-xs text-muted-foreground">…</span>
         ) : data ? (
-          <Badge variant="outline" className="text-xs">
-            {data.status}
-          </Badge>
+          <Stamp>{data.status}</Stamp>
         ) : null}
       </TableCell>
     </TableRow>

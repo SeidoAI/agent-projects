@@ -33,9 +33,7 @@ describe("renderWithProviders + MSW", () => {
 
   it("server.use(...) override is honoured for a single test", async () => {
     server.use(
-      http.get("/api/projects/p1", () =>
-        HttpResponse.json({ id: "p1", name: "Overridden" }),
-      ),
+      http.get("/api/projects/p1", () => HttpResponse.json({ id: "p1", name: "Overridden" })),
     );
     renderWithProviders(<ProjectProbe pid="p1" />);
     await waitFor(() => expect(screen.getByTestId("probe-name").textContent).toBe("Overridden"));

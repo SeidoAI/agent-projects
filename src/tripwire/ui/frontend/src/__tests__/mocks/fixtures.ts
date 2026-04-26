@@ -8,11 +8,7 @@
  * cache priming — they are the single source of truth for fixture
  * shape across the test suite.
  */
-import type {
-  ArtifactManifest,
-  ArtifactSpec,
-  ArtifactStatus,
-} from "@/lib/api/endpoints/artifacts";
+import type { ArtifactManifest, ArtifactSpec, ArtifactStatus } from "@/lib/api/endpoints/artifacts";
 import type { EnumDescriptor } from "@/lib/api/endpoints/enums";
 import type { ReactFlowGraph } from "@/lib/api/endpoints/graph";
 import type { IssueDetail, IssueSummary } from "@/lib/api/endpoints/issues";
@@ -23,11 +19,7 @@ import type {
   ReverseRefsResult,
 } from "@/lib/api/endpoints/nodes";
 import type { ProjectDetail } from "@/lib/api/endpoints/project";
-import type {
-  RepoBinding,
-  SessionDetail,
-  SessionSummary,
-} from "@/lib/api/endpoints/sessions";
+import type { RepoBinding, SessionDetail, SessionSummary } from "@/lib/api/endpoints/sessions";
 
 export const FIXTURE_PROJECT_ID = "p1";
 

@@ -104,9 +104,7 @@ export interface IssueValidationReport {
 
 export const issuesApi = {
   list: (pid: string, filters?: IssueFilterParams) =>
-    apiGet<IssueSummary[]>(
-      `/api/projects/${encodeURIComponent(pid)}/issues${buildQuery(filters)}`,
-    ),
+    apiGet<IssueSummary[]>(`/api/projects/${encodeURIComponent(pid)}/issues${buildQuery(filters)}`),
   get: (pid: string, key: string) =>
     apiGet<IssueDetail>(
       `/api/projects/${encodeURIComponent(pid)}/issues/${encodeURIComponent(key)}`,

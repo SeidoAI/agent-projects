@@ -181,9 +181,7 @@ describe("ArtifactList", () => {
       content,
     });
 
-    await waitFor(() =>
-      expect(screen.getByTestId("task-checklist-progress")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("task-checklist-progress")).toBeInTheDocument());
     expect(screen.getByText("2/3")).toBeInTheDocument();
   });
 });
@@ -206,12 +204,7 @@ describe("ArtifactViewer approval gate", () => {
     );
 
     renderWithCache(
-      <ArtifactViewer
-        projectId="p1"
-        sessionId="s1"
-        name="plan"
-        status={statusFor("plan", true)}
-      />,
+      <ArtifactViewer projectId="p1" sessionId="s1" name="plan" status={statusFor("plan", true)} />,
       {
         manifest: fixtureManifest(),
         statuses: [statusFor("plan", true)],
@@ -246,12 +239,7 @@ describe("ArtifactViewer approval gate", () => {
     );
 
     renderWithCache(
-      <ArtifactViewer
-        projectId="p1"
-        sessionId="s1"
-        name="plan"
-        status={statusFor("plan", true)}
-      />,
+      <ArtifactViewer projectId="p1" sessionId="s1" name="plan" status={statusFor("plan", true)} />,
       {
         manifest: fixtureManifest(),
         statuses: [statusFor("plan", true)],
@@ -294,14 +282,11 @@ describe("ArtifactViewer approval gate", () => {
       body: "Body.",
       mtime: "2026-04-24T00:00:00Z",
     };
-    renderWithCache(
-      <ArtifactViewer projectId="p1" sessionId="s1" name="plan" status={status} />,
-      {
-        manifest: fixtureManifest(),
-        statuses: [status],
-        content: { plan: content },
-      },
-    );
+    renderWithCache(<ArtifactViewer projectId="p1" sessionId="s1" name="plan" status={status} />, {
+      manifest: fixtureManifest(),
+      statuses: [status],
+      content: { plan: content },
+    });
 
     expect(screen.getByText(/Approved/)).toBeInTheDocument();
     expect(screen.getByText(/sean/)).toBeInTheDocument();

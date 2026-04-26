@@ -10,10 +10,7 @@ import {
 import { KanbanBoard } from "@/features/issues/KanbanBoard";
 import type { IssueFilterParams, IssueSummary } from "@/lib/api/endpoints/issues";
 import { queryKeys } from "@/lib/api/queryKeys";
-import {
-  makeIssueStatusEnum,
-  makeIssueSummary,
-} from "../../mocks/fixtures";
+import { makeIssueStatusEnum, makeIssueSummary } from "../../mocks/fixtures";
 import { server } from "../../mocks/server";
 import { makeTestQueryClient, renderWithProviders } from "../../test-utils";
 

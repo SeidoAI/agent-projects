@@ -11,7 +11,6 @@ import { SessionList } from "@/features/sessions/SessionList";
 import { Placeholder } from "./Placeholder";
 import { ProjectShell } from "./ProjectShell";
 import { RootRedirect } from "./RootRedirect";
-import { V2Placeholder } from "./V2Placeholder";
 
 export const router = createBrowserRouter([
   { path: "/", element: <RootRedirect /> },
@@ -31,15 +30,12 @@ export const router = createBrowserRouter([
         path: "sessions/:sid/artifacts/:name",
         element: <StandaloneArtifactViewer />,
       },
-      { path: "orchestration", element: <Placeholder name="OrchestrationView" /> },
-
-      // v2 placeholders
-      { path: "agents", element: <V2Placeholder feature="Agents" /> },
-      { path: "agents/:sessionId", element: <V2Placeholder feature="Agent session detail" /> },
-      { path: "messages", element: <V2Placeholder feature="Messages" /> },
-      { path: "messages/:sessionId", element: <V2Placeholder feature="Message thread" /> },
-      { path: "approvals", element: <V2Placeholder feature="Approval queue" /> },
-      { path: "pm-reviews", element: <V2Placeholder feature="PM reviews" /> },
+      // Strand Z new screens — placeholders here in S1; S5/S6/S7 wire
+      // the real implementations in. The ScreenShell nav already links
+      // to these paths, so the routes must exist.
+      { path: "workflow", element: <Placeholder name="WorkflowMap" /> },
+      { path: "tripwires", element: <Placeholder name="TripwireLog" /> },
+      { path: "sessions/:sid/live", element: <Placeholder name="LiveMonitor" /> },
     ],
   },
 ]);

@@ -2,9 +2,9 @@ import { AlertTriangle } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
 import { MarkdownBody } from "@/components/MarkdownBody";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Stamp } from "@/components/ui/stamp";
 import { ApiError } from "@/lib/api/client";
 import { useNode, useNodes, useReverseRefs } from "@/lib/api/endpoints/nodes";
 import { NodeRelatedPanel } from "./NodeRelatedPanel";
@@ -54,15 +54,15 @@ function NodeDetailInner({ projectId, nodeId }: { projectId: string; nodeId: str
       <header className="space-y-1">
         <h1 className="font-mono text-2xl font-semibold text-foreground">[[{node.id}]]</h1>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Badge variant="outline">{node.type}</Badge>
+          <Stamp tone="default">{node.type}</Stamp>
           <span>{node.name}</span>
         </div>
         {node.tags.length > 0 ? (
           <div className="flex flex-wrap gap-1 pt-1">
             {node.tags.map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-xs">
+              <Stamp key={tag} tone="info">
                 {tag}
-              </Badge>
+              </Stamp>
             ))}
           </div>
         ) : null}

@@ -240,9 +240,7 @@ describe("IssueDetail", () => {
       fixed: [],
     };
     server.use(
-      http.post(`/api/projects/p1/issues/${ISSUE_ID}/validate`, () =>
-        HttpResponse.json(report),
-      ),
+      http.post(`/api/projects/p1/issues/${ISSUE_ID}/validate`, () => HttpResponse.json(report)),
     );
 
     renderIssueDetail({ issue: fixtureIssue(), project: fixtureProject() });
@@ -271,9 +269,7 @@ describe("IssueDetail", () => {
       fixed: [],
     };
     server.use(
-      http.post(`/api/projects/p1/issues/${ISSUE_ID}/validate`, () =>
-        HttpResponse.json(report),
-      ),
+      http.post(`/api/projects/p1/issues/${ISSUE_ID}/validate`, () => HttpResponse.json(report)),
     );
 
     renderIssueDetail({ issue: fixtureIssue(), project: fixtureProject() });
@@ -317,9 +313,7 @@ describe("IssueDetail", () => {
     renderIssueDetail({ issue: fixtureIssue(), project: fixtureProject() });
     fireEvent.click(screen.getByRole("button", { name: /Validate/ }));
 
-    await waitFor(() =>
-      expect(toastMocks.error).toHaveBeenCalledWith("Validator crashed."),
-    );
+    await waitFor(() => expect(toastMocks.error).toHaveBeenCalledWith("Validator crashed."));
     expect(toastMocks.success).not.toHaveBeenCalled();
   });
 

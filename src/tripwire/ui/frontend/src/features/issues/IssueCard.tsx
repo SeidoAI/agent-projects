@@ -2,7 +2,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { Link2 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
-import { Badge } from "@/components/ui/badge";
+import { Stamp, type StampTone } from "@/components/ui/stamp";
 import type { IssueSummary } from "@/lib/api/endpoints/issues";
 import { cn } from "@/lib/utils";
 
@@ -88,18 +88,14 @@ export function IssueCard({ issue, refCount }: IssueCardProps) {
   );
 }
 
-const PRIORITY_STYLES: Record<string, string> = {
-  critical: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300",
-  high: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  medium: "border-muted-foreground/30 bg-muted text-muted-foreground",
-  low: "border-muted-foreground/20 bg-muted/50 text-muted-foreground",
+const PRIORITY_TONE: Record<string, StampTone> = {
+  critical: "rule",
+  high: "tripwire",
+  medium: "default",
+  low: "default",
 };
 
 function PriorityBadge({ priority }: { priority: string }) {
-  const style = PRIORITY_STYLES[priority] ?? PRIORITY_STYLES.medium;
-  return (
-    <Badge variant="outline" className={cn("text-[10px] capitalize", style)}>
-      {priority}
-    </Badge>
-  );
+  const tone = PRIORITY_TONE[priority] ?? "default";
+  return <Stamp tone={tone}>{priority}</Stamp>;
 }

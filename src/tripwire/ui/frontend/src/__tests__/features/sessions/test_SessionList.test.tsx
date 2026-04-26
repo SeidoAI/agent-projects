@@ -70,9 +70,7 @@ describe("SessionList", () => {
     });
 
     await waitFor(() => expect(requested.length).toBeGreaterThan(0));
-    expect(requested.some((u) => new URL(u).searchParams.get("status") === "active")).toBe(
-      true,
-    );
+    expect(requested.some((u) => new URL(u).searchParams.get("status") === "active")).toBe(true);
   });
 
   it("hides blocked 'planned' sessions when Only actionable is on", () => {
@@ -107,8 +105,6 @@ describe("SessionList", () => {
     qc.setQueryData(queryKeys.sessions("p1"), []);
     renderWithProviders(<SessionList />, { queryClient: qc });
 
-    expect(
-      screen.getByText(/No sessions yet. The PM agent creates sessions/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No sessions yet. The PM agent creates sessions/)).toBeInTheDocument();
   });
 });

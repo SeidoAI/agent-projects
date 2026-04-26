@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-import { Badge } from "@/components/ui/badge";
+import { Stamp } from "@/components/ui/stamp";
 import type { SessionSummary } from "@/lib/api/endpoints/sessions";
 import { TaskProgressBar } from "./TaskProgressBar";
 
@@ -23,9 +23,7 @@ export function SessionCard({ session, projectId }: SessionCardProps) {
             {session.id} · {session.agent}
           </p>
         </div>
-        <Badge variant="outline" data-badge="status">
-          {session.status}
-        </Badge>
+        <Stamp data-badge="status">{session.status}</Stamp>
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

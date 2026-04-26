@@ -4,7 +4,6 @@ import { createMemoryRouter, Navigate, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Placeholder } from "@/app/Placeholder";
 import { ProjectShell } from "@/app/ProjectShell";
-import { V2Placeholder } from "@/app/V2Placeholder";
 import { __resetProjectWebSocketsForTests } from "@/lib/realtime/useProjectWebSocket";
 
 // Avoid opening a real WebSocket when ProjectShell mounts — the router
@@ -32,9 +31,8 @@ function renderRoute(path: string) {
         { path: "board", element: <Placeholder name="KanbanBoard" /> },
         { path: "graph", element: <Placeholder name="ConceptGraph" /> },
         { path: "sessions", element: <Placeholder name="SessionList" /> },
-        { path: "orchestration", element: <Placeholder name="OrchestrationView" /> },
-        { path: "messages", element: <V2Placeholder feature="Messages" /> },
-        { path: "agents", element: <V2Placeholder feature="Agents" /> },
+        { path: "workflow", element: <Placeholder name="WorkflowMap" /> },
+        { path: "tripwires", element: <Placeholder name="TripwireLog" /> },
       ],
     },
   ];
@@ -54,35 +52,33 @@ describe("Router", () => {
     expect(screen.getByText("Coming in a later issue.")).toBeDefined();
   });
 
-  it("renders ProjectShell with TopBar at /p/:projectId/board", () => {
+  it("renders ProjectShell with breadcrumb project id at /p/:projectId/board", () => {
     renderRoute("/p/proj-1/board");
-    // TopBar renders the project name
-    expect(screen.getByText("Project proj-1")).toBeDefined();
+    // ScreenShell breadcrumb + project chip both render the project id
+    // ("Workspace / proj-1" + the chip in the side rail).
+    expect(screen.getAllByText("proj-1").length).toBeGreaterThan(0);
     // Board placeholder renders inside the outlet
     expect(screen.getByText("KanbanBoard")).toBeDefined();
   });
 
-  it("renders V2Placeholder for /p/:projectId/messages", () => {
-    renderRoute("/p/proj-1/messages");
-    expect(screen.getByRole("heading", { name: "Messages" })).toBeDefined();
-    expect(screen.getByText(/Coming in v2/)).toBeDefined();
-  });
-
-  it("renders V2Placeholder for /p/:projectId/agents", () => {
-    renderRoute("/p/proj-1/agents");
-    expect(screen.getByRole("heading", { name: "Agents" })).toBeDefined();
-  });
-
-  it("renders AgentStatusBar in the top bar", () => {
+  it("renders the cream-palette nav items in the side rail", () => {
     renderRoute("/p/proj-1/board");
-    expect(screen.getByText("0 agents running")).toBeDefined();
+    // Lowercase nav per spec §3.1 C0.3.
+    expect(screen.getByRole("link", { name: /overview/ })).toBeDefined();
+    expect(screen.getByRole("link", { name: /board/ })).toBeDefined();
+    expect(screen.getByRole("link", { name: /workflow/ })).toBeDefined();
+    expect(screen.getByRole("link", { name: /concepts/ })).toBeDefined();
+    expect(screen.getByRole("link", { name: /sessions/ })).toBeDefined();
+    expect(screen.getByRole("link", { name: /tripwires/ })).toBeDefined();
   });
 
-  it("renders nav tabs in TopBar", () => {
-    renderRoute("/p/proj-1/board");
-    expect(screen.getByText("Board")).toBeDefined();
-    expect(screen.getByText("Graph")).toBeDefined();
-    expect(screen.getByText("Sessions")).toBeDefined();
-    expect(screen.getByText("Orchestration")).toBeDefined();
+  it("renders the workflow placeholder at /workflow", () => {
+    renderRoute("/p/proj-1/workflow");
+    expect(screen.getByText("WorkflowMap")).toBeDefined();
+  });
+
+  it("renders the tripwire log placeholder at /tripwires", () => {
+    renderRoute("/p/proj-1/tripwires");
+    expect(screen.getByText("TripwireLog")).toBeDefined();
   });
 });

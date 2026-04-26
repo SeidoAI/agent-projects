@@ -38,6 +38,10 @@ export const queryKeys = {
   orchestration: (pid: string) => ["projects", pid, "orchestration"] as const,
   validationStatus: (pid: string) => ["projects", pid, "validation-status"] as const,
 
+  // Strand Y (v0.8) — workflow graph + process events.
+  workflow: (pid: string) => ["projects", pid, "workflow"] as const,
+  events: (pid: string, params: object) => ["projects", pid, "events", params] as const,
+
   // v2 (declared but unused in v1 — placeholder to avoid churn later)
   containers: () => ["containers"] as const,
   messages: (sid: string) => ["messages", sid] as const,

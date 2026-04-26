@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ConceptGraph } from "@/features/graph/ConceptGraph";
 import type { ReactFlowGraph } from "@/lib/api/endpoints/graph";
@@ -11,19 +11,6 @@ import { queryKeys } from "@/lib/api/queryKeys";
 vi.mock("@/app/ProjectShell", () => ({
   useProjectShell: () => ({ projectId: "p1", wsStatus: "open" }),
 }));
-
-// React Flow relies on ResizeObserver at mount. jsdom doesn't ship one,
-// so every test suite that mounts ReactFlow has to supply a stub. We
-// also stub `DOMRect` measurements via getBoundingClientRect below.
-class ResizeObserverMock {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-}
-
-beforeEach(() => {
-  vi.stubGlobal("ResizeObserver", ResizeObserverMock);
-});
 
 function withSeed(data: ReactFlowGraph | undefined) {
   const qc = new QueryClient({
@@ -44,7 +31,6 @@ function withSeed(data: ReactFlowGraph | undefined) {
 describe("ConceptGraph", () => {
   afterEach(() => {
     cleanup();
-    vi.unstubAllGlobals();
   });
 
   it("shows the empty-state when the backend returns 0 nodes", () => {

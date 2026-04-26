@@ -1,6 +1,6 @@
 import { MarkdownBody } from "@/components/MarkdownBody";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Stamp } from "@/components/ui/stamp";
 import { ApiError } from "@/lib/api/client";
 import { type ArtifactStatus, useArtifact } from "@/lib/api/endpoints/artifacts";
 import { ApprovalControls } from "./ApprovalControls";
@@ -97,16 +97,8 @@ export function ArtifactViewer({ projectId, sessionId, name, status }: ArtifactV
     <article className="space-y-4" data-testid="artifact-viewer">
       <header className="flex flex-wrap items-center gap-2 text-sm">
         <h3 className="font-semibold text-foreground">{name}</h3>
-        {status?.spec.produced_at ? (
-          <Badge variant="outline" className="text-xs">
-            {status.spec.produced_at}
-          </Badge>
-        ) : null}
-        {status?.spec.required ? (
-          <Badge variant="secondary" className="text-xs">
-            required
-          </Badge>
-        ) : null}
+        {status?.spec.produced_at ? <Stamp tone="default">{status.spec.produced_at}</Stamp> : null}
+        {status?.spec.required ? <Stamp tone="info">required</Stamp> : null}
         <span className="ml-auto text-xs text-muted-foreground">
           {size ? <span>{size}</span> : null}
           {size && mtime ? <span> · </span> : null}

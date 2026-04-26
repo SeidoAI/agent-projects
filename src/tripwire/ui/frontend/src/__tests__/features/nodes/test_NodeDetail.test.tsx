@@ -7,12 +7,7 @@ import { NodeDetail as NodeDetailView } from "@/features/nodes/NodeDetail";
 import type { NodeDetail, NodeSummary, ReverseRefsResult } from "@/lib/api/endpoints/nodes";
 import type { ProjectDetail } from "@/lib/api/endpoints/project";
 import { queryKeys } from "@/lib/api/queryKeys";
-import {
-  makeNodeDetail,
-  makeNodeSummary,
-  makeProject,
-  makeReferrers,
-} from "../../mocks/fixtures";
+import { makeNodeDetail, makeNodeSummary, makeProject, makeReferrers } from "../../mocks/fixtures";
 import { server } from "../../mocks/server";
 import { makeTestQueryClient, renderWithProviders } from "../../test-utils";
 
@@ -48,9 +43,7 @@ function fixtureProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
   });
 }
 
-const NODE_DETAIL_EXTRAS = (
-  <Route path="/p/:projectId/graph" element={<div>Graph stub</div>} />
-);
+const NODE_DETAIL_EXTRAS = <Route path="/p/:projectId/graph" element={<div>Graph stub</div>} />;
 
 function renderNodeDetail(opts: {
   node?: NodeDetail;
@@ -237,10 +230,7 @@ describe("NodeDetail", () => {
   it("renders 'not found' when the API returns 404", async () => {
     server.use(
       http.get("/api/projects/p1/nodes/missing-node", () =>
-        HttpResponse.json(
-          { detail: "Node not found", code: "node/not_found" },
-          { status: 404 },
-        ),
+        HttpResponse.json({ detail: "Node not found", code: "node/not_found" }, { status: 404 }),
       ),
     );
 
