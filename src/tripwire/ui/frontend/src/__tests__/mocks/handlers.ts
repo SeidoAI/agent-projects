@@ -78,6 +78,13 @@ export const defaultHandlers = [
     return HttpResponse.json({ name: String(params.name), values: [] });
   }),
 
+  // Strand Y (v0.8) — workflow + events. The endpoints are still in
+  // flight; default handlers return empty payloads so consumers like
+  // the Dashboard's "Recent Activity" feed render their empty state.
+  // Tests asserting populated states `setQueryData` directly.
+  http.get("/api/projects/:pid/workflow", () => HttpResponse.json({ events: [], next_cursor: null })),
+  http.get("/api/projects/:pid/events", () => HttpResponse.json({ events: [], next_cursor: null })),
+
   // Artifacts
   http.get("/api/projects/:pid/artifact-manifest", () =>
     HttpResponse.json(makeArtifactManifest()),
