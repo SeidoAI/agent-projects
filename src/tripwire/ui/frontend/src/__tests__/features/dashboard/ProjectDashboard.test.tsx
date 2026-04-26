@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectDashboard } from "@/features/dashboard/ProjectDashboard";
 import type { EnumDescriptor } from "@/lib/api/endpoints/enums";
+import type { EventsResponse } from "@/lib/api/endpoints/events";
 import type { IssueSummary } from "@/lib/api/endpoints/issues";
 import type { ProjectDetail } from "@/lib/api/endpoints/project";
 import type { SessionSummary } from "@/lib/api/endpoints/sessions";
@@ -20,6 +21,7 @@ interface Seed {
   issues?: IssueSummary[];
   statusEnum?: EnumDescriptor;
   sessions?: SessionSummary[];
+  events?: EventsResponse;
 }
 
 function seed(data: Seed) {
@@ -30,6 +32,22 @@ function seed(data: Seed) {
   if (data.issues) qc.setQueryData(queryKeys.issues("p1"), data.issues);
   if (data.statusEnum) qc.setQueryData(queryKeys.enum("p1", "issue_status"), data.statusEnum);
   if (data.sessions) qc.setQueryData(queryKeys.sessions("p1"), data.sessions);
+  // Events are seeded under the same query key the Dashboard consumes
+  // (centre column "Recent Activity"). The Dashboard requests the
+  // last 6 of a fixed kind list — match that exact param signature.
+  if (data.events)
+    qc.setQueryData(
+      queryKeys.events("p1", {
+        limit: 6,
+        kinds: [
+          "tripwire_fire",
+          "validator_fail",
+          "artifact_rejected",
+          "pm_review_opened",
+        ],
+      }),
+      data.events,
+    );
   return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/p/p1"]}>
@@ -71,7 +89,7 @@ function issue(id: string, status: string): IssueSummary {
   };
 }
 
-function session(id: string): SessionSummary {
+function session(id: string, current_state: string | null = null): SessionSummary {
   return {
     id,
     name: `Session ${id}`,
@@ -81,7 +99,7 @@ function session(id: string): SessionSummary {
     estimated_size: null,
     blocked_by_sessions: [],
     repos: [],
-    current_state: null,
+    current_state,
     re_engagement_count: 0,
     task_progress: { done: 0, total: 0 },
   };
@@ -92,35 +110,18 @@ describe("ProjectDashboard", () => {
     cleanup();
   });
 
-  it("renders status counts derived from issues + enum", () => {
+  it("renders the project name as a hero heading", () => {
     const wrapper = seed({
-      project: {
-        id: "p1",
-        name: "Demo",
-        key_prefix: "DEMO",
-        phase: "executing",
-      },
-      issues: [
-        issue("X-1", "todo"),
-        issue("X-2", "todo"),
-        issue("X-3", "doing"),
-        issue("X-4", "done"),
-      ],
+      project: { id: "p1", name: "Demo Project", key_prefix: "DEMO", phase: "executing" },
+      issues: [],
       statusEnum: ENUM,
       sessions: [],
     });
     render(<ProjectDashboard />, { wrapper });
-
-    // 4 issues total in the header
-    expect(screen.getByText("4 issues")).toBeInTheDocument();
-    // One card per enum value with the right count
-    const todoCard = screen.getByLabelText(/2 issues in status To do/i);
-    expect(todoCard).toHaveAttribute("href", "/p/p1/board?status=todo");
-    expect(screen.getByLabelText(/1 issues in status Doing/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/1 issues in status Done/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Demo Project/ })).toBeInTheDocument();
   });
 
-  it("shows the phase card with a human description", () => {
+  it("renders the lifecycle wire with the six default stations", () => {
     const wrapper = seed({
       project: { id: "p1", name: "Demo", key_prefix: "DEMO", phase: "executing" },
       issues: [],
@@ -128,11 +129,34 @@ describe("ProjectDashboard", () => {
       sessions: [],
     });
     render(<ProjectDashboard />, { wrapper });
-    expect(screen.getByText("executing")).toBeInTheDocument();
-    expect(screen.getByText(/Sessions are in flight/)).toBeInTheDocument();
+    // The default wire is the session lifecycle: planned → completed.
+    for (const label of ["planned", "queued", "executing", "review", "verified", "completed"]) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
   });
 
-  it("shows the empty-state copy when there are no sessions", () => {
+  it("groups open work by station and lists active sessions in the left column", () => {
+    const wrapper = seed({
+      project: { id: "p1", name: "Demo", key_prefix: "DEMO", phase: "executing" },
+      issues: [],
+      statusEnum: ENUM,
+      sessions: [
+        session("sessA", "executing"),
+        session("sessB", "in_review"),
+      ],
+    });
+    render(<ProjectDashboard />, { wrapper });
+    expect(screen.getByRole("link", { name: /Session sessA/ })).toHaveAttribute(
+      "href",
+      "/p/p1/sessions/sessA",
+    );
+    expect(screen.getByRole("link", { name: /Session sessB/ })).toHaveAttribute(
+      "href",
+      "/p/p1/sessions/sessB",
+    );
+  });
+
+  it("renders an empty state when there are no sessions and no events", () => {
     const wrapper = seed({
       project: { id: "p1", name: "Demo", key_prefix: "DEMO", phase: "scoping" },
       issues: [],
@@ -140,35 +164,27 @@ describe("ProjectDashboard", () => {
       sessions: [],
     });
     render(<ProjectDashboard />, { wrapper });
-    expect(screen.getByText(/No sessions yet/)).toBeInTheDocument();
+    expect(screen.getByText(/no open sessions/i)).toBeInTheDocument();
+    expect(screen.getByText(/no recent activity/i)).toBeInTheDocument();
   });
 
-  it("renders recent sessions as links to the session detail route", () => {
-    const wrapper = seed({
-      project: { id: "p1", name: "Demo", key_prefix: "DEMO", phase: "executing" },
-      issues: [],
-      statusEnum: ENUM,
-      sessions: [session("sessA"), session("sessB")],
+  it("does not crash when project data hasn't loaded yet", () => {
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
     });
-    render(<ProjectDashboard />, { wrapper });
-    expect(screen.getByRole("link", { name: /Session sessA/ })).toHaveAttribute(
-      "href",
-      "/p/p1/sessions/sessA",
-    );
-  });
-
-  it("renders shortcut links to board, graph, sessions", () => {
-    const wrapper = seed({
-      project: { id: "p1", name: "Demo", key_prefix: "DEMO", phase: "executing" },
-      issues: [],
-      statusEnum: ENUM,
-      sessions: [],
-    });
-    render(<ProjectDashboard />, { wrapper });
-    expect(screen.getByRole("link", { name: /Open board/ })).toHaveAttribute("href", "/p/p1/board");
-    expect(screen.getByRole("link", { name: /Concept graph/ })).toHaveAttribute(
-      "href",
-      "/p/p1/graph",
-    );
+    function Wrap({ children }: { children: ReactNode }) {
+      return (
+        <QueryClientProvider client={qc}>
+          <MemoryRouter initialEntries={["/p/p1"]}>
+            <Routes>
+              <Route path="/p/:projectId" element={children} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+    }
+    render(<ProjectDashboard />, { wrapper: Wrap });
+    // Falls back to the project id as the heading until the API resolves.
+    expect(screen.getByRole("heading", { name: /p1/ })).toBeInTheDocument();
   });
 });
