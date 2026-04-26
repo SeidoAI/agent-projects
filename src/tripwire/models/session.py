@@ -74,6 +74,11 @@ class RuntimeState(BaseModel):
     log_path: str | None = None
     skills_hash: str | None = None  # sentinel for copy_skills idempotency
     last_spawn_resumed: bool = False  # whether last spawn was --resume
+    # v0.7.10 §3.A4 — set by the runtime monitor's ActionExecutor when
+    # the cost-overrun tripwire fires. The CLI surfaces this as
+    # `(over budget)` next to the paused status so a human knows the
+    # session was halted by budget, not by a manual pause.
+    cost_overrun_at: datetime | str | None = None
 
 
 class SessionOrchestration(BaseModel):

@@ -61,6 +61,10 @@ class SpawnConfigValues(BaseModel):
     max_turns: int = 200
     max_budget_usd: int = 100
     output_format: str = "stream-json"
+    # v0.7.10 §3.A2 — pick a route from `templates/spawn/routing.yaml`.
+    # Empty string falls back to the routing table's `default:` route
+    # (`agentic_loop` ⇒ opus xhigh, matching the existing baseline).
+    task_kind: str = ""
 
 
 class SpawnDefaults(BaseModel):

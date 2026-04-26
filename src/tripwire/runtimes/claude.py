@@ -105,6 +105,7 @@ class ClaudeRuntime:
             session_id=prepped.session_id,
             claude_session_id=prepped.claude_session_id,
             resume=prepped.resume,
+            project_dir=prepped.project_dir,
         )
 
         log_path = _render_log_path(prepped)

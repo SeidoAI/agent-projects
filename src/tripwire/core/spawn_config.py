@@ -20,6 +20,7 @@ from typing import Any
 
 import yaml
 
+from tripwire.core.spawn_routing import RouteResolution, resolve_route
 from tripwire.core.store import load_project
 from tripwire.models.session import AgentSession
 from tripwire.models.spawn import SpawnConfigValues, SpawnDefaults
@@ -253,6 +254,7 @@ def build_claude_args(
     claude_session_id: str,
     resume: bool = False,
     interactive: bool = False,
+    project_dir: Path | None = None,
 ) -> list[str]:
     """Build the claude CLI argv from the resolved spawn config.
 
@@ -273,6 +275,14 @@ def build_claude_args(
     unconditionally — it's display-only and safe in both modes.
 
     Flag set matches ``claude --help`` output and spec §8.1.
+
+    v0.7.10 §3.A2 — when ``project_dir`` is supplied, the resolved
+    spawn config's ``task_kind`` is looked up via
+    :func:`tripwire.core.spawn_routing.resolve_route`. The route's
+    ``(model, effort)`` replace ``cfg.model`` / ``cfg.effort`` (which
+    become defaults that the route layers on top of). When
+    ``project_dir`` is ``None``, the legacy path is preserved — every
+    pre-routing test continues to pass without modification.
     """
     if interactive and prompt is not None:
         raise ValueError("prompt must be None when interactive=True")
@@ -280,6 +290,12 @@ def build_claude_args(
         raise ValueError("prompt is required when interactive=False")
 
     cfg = defaults.config
+    model = cfg.model
+    effort = cfg.effort
+    if project_dir is not None:
+        route: RouteResolution = resolve_route(cfg.task_kind, project_dir)
+        model = route.model
+        effort = route.effort
     args: list[str] = [defaults.invocation.command]
     if not interactive:
         args += ["-p", prompt]
@@ -290,9 +306,9 @@ def build_claude_args(
         args += ["--session-id", claude_session_id]
     args += [
         "--effort",
-        cfg.effort,
+        effort,
         "--model",
-        cfg.model,
+        model,
         "--fallback-model",
         cfg.fallback_model,
         "--permission-mode",

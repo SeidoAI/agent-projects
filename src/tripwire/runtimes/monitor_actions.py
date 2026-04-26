@@ -65,6 +65,10 @@ class ActionExecutor:
         sent = send_sigterm(action.pid)
         outcome = f"sigterm/{action.tripwire_id} pid={action.pid} sent={sent}: {action.reason}"
         self._stamp_engagement(outcome)
+        # v0.7.10 §3.A4 — flag cost-overrun on runtime_state so
+        # `tripwire session list` can surface it.
+        if action.tripwire_id == "monitor/cost_overrun":
+            self._stamp_cost_overrun()
         self._append_monitor_log(action.tripwire_id, action.reason)
         if not sent:
             logger.warning(
@@ -72,6 +76,17 @@ class ActionExecutor:
                 action.pid,
                 action.tripwire_id,
             )
+
+    def _stamp_cost_overrun(self) -> None:
+        try:
+            session = load_session(self.project_dir, self.session_id)
+        except FileNotFoundError:
+            return
+        if session.runtime_state.cost_overrun_at is not None:
+            return  # idempotent — first crossing wins
+        session.runtime_state.cost_overrun_at = datetime.now(tz=timezone.utc)
+        session.updated_at = datetime.now(tz=timezone.utc)
+        save_session(self.project_dir, session)
 
     def _do_transition(self, action: TransitionStatus) -> None:
         try:

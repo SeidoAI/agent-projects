@@ -1,0 +1,70 @@
+# Model + effort routing table (v0.7.10 §3.A1).
+#
+# A session declares ``task_kind: <key>`` in its ``spawn_config`` and
+# the runtime resolves it to a ``(provider, model, effort)`` tuple.
+# Empty / missing ``task_kind`` falls back to ``default:`` below.
+#
+# Resolution precedence (highest wins):
+#   1. session.yaml    spawn_config.task_kind picks the route name
+#   2. project file    <project_dir>/.tripwire/spawn/routing.yaml
+#                      may add or replace routes; may change ``default:``
+#   3. shipped default this file
+#
+# Override semantics: a project file's ``routes`` map deep-merges into
+# this file's ``routes`` map, with leaf-level replacement (i.e. a single
+# ``provider:`` field replaces the whole dict's value for that field).
+# A project file's ``default:`` scalar replaces the shipped one.
+#
+# The 6 named routes match the v0.7.10 spec narrative: cheap routes for
+# narrow edits, premium routes for ambiguous multi-step work.
+
+default: agentic_loop
+
+routes:
+  # Narrow, deterministic edits: yaml/markdown patches, comment-only
+  # diffs, lint-rule additions. Sonnet at low effort handles these in
+  # one or two turns; opus burns budget for no quality gain.
+  lint_or_template_edit:
+    provider: claude
+    model: sonnet
+    effort: low
+
+  # Single-purpose CLI commands or tests: scaffolding a new flag, fixing
+  # one regression, adding one click subcommand. Sonnet medium is the
+  # sweet spot for "one feature, well-tested".
+  small_cli_command:
+    provider: claude
+    model: sonnet
+    effort: medium
+
+  # Touching multiple files behind a clear test contract. Sonnet high is
+  # disciplined enough for refactors that would still cost too much on
+  # opus and not survive on low effort.
+  refactor_with_tdd:
+    provider: claude
+    model: sonnet
+    effort: high
+
+  # The default for sessions that need plan-driven multi-step work with
+  # frequent re-planning: read code, write tests, run them, push, react
+  # to CI. Opus xhigh is what every v0.7.x agent has been running on.
+  agentic_loop:
+    provider: claude
+    model: opus
+    effort: xhigh
+
+  # Hard debug sessions: complex state, racey behaviour, intermittent
+  # CI failures, deep cross-file reasoning. Max effort gives the model
+  # room to think before it acts.
+  gnarly_debug:
+    provider: claude
+    model: opus
+    effort: max
+
+  # Cross-runtime / cross-agent review work: read other agents' diffs,
+  # post structured findings, no production code being authored. Opus
+  # high is enough — review tasks are read-heavy not generate-heavy.
+  cross_review:
+    provider: claude
+    model: opus
+    effort: high
