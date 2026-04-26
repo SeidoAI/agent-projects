@@ -24,6 +24,7 @@ from tripwire.cli.next_key import next_key_cmd
 from tripwire.cli.node import node_cmd
 from tripwire.cli.plan import plan_cmd
 from tripwire.cli.pr_summary import pr_summary_cmd
+from tripwire.cli.queue import queue_cmd
 from tripwire.cli.readme import readme_cmd
 from tripwire.cli.refresh import refresh_cmd
 from tripwire.cli.refs import refs_cmd
@@ -103,6 +104,7 @@ cli.add_command(refresh_cmd)
 cli.add_command(refs_cmd)
 cli.add_command(node_cmd)
 cli.add_command(session_cmd)
+cli.add_command(queue_cmd)
 cli.add_command(templates_cmd)
 cli.add_command(enums_cmd)
 cli.add_command(artifacts_cmd)
