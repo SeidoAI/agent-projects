@@ -136,7 +136,37 @@ class InjectFollowUp:
     target: str = "plan.md"
 
 
-MonitorAction = LogWarning | SigtermProcess | TransitionStatus | InjectFollowUp
+@dataclass
+class SuspendProcess:
+    """Freeze the agent process via SIGSTOP — used during CI-wait
+    (v0.7.10 §B4) so token-burn drops to ~0 while the agent polls a
+    PR's CI status. The executor schedules a defensive 30-min
+    SIGCONT so a stuck monitor never leaves the agent frozen
+    indefinitely.
+    """
+
+    tripwire_id: str
+    pid: int
+    reason: str
+
+
+@dataclass
+class ResumeProcess:
+    """Wake a SIGSTOP-frozen agent process via SIGCONT."""
+
+    tripwire_id: str
+    pid: int
+    reason: str
+
+
+MonitorAction = (
+    LogWarning
+    | SigtermProcess
+    | TransitionStatus
+    | InjectFollowUp
+    | SuspendProcess
+    | ResumeProcess
+)
 
 
 # ---------- Context -------------------------------------------------------
@@ -273,6 +303,10 @@ class RuntimeMonitor:
         self._final_text = ""
         self._session_complete_text_seen = False
         self._quota_error_fired = False
+        # B4 — CI-wait suspend dedup: re-firing while suspended races
+        # against the resume side and re-suspends an already-frozen
+        # pid. One Suspend per cycle.
+        self._suspended_pending = False
 
     # --- public surface -------------------------------------------------
 
@@ -337,6 +371,9 @@ class RuntimeMonitor:
         # #10 — `gh pr create` from code worktree
         if cmd and self._is_pr_create(cmd):
             self._check_code_pr_no_pt(actions)
+        # B4 — CI-wait suspend
+        if cmd and self._is_ci_poll(cmd):
+            self._maybe_fire_ci_wait_suspend(actions)
 
     def _handle_user(self, event: dict[str, Any], actions: list[MonitorAction]) -> None:
         message = event.get("message") or {}
@@ -538,6 +575,40 @@ class RuntimeMonitor:
         return "gh pr create" in cmd
 
     @staticmethod
+    def _is_ci_poll(cmd: str) -> bool:
+        """True if ``cmd`` is one of the CI-wait poll variants from §B1.
+
+        Two shapes the spawn template supports:
+          - ``gh pr checks <num> --watch`` (single blocking poll)
+          - ``gh pr view <num> --json statusCheckRollup`` (loop variant
+            with ``sleep 30`` between iterations)
+
+        ``gh pr view --json title`` and similar non-CI uses must NOT
+        match — only the statusCheckRollup form indicates CI-wait.
+        """
+        if "gh pr checks" in cmd and "--watch" in cmd:
+            return True
+        if "gh pr view" in cmd and "statusCheckRollup" in cmd:
+            return True
+        return False
+
+    def _maybe_fire_ci_wait_suspend(self, actions: list[MonitorAction]) -> None:
+        if self._suspended_pending:
+            return
+        self._suspended_pending = True
+        actions.append(
+            SuspendProcess(
+                tripwire_id="monitor/ci_wait_suspend",
+                pid=self.ctx.pid,
+                reason=(
+                    "Agent entered CI-wait poll (§B1). SIGSTOP'ing to "
+                    "drop token-burn to ~0; defensive 30-min SIGCONT "
+                    "is scheduled by the executor."
+                ),
+            )
+        )
+
+    @staticmethod
     def _stringify_tool_result(content: Any) -> str:
         if content is None:
             return ""
@@ -661,7 +732,9 @@ __all__ = [
     "MonitorAction",
     "MonitorContext",
     "MonitorThread",
+    "ResumeProcess",
     "RuntimeMonitor",
     "SigtermProcess",
+    "SuspendProcess",
     "TransitionStatus",
 ]

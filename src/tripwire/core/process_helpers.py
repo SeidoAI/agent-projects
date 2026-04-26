@@ -37,3 +37,26 @@ def send_sigterm(pid: int) -> bool:
         return True
     except ProcessLookupError:
         return False
+
+
+def send_sigstop(pid: int) -> bool:
+    """Send SIGSTOP to freeze a process. Returns True if it existed.
+
+    Used by the v0.7.10 §B4 pause-on-CI-wait tripwire to halt the
+    agent process during CI polling so token-burn drops to ~0. The
+    process is resumed via ``send_sigcont``.
+    """
+    try:
+        os.kill(pid, signal.SIGSTOP)
+        return True
+    except ProcessLookupError:
+        return False
+
+
+def send_sigcont(pid: int) -> bool:
+    """Send SIGCONT to resume a SIGSTOP-frozen process."""
+    try:
+        os.kill(pid, signal.SIGCONT)
+        return True
+    except ProcessLookupError:
+        return False

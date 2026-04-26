@@ -14,18 +14,28 @@ disk.
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from tripwire.core.process_helpers import send_sigterm
+from tripwire.core.process_helpers import send_sigcont, send_sigstop, send_sigterm
 from tripwire.core.session_store import load_session, save_session
 from tripwire.runtimes.monitor import (
     InjectFollowUp,
     LogWarning,
     MonitorAction,
+    ResumeProcess,
     SigtermProcess,
+    SuspendProcess,
     TransitionStatus,
 )
+
+# B4 — defensive cap on how long the agent may stay SIGSTOP'd. Even if
+# external state never SIGCONTs the agent, after this many seconds the
+# scheduled timer wakes it back up so the session isn't lost. 30 min
+# is roughly an order of magnitude longer than the longest observed
+# CI run on this repo (~3 min); shorter caps risk waking mid-poll.
+_DEFENSIVE_RESUME_SECONDS = 30 * 60
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +66,10 @@ class ActionExecutor:
             self._do_inject(action)
         elif isinstance(action, LogWarning):
             self._do_warning(action)
+        elif isinstance(action, SuspendProcess):
+            self._do_suspend(action)
+        elif isinstance(action, ResumeProcess):
+            self._do_resume(action)
         else:  # pragma: no cover — exhaustive over the dataclass union
             logger.warning("ActionExecutor: unknown action type %r", action)
 
@@ -118,6 +132,59 @@ class ActionExecutor:
 
     def _do_warning(self, action: LogWarning) -> None:
         self._append_monitor_log(action.tripwire_id, action.message)
+
+    def _do_suspend(self, action: SuspendProcess) -> None:
+        sent = send_sigstop(action.pid)
+        outcome = (
+            f"sigstop/{action.tripwire_id} pid={action.pid} sent={sent}: "
+            f"{action.reason}"
+        )
+        self._append_monitor_log(action.tripwire_id, outcome)
+        if not sent:
+            logger.warning(
+                "monitor: SIGSTOP target pid %d not found (%s)",
+                action.pid,
+                action.tripwire_id,
+            )
+            return
+        # Schedule a defensive SIGCONT — even if nothing else wakes
+        # the agent, it can't be left frozen indefinitely.
+        timer = threading.Timer(
+            _DEFENSIVE_RESUME_SECONDS,
+            self._defensive_resume,
+            args=(action.pid, action.tripwire_id),
+        )
+        timer.daemon = True
+        timer.start()
+
+    def _do_resume(self, action: ResumeProcess) -> None:
+        sent = send_sigcont(action.pid)
+        outcome = (
+            f"sigcont/{action.tripwire_id} pid={action.pid} sent={sent}: "
+            f"{action.reason}"
+        )
+        self._append_monitor_log(action.tripwire_id, outcome)
+        if not sent:
+            logger.warning(
+                "monitor: SIGCONT target pid %d not found (%s)",
+                action.pid,
+                action.tripwire_id,
+            )
+
+    def _defensive_resume(self, pid: int, source_tripwire_id: str) -> None:
+        """Fallback SIGCONT path that fires after ``_DEFENSIVE_RESUME_SECONDS``.
+
+        Runs on a daemon ``threading.Timer``. If the agent already
+        exited (pid gone), ``send_sigcont`` is a no-op.
+        """
+        sent = send_sigcont(pid)
+        self._append_monitor_log(
+            "monitor/ci_wait_resume",
+            (
+                f"defensive sigcont pid={pid} sent={sent} "
+                f"source={source_tripwire_id} after={_DEFENSIVE_RESUME_SECONDS}s"
+            ),
+        )
 
     # --- helpers --------------------------------------------------------
 
