@@ -18,17 +18,21 @@ sessions that have `session.yaml` in their directory. A flat
 
 from __future__ import annotations
 
+import logging
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from tripwire.core import paths
+from tripwire.core.event_emitter import EventEmitter, NullEmitter
 from tripwire.core.parser import (
     ParseError,
     parse_frontmatter_body,
     serialize_frontmatter_body,
 )
 from tripwire.models.session import AgentSession
+
+logger = logging.getLogger(__name__)
 
 
 def session_dir(project_dir: Path, session_id: str) -> Path:
@@ -54,13 +58,25 @@ def load_session(project_dir: Path, session_id: str) -> AgentSession:
     return AgentSession.model_validate({**frontmatter, "body": body})
 
 
-def save_session(project_dir: Path, session: AgentSession) -> None:
+def save_session(
+    project_dir: Path,
+    session: AgentSession,
+    *,
+    emitter: EventEmitter | None = None,
+) -> None:
     """Serialise an AgentSession to `sessions/<id>/session.yaml`.
 
     Creates the session directory if missing. Sets `updated_at` to now
     if it is unset. Does not invalidate the graph cache (sessions are
     not tracked in the concept graph).
+
+    If *emitter* is supplied and the session's previously-persisted
+    `status` differs from the new value, one ``status_transition`` event
+    is emitted. The default `NullEmitter` keeps existing batch behaviour
+    unchanged. See `docs/specs/2026-04-26-v08-handoff.md` §1.2.
     """
+    prior_status = _read_persisted_status(project_dir, session.id)
+
     if session.updated_at is None:
         session.updated_at = datetime.now()
 
@@ -70,6 +86,63 @@ def save_session(project_dir: Path, session: AgentSession) -> None:
     data = session.model_dump(mode="json", exclude={"body"}, exclude_none=True)
     text = serialize_frontmatter_body(data, session.body)
     path.write_text(text, encoding="utf-8")
+
+    if emitter is None:
+        emitter = NullEmitter()
+    if isinstance(emitter, NullEmitter):
+        return
+    if prior_status is None or prior_status == session.status:
+        return
+    _emit_status_transition(
+        emitter,
+        session_id=session.id,
+        from_status=prior_status,
+        to_status=session.status,
+    )
+
+
+def _read_persisted_status(project_dir: Path, session_id: str) -> str | None:
+    """Return the status field of the on-disk session.yaml or None.
+
+    Used to compute the `from_status` field in a `status_transition`
+    event. The check is best-effort: a parse error or missing file
+    means we have nothing to compare against, so no event fires.
+    """
+    path = session_yaml_path(project_dir, session_id)
+    if not path.exists():
+        return None
+    try:
+        text = path.read_text(encoding="utf-8")
+        frontmatter, _ = parse_frontmatter_body(text)
+    except (OSError, ParseError):
+        return None
+    status = frontmatter.get("status")
+    return status if isinstance(status, str) else None
+
+
+def _emit_status_transition(
+    emitter: EventEmitter,
+    *,
+    session_id: str,
+    from_status: str,
+    to_status: str,
+) -> None:
+    """Emit one `status_transition` event under `status_transitions/`."""
+    fired_at = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    payload = {
+        "id": (
+            f"evt-{fired_at}-status-{session_id}-{from_status}-to-{to_status}"
+        ),
+        "kind": "status_transition",
+        "fired_at": fired_at,
+        "session_id": session_id,
+        "from_status": from_status,
+        "to_status": to_status,
+    }
+    try:
+        emitter.emit("status_transitions", payload)
+    except Exception:
+        logger.exception("status_transition emission failed for %s", session_id)
 
 
 def list_sessions(project_dir: Path) -> list[AgentSession]:
