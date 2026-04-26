@@ -16,10 +16,12 @@ from tripwire.runtimes.base import (
     SessionRuntime,
 )
 from tripwire.runtimes.claude import ClaudeRuntime
+from tripwire.runtimes.codex import CodexRuntime
 from tripwire.runtimes.manual import ManualRuntime
 
 RUNTIMES: dict[str, SessionRuntime] = {
     "claude": ClaudeRuntime(),
+    "codex": CodexRuntime(),
     "manual": ManualRuntime(),
 }
 
@@ -39,6 +41,7 @@ __all__ = [
     "AttachExec",
     "AttachInstruction",
     "ClaudeRuntime",
+    "CodexRuntime",
     "ManualRuntime",
     "PreppedSession",
     "RuntimeStartResult",
