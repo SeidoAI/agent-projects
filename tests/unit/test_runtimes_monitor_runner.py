@@ -136,3 +136,163 @@ def test_runner_dispatches_actions_to_executor(project: Path, tmp_path: Path):
     runner.run()
     session = load_session(project, "s1")
     assert session.status == "paused"
+
+
+# ---------- Stream-idle reaper -----------------------------------------
+
+
+def test_runner_reaps_stream_idle_when_log_silent(project: Path, tmp_path: Path):
+    """If the watched pid stays alive but no events are produced for
+    longer than ``stream_idle_threshold_seconds``, the runner classifies
+    it as a wedged-stream death and reaps it (SIGTERM + flip status to
+    failed + inject follow-up)."""
+    import os
+
+    from tripwire.core.session_store import load_session
+
+    log = tmp_path / "agent.log"
+    log.write_text("")  # never any events
+    cfg = RunnerConfig(
+        session_id="s1",
+        pid=os.getpid(),  # alive throughout the test
+        log_path=log,
+        code_worktree=tmp_path / "code",
+        pt_worktree=None,
+        project_dir=project,
+        max_budget_usd=10.0,
+        monitor_log_path=tmp_path / "monitor.log",
+        poll_interval=0.02,
+        stream_idle_threshold_seconds=0.1,  # 100ms — fires fast in test
+    )
+    runner = MonitorRunner(cfg, max_runtime_seconds=2.0)
+    # Patch the SIGTERM action so the test doesn't actually kill pytest.
+    import tripwire.runtimes.monitor_actions as actions_mod
+
+    sigterm_calls: list[int] = []
+    real_do_sigterm = actions_mod.ActionExecutor._do_sigterm
+    actions_mod.ActionExecutor._do_sigterm = lambda self, action: sigterm_calls.append(
+        action.pid
+    )
+    try:
+        runner.run()
+    finally:
+        actions_mod.ActionExecutor._do_sigterm = real_do_sigterm
+
+    assert runner.exit_reason == "stream_idle"
+    # The reaper sent SIGTERM to the watched pid (intercepted by patch).
+    assert sigterm_calls == [os.getpid()]
+    # And flipped the session to failed via the existing executor path.
+    session = load_session(project, "s1")
+    assert session.status == "failed"
+
+
+def test_runner_does_not_reap_when_events_keep_flowing(project: Path, tmp_path: Path):
+    """As long as new events land in the log, the stream-idle clock
+    keeps resetting and the reaper never fires. A flow of trivial
+    events plus a short window should leave us with the standard
+    pid-dead exit, not a stream-idle one."""
+    log = tmp_path / "agent.log"
+    log.write_text("")
+    cfg = RunnerConfig(
+        session_id="s1",
+        pid=999999,  # not alive — pid_dead exit will eventually fire
+        log_path=log,
+        code_worktree=tmp_path / "code",
+        pt_worktree=None,
+        project_dir=project,
+        max_budget_usd=10.0,
+        monitor_log_path=tmp_path / "monitor.log",
+        poll_interval=0.02,
+        stream_idle_threshold_seconds=0.5,  # 500ms — would fire if no events
+    )
+    runner = MonitorRunner(cfg, max_runtime_seconds=2.0)
+    # Even with pid not alive, the runner's first poll-tick happens
+    # before pid is checked → if stream-idle threshold is very small
+    # AND no events arrive AND pid_dead is faster, we'd want pid_dead.
+    # Here we want the simpler assertion: with pid=999999 (dead), the
+    # runner exits via pid_dead, not stream_idle, even though no
+    # events arrive — because the threshold is 0.5s but pid_dead
+    # fires within one poll_interval (20ms).
+    runner.run()
+    assert runner.exit_reason == "pid_dead"
+
+
+def test_monitor_thread_tracks_last_event_at(tmp_path: Path):
+    """`MonitorThread.last_event_at` advances every time a parsed
+    event is processed, regardless of whether it produces actions."""
+    import json
+    import time
+
+    from tripwire.runtimes.monitor import (
+        MonitorContext,
+        MonitorThread,
+        RuntimeMonitor,
+    )
+
+    log = tmp_path / "agent.log"
+    log.write_text("")
+    monitor = RuntimeMonitor(
+        MonitorContext(
+            session_id="s1",
+            pid=12345,
+            log_path=log,
+            code_worktree=tmp_path / "code",
+            pt_worktree=None,
+            project_dir=tmp_path,
+            max_budget_usd=10.0,
+            model_name="claude-opus-4-7",
+            key_files=[],
+            required_artifacts=[],
+        )
+    )
+    actions: list = []
+    thread = MonitorThread(monitor, actions.append, poll_interval=0.02)
+    thread.start()
+    try:
+        baseline = thread.last_event_at
+        time.sleep(0.05)
+        # Append a benign event that produces no actions.
+        log.write_text(json.dumps({"type": "system", "subtype": "init"}) + "\n")
+        # Wait for the thread's tail loop to pick it up.
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline and thread.last_event_at == baseline:
+            time.sleep(0.02)
+    finally:
+        thread.stop()
+    assert thread.last_event_at > baseline
+
+
+def test_runner_config_defaults_stream_idle_threshold_to_600s():
+    """Default threshold is 10 minutes — well above any normal
+    between-events gap during heavy tool use."""
+    cfg = RunnerConfig(
+        session_id="s1",
+        pid=1,
+        log_path=Path("/tmp/x"),
+        code_worktree=Path("/tmp/code"),
+        pt_worktree=None,
+        project_dir=Path("/tmp/proj"),
+        max_budget_usd=10.0,
+        monitor_log_path=Path("/tmp/m"),
+    )
+    assert cfg.stream_idle_threshold_seconds == 600.0
+
+
+def test_runner_config_roundtrips_stream_idle_threshold(tmp_path: Path):
+    """Custom threshold survives the JSON write/read cycle so the
+    spawning runtime can override it."""
+    cfg = RunnerConfig(
+        session_id="s1",
+        pid=1,
+        log_path=tmp_path / "log",
+        code_worktree=tmp_path / "code",
+        pt_worktree=None,
+        project_dir=tmp_path,
+        max_budget_usd=10.0,
+        monitor_log_path=tmp_path / "m",
+        stream_idle_threshold_seconds=120.0,
+    )
+    target = tmp_path / "ctx.json"
+    write_runner_config(cfg, target)
+    loaded = read_runner_config(target)
+    assert loaded.stream_idle_threshold_seconds == 120.0

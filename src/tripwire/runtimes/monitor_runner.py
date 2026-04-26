@@ -31,11 +31,17 @@ from pathlib import Path
 
 from tripwire.core.process_helpers import is_alive
 from tripwire.runtimes.monitor import (
+    InjectFollowUp,
+    LogWarning,
     MonitorContext,
     MonitorThread,
     RuntimeMonitor,
+    SigtermProcess,
+    TransitionStatus,
 )
 from tripwire.runtimes.monitor_actions import ActionExecutor
+
+STREAM_IDLE_TRIPWIRE_ID = "monitor/stream_idle"
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +65,13 @@ class RunnerConfig:
     key_files: list[str] = field(default_factory=list)
     required_artifacts: list[str] = field(default_factory=list)
     poll_interval: float = 1.0
+    # Stream-idle threshold: if the agent's log file has produced no
+    # new events for this many seconds while the process is still
+    # alive, the runner classifies it as a silent stream-idle death
+    # (typically a wedged libuv loop after a SIGSTOP/SIGCONT cycle, or
+    # a `claude -p` post-end_turn hang) and reaps it. 600s = 10 min,
+    # well above any normal between-events gap during heavy tool use.
+    stream_idle_threshold_seconds: float = 600.0
 
 
 def write_runner_config(cfg: RunnerConfig, target: Path) -> None:
@@ -128,11 +141,76 @@ class MonitorRunner:
                 if time.monotonic() >= deadline:
                     self.exit_reason = "max_runtime"
                     return
+                if self._is_stream_idle():
+                    self._reap_stream_idle()
+                    self.exit_reason = "stream_idle"
+                    return
                 time.sleep(self.cfg.poll_interval)
         finally:
             # Flush remaining lines + run on-exit tripwires + stop thread.
             self._thread.on_process_exit(exit_code=None)
             self._thread.stop()
+
+    def _is_stream_idle(self) -> bool:
+        """True when the agent's log has produced no events for longer
+        than the configured threshold while the process is still alive.
+
+        Symptom of a wedged libuv loop (post-SIGSTOP/SIGCONT) or a
+        `claude -p` that didn't `_exit` after `result/end_turn`.
+        Process is technically alive but doing no useful work.
+        """
+        if self.cfg.stream_idle_threshold_seconds <= 0:
+            return False
+        idle_for = time.monotonic() - self._thread.last_event_at
+        return idle_for > self.cfg.stream_idle_threshold_seconds
+
+    def _reap_stream_idle(self) -> None:
+        """SIGTERM the wedged agent + flip session status to ``failed``
+        + leave a follow-up note in the plan so the next ``--resume``
+        spawn knows what happened."""
+        idle_minutes = (time.monotonic() - self._thread.last_event_at) / 60.0
+        reason = (
+            f"agent log produced no events for ~{idle_minutes:.0f} min "
+            f"while pid {self.cfg.pid} was still alive; "
+            f"classified as silent stream-idle (likely a wedged libuv "
+            f"loop after a SIGSTOP/SIGCONT cycle or a claude -p "
+            f"post-end_turn hang)"
+        )
+        followup = (
+            "## PM follow-up — silent stream-idle reaper\n\n"
+            f"Previous engagement was reaped at {idle_minutes:.0f} min "
+            "of stream silence. Your prior conversation is preserved; "
+            "resume from where you left off. If you were in PR closeout, "
+            "verify the closing comment + status transition landed before "
+            "the silence began."
+        )
+        self._executor.execute(
+            LogWarning(
+                tripwire_id=STREAM_IDLE_TRIPWIRE_ID,
+                message=reason,
+            )
+        )
+        self._executor.execute(
+            SigtermProcess(
+                tripwire_id=STREAM_IDLE_TRIPWIRE_ID,
+                pid=self.cfg.pid,
+                reason=reason,
+            )
+        )
+        self._executor.execute(
+            TransitionStatus(
+                tripwire_id=STREAM_IDLE_TRIPWIRE_ID,
+                new_status="failed",
+                reason=reason,
+            )
+        )
+        self._executor.execute(
+            InjectFollowUp(
+                tripwire_id=STREAM_IDLE_TRIPWIRE_ID,
+                message=followup,
+                target="plan.md",
+            )
+        )
 
 
 def spawn_monitor_runner(

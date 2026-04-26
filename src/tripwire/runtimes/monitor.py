@@ -32,6 +32,7 @@ import json
 import logging
 import subprocess
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -634,10 +635,29 @@ class MonitorThread:
         self._thread: threading.Thread | None = None
         self._buffer = ""
         self._offset = 0
+        # Stream-idle detector: monotonic timestamp of the last
+        # successfully-processed event (or thread start, if no events
+        # yet). Read by `MonitorRunner.run()` to decide whether the
+        # agent's stream has gone silent without the process exiting.
+        # Atomic float reads/writes in CPython make a lock unnecessary
+        # for this single-writer / single-reader pattern.
+        self._last_event_at: float = time.monotonic()
+
+    @property
+    def last_event_at(self) -> float:
+        """Monotonic timestamp of the most recent processed event.
+
+        Initialised to thread-start time so a brand-new thread isn't
+        immediately flagged as stale before its first event.
+        """
+        return self._last_event_at
 
     def start(self) -> None:
         if self._thread is not None:
             return
+        # Reset the stale-detector clock when the thread (re)starts so
+        # we don't carry over a stale timestamp from a previous run.
+        self._last_event_at = time.monotonic()
         self._thread = threading.Thread(
             target=self._run, daemon=True, name="tw-monitor"
         )
@@ -690,6 +710,11 @@ class MonitorThread:
                 continue
             if not isinstance(event, dict):
                 continue
+            # Stamp the stream-idle clock on every successfully-parsed
+            # event, regardless of whether the monitor emits actions for
+            # it. The signal we care about is "stream is moving," not
+            # "stream is producing tripwire-relevant content."
+            self._last_event_at = time.monotonic()
             try:
                 actions = self._monitor.process_event(event)
             except Exception:
