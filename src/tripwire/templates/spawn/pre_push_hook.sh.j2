@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# tripwire pre-push hook — installed at session-spawn time (KUI-99).
+#
+# Blocks `git push` from this session worktree until the self-review
+# tripwire has been acknowledged via a substantive marker file at
+# <project_dir>/.tripwire/acks/self-review-<session_id>.json, OR the
+# operator has explicitly bypassed via `tripwire session complete
+# --no-tripwires` (audit-log entry under .tripwire/audit/).
+#
+# Two opt-outs:
+#   * per-call:   `tripwire session complete --no-tripwires` writes the
+#                 audit entry this hook checks for.
+#   * per-project: `tripwires.enabled: false` in project.yaml — the
+#                  hook re-reads project.yaml on every invocation so a
+#                  late opt-out works without reinstall.
+set -eu
+
+PROJECT_DIR="{{ project_dir }}"
+SESSION_ID="{{ session_id }}"
+
+# Re-read project.yaml so a late `tripwires.enabled: false` works
+# without re-installing the hook. We grep rather than parse YAML to
+# keep the hook self-contained (no python invocation cost on every
+# push). The pattern matches the rendered `enabled: false` line
+# exactly — over-matching here would be a false-positive bypass.
+if [ -f "${PROJECT_DIR}/project.yaml" ]; then
+  if grep -E '^[[:space:]]*enabled:[[:space:]]*false[[:space:]]*$' \
+      "${PROJECT_DIR}/project.yaml" >/dev/null 2>&1; then
+    # Could be enabled:false in some other block, but project.yaml
+    # only carries one `enabled:` key today. If we add more, this
+    # hook tightens to a YAML-aware probe.
+    exit 0
+  fi
+fi
+
+ACK_MARKER="${PROJECT_DIR}/.tripwire/acks/self-review-${SESSION_ID}.json"
+BYPASS_LOG="${PROJECT_DIR}/.tripwire/audit/tripwire_bypass.log"
+
+# Per-call bypass: any audit entry naming this session is enough.
+if [ -f "${BYPASS_LOG}" ]; then
+  if grep -E "[[:space:]]${SESSION_ID}[[:space:]].*--no-tripwires" \
+      "${BYPASS_LOG}" >/dev/null 2>&1; then
+    exit 0
+  fi
+fi
+
+# Substantive ack: marker exists AND has either a non-empty
+# fix_commits list OR declared_no_findings=true. We do a minimal
+# JSON-shape check via grep to keep the hook fast.
+if [ -f "${ACK_MARKER}" ]; then
+  # Match either:
+  #   "fix_commits": [ ... non-empty ... ]
+  #   "declared_no_findings": true
+  if grep -E '"fix_commits"[[:space:]]*:[[:space:]]*\[[[:space:]]*"' \
+      "${ACK_MARKER}" >/dev/null 2>&1; then
+    exit 0
+  fi
+  if grep -E '"declared_no_findings"[[:space:]]*:[[:space:]]*true' \
+      "${ACK_MARKER}" >/dev/null 2>&1; then
+    exit 0
+  fi
+fi
+
+cat >&2 <<EOF
+tripwire: push blocked.
+
+Session ${SESSION_ID} hasn't run a successful self-review yet. Run:
+
+  tripwire session complete ${SESSION_ID}
+
+— this returns the self-review prompt. Address it (commit fixes), then:
+
+  tripwire session complete ${SESSION_ID} --ack --fix-commit <sha>
+
+OR:
+
+  tripwire session complete ${SESSION_ID} --ack --declared-no-findings
+
+After that, this push will succeed.
+
+Bypass options:
+  * per-call:    tripwire session complete --no-tripwires
+  * per-project: set tripwires.enabled: false in project.yaml
+EOF
+exit 1

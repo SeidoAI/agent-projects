@@ -644,6 +644,74 @@ def render_kickoff(*, code_worktree: Path, prompt: str) -> None:
     kickoff.write_text(prompt, encoding="utf-8")
 
 
+def install_pre_push_hook(
+    *, worktree: Path, project_dir: Path, session_id: str
+) -> None:
+    """Install the tripwire pre-push hook in this worktree (KUI-99).
+
+    Reads ``project.yaml.tripwires.enabled``; on False, skips
+    installation entirely. On True, renders
+    ``templates/spawn/pre_push_hook.sh.j2`` into
+    ``<worktree>/.git/hooks/pre-push`` and chmods it executable.
+
+    The hook itself re-reads the project config on every push, so a
+    late ``tripwires.enabled: false`` flip works without re-install.
+    """
+    from jinja2 import Environment, FileSystemLoader
+
+    from tripwire.core.store import load_project
+
+    project = load_project(project_dir)
+    tripwires_cfg = getattr(project, "tripwires", None)
+    if (
+        tripwires_cfg is not None
+        and getattr(tripwires_cfg, "enabled", True) is False
+    ):
+        log.info(
+            "session %s: project.yaml.tripwires.enabled is False; skipping "
+            "pre-push hook install",
+            session_id,
+        )
+        return
+
+    git_dir = worktree / ".git"
+    if not git_dir.exists():
+        log.info(
+            "worktree %s has no .git; skipping pre-push hook install",
+            worktree,
+        )
+        return
+
+    # `.git` may be a file (linked worktrees) — resolve via `gitdir:`
+    # pointer so the hook lands in the right hooks/ directory.
+    if git_dir.is_file():
+        text = git_dir.read_text(encoding="utf-8")
+        for line in text.splitlines():
+            if line.startswith("gitdir:"):
+                pointer = Path(line.removeprefix("gitdir:").strip())
+                if not pointer.is_absolute():
+                    pointer = (worktree / pointer).resolve()
+                git_dir = pointer
+                break
+
+    hooks_dir = git_dir / "hooks"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+
+    template_root = Path(__file__).resolve().parent.parent / "templates" / "spawn"
+    env = Environment(
+        loader=FileSystemLoader(str(template_root)), keep_trailing_newline=True
+    )
+    template = env.get_template("pre_push_hook.sh.j2")
+    body = template.render(
+        project_dir=str(project_dir.resolve()),
+        session_id=session_id,
+    )
+
+    hook = hooks_dir / "pre-push"
+    hook.write_text(body, encoding="utf-8")
+    hook.chmod(0o755)
+
+
 def _load_project_slug(project_dir: Path) -> str:
     from tripwire.core.store import load_project
 
@@ -730,6 +798,26 @@ def run(
         raise RuntimeError(f"session '{session.id}' has no repos configured")
 
     code_worktree = Path(worktrees[0].worktree_path)
+
+    # KUI-99: install the tripwire pre-push hook on every code worktree
+    # so `git push` can't dodge `tripwire session complete`. Skipped
+    # when project.yaml.tripwires.enabled is False (the helper handles
+    # the check). Idempotent — overwrites any existing hook with the
+    # current template.
+    for wt in worktrees:
+        try:
+            install_pre_push_hook(
+                worktree=Path(wt.worktree_path),
+                project_dir=project_dir,
+                session_id=session.id,
+            )
+        except (OSError, RuntimeError) as exc:
+            log.warning(
+                "session %s: pre-push hook install failed for %s: %s",
+                session.id,
+                wt.worktree_path,
+                exc,
+            )
 
     # Look up the agent's declared skills
     skill_names: list[str] = []
