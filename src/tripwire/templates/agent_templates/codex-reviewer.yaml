@@ -1,0 +1,68 @@
+---
+id: codex-reviewer
+name: "Codex code reviewer"
+description: |
+  Single-shot review-only agent. Reads a PR diff (`gh pr diff <num>`),
+  posts a structured review (issues + severity + code references) as
+  a PR comment, exits. No implementation work, no file writes.
+
+# KUI-94 §C4: this field flips the spawn config to CodexRuntime.
+# `_apply_agent_yaml_overrides` in core/spawn_config.py picks it up
+# unless the project/session has explicitly pinned a different runtime.
+runtime: codex
+
+# Codex CLI's review variant. `gpt-5-codex` is the codex-specialised
+# model; effort: high gives it room to reason about the diff without
+# burning through max-effort budgets that review tasks don't need.
+# (Re-tune by editing this file in the project's `agents/` dir; the
+# packaged default tracks the v0.7.10 spec narrative.)
+model: gpt-5-codex
+effort: high
+
+# GitHub identity — projects override these to match a real bot
+# account. The token is what `gh pr diff` / `gh pr comment` use; the
+# review workflow at `.github/workflows/codex-review.yml` shells out
+# under the workflow token, but spawned-as-tripwire-session runs
+# (e.g. `tripwire session spawn ... --task-kind cross_review`) need
+# their own credentials.
+github_identity:
+  username: seido-codex-reviewer-bot
+  email: codex-reviewer-bot@example.com
+  token_env: GITHUB_TOKEN_CODEX
+
+# Permissions and resources. Codex review is read-only — no commit,
+# push, or PR-create — so the network allowlist is narrow: github.com
+# for the gh CLI, plus OpenAI for the codex API call.
+permissions:
+  github: read-write   # write so `gh pr comment` succeeds; nothing else writes
+  gcp: none
+  network:
+    - "github.com"
+    - "api.github.com"
+    - "objects.githubusercontent.com"
+    - "api.openai.com"
+resources:
+  memory: "4Gi"
+  cpus: 2
+tools:
+  - git
+  - gh
+
+# Context: KUI-94 inlines skill content into the codex prompt at
+# spawn time (codex has no SKILL.md / .codex/skills/ analogue), so
+# `context.skills` MUST stay empty here — non-empty would silently
+# drop the skills, not load them.
+#
+# `context.docs` ships the small protocol doc the agent reads
+# alongside the diff; the workflow file inlines a brief version
+# too, but a tripwire-spawned session reads the doc directly.
+context:
+  skills: []
+  docs:
+    - docs/codex-review-protocol.md
+  mcp_servers: []
+
+# Single-shot review work — no multi-issue batching. The agent
+# spawns, reads one PR's diff, posts one comment, exits.
+multi_ticket: false
+max_concurrent_issues: 1
