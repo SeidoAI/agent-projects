@@ -40,6 +40,10 @@ class PRState:
     head_branch: str
     title: str = ""
     url: str = ""
+    # Aggregate CI status for the PR's relevant commit. ``"PASS"`` /
+    # ``"FAIL"`` / ``"PENDING"`` / ``None`` when unknown. Used by the
+    # post-merge CI failure tripwire (v0.7.10 §B2).
+    check_status: str | None = None
 
 
 @dataclass
@@ -102,6 +106,15 @@ FetchPRFiles = Callable[..., list[dict]]
 _TEN_MINUTES = timedelta(minutes=10)
 
 
+# Sessions in any of these statuses count as "inactive" for the post-
+# merge CI failure tripwire — the agent has already exited and a fresh
+# red CI on main means a regression that needs PM follow-up. Sessions
+# in ``executing`` belong to the in-flight CI-aware-exit (§B1) instead.
+_POST_MERGE_INACTIVE_STATUSES = frozenset(
+    {"paused", "in_review", "verified", "completed", "done"}
+)
+
+
 class PRWatcher:
     """Pure-function watcher: WatchedSession list in, WatcherAction list out.
 
@@ -126,6 +139,7 @@ class PRWatcher:
         self._fired_no_pt: set[str] = set()
         self._fired_merged_executing: set[str] = set()
         self._fired_pt_missing: set[int] = set()  # pt_pr_number
+        self._fired_post_merge_ci_failure: set[str] = set()  # session_id
 
     def tick(
         self, sessions: Iterable[WatchedSession], *, now: datetime
@@ -152,6 +166,13 @@ class PRWatcher:
         # #17 — code PR merged but status still executing
         if code_state.merged and ws.session_status == "executing":
             self._maybe_fire_merged_executing(ws, actions)
+        # B2 — post-merge CI red on an inactive session
+        if (
+            code_state.merged
+            and code_state.check_status == "FAIL"
+            and ws.session_status in _POST_MERGE_INACTIVE_STATUSES
+        ):
+            self._maybe_fire_post_merge_ci_failure(ws, code_state, actions)
         # #15 — code PR open, no PT PR after 10 min
         if (
             code_state.state == "open"
@@ -196,6 +217,54 @@ class PRWatcher:
                     "completion protocol (self-review.md, insights.yaml, "
                     "PT PR, `tripwire session complete`)."
                 ),
+            )
+        )
+
+    def _maybe_fire_post_merge_ci_failure(
+        self,
+        ws: WatchedSession,
+        code_state: PRState,
+        actions: list[WatcherAction],
+    ) -> None:
+        if ws.session_id in self._fired_post_merge_ci_failure:
+            return
+        self._fired_post_merge_ci_failure.add(ws.session_id)
+        pr_url = code_state.url or f"https://github.com/{ws.code_repo}/pull/{ws.code_pr_number}"
+        actions.append(
+            InjectFollowUp(
+                session_id=ws.session_id,
+                tripwire_id="watcher/post_merge_ci_failure",
+                message=(
+                    "## PM follow-up — post-merge CI failure (auto-injected)\n\n"
+                    f"Code PR #{ws.code_pr_number} on `{ws.code_repo}` was merged "
+                    "but CI on the merge commit is red. The session was already "
+                    f"in `{ws.session_status}` when this regression surfaced.\n\n"
+                    f"PR: {pr_url}\n\n"
+                    "Read the failing job's log via `gh run view <run-id> --log-failed` "
+                    "(run-id from `gh pr view "
+                    f"{ws.code_pr_number} --json statusCheckRollup`), identify the "
+                    "*pattern* of the failure, `grep` the test suite for siblings, "
+                    "and patch every occurrence in one fix commit. The runtime has "
+                    "already paused this session and will spawn `--resume` so you "
+                    "pick up from here."
+                ),
+            )
+        )
+        actions.append(
+            TransitionStatus(
+                session_id=ws.session_id,
+                tripwire_id="watcher/post_merge_ci_failure",
+                new_status="paused",
+                reason=(
+                    f"Post-merge CI red on PR #{ws.code_pr_number} "
+                    f"({ws.code_repo}); session was {ws.session_status}."
+                ),
+            )
+        )
+        actions.append(
+            ReengageAgent(
+                session_id=ws.session_id,
+                reason="watcher/post_merge_ci_failure",
             )
         )
 

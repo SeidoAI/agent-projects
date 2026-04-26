@@ -64,6 +64,11 @@ def fetch_pr_state(repo_tuple: tuple[str, str], pr_number: int, *, token: str | 
 
     Wrapped here (rather than in :mod:`pr_watcher`) so the watcher
     stays a pure function with an injectable fetcher.
+
+    For merged PRs the merge-commit's check-runs are also fetched and
+    aggregated into ``check_status`` (PASS / FAIL / PENDING). The
+    v0.7.10 §B2 post-merge CI failure tripwire reads this field; for
+    open PRs we leave it ``None`` since #15 / #17 do not consume it.
     """
     from tripwire.core.pr_watcher import PRState
 
@@ -81,14 +86,56 @@ def fetch_pr_state(repo_tuple: tuple[str, str], pr_number: int, *, token: str | 
     )
     response.raise_for_status()
     payload = response.json()
+    merge_sha = payload.get("merge_commit_sha")
+    merged = bool(payload.get("merged"))
+    check_status: str | None = None
+    if merged and merge_sha:
+        check_status = _aggregate_check_status(
+            owner, repo, merge_sha, headers=headers
+        )
     return PRState(
         number=payload["number"],
         state=payload["state"],
-        merged=bool(payload.get("merged")),
+        merged=merged,
         head_branch=payload.get("head", {}).get("ref", ""),
         title=payload.get("title", ""),
         url=payload.get("html_url", ""),
+        check_status=check_status,
     )
+
+
+def _aggregate_check_status(
+    owner: str, repo: str, sha: str, *, headers: dict[str, str]
+) -> str | None:
+    """Collapse all check-runs for a commit into ``PASS|FAIL|PENDING|None``.
+
+    Returns ``None`` when the API has no runs to report (e.g. CI never
+    ran). The watcher treats ``None`` as "don't fire" — see
+    ``test_no_action_when_check_status_unknown``.
+    """
+    try:
+        response = httpx.get(
+            f"{GITHUB_API}/repos/{owner}/{repo}/commits/{sha}/check-runs",
+            headers=headers,
+            timeout=15.0,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError:
+        return None
+    payload = response.json()
+    runs = payload.get("check_runs") or []
+    if not runs:
+        return None
+    has_pending = False
+    for run in runs:
+        status = (run.get("status") or "").lower()
+        conclusion = (run.get("conclusion") or "").lower()
+        if status != "completed":
+            has_pending = True
+            continue
+        if conclusion in {"failure", "timed_out", "cancelled", "action_required"}:
+            return "FAIL"
+    return "PENDING" if has_pending else "PASS"
 
 
 def fetch_pr_files(
