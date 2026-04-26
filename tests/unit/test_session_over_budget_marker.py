@@ -85,8 +85,9 @@ def test_action_executor_does_not_stamp_for_other_sigterm(
 def test_session_list_table_flags_over_budget(
     save_test_session, tmp_path_project
 ) -> None:
-    """`tripwire session list` (table format) shows ``paused (over budget)``
-    for any session whose ``runtime_state.cost_overrun_at`` is set."""
+    """`tripwire session list` (table format) shows ``(over budget)`` for
+    every session whose ``runtime_state.cost_overrun_at`` is set, and not
+    for clean paused sessions."""
     save_test_session(
         tmp_path_project,
         session_id="session-overbudget",
@@ -103,17 +104,15 @@ def test_session_list_table_flags_over_budget(
     result = runner.invoke(
         session_cmd,
         ["list", "--project-dir", str(tmp_path_project), "--format", "table"],
+        env={"COLUMNS": "200"},
     )
     assert result.exit_code == 0, result.output
-    # The over-budget row gets the marker, the clean-paused row does not.
+    # The marker appears exactly once: for the over-budget row only.
+    assert result.output.count("over budget") == 1
     over_line = next(
         line for line in result.output.splitlines() if "session-overbudget" in line
     )
-    clean_line = next(
-        line for line in result.output.splitlines() if "session-paused-clean" in line
-    )
     assert "over budget" in over_line
-    assert "over budget" not in clean_line
 
 
 def test_session_list_json_includes_cost_overrun_at(

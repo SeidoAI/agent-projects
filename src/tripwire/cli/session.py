@@ -58,6 +58,7 @@ class SessionSummary:
     status: str
     issue_count: int
     repo_count: int
+    over_budget: bool = False
 
 
 @click.group(name="session")
@@ -93,6 +94,7 @@ def session_list_cmd(project_dir: Path, output_format: str) -> None:
             status=s.status,
             issue_count=len(s.issues),
             repo_count=len(s.repos),
+            over_budget=s.runtime_state.cost_overrun_at is not None,
         )
         for s in sessions
     ]
@@ -113,11 +115,15 @@ def session_list_cmd(project_dir: Path, output_format: str) -> None:
     table.add_column("issues", justify="right")
     table.add_column("repos", justify="right")
     for s in summaries:
+        # v0.7.10 §3.A4 — flag budget-driven pauses next to status so a
+        # human reading `session list` can tell apart manual pauses
+        # from monitor-driven cost-overrun pauses.
+        status_cell = f"{s.status} (over budget)" if s.over_budget else s.status
         table.add_row(
             s.id,
             s.name,
             s.agent,
-            s.status,
+            status_cell,
             str(s.issue_count),
             str(s.repo_count),
         )
