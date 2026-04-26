@@ -102,12 +102,19 @@ prompt_template: |
      where <body> summarises the work in that worktree AND
      cross-links the sibling PR.
   4. After PR-open, poll its CI: `gh pr checks <pr-number> --watch`.
-     When all checks pass, you're done. If a check fails, push a fix
-     commit and `--watch` again. After 3 failed-fix attempts, write
-     the failure summary as plain text and stop — the PM will take
-     over. Do not loop a 4th time. The 3-attempt cap is a circuit
-     breaker for flaky tests and infra issues that the agent cannot
-     diagnose without human context.
+     When all checks pass, you're done. If a check fails, do NOT
+     guess — read the failing job's log first via `gh run view <run-id>
+     --log-failed` (run-id is in the rollup output) before writing
+     a fix. Then identify the *pattern* of the failure (which CLI
+     flag is missing, which precondition is tripping, etc.) and
+     `grep` the entire test suite for sibling occurrences. Patch
+     every occurrence in one fix commit — don't fix only the test
+     mentioned in the CI log; there are usually siblings that will
+     fail on the next run. Push the fix and `--watch` again. After
+     3 failed-fix attempts, write the failure summary as plain text
+     and stop — the PM will take over. Do not loop a 4th time. The
+     3-attempt cap is a circuit breaker for flaky tests and infra
+     issues that the agent cannot diagnose without human context.
 
   Cross-link the two PRs in their bodies — the code PR body links the
   PT PR URL and vice versa.
@@ -176,3 +183,8 @@ system_prompt_append: |
   If context is getting heavy, use /compact to free space.
   Do not use the Agent tool — you are a single-agent session.
   Do not use /batch — the work is already decomposed in your plan.
+  When a CI test fails, fix the *pattern* not the symptom: identify
+  which precondition or CLI flag broke, `grep` the full test suite
+  for sibling occurrences, and patch them all in one commit. Fixing
+  only the test named in the CI log triggers a second red-CI cycle
+  on the next sibling.
