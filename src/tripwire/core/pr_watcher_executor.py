@@ -90,9 +90,7 @@ def fetch_pr_state(repo_tuple: tuple[str, str], pr_number: int, *, token: str | 
     merged = bool(payload.get("merged"))
     check_status: str | None = None
     if merged and merge_sha:
-        check_status = _aggregate_check_status(
-            owner, repo, merge_sha, headers=headers
-        )
+        check_status = _aggregate_check_status(owner, repo, merge_sha, headers=headers)
     return PRState(
         number=payload["number"],
         state=payload["state"],

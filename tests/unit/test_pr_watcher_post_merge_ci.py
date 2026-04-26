@@ -98,8 +98,7 @@ def test_post_merge_ci_failure_on_done_session_emits_inject_pause_reengage():
     reengages = [
         a
         for a in actions
-        if isinstance(a, ReengageAgent)
-        and a.reason == "watcher/post_merge_ci_failure"
+        if isinstance(a, ReengageAgent) and a.reason == "watcher/post_merge_ci_failure"
     ]
     assert len(injects) == 1, "post-merge CI failure must inject a follow-up"
     assert "post-merge CI failure" in injects[0].message

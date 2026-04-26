@@ -89,9 +89,7 @@ class TestSuspendDetection:
     def test_gh_pr_view_status_check_rollup_emits_suspend(self, tmp_path):
         """The polling-loop variant: `gh pr view <num> --json statusCheckRollup`."""
         monitor = RuntimeMonitor(_ctx(tmp_path))
-        actions = monitor.process_event(
-            _bash("gh pr view 42 --json statusCheckRollup")
-        )
+        actions = monitor.process_event(_bash("gh pr view 42 --json statusCheckRollup"))
         suspends = [a for a in actions if isinstance(a, SuspendProcess)]
         assert len(suspends) == 1
 
@@ -113,7 +111,9 @@ class TestSuspendDetection:
         re-suspend a process that's already frozen — wasteful but more
         importantly, races against the resume side."""
         monitor = RuntimeMonitor(_ctx(tmp_path))
-        first = monitor.process_event(_bash("gh pr checks 42 --watch", tool_use_id="t1"))
+        first = monitor.process_event(
+            _bash("gh pr checks 42 --watch", tool_use_id="t1")
+        )
         second = monitor.process_event(
             _bash("gh pr checks 42 --watch", tool_use_id="t2")
         )

@@ -229,7 +229,10 @@ class PRWatcher:
         if ws.session_id in self._fired_post_merge_ci_failure:
             return
         self._fired_post_merge_ci_failure.add(ws.session_id)
-        pr_url = code_state.url or f"https://github.com/{ws.code_repo}/pull/{ws.code_pr_number}"
+        pr_url = (
+            code_state.url
+            or f"https://github.com/{ws.code_repo}/pull/{ws.code_pr_number}"
+        )
         actions.append(
             InjectFollowUp(
                 session_id=ws.session_id,
