@@ -133,7 +133,9 @@ def test_file_emitter_concurrent_threads_no_clobber(tmp_path: Path) -> None:
     assert len(paths) == expected_count
     assert len(set(paths)) == expected_count, "duplicate paths returned to callers"
 
-    files = sorted((tmp_path / ".tripwire" / "events" / "firings" / "s1").glob("*.json"))
+    files = sorted(
+        (tmp_path / ".tripwire" / "events" / "firings" / "s1").glob("*.json")
+    )
     assert len(files) == expected_count
     names = [f.name for f in files]
     assert names == [f"{i:04d}.json" for i in range(1, expected_count + 1)]
