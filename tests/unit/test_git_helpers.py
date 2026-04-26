@@ -60,13 +60,13 @@ class TestWorktreePathForSession:
         clone = tmp_path / "projects" / "tripwire"
         clone.mkdir(parents=True)
         result = worktree_path_for_session(clone, "api-endpoints")
-        assert result == clone.resolve().parent / "tripwire-wt-api-endpoints"
+        assert result == clone.resolve().parent / "worktree-tripwire-api-endpoints"
 
     def test_name_suffix(self, tmp_path):
         clone = tmp_path / "myrepo"
         clone.mkdir()
         result = worktree_path_for_session(clone, "auth-spike")
-        assert result.name == "myrepo-wt-auth-spike"
+        assert result.name == "worktree-myrepo-auth-spike"
 
 
 class TestWorktreeAdd:
