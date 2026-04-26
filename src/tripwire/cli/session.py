@@ -1894,17 +1894,70 @@ session_cmd.add_command(artifacts_list, name="artifacts")
 @click.argument("session_id")
 @click.option("--project-dir", type=click.Path(path_type=Path), default=".")
 @click.option("--dry-run", is_flag=True, default=False)
+@click.option(
+    "--ack",
+    is_flag=True,
+    default=False,
+    help=(
+        "Write the tripwire ack marker rather than running the close-out. "
+        "Requires `--fix-commit` (≥1) OR `--declared-no-findings`."
+    ),
+)
+@click.option(
+    "--fix-commit",
+    "fix_commits",
+    multiple=True,
+    help="Commit SHA addressing a tripwire finding (use multiple times).",
+)
+@click.option(
+    "--declared-no-findings",
+    is_flag=True,
+    default=False,
+    help="Acknowledge the tripwire with an explicit no-findings declaration.",
+)
+@click.option(
+    "--no-tripwires",
+    is_flag=True,
+    default=False,
+    help=(
+        "Bypass tripwire firing (still runs close-out gates). Logs an "
+        "audit entry to `.tripwire/audit/tripwire_bypass.log`."
+    ),
+)
+@click.option(
+    "--web",
+    is_flag=True,
+    default=False,
+    help="After complete, print a deep-link to the UI Tripwire Log.",
+)
 def session_complete_cmd(
     session_id: str,
     project_dir: Path,
     dry_run: bool,
+    ack: bool,
+    fix_commits: tuple[str, ...],
+    declared_no_findings: bool,
+    no_tripwires: bool,
+    web: bool,
 ) -> None:
     """Complete a session: verify PRs merged, close issues, cleanup.
 
-    Every gate is mandatory. If a session can't pass them, run
-    `tripwire session abandon` — that's the terminal-but-not-claimed-
-    success path. There are no bypass flags by design (v0.7.9 §A4).
+    The session.complete lifecycle event fires the tripwire registry
+    BEFORE the close-out gates run. On a first call (no marker), the
+    self-review tripwire returns its prompt on stdout and the command
+    exits 1. The agent acks via `--ack --fix-commit <sha>` (≥1) OR
+    `--ack --declared-no-findings`, and then re-runs without `--ack`
+    to invoke the close-out gates as in v0.7.x.
+
+    `--no-tripwires` bypasses the tripwire fire entirely (audit entry
+    written). `tripwires.enabled: false` in project.yaml disables them
+    project-wide.
+
+    Close-out gates are unchanged from v0.7.9 §A4: PR merged, issue
+    artifacts present, review.json exit_code ≤ 1. There are no bypass
+    flags for the gates themselves.
     """
+    from tripwire._internal.tripwires import fire_event
     from tripwire.core.session_complete import (
         CompleteError,
         complete_session,
@@ -1912,6 +1965,37 @@ def session_complete_cmd(
 
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
+
+    if ack:
+        _write_tripwire_ack(
+            project_dir=resolved,
+            session_id=session_id,
+            tripwire_id="self-review",
+            fix_commits=list(fix_commits),
+            declared_no_findings=declared_no_findings,
+        )
+        click.echo(
+            f"Tripwire 'self-review' acknowledged for session {session_id}. "
+            f"Re-run without --ack to invoke close-out."
+        )
+        return
+
+    if no_tripwires:
+        _record_tripwire_bypass(
+            project_dir=resolved,
+            session_id=session_id,
+            event="session.complete",
+        )
+    else:
+        fire = fire_event(
+            project_dir=resolved,
+            event="session.complete",
+            session_id=session_id,
+        )
+        if fire.blocked:
+            for prompt in fire.prompts:
+                click.echo(prompt)
+            raise SystemExit(1)
 
     try:
         result = complete_session(resolved, session_id, dry_run=dry_run)
@@ -1929,6 +2013,73 @@ def session_complete_cmd(
         click.echo(f"  closed: {iss}")
     for wt in result.worktrees_removed:
         click.echo(f"  removed worktree: {wt}")
+
+    if web:
+        click.echo(
+            f"  Tripwire Log: http://localhost:8000/tripwires"
+            f"?session_id={session_id}"
+        )
+
+
+def _write_tripwire_ack(
+    *,
+    project_dir: Path,
+    session_id: str,
+    tripwire_id: str,
+    fix_commits: list[str],
+    declared_no_findings: bool,
+) -> None:
+    """Write the tripwire ack marker, validating substantiveness.
+
+    Raises ``click.ClickException`` if the caller didn't supply enough
+    substance — the marker check would reject the same case at the
+    next fire, so we surface it now rather than letting the agent
+    "ack" something that won't unblock.
+    """
+    import json as _json
+    from datetime import datetime as _dt
+    from datetime import timezone as _tz
+
+    if not fix_commits and not declared_no_findings:
+        raise click.ClickException(
+            "Tripwire ack requires substance: pass at least one "
+            "`--fix-commit <sha>` OR `--declared-no-findings`. The "
+            "marker substantiveness check would reject an empty ack."
+        )
+
+    marker = (
+        project_dir / ".tripwire" / "acks" / f"{tripwire_id}-{session_id}.json"
+    )
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "tripwire_id": tripwire_id,
+        "session_id": session_id,
+        "acked_at": _dt.now(tz=_tz.utc).isoformat(),
+        "fix_commits": list(fix_commits),
+        "declared_no_findings": bool(declared_no_findings),
+    }
+    marker.write_text(_json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _record_tripwire_bypass(
+    *, project_dir: Path, session_id: str, event: str
+) -> None:
+    """Append a one-line audit entry when `--no-tripwires` is used.
+
+    The audit log is the only durable record of the bypass — without
+    it, an agent could opt out of the tripwire silently and the PM
+    review would never know.
+    """
+    from datetime import datetime as _dt
+    from datetime import timezone as _tz
+
+    audit_dir = project_dir / ".tripwire" / "audit"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    log_path = audit_dir / "tripwire_bypass.log"
+    stamp = _dt.now(tz=_tz.utc).isoformat()
+    line = f"{stamp}\t{event}\t{session_id}\t--no-tripwires\n"
+    with log_path.open("a", encoding="utf-8") as fh:
+        fh.write(line)
 
 
 # ----------------------------------------------------------------------------
