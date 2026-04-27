@@ -1,10 +1,10 @@
 import { createBrowserRouter } from "react-router-dom";
 
 import { StandaloneArtifactViewer } from "@/features/artifacts/StandaloneArtifactViewer";
+import { Board } from "@/features/board/Board";
 import { ProjectDashboard } from "@/features/dashboard/ProjectDashboard";
 import { ConceptGraph } from "@/features/graph/ConceptGraph";
 import { IssueDetail } from "@/features/issues/IssueDetail";
-import { KanbanBoard } from "@/features/issues/KanbanBoard";
 import { NodeDetail } from "@/features/nodes/NodeDetail";
 import { SessionDetail } from "@/features/sessions/SessionDetail";
 import { SessionList } from "@/features/sessions/SessionList";
@@ -20,7 +20,7 @@ export const router = createBrowserRouter([
     element: <ProjectShell />,
     children: [
       { index: true, element: <ProjectDashboard /> },
-      { path: "board", element: <KanbanBoard /> },
+      { path: "board", element: <Board /> },
       { path: "graph", element: <ConceptGraph /> },
       { path: "issues/:key", element: <IssueDetail /> },
       { path: "nodes/:nodeId", element: <NodeDetail /> },

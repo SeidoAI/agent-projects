@@ -74,9 +74,7 @@ describe("BoardSessionCard", () => {
   });
 
   it("shows the re-engagement count chip when > 0", () => {
-    renderWithProviders(
-      <BoardSessionCard session={makeSession({ re_engagement_count: 3 })} />,
-    );
+    renderWithProviders(<BoardSessionCard session={makeSession({ re_engagement_count: 3 })} />);
     expect(screen.getByText(/↺\s*3/)).toBeInTheDocument();
   });
 });

@@ -51,9 +51,7 @@ describe("IssuesView", () => {
       />,
     );
     for (const s of STATUS_VALUES) {
-      expect(
-        screen.getByRole("region", { name: new RegExp(s.label, "i") }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: new RegExp(s.label, "i") })).toBeInTheDocument();
     }
   });
 

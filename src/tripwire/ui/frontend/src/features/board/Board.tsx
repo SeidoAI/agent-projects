@@ -189,10 +189,9 @@ function ViewToggle({
   issuesCount: number;
 }) {
   return (
-    <div
-      role="group"
+    <fieldset
       aria-label="Board view"
-      className="inline-flex items-center gap-0 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) p-0.5"
+      className="m-0 inline-flex items-center gap-0 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) p-0.5"
     >
       <ToggleButton active={value === "sessions"} onClick={() => onChange("sessions")}>
         sessions · {sessionsCount}
@@ -200,7 +199,7 @@ function ViewToggle({
       <ToggleButton active={value === "issues"} onClick={() => onChange("issues")}>
         issues · {issuesCount}
       </ToggleButton>
-    </div>
+    </fieldset>
   );
 }
 
@@ -246,9 +245,7 @@ function BoardDrawer({
     return <InboxPreviewDrawer projectId={projectId} entryId={null} onClose={onClose} />;
   }
   if (target.kind === "inbox") {
-    return (
-      <InboxPreviewDrawer projectId={projectId} entryId={target.entryId} onClose={onClose} />
-    );
+    return <InboxPreviewDrawer projectId={projectId} entryId={target.entryId} onClose={onClose} />;
   }
   if (target.kind === "session") {
     return (
@@ -320,7 +317,9 @@ function SessionDrawerBody({ session }: { session: SessionSummary }) {
       />
       <Pair
         label="blocked by"
-        value={session.blocked_by_sessions.length === 0 ? "—" : session.blocked_by_sessions.join(", ")}
+        value={
+          session.blocked_by_sessions.length === 0 ? "—" : session.blocked_by_sessions.join(", ")
+        }
       />
       <Pair label="issues" value={session.issues.length === 0 ? "—" : session.issues.join(", ")} />
     </dl>

@@ -80,9 +80,7 @@ describe("useBoardFilters", () => {
     }
     const { result } = renderHook(() => useBoardFilters(), {
       wrapper: ({ children }: { children: ReactNode }) => (
-        <MemoryRouter
-          initialEntries={["/p/x/board?view=issues&agent=alice&inbox=1&blocked=1"]}
-        >
+        <MemoryRouter initialEntries={["/p/x/board?view=issues&agent=alice&inbox=1&blocked=1"]}>
           {children}
           <Probe />
         </MemoryRouter>

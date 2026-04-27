@@ -30,9 +30,7 @@ describe("FilterPills", () => {
     expect(screen.getByRole("button", { name: /^bob$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^maintainer$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^this-week$/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /open blocked inbox entry/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open blocked inbox entry/i })).toBeInTheDocument();
   });
 
   it("never renders a `has-tripwires` pill — replaced by has-blocked-inbox-entry", () => {
@@ -60,20 +58,13 @@ describe("FilterPills", () => {
 
   it("renders selected pills with aria-pressed=true", () => {
     renderWithProviders(
-      <FilterPills
-        {...baseProps}
-        selectedAgents={new Set(["alice"])}
-        hasBlockedInbox={true}
-      />,
+      <FilterPills {...baseProps} selectedAgents={new Set(["alice"])} hasBlockedInbox={true} />,
     );
     expect(screen.getByRole("button", { name: /^alice$/i })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("button", { name: /^bob$/i })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
+    expect(screen.getByRole("button", { name: /^bob$/i })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: /open blocked inbox entry/i })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -85,11 +76,7 @@ describe("FilterPills", () => {
     const { rerender } = renderWithProviders(<FilterPills {...baseProps} />);
     expect(screen.queryByRole("button", { name: /clear filters/i })).not.toBeInTheDocument();
     rerender(
-      <FilterPills
-        {...baseProps}
-        selectedAgents={new Set(["alice"])}
-        onClearAll={onClearAll}
-      />,
+      <FilterPills {...baseProps} selectedAgents={new Set(["alice"])} onClearAll={onClearAll} />,
     );
     const clear = screen.getByRole("button", { name: /clear filters/i });
     fireEvent.click(clear);

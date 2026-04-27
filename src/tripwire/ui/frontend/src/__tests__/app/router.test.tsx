@@ -28,7 +28,7 @@ function renderRoute(path: string) {
       element: <ProjectShell />,
       children: [
         { index: true, element: <Navigate to="board" replace /> },
-        { path: "board", element: <Placeholder name="KanbanBoard" /> },
+        { path: "board", element: <Placeholder name="Board" /> },
         { path: "graph", element: <Placeholder name="ConceptGraph" /> },
         { path: "sessions", element: <Placeholder name="SessionList" /> },
         { path: "workflow", element: <Placeholder name="WorkflowMap" /> },
@@ -58,7 +58,7 @@ describe("Router", () => {
     // ("Workspace / proj-1" + the chip in the side rail).
     expect(screen.getAllByText("proj-1").length).toBeGreaterThan(0);
     // Board placeholder renders inside the outlet
-    expect(screen.getByText("KanbanBoard")).toBeDefined();
+    expect(screen.getByText("Board")).toBeDefined();
   });
 
   it("renders the cream-palette nav items in the side rail", () => {

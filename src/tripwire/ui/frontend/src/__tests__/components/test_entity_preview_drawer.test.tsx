@@ -35,12 +35,7 @@ describe("EntityPreviewDrawer", () => {
   it("calls onClose when the close button is pressed", () => {
     const onClose = vi.fn();
     renderWithProviders(
-      <EntityPreviewDrawer
-        open
-        onClose={onClose}
-        title="some entity"
-        body={<p>body</p>}
-      />,
+      <EntityPreviewDrawer open onClose={onClose} title="some entity" body={<p>body</p>} />,
     );
     fireEvent.click(screen.getByLabelText(/close preview/i));
     expect(onClose).toHaveBeenCalled();

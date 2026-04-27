@@ -9,10 +9,10 @@ import {
 import { toast } from "sonner";
 
 import { Stamp } from "@/components/ui/stamp";
+import { useUpdateIssueStatus } from "@/features/issues/hooks/useIssues";
 import type { ApiError } from "@/lib/api/client";
 import type { EnumValue } from "@/lib/api/endpoints/enums";
 import type { IssueSummary } from "@/lib/api/endpoints/issues";
-import { useUpdateIssueStatus } from "@/features/issues/hooks/useIssues";
 import { cn } from "@/lib/utils";
 import type { BlockedInboxIndex } from "./hooks/useBlockedInbox";
 import { BoardIssueCard } from "./IssueCard";

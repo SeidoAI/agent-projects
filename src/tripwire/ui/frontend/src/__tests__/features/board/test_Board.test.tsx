@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -67,24 +67,19 @@ function renderBoard({
   qc: QueryClient;
   initialPath?: string;
 }) {
-  return {
-    qc,
-    ...(() => {
-      function Wrapper({ children }: { children: ReactNode }) {
-        return (
-          <QueryClientProvider client={qc}>
-            <MemoryRouter initialEntries={[initialPath]}>
-              <Routes>
-                <Route path="/p/:projectId/board" element={children} />
-                <Route path="*" element={<div data-testid="elsewhere" />} />
-              </Routes>
-            </MemoryRouter>
-          </QueryClientProvider>
-        );
-      }
-      return require("@testing-library/react").render(<Board />, { wrapper: Wrapper });
-    })(),
-  };
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={[initialPath]}>
+          <Routes>
+            <Route path="/p/:projectId/board" element={children} />
+            <Route path="*" element={<div data-testid="elsewhere" />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+  }
+  return { qc, ...render(<Board />, { wrapper: Wrapper }) };
 }
 
 describe("Board", () => {
@@ -137,9 +132,7 @@ describe("Board", () => {
 
   it("opens the entity preview drawer when a card is clicked", async () => {
     const qc = makeQc();
-    qc.setQueryData(queryKeys.sessions("p1"), [
-      makeSession({ id: "abc", name: "Demo session" }),
-    ]);
+    qc.setQueryData(queryKeys.sessions("p1"), [makeSession({ id: "abc", name: "Demo session" })]);
     qc.setQueryData(queryKeys.issues("p1"), []);
     qc.setQueryData(queryKeys.enum("p1", "issue_status"), { name: "x", values: [] });
     qc.setQueryData(queryKeys.inboxFiltered("p1", { bucket: "blocked" }), []);

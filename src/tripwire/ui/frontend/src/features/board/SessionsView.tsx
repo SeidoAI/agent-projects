@@ -112,7 +112,9 @@ export function SessionsView({
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <div className="flex h-full gap-2.5 overflow-x-auto px-1 py-2">
         {buckets.map((col) => {
-          const visible = col.isOffTrack ? true : activeStages === null || activeStages.has(col.stageId);
+          const visible = col.isOffTrack
+            ? true
+            : activeStages === null || activeStages.has(col.stageId);
           if (!visible) return null;
           return (
             <SessionColumn
