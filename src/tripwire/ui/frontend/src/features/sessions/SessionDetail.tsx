@@ -93,10 +93,21 @@ function SessionDetailReady({
       ),
     [inbox.data, session.id],
   );
-  const blockedCount = linkedInbox.filter((i) => i.bucket === "blocked").length;
+  const blockedInbox = useMemo(
+    () => linkedInbox.filter((i) => i.bucket === "blocked"),
+    [linkedInbox],
+  );
+  const blockedCount = blockedInbox.length;
   const fyiCount = linkedInbox.length - blockedCount;
   const inboxChipLabel =
     blockedCount > 0 ? `${blockedCount} blocked` : fyiCount > 0 ? `${fyiCount} fyi` : null;
+  // Click target: when the chip surfaces a blocked count, route to a
+  // blocked entry — not whichever entry happens to sort first in the
+  // API response. Otherwise the user clicks a "blocked" warning and
+  // lands on a non-blocking item, hiding urgent work. Falls back to
+  // `linkedInbox[0]` only when no blocked entries exist (chip is fyi).
+  const inboxChipTargetId =
+    blockedCount > 0 ? blockedInbox[0]?.id : linkedInbox[0]?.id;
 
   const [previewInboxId, setPreviewInboxId] = useState<string | null>(null);
 
@@ -143,7 +154,7 @@ function SessionDetailReady({
           {inboxChipLabel ? (
             <button
               type="button"
-              onClick={() => setPreviewInboxId(linkedInbox[0]?.id ?? null)}
+              onClick={() => setPreviewInboxId(inboxChipTargetId ?? null)}
               aria-label={`inbox · ${inboxChipLabel} for this session`}
               className="ml-auto inline-flex items-center gap-1.5 rounded-(--radius-stamp) border border-(--color-rule) bg-(--color-rule)/10 px-2 py-0.5 font-mono text-[10px] text-(--color-rule) uppercase tracking-[0.06em] hover:bg-(--color-rule)/20"
             >
