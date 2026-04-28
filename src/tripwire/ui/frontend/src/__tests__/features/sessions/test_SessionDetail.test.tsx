@@ -1,86 +1,80 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { Link, Route } from "react-router-dom";
+import { Route } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { SessionDetail } from "@/features/sessions/SessionDetail";
-import type { ArtifactManifest } from "@/lib/api/endpoints/artifacts";
-import type { IssueDetail } from "@/lib/api/endpoints/issues";
+import type { InboxItem } from "@/lib/api/endpoints/inbox";
 import type { SessionDetail as SessionDetailType } from "@/lib/api/endpoints/sessions";
 import { queryKeys } from "@/lib/api/queryKeys";
-import {
-  makeArtifactSpec,
-  makeIssueDetail,
-  makeRepoBinding,
-  makeSessionDetail,
-} from "../../mocks/fixtures";
+import { makeRepoBinding, makeSessionDetail } from "../../mocks/fixtures";
 import { server } from "../../mocks/server";
 import { makeTestQueryClient, renderWithProviders } from "../../test-utils";
 
-function clickTab(el: HTMLElement) {
-  // Radix Tabs trigger uses onMouseDown + onClick; jsdom's fireEvent.click
-  // alone doesn't always activate the trigger. Fire the full press sequence.
-  fireEvent.mouseDown(el, { button: 0 });
-  fireEvent.mouseUp(el, { button: 0 });
-  fireEvent.click(el);
-}
+const SESSION_DETAIL_EXTRAS = (
+  <Route path="/p/:projectId/sessions" element={<div>sessions stub</div>} />
+);
 
 function fixtureSession(overrides: Partial<SessionDetailType> = {}): SessionDetailType {
   return makeSessionDetail({
     id: "sess-a",
     name: "Foundation packaging",
     agent: "backend-coder",
+    status: "executing",
     issues: ["KUI-1"],
     estimated_size: "M",
     repos: [makeRepoBinding()],
     task_progress: { done: 1, total: 3 },
     plan_md: "# Plan\n\nContent here.",
-    grouping_rationale: "Grouped because they share an API surface.",
+    grouping_rationale: null,
+    engagements: [],
     ...overrides,
   });
 }
 
-function fixtureIssue(): IssueDetail {
-  return makeIssueDetail({
-    id: "KUI-1",
-    title: "First issue",
-  });
+function setupServer(events: { events: unknown[]; next_cursor: null } = { events: [], next_cursor: null }) {
+  server.use(
+    http.get("/api/projects/p1/events", () => HttpResponse.json(events)),
+    http.get("/api/projects/p1/inbox", () => HttpResponse.json([])),
+  );
 }
-
-function fixtureManifest(): ArtifactManifest {
-  return {
-    artifacts: [
-      makeArtifactSpec({ name: "plan", file: "plan.md", template: "plan" }),
-      makeArtifactSpec({
-        name: "task-checklist",
-        file: "task-checklist.md",
-        template: "task-checklist",
-        produced_at: "executing",
-        produced_by: "executor",
-      }),
-    ],
-  };
-}
-
-const SESSION_DETAIL_EXTRAS = (
-  <>
-    <Route path="/p/:projectId/sessions" element={<div>sessions stub</div>} />
-    <Route path="/p/:projectId/issues/:key" element={<div>issue stub</div>} />
-  </>
-);
 
 afterEach(() => {
   cleanup();
 });
 
-describe("SessionDetail", () => {
-  it("renders header, tabs, and switches to each tab", () => {
+describe("SessionDetail (v0.8 — Option C)", () => {
+  it("renders header with status pill, mini-wire, and the plan / engagements / events sections", async () => {
+    setupServer();
     const session = fixtureSession();
     const qc = makeTestQueryClient();
     qc.setQueryData(queryKeys.session("p1", session.id), session);
-    qc.setQueryData(queryKeys.issue("p1", "KUI-1"), fixtureIssue());
-    qc.setQueryData(queryKeys.artifactManifest("p1"), fixtureManifest());
-    qc.setQueryData(queryKeys.sessionArtifacts("p1", session.id), []);
+
+    renderWithProviders(<SessionDetail />, {
+      queryClient: qc,
+      initialPath: `/p/p1/sessions/${session.id}`,
+      routePath: "/p/:projectId/sessions/:sid",
+      extraRoutes: SESSION_DETAIL_EXTRAS,
+    });
+
+    expect(screen.getByText("Foundation packaging")).toBeInTheDocument();
+
+    // Status pill renders the status string. (Mini-wire is SVG-only;
+    // we don't assert its internal markup here — the dashboard's wire
+    // tests already cover its rendering.)
+    expect(screen.getByText(/executing/i)).toBeInTheDocument();
+
+    // Three body sections — assert by their headings.
+    expect(screen.getByRole("heading", { name: /plan/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /engagements/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /events/i })).toBeInTheDocument();
+  });
+
+  it("flips the header into alert chrome when the session is off-track (paused)", async () => {
+    setupServer();
+    const session = fixtureSession({ status: "paused" });
+    const qc = makeTestQueryClient();
+    qc.setQueryData(queryKeys.session("p1", session.id), session);
 
     const { container } = renderWithProviders(<SessionDetail />, {
       queryClient: qc,
@@ -89,86 +83,128 @@ describe("SessionDetail", () => {
       extraRoutes: SESSION_DETAIL_EXTRAS,
     });
 
-    expect(screen.getByText("Foundation packaging")).toBeInTheDocument();
-    expect(screen.getByText("active")).toBeInTheDocument();
-    expect(screen.getByText("1/3")).toBeInTheDocument();
-
-    // Plan tab active by default, markdown rendered
-    expect(container.querySelector('[role="tabpanel"][data-state="active"]')).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "Plan" })).toBeInTheDocument();
-
-    // Issues tab
-    clickTab(screen.getByRole("tab", { name: "Issues" }));
-    expect(screen.getByText(/Grouped because/)).toBeInTheDocument();
-    expect(screen.getByText("First issue")).toBeInTheDocument();
-
-    // Repos tab
-    clickTab(screen.getByRole("tab", { name: "Repos" }));
-    expect(screen.getByText("SeidoAI/tripwire")).toBeInTheDocument();
-
-    // Artifacts tab — verify the inner ArtifactList tabs appear
-    clickTab(screen.getByRole("tab", { name: "Artifacts" }));
-    expect(container.querySelector('[data-tab-name="plan"]')).not.toBeNull();
-    expect(container.querySelector('[data-tab-name="task-checklist"]')).not.toBeNull();
+    const header = container.querySelector("header[data-off-track]");
+    expect(header).not.toBeNull();
+    expect(header?.getAttribute("data-off-track")).toBe("true");
+    // The off-track header carries an AlertTriangle icon next to the
+    // session id; it's `aria-hidden`, so we look it up via the wrapping
+    // header rather than role.
+    expect(header?.querySelector("svg")).not.toBeNull();
   });
 
-  it("resets the active tab to Plan when the URL :sid changes", async () => {
-    const sessionA = fixtureSession({ id: "sess-a", name: "Session A" });
-    const sessionB = fixtureSession({ id: "sess-b", name: "Session B" });
-    const qc = makeTestQueryClient();
-    qc.setQueryData(queryKeys.session("p1", sessionA.id), sessionA);
-    qc.setQueryData(queryKeys.session("p1", sessionB.id), sessionB);
-
-    // A link inside the route tree triggers a client-side navigation
-    // so the `:sid` segment changes while the Router / QueryClient /
-    // DOM tree are all preserved — the exact condition the
-    // `key={sid}` fix targets.
-    const GoToB = () => (
-      <Link to={`/p/p1/sessions/${sessionB.id}`} data-testid="nav-b">
-        go B
-      </Link>
-    );
-
-    const { container } = renderWithProviders(
-      <>
-        <GoToB />
-        <SessionDetail />
-      </>,
+  it("surfaces the inbox cross-link chip when an unresolved entry references this session", async () => {
+    const inboxItems: InboxItem[] = [
       {
-        queryClient: qc,
-        initialPath: `/p/p1/sessions/${sessionA.id}`,
-        routePath: "/p/:projectId/sessions/:sid",
-        extraRoutes: <Route path="/p/:projectId/sessions" element={<div>sessions stub</div>} />,
+        id: "inb-1",
+        bucket: "blocked",
+        title: "Needs human review",
+        body: "",
+        author: "pm-agent",
+        created_at: "2026-04-27T12:00:00Z",
+        references: [{ session: "sess-a" }],
+        escalation_reason: null,
+        resolved: false,
+        resolved_at: null,
+        resolved_by: null,
       },
+      {
+        // Resolved entries should NOT count toward the chip.
+        id: "inb-2",
+        bucket: "fyi",
+        title: "Earlier ping",
+        body: "",
+        author: "pm-agent",
+        created_at: "2026-04-26T08:00:00Z",
+        references: [{ session: "sess-a" }],
+        escalation_reason: null,
+        resolved: true,
+        resolved_at: "2026-04-26T09:00:00Z",
+        resolved_by: "user",
+      },
+      {
+        // Different session — should NOT count.
+        id: "inb-3",
+        bucket: "blocked",
+        title: "Other session",
+        body: "",
+        author: "pm-agent",
+        created_at: "2026-04-27T11:00:00Z",
+        references: [{ session: "sess-b" }],
+        escalation_reason: null,
+        resolved: false,
+        resolved_at: null,
+        resolved_by: null,
+      },
+    ];
+    server.use(
+      http.get("/api/projects/p1/events", () =>
+        HttpResponse.json({ events: [], next_cursor: null }),
+      ),
+      http.get("/api/projects/p1/inbox", () => HttpResponse.json(inboxItems)),
     );
 
-    // Start on Session A, switch to Repos tab.
-    expect(screen.getByText("Session A")).toBeInTheDocument();
-    clickTab(screen.getByRole("tab", { name: "Repos" }));
-    const activeA = container.querySelector('[role="tab"][data-state="active"]');
-    expect(activeA?.textContent).toMatch(/Repos/);
+    const session = fixtureSession();
+    const qc = makeTestQueryClient();
+    qc.setQueryData(queryKeys.session("p1", session.id), session);
 
-    // Client-side nav to session B via an in-tree link.
-    fireEvent.click(screen.getByTestId("nav-b"));
+    renderWithProviders(<SessionDetail />, {
+      queryClient: qc,
+      initialPath: `/p/p1/sessions/${session.id}`,
+      routePath: "/p/:projectId/sessions/:sid",
+      extraRoutes: SESSION_DETAIL_EXTRAS,
+    });
 
-    // React re-renders with the new :sid. `key={sid}` on
-    // SessionDetailInner remounts the subtree; the uncontrolled Tabs
-    // default ("plan") wins.
-    expect(await screen.findByText("Session B")).toBeInTheDocument();
-    const activeB = container.querySelector('[role="tab"][data-state="active"]');
-    expect(activeB?.textContent).toMatch(/Plan/);
+    // Chip text reflects the count + bucket of the active references.
+    const chip = await screen.findByRole("button", { name: /inbox.*1.*blocked/i });
+    expect(chip).toBeInTheDocument();
+
+    // Resolved + foreign-session entries should not show.
+    expect(screen.queryByText(/Earlier ping/)).not.toBeInTheDocument();
+
+    // Click → drawer opens with the entry's title.
+    fireEvent.click(chip);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Needs human review")).toBeInTheDocument();
+  });
+
+  it("renders the engagement list when runtime_state.engagements has entries", async () => {
+    setupServer();
+    const session = fixtureSession({
+      engagements: [
+        {
+          engagement_id: "e1",
+          started_at: "2026-04-26T12:00:00Z",
+          ended_at: "2026-04-26T13:00:00Z",
+          trigger: "spawn",
+          outcome: "paused",
+        },
+      ],
+    });
+    const qc = makeTestQueryClient();
+    qc.setQueryData(queryKeys.session("p1", session.id), session);
+
+    renderWithProviders(<SessionDetail />, {
+      queryClient: qc,
+      initialPath: `/p/p1/sessions/${session.id}`,
+      routePath: "/p/:projectId/sessions/:sid",
+      extraRoutes: SESSION_DETAIL_EXTRAS,
+    });
+
+    expect(await screen.findByText(/engagement #1/i)).toBeInTheDocument();
   });
 
   it("renders 'not found' when the session API returns 404", async () => {
+    setupServer();
     server.use(
       http.get("/api/projects/p1/sessions/missing", () =>
         HttpResponse.json({ detail: "missing", code: "session/not_found" }, { status: 404 }),
       ),
     );
+
     renderWithProviders(<SessionDetail />, {
       initialPath: "/p/p1/sessions/missing",
       routePath: "/p/:projectId/sessions/:sid",
-      extraRoutes: <Route path="/p/:projectId/sessions" element={<div>sessions stub</div>} />,
+      extraRoutes: SESSION_DETAIL_EXTRAS,
     });
 
     expect(await screen.findByText("Session not found")).toBeInTheDocument();
