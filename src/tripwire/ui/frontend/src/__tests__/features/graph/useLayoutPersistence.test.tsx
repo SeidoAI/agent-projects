@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useLayoutPersistence } from "@/features/graph/useLayoutPersistence";
 
@@ -21,59 +21,94 @@ function mockFetch() {
 }
 
 describe("useLayoutPersistence", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
   afterEach(() => {
-    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
-  it("debounces persistence calls then PATCHes once per node", async () => {
+  it("flush() PATCHes the latest position per node", async () => {
     const fetchSpy = mockFetch();
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { result } = renderHook(() => useLayoutPersistence("p1"), {
       wrapper: wrapperWith(qc),
     });
 
-    act(() => {
+    await act(async () => {
       result.current.persist({ "user-model": { x: 10, y: 20 } });
       result.current.persist({ "user-model": { x: 11, y: 21 } });
       result.current.persist({ "user-model": { x: 12, y: 22 } });
+      await result.current.flush();
     });
-    expect(fetchSpy).not.toHaveBeenCalled();
 
-    await act(async () => {
-      vi.advanceTimersByTime(2000);
-    });
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1), { timeout: 100 });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url, init] = fetchSpy.mock.calls[0] ?? [];
     expect(url).toBe("/api/projects/p1/nodes/user-model/layout");
     expect(init?.method).toBe("PATCH");
     expect(JSON.parse(String(init?.body))).toEqual({ x: 12, y: 22 });
   });
 
-  it("PATCHes one call per distinct node id in a debounced batch", async () => {
+  it("flush() emits one PATCH per distinct node id", async () => {
     const fetchSpy = mockFetch();
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { result } = renderHook(() => useLayoutPersistence("p1"), {
       wrapper: wrapperWith(qc),
     });
 
-    act(() => {
+    await act(async () => {
       result.current.persist({
         "user-model": { x: 1, y: 1 },
         "auth-flow": { x: 2, y: 2 },
       });
+      await result.current.flush();
     });
-    await act(async () => {
-      vi.advanceTimersByTime(2000);
-    });
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2), { timeout: 100 });
-    const urls = fetchSpy.mock.calls.map((c) => c[0]);
-    expect(urls.sort()).toEqual([
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const urls = fetchSpy.mock.calls.map((c) => String(c[0])).sort();
+    expect(urls).toEqual([
       "/api/projects/p1/nodes/auth-flow/layout",
       "/api/projects/p1/nodes/user-model/layout",
     ]);
+  });
+
+  it("debounces auto-flush — repeated persists collapse into one PATCH per node", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchSpy = mockFetch();
+      const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const { result } = renderHook(() => useLayoutPersistence("p1"), {
+        wrapper: wrapperWith(qc),
+      });
+
+      act(() => {
+        result.current.persist({ "user-model": { x: 1, y: 1 } });
+      });
+      // Before the debounce window ends, no PATCH yet.
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      act(() => {
+        result.current.persist({ "user-model": { x: 9, y: 9 } });
+      });
+      // Total elapsed > original debounce, but the second persist
+      // restarted the timer — still no PATCH yet.
+      act(() => {
+        vi.advanceTimersByTime(1200);
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      // Cross the debounce threshold from the most recent persist.
+      await act(async () => {
+        vi.advanceTimersByTime(500);
+        await Promise.resolve();
+      });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))).toEqual({
+        x: 9,
+        y: 9,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
