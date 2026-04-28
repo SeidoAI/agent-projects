@@ -21,6 +21,18 @@ const NODE_RADIUS_SMALL = 16;
  *  collide so heavily the screen is unreadable. */
 const NODE_LABEL_MAX_CHARS = 18;
 
+/** Edge relations rendered with a solid stroke. Everything else
+ *  (e.g. `related`, `blocked_by`, `parent`) renders dashed.
+ *  Explicit + exhaustive per PM #25 round 4 P2: the previous
+ *  implicit `relation === "cites"` branch left `references` edges
+ *  dashed even though the legend's solid swatch is meant to
+ *  cover them. */
+const SOLID_EDGE_RELATIONS: ReadonlySet<string> = new Set(["cites", "references"]);
+
+function isSolidRelation(relation: string): boolean {
+  return SOLID_EDGE_RELATIONS.has(relation);
+}
+
 function truncateLabel(text: string): string {
   if (text.length <= NODE_LABEL_MAX_CHARS) return text;
   return `${text.slice(0, NODE_LABEL_MAX_CHARS - 1)}…`;
@@ -74,10 +86,10 @@ function computeBBox(
  *
  * Replaces the placeholder canvas left over from KUI-101. Hand-rolled
  * SVG per `[[dec-drop-xyflow-for-svg]]`: ledger-grid background,
- * `<line>` edges (solid for cites / dashed for related), `<circle>`
- * nodes with stale-amber dashed stroke + cross-link badge for inbox
- * referrers, and a `[[concept]]` rail mirroring the
- * EntityPreviewDrawer chrome.
+ * `<line>` edges (solid for cites + references / dashed for everything
+ * else — see {@link SOLID_EDGE_RELATIONS}), `<circle>` nodes with
+ * stale-amber dashed stroke + cross-link badge for inbox referrers,
+ * and a `[[concept]]` rail mirroring the EntityPreviewDrawer chrome.
  *
  * Positions come from `useGraphLayout`: nodes with a server-side
  * `data.has_saved_layout` are pinned to their stored `(x, y)`; the
@@ -238,7 +250,7 @@ export function ConceptGraph() {
             const b = layout.positions[edge.target];
             if (!a || !b) return null;
             const isFocused = focus !== null && (edge.source === focus || edge.target === focus);
-            const dashed = edge.relation !== "cites";
+            const dashed = !isSolidRelation(edge.relation);
             return (
               <line
                 key={edge.id}
