@@ -55,6 +55,33 @@ export interface PongEvent {
   timestamp: string;
 }
 
+/** Mirrors `ProcessEvent` from `tripwire.ui.events` (KUI-100).
+ *  A `.tripwire/events/<kind>/<sid>/<n>.json` write classified by
+ *  the file watcher; the WS notification is a thin pointer. The Live
+ *  Monitor (KUI-107) consumes it to invalidate `useWorkflowEvents`
+ *  so tripwire fires + status transitions appear in real time.
+ *
+ *  Named `ProcessEventBroadcast` rather than `ProcessEvent` to avoid
+ *  colliding with the same-named REST type in `endpoints/events.ts`. */
+export type ProcessEventKindBroadcast =
+  | "tripwire_fire"
+  | "validator_pass"
+  | "validator_fail"
+  | "artifact_rejected"
+  | "pm_review_opened"
+  | "pm_review_closed"
+  | "status_transition";
+
+export interface ProcessEventBroadcast {
+  type: "process_event";
+  timestamp: string;
+  project_id: string;
+  event_id: string;
+  kind: ProcessEventKindBroadcast;
+  session_id: string;
+  fired_at: string;
+}
+
 // v2 stubs — declared so the dispatch table can accept them without
 // validation errors, but handled as no-ops in v1.
 
@@ -125,6 +152,7 @@ export type TripwireUiEvent =
   | FileChangedEvent
   | ArtifactUpdatedEvent
   | ValidationCompletedEvent
+  | ProcessEventBroadcast
   | PingEvent
   | PongEvent
   | ContainerStatusEvent

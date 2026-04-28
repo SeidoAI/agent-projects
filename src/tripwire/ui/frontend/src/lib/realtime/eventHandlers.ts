@@ -38,6 +38,19 @@ export function dispatchEvent(event: TripwireUiEvent, queryClient: QueryClient):
       applyValidationCompleted(event, queryClient);
       return;
 
+    case "process_event":
+      // KUI-100 / KUI-107 — a tripwire fire / validator pass-or-fail
+      // / status transition / etc. landed in `.tripwire/events/...`.
+      // The Live Monitor's `useWorkflowEvents` query hangs off the
+      // `events(pid, params)` prefix; invalidating the project-level
+      // prefix covers every variant a consumer might have opened
+      // (no-filter, session-scoped, kind-filtered) so the right rail
+      // and turn stream pick up the new event without a reload.
+      queryClient.invalidateQueries({
+        queryKey: ["projects", event.project_id, "events"],
+      });
+      return;
+
     case "ping":
     case "pong":
       // Heartbeat — connection liveness only.

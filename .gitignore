@@ -51,11 +51,11 @@ src/tripwire/ui/frontend/node_modules/
 src/tripwire/ui/frontend/dist/
 src/tripwire/ui/frontend/coverage/
 
-# Vitest sometimes writes a top-level node_modules/.vite cache when
-# the runner is invoked outside the frontend dir. Ignore at the repo
-# root so accidental cache writes don't sneak into a commit.
+# Vitest occasionally writes a top-level node_modules/.vite cache
+# when invoked outside the frontend dir; the anchor below keeps the
+# ignore narrow to the repo root only. The frontend's own .gitignore
+# owns `.vite/` inside `src/tripwire/ui/frontend/`.
 /node_modules/
-.vite/
 
 # Worktrees
 .worktrees/

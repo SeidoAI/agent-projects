@@ -1,2 +1,6 @@
 node_modules/
 dist/
+# Vitest writes its run cache under .vite/. The bare entry here covers
+# anywhere inside the frontend tree (the previous unanchored entry at
+# the repo root was over-broad).
+.vite/

@@ -192,6 +192,60 @@ class TestPauseSession:
         assert r.status_code == 400
         assert r.json()["code"] == "session/bad_slug"
 
+    def test_dead_pid_falls_through_to_failed(
+        self,
+        sess_project: Path,
+        sess_project_id: str,
+        save_test_session,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        """When the session has a non-null PID that is no longer alive,
+        the pause route flips status to ``failed`` rather than lying
+        about a runtime that already exited. Mirrors the same fall-through
+        the CLI's ``tripwire session pause`` performs.
+        """
+        _project_svc.seed_project_index([sess_project])
+        summary = _project_svc._try_load_summary(sess_project.resolve())
+        if summary is not None:
+            _project_svc._discovery_cache = (time.monotonic(), [summary])
+        save_test_session(
+            sess_project,
+            "live-session",
+            plan=True,
+            status="executing",
+            runtime_state={"pid": 12345},
+        )
+
+        # Force is_alive(pid) to return False so the route hits the
+        # dead-PID branch deterministically (PID 12345 might happen to
+        # belong to a real process on the CI host).
+        from tripwire.core import process_helpers as _ph
+        from tripwire.ui.services import action_service as _action_svc
+
+        monkeypatch.setattr(_ph, "is_alive", lambda pid: False)
+        monkeypatch.setattr(_action_svc, "load_session", _action_svc.load_session)
+
+        client = TestClient(create_app(dev_mode=True))
+        r = client.post(f"/api/projects/{sess_project_id}/sessions/live-session/pause")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["status"] == "failed"
+        assert body["session_id"] == "live-session"
+
+        # Persisted on disk.
+        from tripwire.core.session_store import load_session
+
+        sess = load_session(sess_project, "live-session")
+        assert sess.status == "failed"
+
+        # Audit-log entry was written so a verifier can reconstruct
+        # the dead-PID branch later.
+        from tripwire.ui.services._audit import audit_log_path
+
+        audit_text = audit_log_path(sess_project).read_text(encoding="utf-8")
+        assert "actions.pause_session" in audit_text
+        assert "dead_pid" in audit_text
+
 
 class TestOpenAPI:
     def test_registers_paths(self, session_client):

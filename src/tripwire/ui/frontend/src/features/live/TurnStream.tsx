@@ -1,5 +1,5 @@
 import { ArrowDown, GitBranch, Zap } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -34,6 +34,12 @@ export type TurnStreamEntry =
 
 export interface TurnStreamProps {
   entries: TurnStreamEntry[];
+  /** When true, auto-scroll is force-paused regardless of the user's
+   *  scroll position. The Live Monitor passes the session's
+   *  off-track state (paused / failed / abandoned) so a mid-stream
+   *  flip stops chasing the tail and lets the user read what tripped
+   *  per the v0.8.x amendment. */
+  isOffTrack?: boolean;
   className?: string;
 }
 
@@ -44,23 +50,52 @@ export interface TurnStreamProps {
  *  pause when the user scrolls up". */
 const AT_BOTTOM_THRESHOLD_PX = 40;
 
-export function TurnStream({ entries, className }: TurnStreamProps) {
+export function TurnStream({ entries, isOffTrack = false, className }: TurnStreamProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [paused, setPaused] = useState(false);
+  const [userPaused, setUserPaused] = useState(false);
+  // The pill (and the auto-scroll-skip) is shown when EITHER the user
+  // scrolled up OR the session went off-track. Off-track forces the
+  // pause — the user needs to read what happened, not race to the
+  // new bottom.
+  const paused = userPaused || isOffTrack;
 
-  const handleScroll = useCallback((ev: React.UIEvent<HTMLDivElement>) => {
-    const el = ev.currentTarget;
-    const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
-    setPaused(distanceFromBottom > AT_BOTTOM_THRESHOLD_PX);
-  }, []);
+  const handleScroll = useCallback(
+    (ev: React.UIEvent<HTMLDivElement>) => {
+      // Off-track wins regardless of scroll position. Don't let a
+      // bottom-edge scroll event silently re-enable auto-follow.
+      if (isOffTrack) {
+        setUserPaused(true);
+        return;
+      }
+      const el = ev.currentTarget;
+      const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
+      setUserPaused(distanceFromBottom > AT_BOTTOM_THRESHOLD_PX);
+    },
+    [isOffTrack],
+  );
 
   const jumpToLive = useCallback(() => {
     const el = scrollRef.current;
     if (el) {
       el.scrollTop = el.scrollHeight;
     }
-    setPaused(false);
+    setUserPaused(false);
   }, []);
+
+  // Auto-scroll effect — when new entries arrive (or the entry list
+  // identity otherwise changes) and the user is not paused, advance
+  // scrollTop to scrollHeight so the live tail keeps showing. Without
+  // this, jsdom's lack of layout means the test catches what would
+  // also break in a real browser when a flexbox column appended new
+  // children while the user was at the bottom: the scroll position
+  // was left behind and no scroll event fired to even show the pill.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional — re-run on entry list growth, not on `paused` flip
+  useEffect(() => {
+    if (paused) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [entries, paused]);
 
   // Compute engagement number for each engagement entry — engagements
   // are 1-indexed when they appear in the stream, so a re-engagement

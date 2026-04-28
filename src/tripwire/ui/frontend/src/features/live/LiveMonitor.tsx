@@ -120,7 +120,7 @@ function LiveMonitorInner({ projectId, sid }: { projectId: string; sid: string }
 
       <div className="flex flex-1 min-h-0">
         <main className="flex flex-1 min-h-0 flex-col">
-          <TurnStream entries={entries} />
+          <TurnStream entries={entries} isOffTrack={isOffTrack} />
         </main>
         <LiveRail
           projectId={projectId}

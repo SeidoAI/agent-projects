@@ -6,6 +6,7 @@ import { dispatchEvent } from "@/lib/realtime/eventHandlers";
 import type {
   ArtifactUpdatedEvent,
   FileChangedEvent,
+  ProcessEventBroadcast,
   ValidationCompletedEvent,
 } from "@/lib/realtime/events";
 
@@ -148,6 +149,25 @@ describe("dispatchEvent", () => {
       last_run_at: event.timestamp,
     });
     expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  it("process_event → invalidates the workflow events query so the Live Monitor refreshes", () => {
+    const event: ProcessEventBroadcast = makeEvent({
+      type: "process_event",
+      project_id: "p1",
+      event_id: "ev-1",
+      kind: "tripwire_fire",
+      session_id: "sess-01",
+      fired_at: "2026-04-28T10:00:00Z",
+    });
+    dispatchEvent(event, queryClient);
+
+    // The frontend's `useWorkflowEvents` keys queries under the
+    // `events(pid, params)` prefix; invalidating the project-prefix
+    // covers every variant a consumer might have opened (no-filter,
+    // session-scoped, kind-filtered).
+    const keys = invalidatedKeys();
+    expect(keys).toContainEqual(["projects", "p1", "events"]);
   });
 
   it("ping / pong are no-ops", () => {
