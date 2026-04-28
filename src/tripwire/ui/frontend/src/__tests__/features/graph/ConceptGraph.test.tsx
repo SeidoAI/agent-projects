@@ -111,6 +111,66 @@ describe("ConceptGraph", () => {
     vi.restoreAllMocks();
   });
 
+  it("does not crash when the payload contains issue↔concept edges (PM #25 P1)", () => {
+    // Regression: d3-force throws on link initialisation when an
+    // edge endpoint is absent from the simulation's node set. The
+    // backend's concept graph payload returns a mix of concept and
+    // issue nodes; if we hand all edges to useGraphLayout while
+    // only feeding it the concept subset, the issue↔concept edges
+    // dangle and the simulation explodes on first load.
+    const wrapper = withSeed({
+      nodes: [
+        {
+          id: "user-model",
+          type: "concept",
+          position: { x: 100, y: 100 },
+          data: { label: "User model", type: "model", has_saved_layout: true },
+        },
+        {
+          id: "auth-flow",
+          type: "concept",
+          position: { x: 300, y: 200 },
+          data: { label: "Auth flow", type: "decision" },
+        },
+        {
+          id: "KUI-1",
+          type: "issue",
+          position: { x: 500, y: 100 },
+          data: { label: "Login endpoint" },
+        },
+      ],
+      edges: [
+        {
+          id: "e_concept",
+          source: "user-model",
+          target: "auth-flow",
+          relation: "cites",
+          data: {},
+        },
+        {
+          // issue → concept reference edge — would dangle for
+          // useGraphLayout if not filtered out at the call site.
+          id: "e_issue_ref",
+          source: "KUI-1",
+          target: "user-model",
+          relation: "references",
+          data: {},
+        },
+      ],
+      meta: {
+        kind: "concept",
+        focus: null,
+        upstream: false,
+        downstream: false,
+        depth: null,
+        node_count: 3,
+        edge_count: 2,
+        orphans: [],
+      },
+    });
+    expect(() => render(<ConceptGraph />, { wrapper })).not.toThrow();
+  });
+
   it("shows the empty-state when the backend returns 0 nodes", () => {
     const wrapper = withSeed({
       nodes: [],
