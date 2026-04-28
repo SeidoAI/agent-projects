@@ -3,8 +3,8 @@ import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InterveneButton } from "@/features/live/InterveneButton";
-import { renderWithProviders } from "../../test-utils";
 import { server } from "../../mocks/server";
+import { renderWithProviders } from "../../test-utils";
 
 afterEach(() => {
   cleanup();
@@ -25,20 +25,16 @@ describe("InterveneButton — KUI-107 INTERVENE", () => {
       }),
     );
 
-    renderWithProviders(
-      <InterveneButton projectId="p1" sessionId="v08-foo" status="executing" />,
-    );
+    renderWithProviders(<InterveneButton projectId="p1" sessionId="v08-foo" status="executing" />);
 
     fireEvent.click(screen.getByRole("button", { name: /intervene/i }));
 
     await waitFor(() => expect(spy).toHaveBeenCalled());
-    expect(spy.mock.calls[0][1]).toBe("POST");
+    expect(spy.mock.calls[0]?.[1]).toBe("POST");
   });
 
   it("is disabled when the session is not executing (already paused / done / etc.)", () => {
-    renderWithProviders(
-      <InterveneButton projectId="p1" sessionId="v08-foo" status="paused" />,
-    );
+    renderWithProviders(<InterveneButton projectId="p1" sessionId="v08-foo" status="paused" />);
 
     expect(screen.getByRole("button", { name: /intervene/i })).toBeDisabled();
   });
@@ -58,16 +54,12 @@ describe("InterveneButton — KUI-107 INTERVENE", () => {
       }),
     );
 
-    renderWithProviders(
-      <InterveneButton projectId="p1" sessionId="v08-foo" status="executing" />,
-    );
+    renderWithProviders(<InterveneButton projectId="p1" sessionId="v08-foo" status="executing" />);
 
     fireEvent.click(screen.getByRole("button", { name: /intervene/i }));
 
     // While in flight: button shows "pausing…" copy and is disabled.
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /pausing/i })).toBeDisabled(),
-    );
+    await waitFor(() => expect(screen.getByRole("button", { name: /pausing/i })).toBeDisabled());
 
     // Release the response so the test can finish without leaking
     // the pending fetch into other tests.

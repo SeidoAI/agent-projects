@@ -89,11 +89,7 @@ export function TurnStream({ entries, className }: TurnStreamProps) {
               if (entry.kind === "engagement") {
                 engagementOrdinal += 1;
                 return (
-                  <EngagementMarker
-                    key={entry.id}
-                    ordinal={engagementOrdinal}
-                    entry={entry}
-                  />
+                  <EngagementMarker key={entry.id} ordinal={engagementOrdinal} entry={entry} />
                 );
               }
               return <TripwireFire key={entry.id} entry={entry} />;
@@ -129,11 +125,7 @@ function EngagementMarker({ ordinal, entry }: EngagementMarkerProps) {
       data-testid="engagement-marker"
       className="flex items-center gap-2 border-(--color-edge) border-t pt-3"
     >
-      <GitBranch
-        className="h-3.5 w-3.5 text-(--color-ink-2)"
-        aria-hidden
-        strokeWidth={2}
-      />
+      <GitBranch className="h-3.5 w-3.5 text-(--color-ink-2)" aria-hidden strokeWidth={2} />
       <span className="font-mono text-[10px] text-(--color-ink-2) uppercase tracking-[0.18em]">
         engagement #{ordinal}
       </span>
@@ -155,11 +147,7 @@ function TripwireFire({ entry }: TripwireFireProps) {
       data-testid={`tripwire-fire-${entry.id}`}
       className="flex items-center gap-2 rounded-(--radius-stamp) border border-(--color-rule)/40 bg-(--color-rule)/5 px-3 py-2"
     >
-      <Zap
-        className="h-3.5 w-3.5 text-(--color-rule)"
-        aria-hidden
-        strokeWidth={2.2}
-      />
+      <Zap className="h-3.5 w-3.5 text-(--color-rule)" aria-hidden strokeWidth={2.2} />
       <span className="font-mono text-[10px] text-(--color-rule) uppercase tracking-[0.18em]">
         agent received tripwire
       </span>

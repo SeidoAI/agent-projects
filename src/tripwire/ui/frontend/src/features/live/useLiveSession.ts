@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 
 import { sessionStageId } from "@/components/ui/session-stage-row";
-import type { InboxItem } from "@/lib/api/endpoints/inbox";
-import { useInbox } from "@/lib/api/endpoints/inbox";
 import type { ProcessEvent } from "@/lib/api/endpoints/events";
 import { useWorkflowEvents } from "@/lib/api/endpoints/events";
+import type { InboxItem } from "@/lib/api/endpoints/inbox";
+import { useInbox } from "@/lib/api/endpoints/inbox";
 import type { SessionDetail } from "@/lib/api/endpoints/sessions";
 import { useSession } from "@/lib/api/endpoints/sessions";
 
@@ -47,10 +47,7 @@ export interface UseLiveSessionResult {
   costApprovalEntry: InboxItem | null;
 }
 
-export function useLiveSession(
-  projectId: string,
-  sessionId: string,
-): UseLiveSessionResult {
+export function useLiveSession(projectId: string, sessionId: string): UseLiveSessionResult {
   const sessionQuery = useSession(projectId, sessionId);
   const eventsQuery = useWorkflowEvents(projectId, { session_id: sessionId });
   // Filter the inbox to OPEN BLOCKED entries only — the cost-approval
@@ -69,20 +66,14 @@ export function useLiveSession(
     const all = eventsQuery.data?.events ?? [];
     return all
       .filter((e) => e.kind === "tripwire_fire" && e.session_id === sessionId)
-      .sort(
-        (a, b) =>
-          new Date(b.fired_at).getTime() - new Date(a.fired_at).getTime(),
-      );
+      .sort((a, b) => new Date(b.fired_at).getTime() - new Date(a.fired_at).getTime());
   }, [eventsQuery.data, sessionId]);
 
   const statusTransitions = useMemo(() => {
     const all = eventsQuery.data?.events ?? [];
     return all
       .filter((e) => e.kind === "status_transition" && e.session_id === sessionId)
-      .sort(
-        (a, b) =>
-          new Date(a.fired_at).getTime() - new Date(b.fired_at).getTime(),
-      );
+      .sort((a, b) => new Date(a.fired_at).getTime() - new Date(b.fired_at).getTime());
   }, [eventsQuery.data, sessionId]);
 
   const costApprovalEntry = useMemo<InboxItem | null>(() => {
@@ -90,9 +81,7 @@ export function useLiveSession(
     const matched = entries.find(
       (entry) =>
         entry.escalation_reason === "cost-approval" &&
-        entry.references.some(
-          (ref) => "session" in ref && ref.session === sessionId,
-        ),
+        entry.references.some((ref) => "session" in ref && ref.session === sessionId),
     );
     return matched ?? null;
   }, [inboxQuery.data, sessionId]);

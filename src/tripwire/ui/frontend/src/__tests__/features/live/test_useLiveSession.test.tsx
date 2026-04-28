@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { useLiveSession } from "@/features/live/useLiveSession";
-import { queryKeys } from "@/lib/api/queryKeys";
+import type { EventsResponse, ProcessEvent } from "@/lib/api/endpoints/events";
 import type { InboxItem } from "@/lib/api/endpoints/inbox";
-import type { ProcessEvent, EventsResponse } from "@/lib/api/endpoints/events";
+import { queryKeys } from "@/lib/api/queryKeys";
 import { makeSessionDetail } from "../../mocks/fixtures";
 import { makeTestQueryClient } from "../../test-utils";
 
@@ -55,10 +55,7 @@ describe("useLiveSession", () => {
       events: [fire, otherFire],
       next_cursor: null,
     };
-    client.setQueryData(
-      queryKeys.events("p1", { session_id: "v08-foo" }),
-      eventsResp,
-    );
+    client.setQueryData(queryKeys.events("p1", { session_id: "v08-foo" }), eventsResp);
 
     // One open `cost-approval` blocked-bucket entry referencing this session.
     const inboxEntries: InboxItem[] = [
@@ -131,24 +128,21 @@ describe("useLiveSession", () => {
       queryKeys.session("p1", "v08-foo"),
       makeSessionDetail({ id: "v08-foo", status: "executing" }),
     );
-    client.setQueryData(
-      queryKeys.inboxFiltered("p1", { bucket: "blocked", resolved: false }),
-      [
-        {
-          id: "inbox-3",
-          bucket: "blocked",
-          title: "for a different session",
-          body: "",
-          author: "pm-agent",
-          created_at: "2026-04-28T10:00:00Z",
-          references: [{ session: "other-sess" }],
-          escalation_reason: "cost-approval",
-          resolved: false,
-          resolved_at: null,
-          resolved_by: null,
-        },
-      ] satisfies InboxItem[],
-    );
+    client.setQueryData(queryKeys.inboxFiltered("p1", { bucket: "blocked", resolved: false }), [
+      {
+        id: "inbox-3",
+        bucket: "blocked",
+        title: "for a different session",
+        body: "",
+        author: "pm-agent",
+        created_at: "2026-04-28T10:00:00Z",
+        references: [{ session: "other-sess" }],
+        escalation_reason: "cost-approval",
+        resolved: false,
+        resolved_at: null,
+        resolved_by: null,
+      },
+    ] satisfies InboxItem[]);
 
     const { result } = renderHook(() => useLiveSession("p1", "v08-foo"), {
       wrapper,

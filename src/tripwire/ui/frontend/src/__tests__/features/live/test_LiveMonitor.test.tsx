@@ -1,13 +1,17 @@
 import { cleanup, screen } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, it } from "vitest";
-
-import { LiveMonitor } from "@/features/live/LiveMonitor";
 import { sessionStageColor } from "@/components/ui/session-stage-row";
+import { LiveMonitor } from "@/features/live/LiveMonitor";
 import { queryKeys } from "@/lib/api/queryKeys";
 import { makeSessionDetail } from "../../mocks/fixtures";
+import { server } from "../../mocks/server";
 import { makeTestQueryClient, renderWithProviders } from "../../test-utils";
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  server.resetHandlers();
+});
 
 const ROUTE = "/p/p1/sessions/v08-foo/live";
 const ROUTE_PATTERN = "/p/:projectId/sessions/:sid/live";
@@ -74,6 +78,15 @@ describe("LiveMonitor — KUI-107", () => {
   });
 
   it("shows a not-found state when the session 404s", async () => {
+    server.use(
+      http.get("/api/projects/p1/sessions/missing", () =>
+        HttpResponse.json(
+          { detail: "missing not found", code: "session/not_found", extras: {} },
+          { status: 404 },
+        ),
+      ),
+    );
+
     renderWithProviders(<LiveMonitor />, {
       initialPath: "/p/p1/sessions/missing/live",
       routePath: ROUTE_PATTERN,
@@ -87,9 +100,9 @@ describe("LiveMonitor — KUI-107", () => {
  *  against a stage-row hex need to convert. The helper mirrors what
  *  jsdom does for 6-character hex values. */
 function hexToRgb(hex: string): string {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
-  if (!m) return hex;
-  const num = Number.parseInt(m[1], 16);
+  const captured = /^#?([0-9a-f]{6})$/i.exec(hex)?.[1];
+  if (!captured) return hex;
+  const num = Number.parseInt(captured, 16);
   const r = (num >> 16) & 0xff;
   const g = (num >> 8) & 0xff;
   const b = num & 0xff;

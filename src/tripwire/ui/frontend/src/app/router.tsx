@@ -5,6 +5,7 @@ import { Board } from "@/features/board/Board";
 import { ProjectDashboard } from "@/features/dashboard/ProjectDashboard";
 import { ConceptGraph } from "@/features/graph/ConceptGraph";
 import { IssueDetail } from "@/features/issues/IssueDetail";
+import { LiveMonitor } from "@/features/live/LiveMonitor";
 import { NodeDetail } from "@/features/nodes/NodeDetail";
 import { SessionDetail } from "@/features/sessions/SessionDetail";
 import { SessionList } from "@/features/sessions/SessionList";
@@ -35,7 +36,7 @@ export const router = createBrowserRouter([
       // to these paths, so the routes must exist.
       { path: "workflow", element: <Placeholder name="WorkflowMap" /> },
       { path: "tripwires", element: <Placeholder name="TripwireLog" /> },
-      { path: "sessions/:sid/live", element: <Placeholder name="LiveMonitor" /> },
+      { path: "sessions/:sid/live", element: <LiveMonitor /> },
     ],
   },
 ]);

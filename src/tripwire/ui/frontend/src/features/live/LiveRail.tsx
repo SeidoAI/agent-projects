@@ -56,17 +56,10 @@ export function LiveRail({
       <AgentState state={agentState} />
       <TripwireFires fires={tripwireFires} />
       {costApprovalEntry ? (
-        <CostApprovalChip
-          entry={costApprovalEntry}
-          onClick={onCostApprovalClick}
-        />
+        <CostApprovalChip entry={costApprovalEntry} onClick={onCostApprovalClick} />
       ) : null}
       <div className="mt-auto pt-4">
-        <InterveneButton
-          projectId={projectId}
-          sessionId={sessionId}
-          status={status}
-        />
+        <InterveneButton projectId={projectId} sessionId={sessionId} status={status} />
       </div>
     </aside>
   );
@@ -75,9 +68,7 @@ export function LiveRail({
 function CostTicker({ costUsd }: { costUsd: number }) {
   return (
     <section>
-      <Heading icon={<DollarSign className="h-3 w-3" aria-hidden />}>
-        cost
-      </Heading>
+      <Heading icon={<DollarSign className="h-3 w-3" aria-hidden />}>cost</Heading>
       <div
         data-testid="cost-ticker"
         className={cn(
@@ -93,9 +84,7 @@ function CostTicker({ costUsd }: { costUsd: number }) {
 function AgentState({ state }: { state: string | null }) {
   return (
     <section data-testid="agent-state">
-      <Heading icon={<Cpu className="h-3 w-3" aria-hidden />}>
-        agent state
-      </Heading>
+      <Heading icon={<Cpu className="h-3 w-3" aria-hidden />}>agent state</Heading>
       <div className="mt-1 font-mono text-[12px] text-(--color-ink-2) tracking-[0.04em]">
         {state ?? <span className="text-(--color-ink-3) italic">— no state reported yet</span>}
       </div>
@@ -106,9 +95,7 @@ function AgentState({ state }: { state: string | null }) {
 function TripwireFires({ fires }: { fires: ProcessEvent[] }) {
   return (
     <section>
-      <Heading icon={<Zap className="h-3 w-3" aria-hidden />}>
-        tripwire fires
-      </Heading>
+      <Heading icon={<Zap className="h-3 w-3" aria-hidden />}>tripwire fires</Heading>
       {fires.length === 0 ? (
         <div className="mt-1 font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
           none yet
@@ -160,13 +147,7 @@ function CostApprovalChip({
   );
 }
 
-function Heading({
-  icon,
-  children,
-}: {
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
+function Heading({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-1.5 font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
       {icon}

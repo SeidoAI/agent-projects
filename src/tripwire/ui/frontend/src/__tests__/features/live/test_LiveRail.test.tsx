@@ -30,9 +30,7 @@ describe("LiveRail — KUI-107 right rail", () => {
   });
 
   it("shows the agent's current state when present", () => {
-    renderWithProviders(
-      <LiveRail {...baseProps} agentState="awaiting validator: scope-clarity" />,
-    );
+    renderWithProviders(<LiveRail {...baseProps} agentState="awaiting validator: scope-clarity" />);
     expect(screen.getByTestId("agent-state")).toHaveTextContent(
       /awaiting validator: scope-clarity/,
     );
@@ -71,11 +69,7 @@ describe("LiveRail — KUI-107 right rail", () => {
     };
     const onClick = vi.fn();
     renderWithProviders(
-      <LiveRail
-        {...baseProps}
-        costApprovalEntry={entry}
-        onCostApprovalClick={onClick}
-      />,
+      <LiveRail {...baseProps} costApprovalEntry={entry} onCostApprovalClick={onClick} />,
     );
 
     const chip = screen.getByTestId("cost-approval-chip");

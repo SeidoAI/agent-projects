@@ -5,11 +5,7 @@ import { TurnStream, type TurnStreamEntry } from "@/features/live/TurnStream";
 
 afterEach(() => cleanup());
 
-function engagement(
-  id: string,
-  startedAt: string,
-  trigger: string,
-): TurnStreamEntry {
+function engagement(id: string, startedAt: string, trigger: string): TurnStreamEntry {
   return {
     kind: "engagement",
     id,
@@ -58,9 +54,7 @@ describe("TurnStream — KUI-107 turn stream", () => {
   });
 
   it("shows the jump-to-live pill when the user has scrolled away from the bottom, hides it at the bottom", () => {
-    const entries: TurnStreamEntry[] = [
-      engagement("eng-1", "2026-04-27T10:00:00Z", "spawn"),
-    ];
+    const entries: TurnStreamEntry[] = [engagement("eng-1", "2026-04-27T10:00:00Z", "spawn")];
     render(<TurnStream entries={entries} />);
 
     const container = screen.getByTestId("turn-stream-scroll");
@@ -89,11 +83,7 @@ describe("TurnStream — KUI-107 turn stream", () => {
   });
 
   it("re-hides the jump-to-live pill after the user scrolls back near the bottom", () => {
-    render(
-      <TurnStream
-        entries={[engagement("eng-1", "2026-04-27T10:00:00Z", "spawn")]}
-      />,
-    );
+    render(<TurnStream entries={[engagement("eng-1", "2026-04-27T10:00:00Z", "spawn")]} />);
     const container = screen.getByTestId("turn-stream-scroll");
 
     // First, scroll up to surface the pill.

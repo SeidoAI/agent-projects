@@ -1,7 +1,6 @@
 import { Hand } from "lucide-react";
-
-import { cn } from "@/lib/utils";
 import { usePauseSession } from "@/lib/api/endpoints/sessions";
+import { cn } from "@/lib/utils";
 
 /**
  * The human's escape hatch on the Live Monitor (S7) — calls
@@ -23,12 +22,7 @@ export interface InterveneButtonProps {
   className?: string;
 }
 
-export function InterveneButton({
-  projectId,
-  sessionId,
-  status,
-  className,
-}: InterveneButtonProps) {
+export function InterveneButton({ projectId, sessionId, status, className }: InterveneButtonProps) {
   const pause = usePauseSession(projectId, sessionId);
   const canPause = status === "executing" && !pause.isPending;
   const label = pause.isPending ? "pausing…" : "intervene";
