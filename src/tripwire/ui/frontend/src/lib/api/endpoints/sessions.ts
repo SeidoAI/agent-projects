@@ -30,12 +30,29 @@ export interface SessionSummary {
   task_progress: TaskProgress;
 }
 
+/** One launch of a coding-agent container against a session. See
+ *  `[[engagement-primitive]]`. The full set of fields is documented
+ *  on the node; this interface mirrors what the backend serialises
+ *  via `runtime_state.engagements` on `session.yaml`. Optional fields
+ *  reflect engagements that are still in flight (no `ended_at` /
+ *  `outcome` yet) or older entries written before a field existed. */
+export interface Engagement {
+  engagement_id?: string;
+  started_at: string;
+  ended_at?: string | null;
+  trigger?: "spawn" | "re-engagement" | "resume" | "human-resume" | string;
+  outcome?: "success" | "paused" | "failed" | "abandoned" | string | null;
+  agent_state?: string | null;
+  cost_usd?: number | null;
+  commit_sha?: string | null;
+}
+
 export interface SessionDetail extends SessionSummary {
   plan_md: string;
   key_files: string[];
   docs: string[];
   grouping_rationale: string | null;
-  engagements: Record<string, unknown>[];
+  engagements: Engagement[];
   artifact_status: Record<string, string>;
 }
 
