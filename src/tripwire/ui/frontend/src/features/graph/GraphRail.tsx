@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 
 import { MarkdownBody } from "@/components/MarkdownBody";
 import { Stamp } from "@/components/ui/stamp";
-import type { InboxItem } from "@/lib/api/endpoints/inbox";
 import type { ReactFlowEdge, ReactFlowNode } from "@/lib/api/endpoints/graph";
+import type { InboxItem } from "@/lib/api/endpoints/inbox";
 import { useNode } from "@/lib/api/endpoints/nodes";
 
 /**
@@ -66,8 +66,7 @@ export function GraphRail({
   const kind = String(node.data?.type ?? "concept");
   const stale = detail?.is_stale ?? node.data?.status === "stale";
   const version =
-    detail?.source?.content_hash &&
-    detail.source.content_hash.startsWith(VERSION_PREFIX)
+    detail?.source?.content_hash && detail.source.content_hash.startsWith(VERSION_PREFIX)
       ? detail.source.content_hash.slice(VERSION_PREFIX.length, VERSION_PREFIX.length + 7)
       : null;
   const lastTouched = detail ? null : null; // TODO(v0.8.x): wire reverse-refs/last-session-id when service exposes it
@@ -161,10 +160,7 @@ export function GraphRail({
                   className="flex w-full items-start justify-between gap-2 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) px-2 py-1.5 text-left text-[12px] text-(--color-ink-2) transition-colors hover:bg-(--color-paper-3)"
                 >
                   <span className="min-w-0 truncate">{entry.title}</span>
-                  <Stamp
-                    tone={entry.bucket === "blocked" ? "rule" : "default"}
-                    variant="status"
-                  >
+                  <Stamp tone={entry.bucket === "blocked" ? "rule" : "default"} variant="status">
                     {entry.bucket}
                   </Stamp>
                 </button>

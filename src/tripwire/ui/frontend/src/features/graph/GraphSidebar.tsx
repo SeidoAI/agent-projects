@@ -1,7 +1,6 @@
 import { useMemo } from "react";
-
-import { cn } from "@/lib/utils";
 import type { ReactFlowGraph, ReactFlowNode } from "@/lib/api/endpoints/graph";
+import { cn } from "@/lib/utils";
 
 /**
  * Left rail of the Concept Graph (KUI-104, spec §3.5).
@@ -35,9 +34,7 @@ export function GraphSidebar({ graph, selectedId, onSelect }: GraphSidebarProps)
         concepts · {graph.meta.node_count}
       </h3>
       {grouped.length === 0 ? (
-        <p className="font-serif text-[13px] italic text-(--color-ink-3)">
-          no concepts yet.
-        </p>
+        <p className="font-serif text-[13px] italic text-(--color-ink-3)">no concepts yet.</p>
       ) : (
         <ul className="flex flex-col gap-4">
           {grouped.map(([type, entries]) => (

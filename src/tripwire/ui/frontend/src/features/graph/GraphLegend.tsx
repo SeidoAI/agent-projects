@@ -18,15 +18,7 @@ export function GraphLegend() {
   );
 }
 
-function LegendDot({
-  color,
-  label,
-  dashed,
-}: {
-  color: string;
-  label: string;
-  dashed?: boolean;
-}) {
+function LegendDot({ color, label, dashed }: { color: string; label: string; dashed?: boolean }) {
   return (
     <div className="flex items-center gap-1.5">
       <span
@@ -41,15 +33,7 @@ function LegendDot({
   );
 }
 
-function LegendLine({
-  color,
-  label,
-  dashed,
-}: {
-  color: string;
-  label: string;
-  dashed?: boolean;
-}) {
+function LegendLine({ color, label, dashed }: { color: string; label: string; dashed?: boolean }) {
   return (
     <div className="flex items-center gap-1.5">
       <span

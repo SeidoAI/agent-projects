@@ -2,9 +2,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { useProjectShell } from "@/app/ProjectShell";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 import type { ReactFlowNode } from "@/lib/api/endpoints/graph";
 import { type InboxItem, useInbox } from "@/lib/api/endpoints/inbox";
+import { cn } from "@/lib/utils";
 import { GraphLegend } from "./GraphLegend";
 import { GraphRail } from "./GraphRail";
 import { GraphSidebar } from "./GraphSidebar";
@@ -106,12 +106,10 @@ export function ConceptGraph() {
     );
   }
 
-  const focusedNode = focus ? concepts.find((n) => n.id === focus) ?? null : null;
+  const focusedNode = focus ? (concepts.find((n) => n.id === focus) ?? null) : null;
   const incidentEdges =
     focusedNode && data
-      ? data.edges.filter(
-          (e) => e.source === focusedNode.id || e.target === focusedNode.id,
-        )
+      ? data.edges.filter((e) => e.source === focusedNode.id || e.target === focusedNode.id)
       : [];
 
   return (
@@ -136,18 +134,15 @@ export function ConceptGraph() {
         className="relative overflow-hidden bg-(--color-paper-2)"
       >
         <svg
-          aria-hidden
+          role="img"
+          aria-label="Concept graph canvas"
           className="absolute inset-0 h-full w-full"
           viewBox={`0 0 ${size.width} ${size.height}`}
           preserveAspectRatio="xMidYMid meet"
         >
+          <title>Concept graph canvas</title>
           <defs>
-            <pattern
-              id="concept-graph-ledger"
-              width={40}
-              height={40}
-              patternUnits="userSpaceOnUse"
-            >
+            <pattern id="concept-graph-ledger" width={40} height={40} patternUnits="userSpaceOnUse">
               <path
                 d="M 40 0 L 0 0 0 40"
                 fill="none"
@@ -156,11 +151,7 @@ export function ConceptGraph() {
               />
             </pattern>
           </defs>
-          <rect
-            width={size.width}
-            height={size.height}
-            fill="url(#concept-graph-ledger)"
-          />
+          <rect width={size.width} height={size.height} fill="url(#concept-graph-ledger)" />
 
           {/* edges */}
           {data.edges.map((edge) => {
@@ -197,14 +188,24 @@ export function ConceptGraph() {
             const r = NODE_RADIUS;
             const inboxCount = inboxByNode.get(node.id)?.length ?? 0;
             return (
+              // biome-ignore lint/a11y/useSemanticElements: HTML <button> isn't a valid SVG child; role="button" on a <g> is the standard pattern for interactive SVG groups
               <g
                 key={node.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`Focus ${String(node.data?.label ?? node.id)}`}
                 data-testid={`node-group-${node.id}`}
                 data-focus={isFocus ? "true" : "false"}
                 data-dim={dim ? "true" : "false"}
                 opacity={dim ? 0.35 : 1}
                 style={{ cursor: "pointer", transition: "opacity 200ms ease" }}
                 onClick={() => setFocus(node.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setFocus(node.id);
+                  }
+                }}
               >
                 <circle
                   data-testid={`node-circle-${node.id}`}
@@ -298,7 +299,7 @@ export function ConceptGraph() {
         node={focusedNode}
         incident={incidentEdges}
         allNodes={concepts}
-        referencingInbox={focus ? inboxByNode.get(focus) ?? [] : []}
+        referencingInbox={focus ? (inboxByNode.get(focus) ?? []) : []}
         onSelectNeighbour={setFocus}
       />
     </div>

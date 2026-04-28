@@ -103,10 +103,8 @@ describe("useLayoutPersistence", () => {
         await Promise.resolve();
       });
       expect(fetchSpy).toHaveBeenCalledTimes(1);
-      expect(JSON.parse(String(fetchSpy.mock.calls[0][1]?.body))).toEqual({
-        x: 9,
-        y: 9,
-      });
+      const init = fetchSpy.mock.calls[0]?.[1];
+      expect(JSON.parse(String(init?.body))).toEqual({ x: 9, y: 9 });
     } finally {
       vi.useRealTimers();
     }

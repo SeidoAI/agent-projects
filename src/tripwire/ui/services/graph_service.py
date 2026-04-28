@@ -393,7 +393,10 @@ def _saved_layouts(project_dir: Path) -> dict[str, tuple[float, float]]:
         for node in _list_nodes(project_dir):
             if node.layout is not None:
                 out[node.id] = (node.layout.x, node.layout.y)
-    except Exception as exc:  # noqa: BLE001 — best effort, don't break the graph
+    except (OSError, ValueError) as exc:
+        # Best effort — a malformed node YAML or unreadable file
+        # shouldn't prevent the graph from rendering. Fall back to
+        # the layered BFS positions for any unreadable layouts.
         logger.warning("graph_service: failed to read saved layouts: %s", exc)
     return out
 
@@ -427,9 +430,7 @@ def build_concept_graph(
     saved = _saved_layouts(project_dir)
     positions: dict[str, tuple[float, float]] = dict(layout.positions)
     positions.update(saved)
-    rf_nodes = [
-        _react_flow_node(n, positions, has_saved=n.id in saved) for n in nodes
-    ]
+    rf_nodes = [_react_flow_node(n, positions, has_saved=n.id in saved) for n in nodes]
     rf_edges = _react_flow_edges(edges)
 
     return ReactFlowGraph(

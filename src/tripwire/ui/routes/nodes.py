@@ -52,6 +52,7 @@ class LayoutPatchBody(BaseModel):
     x: float
     y: float
 
+
 router = APIRouter(prefix="/api/projects/{project_id}", tags=["nodes"])
 
 _SLUG_PATTERN = r"^[a-z][a-z0-9-]*$"

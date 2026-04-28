@@ -41,9 +41,7 @@ export function useLayoutPersistence(projectId: string): UseLayoutPersistence {
       // persistence attempts. The next debounce window will retry
       // anything the canvas re-emits.
       await Promise.allSettled(
-        Array.from(batch.entries()).map(([nid, layout]) =>
-          nodesApi.updateLayout(pid, nid, layout),
-        ),
+        Array.from(batch.entries()).map(([nid, layout]) => nodesApi.updateLayout(pid, nid, layout)),
       );
     };
   }, []);

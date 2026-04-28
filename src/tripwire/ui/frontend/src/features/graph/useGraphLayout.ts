@@ -1,11 +1,4 @@
-import {
-  forceCenter,
-  forceLink,
-  forceManyBody,
-  forceSimulation,
-  forceX,
-  forceY,
-} from "d3-force";
+import { forceCenter, forceLink, forceManyBody, forceSimulation, forceX, forceY } from "d3-force";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ReactFlowEdge, ReactFlowNode } from "@/lib/api/endpoints/graph";
@@ -65,9 +58,7 @@ export function useGraphLayout({
   width,
   height,
 }: UseGraphLayoutInput): UseGraphLayoutResult {
-  const [positions, setPositions] = useState<Record<string, Vec2>>(() =>
-    initialPositions(nodes),
-  );
+  const [positions, setPositions] = useState<Record<string, Vec2>>(() => initialPositions(nodes));
   const [didSeed, setDidSeed] = useState<boolean>(false);
   const [newLayouts, setNewLayouts] = useState<Record<string, Vec2>>({});
 

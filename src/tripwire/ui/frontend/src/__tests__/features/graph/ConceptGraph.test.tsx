@@ -17,7 +17,9 @@ vi.mock("@/lib/api/endpoints/inbox", () => ({
   useInbox: () => ({ data: [] }),
 }));
 
-const useNodeMock = vi.fn(() => ({ data: undefined, isLoading: false }));
+const useNodeMock = vi.fn<() => { data: NodeDetail | undefined; isLoading: boolean }>(
+  () => ({ data: undefined, isLoading: false }),
+);
 
 vi.mock("@/lib/api/endpoints/nodes", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -131,16 +133,20 @@ describe("ConceptGraph", () => {
   it("renders the chapter eyebrow + title from the design mockup", () => {
     const wrapper = withSeed(makeGraph());
     render(<ConceptGraph />, { wrapper });
-    expect(screen.getByText(/concept graph/i)).toBeInTheDocument();
+    expect(screen.getByText(/chapter 05 · concept graph/i)).toBeInTheDocument();
     expect(screen.getByText(/What this project is made of/i)).toBeInTheDocument();
   });
 
   it("renders the left sidebar grouped by node type", () => {
     const wrapper = withSeed(makeGraph());
-    render(<ConceptGraph />, { wrapper });
-    expect(screen.getByRole("button", { name: /User model/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Auth flow/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Session service/ })).toBeInTheDocument();
+    const { container } = render(<ConceptGraph />, { wrapper });
+    const sidebar = container.querySelector("[data-testid='graph-sidebar']");
+    expect(sidebar).not.toBeNull();
+    // The SVG canvas also renders these labels via <text> with role=button
+    // groups, so scope the lookup to the sidebar HTML buttons.
+    const buttons = sidebar?.querySelectorAll("button") ?? [];
+    const labels = Array.from(buttons).map((b) => b.textContent ?? "");
+    expect(labels).toEqual(expect.arrayContaining(["Auth flow", "Session service", "User model"]));
   });
 
   it("renders one SVG circle per concept node on the canvas", () => {
@@ -153,12 +159,10 @@ describe("ConceptGraph", () => {
   it("renders edges with the correct dasharray for relation kind", () => {
     const wrapper = withSeed(makeGraph());
     const { container } = render(<ConceptGraph />, { wrapper });
-    const cites = container.querySelector("[data-edge-relation='cites']") as
-      | SVGLineElement
-      | null;
-    const related = container.querySelector("[data-edge-relation='related']") as
-      | SVGLineElement
-      | null;
+    const cites = container.querySelector("[data-edge-relation='cites']") as SVGLineElement | null;
+    const related = container.querySelector(
+      "[data-edge-relation='related']",
+    ) as SVGLineElement | null;
     expect(cites).not.toBeNull();
     expect(related).not.toBeNull();
     expect(cites?.getAttribute("stroke-dasharray")).toBe("0");
@@ -204,9 +208,7 @@ describe("ConceptGraph", () => {
     });
     const wrapper = withSeed(graph);
     const { container } = render(<ConceptGraph />, { wrapper });
-    fireEvent.click(
-      container.querySelector("[data-testid='node-group-user-model']") as Element,
-    );
+    fireEvent.click(container.querySelector("[data-testid='node-group-user-model']") as Element);
     const lonely = container.querySelector("[data-testid='node-group-lonely']");
     expect(lonely?.getAttribute("data-dim")).toBe("true");
   });
@@ -241,9 +243,7 @@ describe("ConceptGraph rail", () => {
 
     const wrapper = withSeed(makeGraph());
     const { container } = render(<ConceptGraph />, { wrapper });
-    fireEvent.click(
-      container.querySelector("[data-testid='node-group-user-model']") as Element,
-    );
+    fireEvent.click(container.querySelector("[data-testid='node-group-user-model']") as Element);
     // Title is rendered with double-bracket wrapper; rail shows it
     // alongside the sidebar entry — assert the rail-specific shape.
     expect(screen.getByText(/\[\[User model\]\]/)).toBeInTheDocument();
