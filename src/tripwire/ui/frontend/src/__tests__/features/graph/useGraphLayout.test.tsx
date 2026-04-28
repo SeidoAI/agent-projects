@@ -73,4 +73,31 @@ describe("useGraphLayout", () => {
     });
     expect(Object.keys(result.current.newLayouts).sort()).toEqual(["a", "b"]);
   });
+
+  it("refreshes positions when saved-node ids swap with same length + topology (PM #25 round 3 P2)", () => {
+    // Regression: seedKey was built from `nodes.length`, the
+    // unsaved-id list, and edge topology. Two all-saved fixtures
+    // with the same length + (empty) topology and different ids
+    // produced identical seedKey → effect short-circuited →
+    // positions stayed pointing at the OLD ids and the NEW nodes
+    // had no entry in `positions`. Including all node ids in the
+    // seedKey identity restores the refresh.
+    const fixtureA = [node("alpha", 10, 20, true), node("beta", 30, 40, true)];
+    const fixtureB = [node("gamma", 50, 60, true), node("delta", 70, 80, true)];
+    const { result, rerender } = renderHook(
+      ({ nodes }: { nodes: ReactFlowNode[] }) =>
+        useGraphLayout({ nodes, edges: [], width: 1000, height: 600 }),
+      { initialProps: { nodes: fixtureA } },
+    );
+    expect(result.current.positions.alpha).toEqual({ x: 10, y: 20 });
+    expect(result.current.positions.beta).toEqual({ x: 30, y: 40 });
+
+    // Same length, same (empty) topology, different ids.
+    rerender({ nodes: fixtureB });
+    expect(result.current.positions.gamma).toEqual({ x: 50, y: 60 });
+    expect(result.current.positions.delta).toEqual({ x: 70, y: 80 });
+    // Old ids no longer in positions.
+    expect(result.current.positions.alpha).toBeUndefined();
+    expect(result.current.positions.beta).toBeUndefined();
+  });
 });
