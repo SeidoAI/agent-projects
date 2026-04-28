@@ -51,6 +51,12 @@ src/tripwire/ui/frontend/node_modules/
 src/tripwire/ui/frontend/dist/
 src/tripwire/ui/frontend/coverage/
 
+# Vitest sometimes writes a top-level node_modules/.vite cache when
+# the runner is invoked outside the frontend dir. Ignore at the repo
+# root so accidental cache writes don't sneak into a commit.
+/node_modules/
+.vite/
+
 # Worktrees
 .worktrees/
 
