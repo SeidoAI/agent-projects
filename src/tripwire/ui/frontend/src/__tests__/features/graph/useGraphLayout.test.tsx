@@ -74,6 +74,28 @@ describe("useGraphLayout", () => {
     expect(Object.keys(result.current.newLayouts).sort()).toEqual(["a", "b"]);
   });
 
+  it("refreshes positions when saved coordinates change for the same node ids (PM #25 round 4 P2)", () => {
+    // Regression: seedKey identity-aware fix in round 3 used node
+    // ids but omitted coordinates. If the backend returns the same
+    // node ids + topology with NEW saved positions (e.g. another
+    // user dragged the node, or a cleanup repositioned things),
+    // `lastSeedRef` short-circuited and `positions` kept the old
+    // coordinates. Including a coordinate hash in seedKey makes
+    // the effect re-run on coordinate changes.
+    const before = [node("alpha", 100, 100, true), node("beta", 200, 200, true)];
+    const after = [node("alpha", 500, 500, true), node("beta", 200, 200, true)];
+    const { result, rerender } = renderHook(
+      ({ nodes }: { nodes: ReactFlowNode[] }) =>
+        useGraphLayout({ nodes, edges: [], width: 1000, height: 600 }),
+      { initialProps: { nodes: before } },
+    );
+    expect(result.current.positions.alpha).toEqual({ x: 100, y: 100 });
+
+    rerender({ nodes: after });
+    expect(result.current.positions.alpha).toEqual({ x: 500, y: 500 });
+    expect(result.current.positions.beta).toEqual({ x: 200, y: 200 });
+  });
+
   it("refreshes positions when saved-node ids swap with same length + topology (PM #25 round 3 P2)", () => {
     // Regression: seedKey was built from `nodes.length`, the
     // unsaved-id list, and edge topology. Two all-saved fixtures
