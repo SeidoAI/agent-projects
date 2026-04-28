@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -6,7 +6,10 @@ import { InterveneButton } from "@/features/live/InterveneButton";
 import { renderWithProviders } from "../../test-utils";
 import { server } from "../../mocks/server";
 
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  cleanup();
+  server.resetHandlers();
+});
 
 describe("InterveneButton — KUI-107 INTERVENE", () => {
   it("calls POST /api/projects/{pid}/sessions/{sid}/pause when clicked", async () => {
