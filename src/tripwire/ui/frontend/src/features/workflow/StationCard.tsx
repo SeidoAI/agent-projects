@@ -1,7 +1,13 @@
 import { sessionStageColor } from "@/components/ui/session-stage-row";
 import type { WorkflowStation } from "@/lib/api/endpoints/workflow";
 
-const STATION_R = 14;
+// Station silhouette matches `LifecycleWire` (r=9 outer, ink stroke,
+// paper-coloured inner pip) so the workflow map and the dashboard
+// wire share one visual primitive. The fill is per-stage rather
+// than rule-red because this surface is teaching the lifecycle
+// stages, not signalling activity — see decisions.md D2.
+const STATION_R = 9;
+const STATION_INNER_R = 3.5;
 const LABEL_GAP = 18;
 
 /**
@@ -25,6 +31,7 @@ export function StationCard({ station, x, y }: StationCardProps) {
   return (
     <g>
       <circle cx={x} cy={y} r={STATION_R} fill={fill} stroke="var(--color-ink)" strokeWidth={1.4} />
+      <circle cx={x} cy={y} r={STATION_INNER_R} fill="var(--color-paper)" />
       <text
         x={x}
         y={y - STATION_R - LABEL_GAP}

@@ -133,7 +133,7 @@ function Canvas({ layout, hovered, onHover, onSelect }: CanvasProps) {
               {producer ? (
                 <ConnectorCurve
                   id={`artifact-out-${a.id}`}
-                  from={{ x: producer.x, y: producer.y + 14 }}
+                  from={{ x: producer.x, y: producer.y + 10 }}
                   to={{ x: a.x, y: a.y - 30 }}
                   dimmed={hl.connectorDimmed(`artifact-out-${a.id}`)}
                   stroke="var(--color-info)"
@@ -143,7 +143,7 @@ function Canvas({ layout, hovered, onHover, onSelect }: CanvasProps) {
                 <ConnectorCurve
                   id={`artifact-in-${a.id}`}
                   from={{ x: a.x, y: a.y - 30 }}
-                  to={{ x: consumer.x, y: consumer.y + 14 }}
+                  to={{ x: consumer.x, y: consumer.y + 10 }}
                   dimmed={hl.connectorDimmed(`artifact-in-${a.id}`)}
                   stroke="var(--color-info)"
                 />
@@ -243,14 +243,12 @@ function ConnectorEndpoint({
       <div
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        onFocus={onMouseEnter}
-        onBlur={onMouseLeave}
         // biome-ignore lint/a11y/noStaticElementInteractions: hover-only
-        // visualisation; connector endpoints are non-interactive (no
-        // click target — the cards above the wire are the click
-        // surface). The lint rule fires because plain divs shouldn't
-        // catch pointer events; we keep it for hover-highlight only,
-        // mirrored to focus/blur for keyboard parity.
+        // visualisation; connector endpoints are NOT focusable (the
+        // cards above the wire are the real click/focus targets).
+        // We don't attach onFocus/onBlur because there's no
+        // tabIndex and adding one would imply interactivity that
+        // doesn't exist.
         role="img"
         aria-label={`${side === "left" ? "Source" : "Sink"} ${connector.name}`}
         className="flex h-full w-full items-center justify-center gap-1.5 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-2"
@@ -396,4 +394,3 @@ function EmptyState() {
     </div>
   );
 }
-
