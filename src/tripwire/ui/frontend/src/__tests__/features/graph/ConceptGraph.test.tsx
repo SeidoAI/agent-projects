@@ -369,6 +369,66 @@ describe("ConceptGraph", () => {
     expect(related?.getAttribute("stroke-dasharray")).toBe("3 3");
   });
 
+  it("treats cites and references as solid relations; related as dashed (PM #25 round 4 P2)", () => {
+    // Regression: edges previously rendered solid only when
+    // `relation === "cites"`, so backend `references` edges showed
+    // dashed even though the legend's solid swatch is meant to
+    // cover both. The mapping is now explicit: solid for cites +
+    // references; dashed for everything else (related, blocked_by,
+    // parent, …).
+    const wrapper = withSeed({
+      nodes: [
+        {
+          id: "a",
+          type: "concept",
+          position: { x: 100, y: 100 },
+          data: { label: "A", type: "model", has_saved_layout: true },
+        },
+        {
+          id: "b",
+          type: "concept",
+          position: { x: 200, y: 100 },
+          data: { label: "B", type: "model", has_saved_layout: true },
+        },
+        {
+          id: "c",
+          type: "concept",
+          position: { x: 300, y: 100 },
+          data: { label: "C", type: "model", has_saved_layout: true },
+        },
+        {
+          id: "d",
+          type: "concept",
+          position: { x: 400, y: 100 },
+          data: { label: "D", type: "model", has_saved_layout: true },
+        },
+      ],
+      edges: [
+        { id: "e1", source: "a", target: "b", relation: "cites", data: {} },
+        { id: "e2", source: "b", target: "c", relation: "references", data: {} },
+        { id: "e3", source: "c", target: "d", relation: "related", data: {} },
+      ],
+      meta: {
+        kind: "concept",
+        focus: null,
+        upstream: false,
+        downstream: false,
+        depth: null,
+        node_count: 4,
+        edge_count: 3,
+        orphans: [],
+      },
+    });
+    const { container } = render(<ConceptGraph />, { wrapper });
+    const get = (rel: string) =>
+      container.querySelector(
+        `[data-edge-relation='${rel}']`,
+      ) as SVGLineElement | null;
+    expect(get("cites")?.getAttribute("stroke-dasharray")).toBe("0");
+    expect(get("references")?.getAttribute("stroke-dasharray")).toBe("0");
+    expect(get("related")?.getAttribute("stroke-dasharray")).toBe("3 3");
+  });
+
   it("draws the dashed amber stroke on stale concept nodes", () => {
     const wrapper = withSeed(makeGraph());
     const { container } = render(<ConceptGraph />, { wrapper });
