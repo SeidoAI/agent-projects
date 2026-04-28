@@ -83,13 +83,13 @@ describe("WorkflowMap", () => {
         <WorkflowMap />
       </Wrapper>,
     );
-    // Legend: each of the five swatches has identifying copy.
-    expect(screen.getByText(/source/i)).toBeTruthy();
-    expect(screen.getByText(/station/i)).toBeTruthy();
-    expect(screen.getByText(/sink/i)).toBeTruthy();
-    expect(screen.getByText(/artifact/i)).toBeTruthy();
-    // Validator vs tripwire distinction must be explicit in the legend.
     const legend = screen.getByLabelText(/legend/i);
+    // Each of the legend swatches has identifying copy.
+    expect(within(legend).getByText(/^source$/i)).toBeTruthy();
+    expect(within(legend).getByText(/^station$/i)).toBeTruthy();
+    expect(within(legend).getByText(/^sink$/i)).toBeTruthy();
+    expect(within(legend).getAllByText(/^artifact$/i).length).toBeGreaterThan(0);
+    // Validator vs tripwire distinction must be explicit in the legend.
     expect(within(legend).getByText(/blocks/i)).toBeTruthy();
     expect(within(legend).getByText(/agent must ack/i)).toBeTruthy();
   });
@@ -169,6 +169,6 @@ describe("WorkflowMap", () => {
         <WorkflowMap />
       </Wrapper>,
     );
-    expect(screen.getByText(/workflow/i)).toBeTruthy();
+    expect(screen.getByText(/backend has not registered the orchestration graph/i)).toBeTruthy();
   });
 });
