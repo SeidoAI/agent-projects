@@ -77,10 +77,7 @@ function SessionDetailReady({
   const stageId = sessionStageId(session.status);
   const isOffTrack = stageId === OFF_TRACK_STAGE_ID;
   const stageColor = sessionStageColor(session.status);
-  const currentIndex = useMemo(
-    () => IN_FLOW_STAGES.findIndex((s) => s.id === stageId),
-    [stageId],
-  );
+  const currentIndex = useMemo(() => IN_FLOW_STAGES.findIndex((s) => s.id === stageId), [stageId]);
 
   // Inbox cross-link: surface unresolved entries that reference this
   // session id. We filter client-side rather than adding a dedicated
@@ -98,11 +95,8 @@ function SessionDetailReady({
   );
   const blockedCount = linkedInbox.filter((i) => i.bucket === "blocked").length;
   const fyiCount = linkedInbox.length - blockedCount;
-  const inboxChipLabel = blockedCount > 0
-    ? `${blockedCount} blocked`
-    : fyiCount > 0
-      ? `${fyiCount} fyi`
-      : null;
+  const inboxChipLabel =
+    blockedCount > 0 ? `${blockedCount} blocked` : fyiCount > 0 ? `${fyiCount} fyi` : null;
 
   const [previewInboxId, setPreviewInboxId] = useState<string | null>(null);
 
@@ -119,11 +113,7 @@ function SessionDetailReady({
       >
         <div className="flex flex-wrap items-center gap-3">
           {isOffTrack ? (
-            <AlertTriangle
-              className="h-4 w-4 text-(--color-rule)"
-              strokeWidth={2.4}
-              aria-hidden
-            />
+            <AlertTriangle className="h-4 w-4 text-(--color-rule)" strokeWidth={2.4} aria-hidden />
           ) : null}
           <Stamp variant="identifier">{session.id}</Stamp>
           <h1 className="font-sans font-semibold text-[20px] text-(--color-ink) leading-tight tracking-[-0.01em]">
@@ -205,9 +195,7 @@ function SessionDetailReady({
         entryId={previewInboxId}
         onClose={() => setPreviewInboxId(null)}
         prefetchedItem={
-          previewInboxId
-            ? (linkedInbox.find((item) => item.id === previewInboxId) ?? null)
-            : null
+          previewInboxId ? (linkedInbox.find((item) => item.id === previewInboxId) ?? null) : null
         }
       />
     </article>

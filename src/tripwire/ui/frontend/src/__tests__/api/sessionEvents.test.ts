@@ -1,5 +1,5 @@
-import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import React from "react";
@@ -17,10 +17,13 @@ function wrapper(qc: QueryClient) {
 
 describe("useSessionEvents", () => {
   it("requests /api/projects/<pid>/events with session_id param", async () => {
-    let captured: URL | null = null;
+    // Hold the captured URL inside a wrapping object — TS narrows
+    // a `let foo: URL | null = null` to `null` since it can't see
+    // the closure-mutation. Wrapping defeats that narrowing.
+    const captured: { url: URL | null } = { url: null };
     server.use(
       http.get("/api/projects/p1/events", ({ request }) => {
-        captured = new URL(request.url);
+        captured.url = new URL(request.url);
         return HttpResponse.json({ events: [], next_cursor: null });
       }),
     );
@@ -33,8 +36,8 @@ describe("useSessionEvents", () => {
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(captured).not.toBeNull();
-    expect(captured!.searchParams.get("session_id")).toBe("sess-a");
+    expect(captured.url).not.toBeNull();
+    expect(captured.url?.searchParams.get("session_id")).toBe("sess-a");
   });
 
   it("forwards `kinds` as repeated `kind` params and includes them in the cache key", async () => {

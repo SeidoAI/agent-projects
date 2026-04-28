@@ -175,16 +175,10 @@ function EventDetailBody({ event }: { event: ProcessEvent }) {
       {event.event ? <DetailRow term="event" value={event.event} /> : null}
       {event.artifact ? <DetailRow term="artifact" value={event.artifact} /> : null}
       {event.rejected_by ? <DetailRow term="rejected by" value={event.rejected_by} /> : null}
-      {event.feedback_excerpt ? (
-        <DetailRow term="feedback" value={event.feedback_excerpt} />
-      ) : null}
+      {event.feedback_excerpt ? <DetailRow term="feedback" value={event.feedback_excerpt} /> : null}
       {event.evidence ? <DetailRow term="evidence" value={event.evidence} /> : null}
-      {event.blocks !== undefined ? (
-        <DetailRow term="blocks" value={String(event.blocks)} />
-      ) : null}
-      {event.resolution ? (
-        <DetailRow term="resolution" value={event.resolution.kind} />
-      ) : null}
+      {event.blocks !== undefined ? <DetailRow term="blocks" value={String(event.blocks)} /> : null}
+      {event.resolution ? <DetailRow term="resolution" value={event.resolution.kind} /> : null}
     </dl>
   );
 }

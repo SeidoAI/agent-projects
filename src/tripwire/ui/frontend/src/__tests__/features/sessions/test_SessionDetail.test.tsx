@@ -32,7 +32,9 @@ function fixtureSession(overrides: Partial<SessionDetailType> = {}): SessionDeta
   });
 }
 
-function setupServer(events: { events: unknown[]; next_cursor: null } = { events: [], next_cursor: null }) {
+function setupServer(
+  events: { events: unknown[]; next_cursor: null } = { events: [], next_cursor: null },
+) {
   server.use(
     http.get("/api/projects/p1/events", () => HttpResponse.json(events)),
     http.get("/api/projects/p1/inbox", () => HttpResponse.json([])),

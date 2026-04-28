@@ -24,12 +24,7 @@ export interface SessionEngagementListProps {
 export function SessionEngagementList({ engagements, className }: SessionEngagementListProps) {
   if (engagements.length === 0) {
     return (
-      <p
-        className={cn(
-          "font-serif text-[14px] italic text-(--color-ink-3)",
-          className,
-        )}
-      >
+      <p className={cn("font-serif text-[14px] italic text-(--color-ink-3)", className)}>
         no engagements recorded yet — this session has not been spawned.
       </p>
     );
