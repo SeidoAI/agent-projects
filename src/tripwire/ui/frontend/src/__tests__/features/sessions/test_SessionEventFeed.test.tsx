@@ -92,6 +92,41 @@ describe("SessionEventFeed", () => {
     expect(screen.queryByText("v_ref_resolution")).not.toBeInTheDocument();
   });
 
+  it("renders status_transition events with their from→to status payload, not the bare kind", async () => {
+    // Codex P2 (2026-04-28): the status_transitions bucket was
+    // unactionable because every row rendered the same generic
+    // 'status_transition' label. The backend payload carries
+    // `from_status` / `to_status` (see core/session_store.py); the
+    // feed must surface them.
+    server.use(
+      http.get("/api/projects/p1/events", () =>
+        HttpResponse.json({
+          events: [
+            makeEvent({
+              id: "st1",
+              kind: "status_transition",
+              from_status: "executing",
+              to_status: "in_review",
+            }),
+            makeEvent({
+              id: "st2",
+              kind: "status_transition",
+              from_status: "in_review",
+              to_status: "verified",
+              fired_at: "2026-04-27T11:00:00Z",
+            }),
+          ],
+          next_cursor: null,
+        }),
+      ),
+    );
+
+    renderWithProviders(<SessionEventFeed projectId="p1" sessionId="sess-a" />);
+
+    expect(await screen.findByText(/executing\s*→\s*in_review/)).toBeInTheDocument();
+    expect(screen.getByText(/in_review\s*→\s*verified/)).toBeInTheDocument();
+  });
+
   it("clicking 'expand →' on a row opens the EntityPreviewDrawer for that event", async () => {
     server.use(
       http.get("/api/projects/p1/events", () =>
