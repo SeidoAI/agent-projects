@@ -17,11 +17,13 @@ vi.mock("@/lib/api/endpoints/inbox", () => ({
   useInbox: () => ({ data: [] }),
 }));
 
+const useNodeMock = vi.fn(() => ({ data: undefined, isLoading: false }));
+
 vi.mock("@/lib/api/endpoints/nodes", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
-    useNode: () => ({ data: undefined, isLoading: false }),
+    useNode: (...args: unknown[]) => useNodeMock(...(args as [])),
   };
 });
 
@@ -213,44 +215,38 @@ describe("ConceptGraph", () => {
 describe("ConceptGraph rail", () => {
   afterEach(() => {
     cleanup();
-    vi.restoreAllMocks();
+    useNodeMock.mockReset();
+    useNodeMock.mockImplementation(() => ({ data: undefined, isLoading: false }));
   });
 
-  it("shows version + last-touched-by metadata when source provenance is set", async () => {
-    vi.doMock("@/lib/api/endpoints/nodes", async (importOriginal) => {
-      const actual = (await importOriginal()) as Record<string, unknown>;
-      const detail: NodeDetail = {
-        id: "user-model",
-        type: "model",
-        name: "User model",
-        description: "User identity record",
-        status: "active",
-        tags: [],
-        related: [],
-        ref_count: 2,
-        body: "## Description\n\nWhat the user model is.\n",
-        is_stale: false,
-        source: {
-          repo: "SeidoAI/web",
-          path: "src/models/user.py",
-          content_hash: "sha256:abc",
-        },
-      };
-      return {
-        ...actual,
-        useNode: () => ({ data: detail, isLoading: false }),
-      };
-    });
-    // Re-import after the mock so the component picks it up.
-    const { ConceptGraph: FreshGraph } = await import("@/features/graph/ConceptGraph");
+  it("shows version + last-touched-by metadata when source provenance is set", () => {
+    const detail: NodeDetail = {
+      id: "user-model",
+      type: "model",
+      name: "User model",
+      description: "User identity record",
+      status: "active",
+      tags: [],
+      related: [],
+      ref_count: 2,
+      body: "## Description\n\nWhat the user model is.\n",
+      is_stale: false,
+      source: {
+        repo: "SeidoAI/web",
+        path: "src/models/user.py",
+        content_hash: "sha256:abc1234567",
+      },
+    };
+    useNodeMock.mockImplementation(() => ({ data: detail, isLoading: false }));
+
     const wrapper = withSeed(makeGraph());
-    const { container } = render(<FreshGraph />, { wrapper });
+    const { container } = render(<ConceptGraph />, { wrapper });
     fireEvent.click(
       container.querySelector("[data-testid='node-group-user-model']") as Element,
     );
-    expect(screen.getByText(/User model/i)).toBeInTheDocument();
-    // Version derived from content_hash; no last-touched session in
-    // this fixture, so the rail just shows the abbreviated hash.
-    expect(screen.getByText(/version · v[0-9a-f]{6,}/i)).toBeInTheDocument();
+    // Title is rendered with double-bracket wrapper; rail shows it
+    // alongside the sidebar entry — assert the rail-specific shape.
+    expect(screen.getByText(/\[\[User model\]\]/)).toBeInTheDocument();
+    expect(screen.getByText(/version · vabc1234/i)).toBeInTheDocument();
   });
 });
