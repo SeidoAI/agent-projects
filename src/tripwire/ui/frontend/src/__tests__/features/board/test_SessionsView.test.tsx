@@ -20,6 +20,7 @@ function makeSession(overrides: Partial<SessionSummary>): SessionSummary {
     current_state: null,
     re_engagement_count: 0,
     task_progress: { done: 0, total: 0 },
+    cost_usd: 0,
     ...overrides,
   };
 }

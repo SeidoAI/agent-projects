@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiGet } from "../client";
+import { apiGet, apiPost } from "../client";
 import { queryKeys, staleTime } from "../queryKeys";
 
 export interface TaskProgress {
@@ -28,6 +28,10 @@ export interface SessionSummary {
   current_state: string | null;
   re_engagement_count: number;
   task_progress: TaskProgress;
+  /** Running cost in USD, computed by walking the session's runtime log.
+   *  `0` for sessions that have never spawned. Surfaced by the Live
+   *  Monitor cost ticker and the dashboard cost columns. */
+  cost_usd: number;
 }
 
 export interface SessionDetail extends SessionSummary {
@@ -39,6 +43,15 @@ export interface SessionDetail extends SessionSummary {
   artifact_status: Record<string, string>;
 }
 
+/** Mutation: `POST /api/projects/{pid}/sessions/{sid}/pause` —
+ *  KUI-107 INTERVENE. Mirrors the CLI ``tripwire session pause``
+ *  endpoint exposed over HTTP. */
+export interface PauseSessionResult {
+  session_id: string;
+  status: string;
+  changed_at: string;
+}
+
 export const sessionsApi = {
   list: (pid: string, status?: string) => {
     const qs = status ? `?status=${encodeURIComponent(status)}` : "";
@@ -47,6 +60,10 @@ export const sessionsApi = {
   get: (pid: string, sid: string) =>
     apiGet<SessionDetail>(
       `/api/projects/${encodeURIComponent(pid)}/sessions/${encodeURIComponent(sid)}`,
+    ),
+  pause: (pid: string, sid: string) =>
+    apiPost<PauseSessionResult>(
+      `/api/projects/${encodeURIComponent(pid)}/sessions/${encodeURIComponent(sid)}/pause`,
     ),
 };
 
@@ -63,5 +80,20 @@ export function useSession(pid: string, sid: string) {
     queryKey: queryKeys.session(pid, sid),
     queryFn: () => sessionsApi.get(pid, sid),
     staleTime: staleTime.default,
+  });
+}
+
+/** Mutation: pause an executing session via `POST .../pause`. The
+ *  cache for `useSession(pid, sid)` is invalidated on success so the
+ *  Live Monitor's status header reads `paused` immediately and any
+ *  list views refresh their stage bucket counts. */
+export function usePauseSession(pid: string, sid: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => sessionsApi.pause(pid, sid),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.session(pid, sid) });
+      qc.invalidateQueries({ queryKey: queryKeys.sessions(pid) });
+    },
   });
 }

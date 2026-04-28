@@ -326,6 +326,7 @@ function useDemoOffTrackSessions(real: SessionSummary[]): SessionSummary[] {
     current_state: null,
     re_engagement_count: 0,
     task_progress: { done: 0, total: 0 },
+    cost_usd: 0,
   });
   return [
     ...real,
@@ -363,6 +364,7 @@ function useDemoSessions(real: SessionSummary[]): SessionSummary[] {
     current_state: null,
     re_engagement_count: 0,
     task_progress: { done: 0, total: 0 },
+    cost_usd: 0,
   });
   const demo: SessionSummary[] = [
     // 4-deep chain: foundations → tripwires → workflow → board.

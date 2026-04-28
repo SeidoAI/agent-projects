@@ -84,6 +84,7 @@ function session(id: string, current_state: string | null = null): SessionSummar
     current_state,
     re_engagement_count: 0,
     task_progress: { done: 0, total: 0 },
+    cost_usd: 0,
   };
 }
 
