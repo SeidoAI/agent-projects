@@ -48,13 +48,17 @@ export function useLayoutPersistence(projectId: string): UseLayoutPersistence {
 
   useEffect(() => {
     return () => {
-      // Drop any pending timer on unmount; we don't need the result.
+      // Don't drop the pending batch on unmount — flushing here is
+      // the only thing that prevents data loss when the user
+      // navigates away within the debounce window. Cancel the
+      // timer first so flush() doesn't compete with it.
       if (timerRef.current !== null) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
+      void flush();
     };
-  }, []);
+  }, [flush]);
 
   const persist = useMemo(() => {
     return (positions: Record<string, NodeLayout>): void => {
@@ -69,5 +73,5 @@ export function useLayoutPersistence(projectId: string): UseLayoutPersistence {
     };
   }, [flush]);
 
-  return { persist, flush };
+  return useMemo(() => ({ persist, flush }), [persist, flush]);
 }
