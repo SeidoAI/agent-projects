@@ -172,6 +172,8 @@ function EventDetailBody({ event }: { event: ProcessEvent }) {
     <dl className="flex flex-col gap-3 font-mono text-[12px]">
       {event.tripwire_id ? <DetailRow term="tripwire" value={event.tripwire_id} /> : null}
       {event.validator_id ? <DetailRow term="validator" value={event.validator_id} /> : null}
+      {event.from_status ? <DetailRow term="from status" value={event.from_status} /> : null}
+      {event.to_status ? <DetailRow term="to status" value={event.to_status} /> : null}
       {event.event ? <DetailRow term="event" value={event.event} /> : null}
       {event.artifact ? <DetailRow term="artifact" value={event.artifact} /> : null}
       {event.rejected_by ? <DetailRow term="rejected by" value={event.rejected_by} /> : null}
@@ -193,6 +195,12 @@ function DetailRow({ term, value }: { term: string; value: string }) {
 }
 
 function eventLabel(event: ProcessEvent): string {
+  // status_transition events carry the from/to pair on the body —
+  // surface it directly so the bucket is actionable. Codex P2
+  // (2026-04-28).
+  if (event.kind === "status_transition" && event.from_status && event.to_status) {
+    return `${event.from_status} → ${event.to_status}`;
+  }
   if (event.tripwire_id) return event.tripwire_id;
   if (event.validator_id) return event.validator_id;
   if (event.artifact) return event.artifact;

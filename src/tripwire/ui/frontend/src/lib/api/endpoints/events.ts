@@ -45,6 +45,9 @@ export interface ProcessEvent {
   event?: string;
   blocks?: boolean;
   resolution?: EventResolution;
+  // status_transition payload (core/session_store.py:_emit_status_transition).
+  from_status?: string;
+  to_status?: string;
 }
 
 export interface EventsResponse {
