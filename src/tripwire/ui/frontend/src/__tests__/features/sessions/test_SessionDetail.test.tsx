@@ -59,15 +59,18 @@ describe("SessionDetail (v0.8 — Option C)", () => {
 
     expect(screen.getByText("Foundation packaging")).toBeInTheDocument();
 
-    // Status pill renders the status string. (Mini-wire is SVG-only;
-    // we don't assert its internal markup here — the dashboard's wire
-    // tests already cover its rendering.)
-    expect(screen.getByText(/executing/i)).toBeInTheDocument();
+    // Status pill renders the status string. The mini-wire also
+    // renders an "executing" station label, so we match by the pill's
+    // structural neighbour — the agent stamp — to disambiguate.
+    expect(screen.getAllByText(/executing/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("backend-coder")).toBeInTheDocument();
 
-    // Three body sections — assert by their headings.
-    expect(screen.getByRole("heading", { name: /plan/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /engagements/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /events/i })).toBeInTheDocument();
+    // Three body sections — assert by their level-2 section labels.
+    // (MarkdownBody renders the plan.md's leading `# Plan` as h1, so
+    // we match the section heading by level to disambiguate.)
+    expect(screen.getByRole("heading", { level: 2, name: /plan/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: /engagements/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: /events/i })).toBeInTheDocument();
   });
 
   it("flips the header into alert chrome when the session is off-track (paused)", async () => {
@@ -141,6 +144,15 @@ describe("SessionDetail (v0.8 — Option C)", () => {
         HttpResponse.json({ events: [], next_cursor: null }),
       ),
       http.get("/api/projects/p1/inbox", () => HttpResponse.json(inboxItems)),
+      // The inbox preview drawer fetches the entry by id when opened,
+      // even when a prefetched copy is supplied (the hook stays mounted
+      // for hook-order stability — see notes in inbox-preview-drawer).
+      http.get("/api/projects/p1/inbox/:id", ({ params }) => {
+        const item = inboxItems.find((i) => i.id === params.id);
+        return item
+          ? HttpResponse.json(item)
+          : HttpResponse.json({ detail: "missing" }, { status: 404 });
+      }),
     );
 
     const session = fixtureSession();
