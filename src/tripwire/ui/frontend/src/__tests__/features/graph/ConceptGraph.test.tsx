@@ -196,9 +196,12 @@ describe("ConceptGraph layout (PM #25 round 2)", () => {
     expect(sidebar).not.toBeNull();
     expect(canvas).not.toBeNull();
     // Both must own their overflow — neither delegates to the
-    // outer grid container.
-    expect(getComputedStyle(sidebar as HTMLElement).overflowY).toBe("auto");
-    expect(getComputedStyle(canvas as HTMLElement).overflowY).toBe("auto");
+    // outer grid container. jsdom doesn't compute Tailwind utility
+    // classes, so we assert on the className contract instead of
+    // getComputedStyle. (The "overflow-y-auto" / "overflow-auto"
+    // utilities are how the production CSS sets overflow.)
+    expect(sidebar?.className ?? "").toMatch(/overflow-y-auto|overflow-auto/);
+    expect(canvas?.className ?? "").toMatch(/overflow-y-auto|overflow-auto/);
     // They are NOT the same node and not nested inside a shared
     // single scroll container.
     expect(sidebar).not.toBe(canvas);

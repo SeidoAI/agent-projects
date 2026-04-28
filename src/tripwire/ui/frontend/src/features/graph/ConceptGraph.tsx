@@ -16,6 +16,59 @@ const DEFAULT_CANVAS = { width: 1000, height: 600 };
 const NODE_RADIUS = 22;
 const NODE_RADIUS_SMALL = 16;
 
+/** Cap on canvas-rendered node labels — the rail shows the full
+ *  string. PM #25 round 2 P1: at ~200 nodes, untruncated titles
+ *  collide so heavily the screen is unreadable. */
+const NODE_LABEL_MAX_CHARS = 18;
+
+function truncateLabel(text: string): string {
+  if (text.length <= NODE_LABEL_MAX_CHARS) return text;
+  return `${text.slice(0, NODE_LABEL_MAX_CHARS - 1)}…`;
+}
+
+interface BBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Compute the bounding box of every laid-out node, padded so node
+ *  glyphs + labels stay inside the viewBox. Used to anchor the
+ *  visible viewport at the top of the layout instead of clipping
+ *  negative-y content (PM #25 round 2 P1). */
+function computeBBox(
+  positions: Record<string, { x: number; y: number }>,
+  fallback: { width: number; height: number },
+): BBox {
+  const entries = Object.values(positions);
+  if (entries.length === 0) {
+    return { x: 0, y: 0, width: fallback.width, height: fallback.height };
+  }
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const p of entries) {
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  const padX = NODE_RADIUS + 60;
+  // Top padding is large enough to leave room for the rail + chrome
+  // overlays and to give the layout some breathing room above the
+  // first node, since the visible viewport anchors at the top.
+  const padTop = NODE_RADIUS + 36;
+  const padBottom = NODE_RADIUS + 60;
+  const x = minX - padX;
+  const y = minY - padTop;
+  const width = Math.max(fallback.width, maxX - minX + padX * 2);
+  const height = Math.max(fallback.height, maxY - minY + padTop + padBottom);
+  return { x, y, width, height };
+}
+
 /**
  * Concept Graph screen (KUI-104, spec §3.5 + amendments).
  *
@@ -124,8 +177,10 @@ export function ConceptGraph() {
       ? data.edges.filter((e) => e.source === focusedNode.id || e.target === focusedNode.id)
       : [];
 
+  const bbox = computeBBox(layout.positions, size);
+
   return (
-    <div className="grid h-full grid-rows-[auto_1fr] grid-cols-[240px_1fr_320px] bg-(--color-paper) text-(--color-ink)">
+    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] grid-cols-[240px_minmax(0,1fr)_320px] bg-(--color-paper) text-(--color-ink)">
       <header className="col-span-3 border-(--color-edge) border-b px-7 py-4">
         <div className="font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
           chapter 05 · concept graph
@@ -143,14 +198,20 @@ export function ConceptGraph() {
       <section
         ref={canvasRef}
         data-testid="concept-graph-canvas"
-        className="relative overflow-hidden bg-(--color-paper-2)"
+        // Independent scroll container — must not share scroll with
+        // the sidebar (PM #25 round 2 P1). The SVG below sizes to
+        // the layout's bbox in pixels, so when the layout exceeds
+        // the visible canvas this <section> scrolls vertically.
+        className="relative min-h-0 overflow-auto bg-(--color-paper-2)"
       >
         <svg
           role="img"
           aria-label="Concept graph canvas"
-          className="absolute inset-0 h-full w-full"
-          viewBox={`0 0 ${size.width} ${size.height}`}
-          preserveAspectRatio="xMidYMid meet"
+          className="block"
+          width={bbox.width}
+          height={bbox.height}
+          viewBox={`${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`}
+          preserveAspectRatio="xMinYMin meet"
         >
           <title>Concept graph canvas</title>
           <defs>
@@ -163,7 +224,13 @@ export function ConceptGraph() {
               />
             </pattern>
           </defs>
-          <rect width={size.width} height={size.height} fill="url(#concept-graph-ledger)" />
+          <rect
+            x={bbox.x}
+            y={bbox.y}
+            width={bbox.width}
+            height={bbox.height}
+            fill="url(#concept-graph-ledger)"
+          />
 
           {/* edges */}
           {data.edges.map((edge) => {
@@ -242,6 +309,7 @@ export function ConceptGraph() {
                   />
                 ) : null}
                 <text
+                  data-testid={`node-label-${node.id}`}
                   x={pos.x}
                   y={pos.y + r + 12}
                   textAnchor="middle"
@@ -250,7 +318,7 @@ export function ConceptGraph() {
                   fontWeight={500}
                   fill={isFocus ? "var(--color-ink)" : "var(--color-ink-2)"}
                 >
-                  {String(node.data?.label ?? node.id)}
+                  {truncateLabel(String(node.data?.label ?? node.id))}
                 </text>
                 <text
                   x={pos.x}
