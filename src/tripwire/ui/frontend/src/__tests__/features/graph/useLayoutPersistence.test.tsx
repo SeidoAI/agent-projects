@@ -69,6 +69,36 @@ describe("useLayoutPersistence", () => {
     ]);
   });
 
+  it("flushes any pending batch on unmount (PM #25 P1)", async () => {
+    // Regression: if the user navigates away within the debounce
+    // window after a position change, the pending PATCH must still
+    // hit the wire — otherwise the YAML never gets written and the
+    // next page load re-runs d3-force as if nothing was saved.
+    const fetchSpy = mockFetch();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result, unmount } = renderHook(() => useLayoutPersistence("p1"), {
+      wrapper: wrapperWith(qc),
+    });
+
+    act(() => {
+      result.current.persist({ "user-model": { x: 7, y: 8 } });
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    // Unmount before the debounce timer fires — but the cleanup
+    // hook must still flush the pending batch.
+    await act(async () => {
+      unmount();
+      // Let the flushed promise resolve before assertions.
+      await Promise.resolve();
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0] ?? [];
+    expect(url).toBe("/api/projects/p1/nodes/user-model/layout");
+    expect(JSON.parse(String(init?.body))).toEqual({ x: 7, y: 8 });
+  });
+
   it("debounces auto-flush — repeated persists collapse into one PATCH per node", async () => {
     vi.useFakeTimers();
     try {
