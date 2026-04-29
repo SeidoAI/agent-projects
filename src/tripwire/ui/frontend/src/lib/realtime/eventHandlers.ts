@@ -79,6 +79,14 @@ export function dispatchEvent(event: TripwireUiEvent, queryClient: QueryClient):
 function dispatchFileChanged(event: FileChangedEvent, queryClient: QueryClient): void {
   const { project_id: pid, entity_type, entity_id } = event;
 
+  // Workflow graph is built from code registries at request time
+  // and isn't tied to any single `EntityType`; bust it on every
+  // file_changed so the workflow map picks up new validators /
+  // tripwires / artifact definitions without the user reloading.
+  // Invalidation is prefix-matched, so both PM-mode and default
+  // cache variants flush together.
+  queryClient.invalidateQueries({ queryKey: queryKeys.workflow(pid) });
+
   switch (entity_type) {
     case "issue":
       queryClient.invalidateQueries({ queryKey: queryKeys.issues(pid) });

@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { useProjectShell } from "@/app/ProjectShell";
 import { Stamp } from "@/components/ui/stamp";
+import { ApiError } from "@/lib/api/client";
 import { useWorkflow } from "@/lib/api/endpoints/workflow";
 import { isPmMode } from "@/lib/role";
 import { ArtifactCard } from "./ArtifactCard";
@@ -39,11 +40,31 @@ export function WorkflowMap() {
   // viewers, so without this the drawer never has the prompt body
   // even when ?role=pm is set.
   const pmMode = useMemo(() => isPmMode(searchParams.get("role")), [searchParams]);
-  const { data: graph } = useWorkflow(projectId, { pmMode });
+  const query = useWorkflow(projectId, { pmMode });
+  const { data: graph, isPending, isError, error, refetch } = query;
 
   const layout = useMemo(() => (graph ? computeWorkflowLayout(graph) : null), [graph]);
   const [hovered, setHovered] = useState<HoverKey | null>(null);
   const [selection, setSelection] = useState<WorkflowSelection | null>(null);
+
+  // Distinct surfaces per query state (Codex P2):
+  //  - pending  → skeleton placeholder so flaky-network users don't
+  //               briefly read "no graph"
+  //  - error (non-404) → error chrome with retry
+  //  - empty (404 or genuine empty graph) → existing copy
+  //  - success → real canvas
+  // 404 still falls through to "empty" — Strand Y is additive,
+  // pre-shipping clients see 404 until the endpoint lands.
+  const stateBranch: React.ReactNode = (() => {
+    if (layout) {
+      return (
+        <Canvas layout={layout} hovered={hovered} onHover={setHovered} onSelect={setSelection} />
+      );
+    }
+    if (isPending) return <LoadingState />;
+    if (isError && !is404(error)) return <ErrorState onRetry={() => void refetch()} />;
+    return <EmptyState />;
+  })();
 
   return (
     <div className="flex h-full flex-col gap-4 p-6">
@@ -56,14 +77,14 @@ export function WorkflowMap() {
         </p>
       </header>
       <Legend />
-      {layout ? (
-        <Canvas layout={layout} hovered={hovered} onHover={setHovered} onSelect={setSelection} />
-      ) : (
-        <EmptyState />
-      )}
+      {stateBranch}
       <WorkflowDrawer selection={selection} pmMode={pmMode} onClose={() => setSelection(null)} />
     </div>
   );
+}
+
+function is404(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 404;
 }
 
 type HoverKey =
@@ -346,12 +367,52 @@ function Legend() {
   );
 }
 
+function StateFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="flex flex-1 items-center justify-center rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) py-24"
+      role="status"
+    >
+      {children}
+    </div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <StateFrame>
+      <p data-loading="workflow" className="font-serif text-[14px] italic text-(--color-ink-3)">
+        Loading workflow…
+      </p>
+    </StateFrame>
+  );
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <StateFrame>
+      <div className="flex flex-col items-center gap-3">
+        <p className="font-serif text-[14px] italic text-(--color-rule)">
+          Couldn't load the workflow graph.
+        </p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded-(--radius-stamp) border border-(--color-ink) bg-(--color-paper) px-3 py-1 font-mono text-[11px] uppercase tracking-[0.06em] text-(--color-ink) hover:bg-(--color-paper-3)"
+        >
+          Retry
+        </button>
+      </div>
+    </StateFrame>
+  );
+}
+
 function EmptyState() {
   return (
-    <div className="flex flex-1 items-center justify-center rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) py-24">
+    <StateFrame>
       <p className="font-serif text-[14px] italic text-(--color-ink-3)">
         Workflow not yet available — backend has not registered the orchestration graph.
       </p>
-    </div>
+    </StateFrame>
   );
 }

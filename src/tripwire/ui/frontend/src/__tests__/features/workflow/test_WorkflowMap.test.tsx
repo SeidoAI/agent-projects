@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { WorkflowMap } from "@/features/workflow/WorkflowMap";
 import type { WorkflowGraph } from "@/lib/api/endpoints/workflow";
 import { queryKeys } from "@/lib/api/queryKeys";
+import { server } from "../../mocks/server";
 
 vi.mock("@/app/ProjectShell", () => ({
   useProjectShell: () => ({ projectId: "p1", wsStatus: "open" }),
@@ -203,13 +205,99 @@ describe("WorkflowMap", () => {
     expect(screen.getByLabelText(/Validator tests-green/)).toBeTruthy();
   });
 
-  it("renders an empty-state placeholder when the API returns no graph", () => {
-    const Wrapper = withProviders(null);
+  it("shows a Loading… surface while the workflow query is pending", () => {
+    // Hold the response open so the query never settles; assert
+    // pending state renders 'Loading workflow…' (not the empty-state
+    // copy, which would mislead users on slow networks).
+    server.use(
+      http.get("/api/projects/:pid/workflow", async () => {
+        await new Promise(() => {
+          /* never resolve */
+        });
+        return HttpResponse.json({});
+      }),
+    );
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const Wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={["/p/p1/workflow"]}>
+          <Routes>
+            <Route path="/p/:projectId/workflow" element={children} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
     render(
       <Wrapper>
         <WorkflowMap />
       </Wrapper>,
     );
-    expect(screen.getByText(/backend has not registered the orchestration graph/i)).toBeTruthy();
+    expect(screen.getByText(/loading workflow/i)).toBeTruthy();
+    expect(screen.queryByText(/backend has not registered the orchestration graph/i)).toBeNull();
+  });
+
+  it("shows an Error surface with a Retry button when the request fails (non-404)", async () => {
+    server.use(
+      http.get("/api/projects/:pid/workflow", () =>
+        HttpResponse.json({ detail: "boom" }, { status: 500 }),
+      ),
+    );
+    // Disable React Query's own retry shaping for this test so the
+    // 500 settles into the error state quickly. The hook's
+    // production retry policy is exercised separately.
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false, retryDelay: 0 } },
+    });
+    const Wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={["/p/p1/workflow"]}>
+          <Routes>
+            <Route path="/p/:projectId/workflow" element={children} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    // The 500 surfaces as a console.error from React Query; the
+    // global setup converts unexpected console output into test
+    // failures, so silence it for this scenario only.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <Wrapper>
+        <WorkflowMap />
+      </Wrapper>,
+    );
+    await waitFor(
+      () => {
+        expect(screen.getByText(/Couldn't load the workflow graph/i)).toBeTruthy();
+      },
+      { timeout: 8000 },
+    );
+    expect(screen.getByRole("button", { name: /retry/i })).toBeTruthy();
+  });
+
+  it("shows the empty-state copy on 404 (Strand Y not yet shipped)", async () => {
+    server.use(
+      http.get("/api/projects/:pid/workflow", () =>
+        HttpResponse.json({ detail: "not found" }, { status: 404 }),
+      ),
+    );
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const Wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={["/p/p1/workflow"]}>
+          <Routes>
+            <Route path="/p/:projectId/workflow" element={children} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    render(
+      <Wrapper>
+        <WorkflowMap />
+      </Wrapper>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/backend has not registered the orchestration graph/i)).toBeTruthy();
+    });
   });
 });

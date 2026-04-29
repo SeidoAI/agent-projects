@@ -71,6 +71,23 @@ export const workflowApi = {
     }),
 };
 
+/** Polling floor for the workflow query.
+ *
+ * The workflow graph is built from registries at request time —
+ * a Python-side validator/tripwire registration changes the
+ * payload but doesn't fire any of the existing `file_changed`
+ * entity types. Polling at 30s is the cheap floor that keeps
+ * the AC#3 "auto-updates when backend registers a new entity"
+ * promise honest even without a matching WS event; the WS
+ * dispatcher in `eventHandlers.ts` invalidates the workflow key
+ * on any `file_changed` for the fast path on top.
+ *
+ * Exported for tests so the hook contract is asserted explicitly
+ * (a future PR shouldn't be able to silently drop polling without
+ * the test failing).
+ */
+export const WORKFLOW_REFETCH_MS = 30_000;
+
 export function useWorkflow(pid: string, opts?: { pmMode?: boolean }) {
   const pmMode = Boolean(opts?.pmMode);
   return useQuery<WorkflowGraph>({
@@ -80,6 +97,7 @@ export function useWorkflow(pid: string, opts?: { pmMode?: boolean }) {
     queryKey: [...queryKeys.workflow(pid), { pmMode }] as const,
     queryFn: () => workflowApi.get(pid, { pmMode }),
     staleTime: staleTime.default,
+    refetchInterval: WORKFLOW_REFETCH_MS,
     // The endpoint is additive — until Strand Y ships, the backend
     // returns 404. Don't retry on a clean 404; surface as undefined to
     // the consumer so the Dashboard renders the empty wire shape.
