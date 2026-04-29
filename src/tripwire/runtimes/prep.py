@@ -644,6 +644,25 @@ def render_kickoff(*, code_worktree: Path, prompt: str) -> None:
     kickoff.write_text(prompt, encoding="utf-8")
 
 
+def install_claude_settings(*, worktree: Path) -> None:
+    """Install ``<worktree>/.claude/settings.json`` with the
+    ``validate-on-edit`` PostToolUse hook (KUI-110 Phase 1.4).
+
+    Shares the template + merge helper with ``tripwire init`` and
+    ``tripwire hooks install`` so all three install paths converge on
+    the same shape. Failures are logged and swallowed — a settings
+    install glitch must not block spawn.
+    """
+    from tripwire.cli.hooks import install_settings_into
+
+    try:
+        install_settings_into(worktree)
+    except OSError as exc:
+        log.warning(
+            "claude settings install failed for %s: %s", worktree, exc
+        )
+
+
 def install_pre_push_hook(
     *, worktree: Path, project_dir: Path, session_id: str
 ) -> None:
@@ -815,6 +834,12 @@ def run(
                 wt.worktree_path,
                 exc,
             )
+
+    # KUI-110: plant `.claude/settings.json` in every worktree so the
+    # PostToolUse `validate-on-edit` hook is in scope no matter which
+    # worktree Claude Code resolves its settings against.
+    for wt in worktrees:
+        install_claude_settings(worktree=Path(wt.worktree_path))
 
     # Look up the agent's declared skills
     skill_names: list[str] = []
