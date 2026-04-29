@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import shutil
 import subprocess
+import uuid
 from datetime import datetime, timezone
 from importlib.resources import files
 from pathlib import Path
@@ -716,6 +717,32 @@ def _load_project_slug(project_dir: Path) -> str:
     return proj.name.lower().replace(" ", "-")
 
 
+def _resolve_claude_session_id(claude_session_id: str | None, *, resume: bool) -> str:
+    """Pick the claude_session_id for this spawn.
+
+    With ``resume=True`` the caller MUST supply the prior session's id —
+    a freshly-generated UUID would be passed to ``claude --resume``,
+    which then fails with "No conversation found". Better to fail fast
+    here with a recovery hint than to spawn a doomed agent.
+    """
+    if claude_session_id is not None:
+        return claude_session_id
+    if resume:
+        raise RuntimeError(
+            "Cannot --resume: session has no recorded "
+            "`runtime_state.claude_session_id`. The previous spawn may "
+            "have failed to persist it, or the field was cleared by a "
+            "manual edit / `git checkout`. Recover the original id from "
+            "the agent's first-spawn log "
+            "(grep `'\"session_id\":'` in the .log under "
+            "~/.tripwire/logs/<project>/<session>-*.log) and restore it "
+            "into session.yaml's runtime_state, or run `tripwire session "
+            "cleanup <id>` and respawn without --resume to start a "
+            "fresh conversation."
+        )
+    return str(uuid.uuid4())
+
+
 def run(
     *,
     session: AgentSession,
@@ -735,8 +762,6 @@ def run(
 
     Returns a PreppedSession the runtime's ``start`` consumes.
     """
-    import uuid as _uuid
-
     import yaml as _yaml
 
     from tripwire.core.handoff_store import load_handoff
@@ -901,7 +926,7 @@ def run(
 
     render_kickoff(code_worktree=code_worktree, prompt=prompt)
 
-    csid = claude_session_id or str(_uuid.uuid4())
+    csid = _resolve_claude_session_id(claude_session_id, resume=resume)
 
     return PreppedSession(
         session_id=session.id,

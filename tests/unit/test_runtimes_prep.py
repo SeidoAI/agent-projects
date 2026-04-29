@@ -742,7 +742,7 @@ class TestPrepRunResume:
             plan_path.parent.mkdir(parents=True, exist_ok=True)
             plan_path.write_text("# Plan\n", encoding="utf-8")
 
-            prep_run(
+            primed = prep_run(
                 session=session,
                 project_dir=tmp_path_project,
                 runtime=RUNTIMES["manual"],
@@ -751,11 +751,15 @@ class TestPrepRunResume:
             # Now remove plan.md to prove resume doesn't read it.
             plan_path.unlink()
 
+            # Resume must carry forward the priming spawn's claude
+            # session id. (`prep.run` no longer silently fabricates one
+            # under resume=True — see TestResolveClaudeSessionId.)
             prepped = prep_run(
                 session=session,
                 project_dir=tmp_path_project,
                 runtime=RUNTIMES["manual"],
                 resume=True,
+                claude_session_id=primed.claude_session_id,
             )
 
         # Resume prompt contains the distinctive marker, not a plan body.
@@ -803,3 +807,58 @@ class TestCopySkillsIdempotency:
         assert len(backups) == 1
         # New set in place.
         assert (worktree / ".claude/skills/verification/SKILL.md").is_file()
+
+
+class TestResolveClaudeSessionId:
+    """Regression for the silent-UUID-fabrication bug.
+
+    `tripwire session spawn --resume` used to silently generate a fresh
+    UUID when ``runtime_state.claude_session_id`` was empty (e.g. the
+    field was cleared by a `git checkout` reverting earlier
+    auto-managed runtime writes). The fresh UUID then went to
+    ``claude --resume <uuid>``, which fails with "No conversation found"
+    because that UUID was just invented. Better to fail fast at prep
+    time with a recovery hint.
+    """
+
+    def test_returns_provided_id_when_present(self):
+        from tripwire.runtimes.prep import _resolve_claude_session_id
+
+        out = _resolve_claude_session_id(
+            "6dab19f0-3a5f-4cf6-899b-0aab12bf9d70", resume=True
+        )
+        assert out == "6dab19f0-3a5f-4cf6-899b-0aab12bf9d70"
+
+    def test_returns_provided_id_when_present_and_not_resuming(self):
+        from tripwire.runtimes.prep import _resolve_claude_session_id
+
+        out = _resolve_claude_session_id(
+            "abcdef12-3456-7890-abcd-ef1234567890", resume=False
+        )
+        assert out == "abcdef12-3456-7890-abcd-ef1234567890"
+
+    def test_generates_fresh_uuid_when_not_resuming(self):
+        from tripwire.runtimes.prep import _resolve_claude_session_id
+
+        out = _resolve_claude_session_id(None, resume=False)
+
+        import uuid
+
+        # Round-trips through uuid.UUID — i.e. it's a syntactically
+        # valid UUID, not a hand-rolled string.
+        assert uuid.UUID(out)
+
+    def test_resume_with_no_id_raises_with_recovery_hint(self):
+        from tripwire.runtimes.prep import _resolve_claude_session_id
+
+        with pytest.raises(RuntimeError) as exc_info:
+            _resolve_claude_session_id(None, resume=True)
+
+        msg = str(exc_info.value)
+        # The error must point the operator at the recovery path.
+        assert "Cannot --resume" in msg
+        assert "claude_session_id" in msg
+        # Must mention both recovery routes — restoring from log AND
+        # cleanup+respawn — so the operator picks the right one.
+        assert "log" in msg.lower()
+        assert "cleanup" in msg.lower()
