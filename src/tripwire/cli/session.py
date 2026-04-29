@@ -841,7 +841,7 @@ _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "paused": {"executing", "abandoned"},
     "failed": {"executing", "abandoned"},
     "in_review": {"verified", "executing", "abandoned"},
-    "verified": {"done", "in_review", "abandoned"},
+    "verified": {"completed", "in_review", "abandoned"},
 }
 
 
