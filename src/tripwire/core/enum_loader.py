@@ -11,9 +11,16 @@ structured representation. The validator (Step 3) uses the loaded enum to
 check that every enum-typed field on every entity has a value present in
 the active enum.
 
-Pydantic models do NOT use the loaded enums as field types — they use plain
-`str`. The dynamism is intentional: a project can add a `qa` status without
-the package having to know about it.
+Field-type policy (post-KUI-110, v1 hardening): some Pydantic models now
+use the upstream StrEnums directly as field types — notably
+``AgentSession.status: SessionStatus`` — locking the upstream value set
+at load time. The project-side YAML remains authoritative for labels,
+colors, and any UI metadata, but the value set itself can no longer
+drift from the upstream Python enum (drift raises ``ValidationError``
+on load). Other entities (e.g. ``Issue``) keep the plain-``str`` field
+type and rely on the validator's ``status_in_enum`` rules for
+enforcement; for those, a project can still add a ``qa`` status
+project-locally without the package having to know about it.
 """
 
 from __future__ import annotations
