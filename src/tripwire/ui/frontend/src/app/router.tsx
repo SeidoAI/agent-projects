@@ -9,6 +9,7 @@ import { LiveMonitor } from "@/features/live/LiveMonitor";
 import { NodeDetail } from "@/features/nodes/NodeDetail";
 import { SessionDetail } from "@/features/sessions/SessionDetail";
 import { SessionList } from "@/features/sessions/SessionList";
+import { WorkflowMap } from "@/features/workflow/WorkflowMap";
 import { Placeholder } from "./Placeholder";
 import { ProjectShell } from "./ProjectShell";
 import { RootRedirect } from "./RootRedirect";
@@ -34,7 +35,7 @@ export const router = createBrowserRouter([
       // Strand Z new screens — placeholders here in S1; S5/S6/S7 wire
       // the real implementations in. The ScreenShell nav already links
       // to these paths, so the routes must exist.
-      { path: "workflow", element: <Placeholder name="WorkflowMap" /> },
+      { path: "workflow", element: <WorkflowMap /> },
       { path: "tripwires", element: <Placeholder name="TripwireLog" /> },
       { path: "sessions/:sid/live", element: <LiveMonitor /> },
     ],

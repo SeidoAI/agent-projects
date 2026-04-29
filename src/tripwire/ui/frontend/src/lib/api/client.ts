@@ -16,6 +16,10 @@ export class ApiError extends Error {
 
 interface RequestOptions {
   signal?: AbortSignal;
+  /** Extra headers merged on top of the per-method defaults. The
+   *  client sets `Accept` (and `Content-Type` for body methods)
+   *  itself; pass anything else (e.g. `X-Tripwire-Role`) here. */
+  headers?: Record<string, string>;
 }
 
 async function handleResponse<T>(res: Response): Promise<T> {
@@ -42,7 +46,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
 export async function apiGet<T>(path: string, opts?: RequestOptions): Promise<T> {
   const res = await fetch(path, {
     method: "GET",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...(opts?.headers ?? {}) },
     signal: opts?.signal,
   });
   return handleResponse<T>(res);

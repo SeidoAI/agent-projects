@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
+import { pmRoleHeaders } from "@/lib/role";
 import { ApiError, apiGet } from "../client";
 import { queryKeys, staleTime } from "../queryKeys";
 
@@ -56,14 +57,47 @@ export interface WorkflowGraph {
 }
 
 export const workflowApi = {
-  get: (pid: string) => apiGet<WorkflowGraph>(`/api/projects/${encodeURIComponent(pid)}/workflow`),
+  /**
+   * GET the orchestration graph for a project.
+   *
+   * `pmMode` toggles the `X-Tripwire-Role: pm` header so the
+   * server fills `tripwires[*].prompt_revealed` with the
+   * unredacted body (otherwise it returns `null`). The role gate
+   * is a semantic separation, not auth — see `role_gate.py`.
+   */
+  get: (pid: string, opts?: { pmMode?: boolean }) =>
+    apiGet<WorkflowGraph>(`/api/projects/${encodeURIComponent(pid)}/workflow`, {
+      headers: pmRoleHeaders(Boolean(opts?.pmMode)),
+    }),
 };
 
-export function useWorkflow(pid: string) {
+/** Polling floor for the workflow query.
+ *
+ * The workflow graph is built from registries at request time —
+ * a Python-side validator/tripwire registration changes the
+ * payload but doesn't fire any of the existing `file_changed`
+ * entity types. Polling at 30s is the cheap floor that keeps
+ * the AC#3 "auto-updates when backend registers a new entity"
+ * promise honest even without a matching WS event; the WS
+ * dispatcher in `eventHandlers.ts` invalidates the workflow key
+ * on any `file_changed` for the fast path on top.
+ *
+ * Exported for tests so the hook contract is asserted explicitly
+ * (a future PR shouldn't be able to silently drop polling without
+ * the test failing).
+ */
+export const WORKFLOW_REFETCH_MS = 30_000;
+
+export function useWorkflow(pid: string, opts?: { pmMode?: boolean }) {
+  const pmMode = Boolean(opts?.pmMode);
   return useQuery<WorkflowGraph>({
-    queryKey: queryKeys.workflow(pid),
-    queryFn: () => workflowApi.get(pid),
+    // PM-mode payload differs from default (tripwire prompt
+    // bodies revealed); cache them under separate keys so toggling
+    // role doesn't return a stale redacted graph.
+    queryKey: [...queryKeys.workflow(pid), { pmMode }] as const,
+    queryFn: () => workflowApi.get(pid, { pmMode }),
     staleTime: staleTime.default,
+    refetchInterval: WORKFLOW_REFETCH_MS,
     // The endpoint is additive — until Strand Y ships, the backend
     // returns 404. Don't retry on a clean 404; surface as undefined to
     // the consumer so the Dashboard renders the empty wire shape.

@@ -53,6 +53,24 @@ describe("dispatchEvent", () => {
     expect(keys).toContainEqual(queryKeys.graph("p1", "deps"));
   });
 
+  it("file_changed → also busts the workflow key (registry rebuilt at request time)", () => {
+    // The workflow graph is computed from code-side registries on
+    // every request. None of the existing `EntityType` values
+    // cleanly maps to "registry change," so we bust workflow on
+    // every `file_changed`. AC#3 (auto-update on new entity)
+    // depends on this — without it the WS path is silent.
+    const event: FileChangedEvent = makeEvent({
+      type: "file_changed",
+      project_id: "p1",
+      entity_type: "node",
+      entity_id: "api-client",
+      action: "modified",
+      path: "nodes/api-client.yaml",
+    });
+    dispatchEvent(event, queryClient);
+    expect(invalidatedKeys()).toContainEqual(queryKeys.workflow("p1"));
+  });
+
   it("file_changed entity=node → invalidates node lists and graph views", () => {
     const event: FileChangedEvent = makeEvent({
       type: "file_changed",
