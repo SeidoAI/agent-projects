@@ -46,21 +46,24 @@ function LiveMonitorInner({ projectId, sid }: { projectId: string; sid: string }
     const session = live.session;
     if (!session) return [];
 
-    type Engagement = Extract<TurnStreamEntry, { kind: "engagement" }>;
-    const engagementEntries: Engagement[] = (session.engagements ?? [])
-      .map((e, idx): Engagement | null => {
-        const startedAt = readString(e, "started_at");
-        if (!startedAt) return null;
+    type EngagementEntry = Extract<TurnStreamEntry, { kind: "engagement" }>;
+    // Use direct property access — `session.engagements[]` is now the
+    // typed `Engagement` interface from `endpoints/sessions.ts` (introduced
+    // in S3 / KUI-103 Option C). The earlier `readString(e, "...")` helper
+    // expected `Record<string, unknown>` and is no longer assignable here.
+    const engagementEntries: EngagementEntry[] = (session.engagements ?? [])
+      .map((e, idx): EngagementEntry | null => {
+        if (!e.started_at) return null;
         return {
           kind: "engagement",
-          id: readString(e, "engagement_id") ?? `eng-${idx}`,
-          timestamp: startedAt,
-          trigger: readString(e, "trigger") ?? "spawn",
-          endedAt: readString(e, "ended_at"),
-          outcome: readString(e, "outcome"),
+          id: e.engagement_id ?? `eng-${idx}`,
+          timestamp: e.started_at,
+          trigger: e.trigger ?? "spawn",
+          endedAt: e.ended_at ?? null,
+          outcome: e.outcome ?? null,
         };
       })
-      .filter((x): x is Engagement => x !== null);
+      .filter((x): x is EngagementEntry => x !== null);
 
     const fireEntries: TurnStreamEntry[] = live.tripwireFires.map((fire) => ({
       kind: "tripwire_fire",
@@ -194,9 +197,4 @@ function NotFound({ projectId }: { projectId?: string }) {
       </Link>
     </div>
   );
-}
-
-function readString(obj: Record<string, unknown>, key: string): string | null {
-  const v = obj[key];
-  return typeof v === "string" ? v : null;
 }
