@@ -65,14 +65,17 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    // Defaults match the documented dev stack (Vite 3000 → FastAPI 8000).
+    // Override via env so multiple worktrees can run dev stacks in
+    // parallel without colliding on those ports.
+    port: Number(process.env.VITE_DEV_PORT ?? 3000),
     proxy: {
       "/api/ws": {
-        target: "ws://localhost:8000",
+        target: `ws://localhost:${process.env.VITE_BACKEND_PORT ?? 8000}`,
         ws: true,
       },
       "/api": {
-        target: "http://localhost:8000",
+        target: `http://localhost:${process.env.VITE_BACKEND_PORT ?? 8000}`,
         changeOrigin: false,
       },
     },

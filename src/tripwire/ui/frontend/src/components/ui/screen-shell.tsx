@@ -1,6 +1,6 @@
 import { ChevronDown, Settings } from "lucide-react";
 import type { ReactNode } from "react";
-import { NavLink, useParams } from "react-router-dom";
+import { NavLink, useNavigate, useParams } from "react-router-dom";
 
 import { useProject } from "@/lib/api/endpoints/project";
 import { cn } from "@/lib/utils";
@@ -130,19 +130,15 @@ function VersionStamp() {
 }
 
 function ProjectChip({ projectId }: { projectId: string }) {
-  // Friendly label: project.name with the conventional "project-"
-  // prefix stripped (e.g. "project-tripwire-v0" → "tripwire-v0").
-  // Falls back to the id while the project query is in flight.
   const project = useProject(projectId);
+  const navigate = useNavigate();
   const rawName = project.data?.name?.trim();
   const label = rawName ? rawName.replace(/^project-/, "") : projectId;
-  // Render as a button so the chevron reads as "this opens
-  // something." Clicking is a no-op today — the project switcher
-  // dropdown is a future enhancement (cross-workspace selection).
   return (
     <button
       type="button"
-      title="Project switcher (coming soon)"
+      aria-label="Switch project"
+      onClick={() => navigate("/")}
       className="mx-4 mb-2 flex items-center gap-2 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-2 py-1.5 font-mono text-[11px] text-(--color-ink-2) transition-colors hover:border-(--color-ink-3)"
     >
       <span className="flex-1 truncate text-left font-semibold text-(--color-ink)">{label}</span>

@@ -1,49 +1,92 @@
+import { colorForKind } from "./GraphSidebar";
+
 /**
- * Floating legend panel that sits at the bottom-left of the Concept
- * Graph canvas (KUI-104). Mirrors the four-row swatch grid from
- * `design_handoff_tripwire_redesign/screens/concept-graph.jsx`:
- * fresh / stale concept dots and cites / related edge styles.
+ * Legend strip for the Concept Graph header (KUI-104).
+ * Mirrors the workflow page's Legend strip: swatch + serif italic copy.
+ *
+ * Type swatches mirror `KIND_COLOR` in `GraphSidebar.tsx`: each
+ * concept node is filled with its type's colour, so the legend has to
+ * enumerate the same vocabulary or users can't decode the canvas.
  */
+
+/** Distinct colour buckets, with the kinds that share each bucket. */
+const TYPE_GROUPS: { kinds: string[]; sample: string }[] = [
+  { kinds: ["schema", "service"], sample: "schema" },
+  { kinds: ["endpoint", "contract"], sample: "endpoint" },
+  { kinds: ["decision"], sample: "decision" },
+  { kinds: ["requirement"], sample: "requirement" },
+  { kinds: ["model"], sample: "model" },
+  { kinds: ["custom"], sample: "custom" },
+];
+
 export function GraphLegend() {
   return (
-    <div
+    <section
       data-testid="graph-legend"
-      className="pointer-events-none absolute bottom-3 left-3 grid grid-cols-2 items-center gap-x-4 gap-y-1.5 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) px-3.5 py-2.5 font-mono text-[10px] text-(--color-ink-2) tracking-[0.04em]"
+      aria-label="Legend"
+      className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-4 py-3"
     >
-      <LegendDot color="var(--color-ink)" label="fresh concept" />
-      <LegendDot color="#c8861f" dashed label="stale concept" />
+      {TYPE_GROUPS.map((g) => (
+        <LegendDot
+          key={g.sample}
+          color={colorForKind(g.sample)}
+          label={g.kinds.join(" · ")}
+          filled
+        />
+      ))}
+      <span aria-hidden className="h-4 w-px shrink-0 bg-(--color-edge)" />
+      <LegendDot color="#c8861f" dashed label="stale" />
       <LegendLine color="var(--color-edge)" label="cites" />
       <LegendLine color="var(--color-edge)" dashed label="related" />
-    </div>
+    </section>
   );
 }
 
-function LegendDot({ color, label, dashed }: { color: string; label: string; dashed?: boolean }) {
+function LegendDot({
+  color,
+  label,
+  dashed,
+  filled,
+}: {
+  color: string;
+  label: string;
+  dashed?: boolean;
+  filled?: boolean;
+}) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-2.5">
       <span
         aria-hidden
-        className="inline-block h-2.5 w-2.5 rounded-full bg-(--color-paper-2)"
+        className="inline-block h-4 w-4 shrink-0 rounded-full"
         style={{
-          border: `1.4px ${dashed ? "dashed" : "solid"} ${color}`,
+          border: `2px ${dashed ? "dashed" : "solid"} ${color}`,
+          // Mirrors the canvas: type-coloured fill at 50% opacity (same
+          // as `fillOpacity={0.5}` on unfocused circles in ConceptGraph),
+          // border at full opacity. `color-mix` keeps the var() reference
+          // so theme changes still propagate.
+          backgroundColor: filled
+            ? `color-mix(in srgb, ${color} 50%, transparent)`
+            : undefined,
         }}
       />
-      <span>{label}</span>
+      <span className="font-serif text-[15px] italic text-(--color-ink-3) leading-snug">
+        {label}
+      </span>
     </div>
   );
 }
 
 function LegendLine({ color, label, dashed }: { color: string; label: string; dashed?: boolean }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-2.5">
       <span
         aria-hidden
-        className="inline-block h-px w-4"
-        style={{
-          borderTop: `1.4px ${dashed ? "dashed" : "solid"} ${color}`,
-        }}
+        className="inline-block h-px w-6 shrink-0"
+        style={{ borderTop: `2px ${dashed ? "dashed" : "solid"} ${color}` }}
       />
-      <span>{label}</span>
+      <span className="font-serif text-[15px] italic text-(--color-ink-3) leading-snug">
+        {label}
+      </span>
     </div>
   );
 }

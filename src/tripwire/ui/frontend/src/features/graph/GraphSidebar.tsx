@@ -1,7 +1,8 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, PanelLeftClose } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { ReactFlowGraph, ReactFlowNode } from "@/lib/api/endpoints/graph";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,6 +26,7 @@ export interface GraphSidebarProps {
   graph: ReactFlowGraph;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onCollapse: () => void;
 }
 
 interface ConceptEntry {
@@ -53,11 +55,11 @@ const KIND_COLOR: Record<string, string> = {
  *  ones lose their reason to collapse. */
 export const CATEGORY_COLLAPSE_THRESHOLD = 6;
 
-function colorForKind(kind: string): string {
+export function colorForKind(kind: string): string {
   return KIND_COLOR[kind] ?? "var(--color-ink-2)";
 }
 
-export function GraphSidebar({ graph, selectedId, onSelect }: GraphSidebarProps) {
+export function GraphSidebar({ graph, selectedId, onSelect, onCollapse }: GraphSidebarProps) {
   const grouped = useMemo(() => groupConcepts(graph.nodes), [graph.nodes]);
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
@@ -83,9 +85,14 @@ export function GraphSidebar({ graph, selectedId, onSelect }: GraphSidebarProps)
       // for the same reason.
       className="flex w-60 shrink-0 flex-col gap-3 overflow-y-auto border-(--color-edge) border-r bg-(--color-paper-2) px-4 py-4"
     >
-      <h3 className="font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
-        concepts · {graph.meta.node_count}
-      </h3>
+      <div className="flex items-center justify-between">
+        <h3 className="font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
+          concepts · {graph.meta.node_count}
+        </h3>
+        <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse panel">
+          <PanelLeftClose className="h-4 w-4" />
+        </Button>
+      </div>
       {grouped.length === 0 ? (
         <p className="font-serif text-[13px] italic text-(--color-ink-3)">no concepts yet.</p>
       ) : (

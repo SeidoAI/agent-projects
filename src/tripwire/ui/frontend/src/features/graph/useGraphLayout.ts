@@ -1,4 +1,4 @@
-import { forceCenter, forceLink, forceManyBody, forceSimulation, forceX, forceY } from "d3-force";
+import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from "d3-force";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ReactFlowEdge, ReactFlowNode } from "@/lib/api/endpoints/graph";
@@ -37,7 +37,9 @@ interface SimLink {
   target: string;
 }
 
-const SIM_ITERATIONS = 240;
+const SIM_ITERATIONS = 400;
+const NODE_R = 22;
+const MIN_PAD = 12;
 
 /**
  * Hand-rolled SVG canvas position seeding for the Concept Graph (KUI-104).
@@ -136,6 +138,7 @@ export function useGraphLayout({
       .force("center", forceCenter(cx, cy).strength(0.05))
       .force("x", forceX(cx).strength(0.04))
       .force("y", forceY(cy).strength(0.04))
+      .force("collide", forceCollide<SimNode>(NODE_R + MIN_PAD).strength(1).iterations(4))
       .stop();
 
     for (let i = 0; i < SIM_ITERATIONS; i += 1) sim.tick();
