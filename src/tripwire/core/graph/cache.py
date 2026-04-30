@@ -57,6 +57,8 @@ CACHE_VERSION = 2
 
 ISSUES_PREFIX = f"{paths.ISSUES_DIR}/"
 NODES_PREFIX = f"{paths.NODES_DIR}/"
+SESSIONS_PREFIX = f"{paths.SESSIONS_DIR}/"
+COMMENTS_SUBDIR = paths.COMMENTS_SUBDIR
 
 
 # ============================================================================
@@ -179,14 +181,61 @@ def node_id_from_rel_path(rel_path: str) -> str | None:
 
 
 def _classify(rel_path: str) -> str | None:
-    """Return `"issue"`, `"node"`, or None for non-tracked files."""
+    """Return `"issue"`, `"node"`, `"session"`, `"comment"`, or None.
+
+    KUI-132 / A7 added `session` and `comment` so the unified index
+    carries cross-type edges from those entities.
+    """
     if rel_path.startswith(ISSUES_PREFIX) and rel_path.endswith(
         f"/{paths.ISSUE_FILENAME}"
     ):
         return "issue"
     if rel_path.startswith(NODES_PREFIX) and rel_path.endswith(".yaml"):
         return "node"
+    if rel_path.startswith(SESSIONS_PREFIX) and rel_path.endswith(
+        f"/{paths.SESSION_FILENAME}"
+    ):
+        return "session"
+    if (
+        rel_path.startswith(ISSUES_PREFIX)
+        and f"/{COMMENTS_SUBDIR}/" in rel_path
+        and rel_path.endswith(".yaml")
+    ):
+        return "comment"
     return None
+
+
+def session_id_from_rel_path(rel_path: str) -> str | None:
+    """Extract the session id from `sessions/<id>/session.yaml`."""
+    if not rel_path.startswith(SESSIONS_PREFIX):
+        return None
+    p = Path(rel_path)
+    if p.name != paths.SESSION_FILENAME:
+        return None
+    return p.parent.name
+
+
+def comment_id_from_rel_path(rel_path: str) -> str | None:
+    """Synthesize a comment id from `issues/<KEY>/comments/<stem>.yaml`.
+
+    The Comment model has no `id` field — only a UUID. The unified
+    index uses `<issue-key>:<filename-stem>` so the id is stable
+    across runs and dereferenceable from the cache.
+    """
+    if not rel_path.startswith(ISSUES_PREFIX):
+        return None
+    if f"/{COMMENTS_SUBDIR}/" not in rel_path:
+        return None
+    p = Path(rel_path)
+    if p.suffix != ".yaml":
+        return None
+    # parts: ["issues", "<KEY>", "comments", "<stem>.yaml"]
+    parts = p.parts
+    if len(parts) < 4:
+        return None
+    issue_key = parts[1]
+    stem = p.stem
+    return f"{issue_key}:{stem}"
 
 
 # ============================================================================
@@ -225,6 +274,35 @@ def _fingerprint_node(node: ConceptNode, abs_path: Path, body: str) -> FileFinge
         blocked_by=[],
         blocks=[],
         related=list(node.related),
+        parent=None,
+    )
+
+
+def _fingerprint_session(abs_path: Path, body: str) -> FileFingerprint:
+    """Fingerprint a session file. Sessions only contribute body refs and
+    cross-type edges; the FileFingerprint shape matches the issue/node one
+    with empty per-type fields."""
+    references_to = list(dict.fromkeys(extract_references(body)))
+    return FileFingerprint(
+        mtime=abs_path.stat().st_mtime,
+        sha=_compute_file_sha(abs_path),
+        references_to=references_to,
+        blocked_by=[],
+        blocks=[],
+        related=[],
+        parent=None,
+    )
+
+
+def _fingerprint_comment(abs_path: Path, body: str) -> FileFingerprint:
+    references_to = list(dict.fromkeys(extract_references(body)))
+    return FileFingerprint(
+        mtime=abs_path.stat().st_mtime,
+        sha=_compute_file_sha(abs_path),
+        references_to=references_to,
+        blocked_by=[],
+        blocks=[],
+        related=[],
         parent=None,
     )
 
@@ -286,6 +364,93 @@ def _issue_edges(issue: Issue, rel_path: str, body: str) -> list[GraphEdge]:
             )
         )
 
+    return edges
+
+
+def _session_edges(
+    session_id: str,
+    rel_path: str,
+    issues: list[str],
+    body: str,
+) -> list[GraphEdge]:
+    """Emit edges sourced from a single session file.
+
+    KUI-132 / A7. Session → issue edges land under canonical `refs`
+    (per the legacy→canonical mapping in `core.graph.index`), so the
+    unified `tripwire graph query downstream <issue>` returns sessions
+    that work on that issue.
+    """
+    edges: list[GraphEdge] = []
+    seen: set[str] = set()
+    # Session.issues[] → refs to each issue
+    for issue_key in issues:
+        if issue_key in seen:
+            continue
+        seen.add(issue_key)
+        edges.append(
+            GraphEdge(
+                from_id=session_id,
+                to_id=issue_key,
+                type="refs",
+                source_file=rel_path,
+                via_artifact=rel_path,
+            )
+        )
+    # Body refs
+    for ref in extract_references(body):
+        if ref in seen:
+            continue
+        seen.add(ref)
+        edges.append(
+            GraphEdge(
+                from_id=session_id,
+                to_id=ref,
+                type="refs",
+                source_file=rel_path,
+                via_artifact=rel_path,
+            )
+        )
+    return edges
+
+
+def _comment_edges(
+    comment_id: str,
+    rel_path: str,
+    issue_key: str,
+    body: str,
+) -> list[GraphEdge]:
+    """Emit edges sourced from a single comment file.
+
+    KUI-132 / A7. The comment's parent issue gets a refs edge. Body
+    `[[id]]` references emit additional refs edges.
+    """
+    edges: list[GraphEdge] = []
+    seen: set[str] = set()
+    # Comment → its issue (refs)
+    edges.append(
+        GraphEdge(
+            from_id=comment_id,
+            to_id=issue_key,
+            type="refs",
+            source_file=rel_path,
+            via_artifact=rel_path,
+        )
+    )
+    seen.add(issue_key)
+    # Body refs
+    for ref in extract_references(body):
+        if ref in seen:
+            continue
+        seen.add(ref)
+        edges.append(
+            GraphEdge(
+                from_id=comment_id,
+                to_id=ref,
+                type="refs",
+                source_file=rel_path,
+                via_artifact=rel_path,
+            )
+        )
     return edges
 
 
@@ -353,6 +518,47 @@ def _load_node_file(project_dir: Path, rel_path: str) -> tuple[ConceptNode, str]
     except (OSError, ValueError):
         return None
     return model, body
+
+
+def _load_session_file(
+    project_dir: Path, rel_path: str
+) -> tuple[list[str], str] | None:
+    """Parse a session file. Returns (issues, body) or None.
+
+    KUI-132 / A7. The cache only needs the issues list and the body for
+    edge extraction; full validation lives in the validator.
+    """
+    abs_path = project_dir / rel_path
+    if not abs_path.exists():
+        return None
+    try:
+        text = abs_path.read_text(encoding="utf-8")
+        fm, body = parse_frontmatter_body(text)
+    except (OSError, ValueError):
+        return None
+    raw_issues = fm.get("issues") or []
+    if not isinstance(raw_issues, list):
+        return None
+    issues = [str(i) for i in raw_issues]
+    return issues, body
+
+
+def _load_comment_file(
+    project_dir: Path, rel_path: str
+) -> tuple[str, str] | None:
+    """Parse a comment file. Returns (issue_key, body) or None."""
+    abs_path = project_dir / rel_path
+    if not abs_path.exists():
+        return None
+    try:
+        text = abs_path.read_text(encoding="utf-8")
+        fm, body = parse_frontmatter_body(text)
+    except (OSError, ValueError):
+        return None
+    issue_key = fm.get("issue_key")
+    if not isinstance(issue_key, str) or not issue_key:
+        return None
+    return issue_key, body
 
 
 def _rebuild_blocks(cache: GraphIndex) -> None:
@@ -468,6 +674,47 @@ def full_rebuild(project_dir: Path) -> GraphIndex:
                 cache.files[rel_path] = _fingerprint_node(node, abs_path, body)
                 cache.edges.extend(_node_edges(node, rel_path, body))
 
+        # Pass 3: session files (KUI-132 / A7)
+        sessions_root = paths.sessions_dir(project_dir)
+        if sessions_root.is_dir():
+            for sdir in sorted(p for p in sessions_root.iterdir() if p.is_dir()):
+                if sdir.name.startswith("."):
+                    continue
+                abs_path = sdir / paths.SESSION_FILENAME
+                if not abs_path.is_file():
+                    continue
+                rel_path = str(abs_path.relative_to(project_dir))
+                parsed_sess = _load_session_file(project_dir, rel_path)
+                if parsed_sess is None:
+                    continue
+                issues, body = parsed_sess
+                cache.files[rel_path] = _fingerprint_session(abs_path, body)
+                cache.edges.extend(
+                    _session_edges(sdir.name, rel_path, issues, body)
+                )
+
+        # Pass 4: comment files (KUI-132 / A7)
+        if issues_root.is_dir():
+            for idir in sorted(p for p in issues_root.iterdir() if p.is_dir()):
+                if idir.name.startswith("."):
+                    continue
+                comments_root = idir / paths.COMMENTS_SUBDIR
+                if not comments_root.is_dir():
+                    continue
+                for abs_path in sorted(comments_root.glob("*.yaml")):
+                    rel_path = str(abs_path.relative_to(project_dir))
+                    parsed_cmt = _load_comment_file(project_dir, rel_path)
+                    if parsed_cmt is None:
+                        continue
+                    issue_key, body = parsed_cmt
+                    comment_id = comment_id_from_rel_path(rel_path)
+                    if comment_id is None:
+                        continue
+                    cache.files[rel_path] = _fingerprint_comment(abs_path, body)
+                    cache.edges.extend(
+                        _comment_edges(comment_id, rel_path, issue_key, body)
+                    )
+
         _rebuild_blocks(cache)
         _rebuild_derived_tables(cache, project_dir)
 
@@ -528,6 +775,26 @@ def update_cache_for_file(project_dir: Path, rel_path: str) -> bool:
                     node, body = parsed_node
                     cache.files[rel_path] = _fingerprint_node(node, abs_path, body)
                     cache.edges.extend(_node_edges(node, rel_path, body))
+            elif kind == "session":
+                parsed_sess = _load_session_file(project_dir, rel_path)
+                if parsed_sess is not None:
+                    issues, body = parsed_sess
+                    sid = session_id_from_rel_path(rel_path)
+                    if sid is not None:
+                        cache.files[rel_path] = _fingerprint_session(abs_path, body)
+                        cache.edges.extend(
+                            _session_edges(sid, rel_path, issues, body)
+                        )
+            elif kind == "comment":
+                parsed_cmt = _load_comment_file(project_dir, rel_path)
+                if parsed_cmt is not None:
+                    issue_key, body = parsed_cmt
+                    cid = comment_id_from_rel_path(rel_path)
+                    if cid is not None:
+                        cache.files[rel_path] = _fingerprint_comment(abs_path, body)
+                        cache.edges.extend(
+                            _comment_edges(cid, rel_path, issue_key, body)
+                        )
         else:
             # File deleted. Nothing more to do beyond the pop above.
             if not had_file:
@@ -583,6 +850,26 @@ def ensure_fresh(project_dir: Path) -> bool:
     if nodes_root.is_dir():
         for abs_path in nodes_root.glob("*.yaml"):
             current_files.add(str(abs_path.relative_to(project_dir)))
+
+    # KUI-132 / A7: also track session and comment files.
+    sessions_root = paths.sessions_dir(project_dir)
+    if sessions_root.is_dir():
+        for sdir in sessions_root.iterdir():
+            if not sdir.is_dir() or sdir.name.startswith("."):
+                continue
+            abs_path = sdir / paths.SESSION_FILENAME
+            if abs_path.is_file():
+                current_files.add(str(abs_path.relative_to(project_dir)))
+
+    if issues_root.is_dir():
+        for idir in issues_root.iterdir():
+            if not idir.is_dir() or idir.name.startswith("."):
+                continue
+            comments_root = idir / paths.COMMENTS_SUBDIR
+            if not comments_root.is_dir():
+                continue
+            for abs_path in comments_root.glob("*.yaml"):
+                current_files.add(str(abs_path.relative_to(project_dir)))
 
     rebuilt = False
 

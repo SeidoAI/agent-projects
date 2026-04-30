@@ -106,14 +106,20 @@ def test_full_rebuild_emits_session_to_issue_refs(tmp_path: Path) -> None:
 
 
 def test_full_rebuild_emits_session_body_refs(tmp_path: Path) -> None:
+    """Session body `[[node-id]]` (lowercase slug) refs must emit edges.
+
+    The existing reference parser only matches lowercase slugs (see
+    `core/graph/refs.py::REFERENCE_PATTERN`); uppercase issue keys
+    like `KUI-1` are not picked up from prose. Sessions referencing
+    a concept node by slug should emit a refs edge.
+    """
     _make_project(tmp_path)
-    _make_issue(tmp_path, "TST-1")
     _write_session(
         tmp_path,
         "session-bar",
         agent="developer",
         issues=[],
-        body="See [[TST-1]] for context.\n",
+        body="See [[user-model]] for context.\n",
     )
 
     cache = full_rebuild(tmp_path)
@@ -123,7 +129,7 @@ def test_full_rebuild_emits_session_body_refs(tmp_path: Path) -> None:
         for e in cache.edges
         if e.source_file == session_rel and e.from_id == "session-bar"
     ]
-    assert any(e.to_id == "TST-1" and e.type == "refs" for e in body_edges)
+    assert any(e.to_id == "user-model" and e.type == "refs" for e in body_edges)
 
 
 def test_full_rebuild_emits_comment_to_issue_refs(tmp_path: Path) -> None:
