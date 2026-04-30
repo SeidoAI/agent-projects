@@ -16,7 +16,7 @@ from tripwire.models.graph import FreshnessResult, FreshnessStatus
 def _stub_stale(monkeypatch, stale_node_ids: set[str]) -> None:
     """Stub freshness.check_all_nodes to mark only ``stale_node_ids`` as STALE."""
 
-    def _fake(nodes, _project):  # noqa: ANN001
+    def _fake(nodes, _project):
         out: list[FreshnessResult] = []
         for n in nodes:
             if n.id in stale_node_ids:
@@ -28,9 +28,7 @@ def _stub_stale(monkeypatch, stale_node_ids: set[str]) -> None:
                     )
                 )
             else:
-                out.append(
-                    FreshnessResult(node_id=n.id, status=FreshnessStatus.FRESH)
-                )
+                out.append(FreshnessResult(node_id=n.id, status=FreshnessStatus.FRESH))
         return out
 
     monkeypatch.setattr(stale_concept, "check_all_nodes", _fake)

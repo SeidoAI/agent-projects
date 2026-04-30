@@ -81,16 +81,12 @@ def get_threshold(
     2. ``KIND_OVERRIDES[project.metadata.kind][lint_name][threshold_name]``.
     3. ``DEFAULT_THRESHOLDS[lint_name][threshold_name]``.
     """
-    project_override = _project_override(
-        project_config, lint_name, threshold_name
-    )
+    project_override = _project_override(project_config, lint_name, threshold_name)
     if project_override is not None:
         return project_override
 
     kind = _project_kind(project_config)
-    kind_override = (
-        KIND_OVERRIDES.get(kind, {}).get(lint_name, {}).get(threshold_name)
-    )
+    kind_override = KIND_OVERRIDES.get(kind, {}).get(lint_name, {}).get(threshold_name)
     if kind_override is not None:
         return kind_override
 

@@ -81,9 +81,7 @@ def test_node_with_no_prose_match_no_warning(
     tmp_path_project: Path, save_test_issue, save_test_node
 ):
     save_test_node(tmp_path_project, node_id="user-model", name="User Model")
-    save_test_issue(
-        tmp_path_project, key="TMP-1", body=_body("Unrelated text only.")
-    )
+    save_test_issue(tmp_path_project, key="TMP-1", body=_body("Unrelated text only."))
     save_test_issue(
         tmp_path_project, key="TMP-2", body=_body("Different topic entirely.")
     )

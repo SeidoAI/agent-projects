@@ -8,10 +8,9 @@ exceptions to HTTP status codes happens here, nothing else.
 from __future__ import annotations
 
 from fastapi import APIRouter, Path
-
-from tripwire.ui.routes._common import envelope_exception
 from pydantic import BaseModel
 
+from tripwire.ui.routes._common import envelope_exception
 from tripwire.ui.services.project_service import (
     ProjectDetail,
     ProjectSummary,

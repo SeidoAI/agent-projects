@@ -1004,9 +1004,7 @@ def session_reopen_cmd(
     _require_project(resolved)
 
     try:
-        result = reopen_session(
-            resolved, session_id, reason, reset_acks=reset_acks
-        )
+        result = reopen_session(resolved, session_id, reason, reset_acks=reset_acks)
     except FileNotFoundError as exc:
         raise click.ClickException(f"session '{session_id}' not found") from exc
     except ValueError as exc:

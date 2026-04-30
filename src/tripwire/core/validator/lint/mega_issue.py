@@ -28,14 +28,10 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
     if not ctx.issues:
         return []
 
-    max_children = get_threshold(
-        ctx.project_config, "mega_issue", "max_children"
-    )
+    max_children = get_threshold(ctx.project_config, "mega_issue", "max_children")
     if max_children is None:
         max_children = 8
-    max_sessions = get_threshold(
-        ctx.project_config, "mega_issue", "max_sessions"
-    )
+    max_sessions = get_threshold(ctx.project_config, "mega_issue", "max_sessions")
     if max_sessions is None:
         max_sessions = 6
 

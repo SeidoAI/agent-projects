@@ -387,27 +387,21 @@ class TestUuidV4:
     """
 
     def test_v3_uuid_is_error(self, empty_project: Path) -> None:
-        write_issue(
-            empty_project, "TST-1", uuid="11111111-1111-3111-8111-111111111111"
-        )
+        write_issue(empty_project, "TST-1", uuid="11111111-1111-3111-8111-111111111111")
         report = validate_project(empty_project)
         assert "uuid/not_v4" in codes(report)
         # v4-pre-check skips schema validation, so no double-report.
         assert "issue/schema_invalid" not in codes(report)
 
     def test_v5_uuid_is_error(self, empty_project: Path) -> None:
-        write_issue(
-            empty_project, "TST-1", uuid="11111111-1111-5111-8111-111111111111"
-        )
+        write_issue(empty_project, "TST-1", uuid="11111111-1111-5111-8111-111111111111")
         report = validate_project(empty_project)
         assert "uuid/not_v4" in codes(report)
 
     def test_invalid_variant_is_error(self, empty_project: Path) -> None:
         # Variant nibble `c` = 0b1100 — Microsoft-compat variant,
         # not RFC 4122 (which requires 0b10xx → 8/9/a/b).
-        write_issue(
-            empty_project, "TST-1", uuid="11111111-1111-4111-c111-111111111111"
-        )
+        write_issue(empty_project, "TST-1", uuid="11111111-1111-4111-c111-111111111111")
         report = validate_project(empty_project)
         assert "uuid/not_v4" in codes(report)
 
@@ -417,9 +411,7 @@ class TestUuidV4:
         assert "uuid/not_v4" in codes(report)
 
     def test_v4_uuid_passes(self, empty_project: Path) -> None:
-        write_issue(
-            empty_project, "TST-1", uuid="11111111-1111-4111-8111-111111111111"
-        )
+        write_issue(empty_project, "TST-1", uuid="11111111-1111-4111-8111-111111111111")
         report = validate_project(empty_project)
         assert "uuid/not_v4" not in codes(report)
 

@@ -24,9 +24,7 @@ def _set_kind(project_dir: Path, kind: str) -> None:
     (project_dir / "project.yaml").write_text(yaml.safe_dump(cfg))
 
 
-def test_too_few_nodes_warns(
-    tmp_path_project: Path, save_test_issue, save_test_node
-):
+def test_too_few_nodes_warns(tmp_path_project: Path, save_test_issue, save_test_node):
     # 10 active issues, 0 nodes → ratio 0 < 0.10 (default min) → warn.
     for n in range(10):
         save_test_issue(tmp_path_project, key=f"TMP-{n + 1}", status="in_progress")
@@ -35,9 +33,7 @@ def test_too_few_nodes_warns(
     assert any(r.code == "node_ratio/below_band" for r in results)
 
 
-def test_too_many_nodes_warns(
-    tmp_path_project: Path, save_test_issue, save_test_node
-):
+def test_too_many_nodes_warns(tmp_path_project: Path, save_test_issue, save_test_node):
     # 5 active issues, 26 nodes → ratio 5.2 > 5.0 (default max) → warn.
     for n in range(5):
         save_test_issue(tmp_path_project, key=f"TMP-{n + 1}", status="in_progress")
@@ -48,9 +44,7 @@ def test_too_many_nodes_warns(
     assert any(r.code == "node_ratio/above_band" for r in results)
 
 
-def test_in_band_no_warning(
-    tmp_path_project: Path, save_test_issue, save_test_node
-):
+def test_in_band_no_warning(tmp_path_project: Path, save_test_issue, save_test_node):
     # 5 active issues, 5 nodes → ratio 1.0 — inside default band.
     for n in range(5):
         save_test_issue(tmp_path_project, key=f"TMP-{n + 1}", status="in_progress")
@@ -60,9 +54,7 @@ def test_in_band_no_warning(
     assert node_ratio.check(ctx) == []
 
 
-def test_small_project_silent(
-    tmp_path_project: Path, save_test_issue, save_test_node
-):
+def test_small_project_silent(tmp_path_project: Path, save_test_issue, save_test_node):
     """Fewer than 5 active issues — lint stays silent (avoids noise)."""
     save_test_issue(tmp_path_project, key="TMP-1", status="in_progress")
     ctx = load_context(tmp_path_project)

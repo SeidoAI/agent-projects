@@ -55,9 +55,7 @@ def test_active_issue_with_no_ac_refs_warns(
     ctx = load_context(tmp_path_project)
     results = semantic_coverage.check(ctx)
     assert any(r.code == "semantic_coverage/below_threshold" for r in results)
-    finding = next(
-        r for r in results if r.code == "semantic_coverage/below_threshold"
-    )
+    finding = next(r for r in results if r.code == "semantic_coverage/below_threshold")
     assert finding.severity == "warning"
     assert "TMP-1" in finding.message
 
@@ -78,9 +76,7 @@ def test_active_issue_with_one_ac_ref_passes(
     assert semantic_coverage.check(ctx) == []
 
 
-def test_done_issue_skipped(
-    tmp_path_project: Path, save_test_issue, save_test_node
-):
+def test_done_issue_skipped(tmp_path_project: Path, save_test_issue, save_test_node):
     save_test_node(tmp_path_project, node_id="auth-system", name="Auth System")
     save_test_issue(
         tmp_path_project,

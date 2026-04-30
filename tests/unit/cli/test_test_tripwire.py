@@ -45,9 +45,7 @@ def test_test_tripwire_prints_prompt(tmp_path: Path, pm_role: Path) -> None:
     assert "--ack" in result.output
 
 
-def test_test_tripwire_unknown_id_exits_nonzero(
-    tmp_path: Path, pm_role: Path
-) -> None:
+def test_test_tripwire_unknown_id_exits_nonzero(tmp_path: Path, pm_role: Path) -> None:
     _project(tmp_path)
     runner = CliRunner()
     result = runner.invoke(

@@ -376,7 +376,9 @@ class TestSessionReopenResetAcks:
         )
         assert result.exit_code == 0, result.output
 
-        events_dir = tmp_path_project / ".tripwire" / "events" / "session_acks_reset" / "s1"
+        events_dir = (
+            tmp_path_project / ".tripwire" / "events" / "session_acks_reset" / "s1"
+        )
         assert events_dir.is_dir()
         event_files = list(events_dir.glob("*.json"))
         assert len(event_files) == 1
