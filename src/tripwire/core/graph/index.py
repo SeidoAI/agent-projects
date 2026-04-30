@@ -24,6 +24,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from tripwire.core.graph import cache as graph_cache
+from tripwire.core.graph import edges as graph_edges
 from tripwire.models.graph import EdgeKind, GraphEdge, GraphIndex
 
 
@@ -90,6 +91,32 @@ class UnifiedIndex:
     def edges_from(self, node_id: str) -> list[GraphEdge]:
         """All edges whose source is `node_id` (outgoing)."""
         return [e for e in self._cache.edges if e.from_id == node_id]
+
+    def edges_by_inverse_kind(
+        self, node_id: str, inverse_name: str
+    ) -> list[tuple[str, str]]:
+        """Surface edges into `node_id` under their *inverse* name.
+
+        For example, ``edges_by_inverse_kind("KUI-1", "blocks")`` finds
+        every ``depends_on`` edge into KUI-1 and returns the upstream
+        node id paired with the original (canonical) kind name. The
+        canonical-direction edges live on disk; the inverse name
+        (``blocks``, ``implemented-by``, ``produces`` …) is computed at
+        read time per the v0.6 ``blocked_by`` ↔ ``blocks`` convention.
+
+        For bidirectional kinds (``refs``), incoming refs are returned
+        with the same kind name on either side.
+
+        Returns a list of ``(other_id, original_kind)`` tuples.
+        """
+        canonical = graph_edges.canonical_for_inverse(inverse_name)
+        out: list[tuple[str, str]] = []
+        for e in self._cache.edges:
+            if e.to_id != node_id:
+                continue
+            if canonical_kind(e.type) == canonical:
+                out.append((e.from_id, canonical))
+        return out
 
     # -- traversal --------------------------------------------------------
 
