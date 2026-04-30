@@ -89,6 +89,20 @@ def _known_tripwires() -> set[str]:
 
     Populated by KUI-121 once each Tripwire subclass declares its
     station via ``at = (...)``.
+
+    KNOWN GAP (codex P2 on PR #73): the registry is populated as a
+    side-effect of `_instantiate()` in tripwires/loader.py, which only
+    runs when `load_registry(project_dir)` is called. `tripwire
+    validate` does not call it, so this set is usually empty during
+    workflow.yaml ref-checks — which silently disables the
+    `workflow/unknown_tripwire` finding. Force-loading from this
+    callsite would mutate global registry state in a way that leaks
+    into the gate runtime in transitions.py (the same registry is
+    used to enforce tripwires-at-stations during `tripwire
+    transition`), turning workflow.yaml validation into an
+    unintentional precondition for transition behaviour. Filed as
+    follow-up: see post-completion-comments.md §Follow-ups
+    "snapshot/restore tripwire registry for validate-time ref checks".
     """
     from tripwire.core.workflow.registry import known_tripwire_ids
 

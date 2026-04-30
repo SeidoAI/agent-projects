@@ -19,14 +19,20 @@ workflows:
         next: queued
       - id: queued
         next: executing
-        prompt_checks: [pm-session-queue]
       - id: executing
         next: in_review
-        prompt_checks: [pm-session-spawn]
       - id: in_review
         next: verified
-        prompt_checks: [pm-session-review]
       - id: verified
         next: completed
       - id: completed
         terminal: true
+    # NOTE: v0.9 ships the gate runner (KUI-159) that READS
+    # `prompt_check.invoked` events, but no caller in this codebase
+    # yet EMITS them. The PM slash-commands wired with `fires_at:`
+    # (KUI-122) carry the station mapping but not the per-invocation
+    # event emit. Until the producer side lands (v0.9.x follow-up),
+    # declaring `prompt_checks: [...]` here would make every real
+    # `tripwire transition` reject with `prompt_checks_missing`.
+    # The schema still supports prompt_checks; this template will
+    # gain the declarations once the producer is wired.

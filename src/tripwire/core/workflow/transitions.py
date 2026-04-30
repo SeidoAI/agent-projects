@@ -147,13 +147,17 @@ def request_transition(
             f"valid stations: {sorted(stations_by_id)}"
         )
 
+    # Pre-lock load: just to populate `transition.requested`'s
+    # `from_station` field with the caller's perspective. The gate
+    # body re-loads inside the lock to evaluate against fresh state
+    # (see codex P1 on PR #73 — concurrent transitions could otherwise
+    # both validate against the same stale snapshot).
     try:
-        session = load_session(project_dir, session_id)
+        pre_lock_session = load_session(project_dir, session_id)
     except FileNotFoundError as exc:
         raise TransitionError(f"session {session_id!r} not found") from exc
 
-    current_station = session.status.value
-    current = stations_by_id.get(current_station)
+    pre_lock_station = pre_lock_session.status.value
 
     # Always emit `transition.requested` first.
     emit_event(
@@ -162,13 +166,21 @@ def request_transition(
         instance=session_id,
         station=target_station,
         event="transition.requested",
-        details={"from_station": current_station, "to_station": target_station},
+        details={"from_station": pre_lock_station, "to_station": target_station},
         now=when,
     )
 
     lock_name = f".tripwire/locks/transition-{session_id}.lock"
     try:
         with project_lock(project_dir, name=lock_name):
+            # Re-read session state INSIDE the lock — stale snapshots
+            # before the lock could let two concurrent transitions
+            # validate against the same source station and both emit
+            # `transition.completed`. Fresh read here is the
+            # serialization point.
+            session = load_session(project_dir, session_id)
+            current_station = session.status.value
+            current = stations_by_id.get(current_station)
             return _run_gate(
                 project_dir,
                 session=session,

@@ -316,3 +316,60 @@ def test_transition_emits_requested_before_completed_or_rejected(
     rows = list(read_events(pd, instance="test-session"))
     kinds = [r["event"] for r in rows]
     assert kinds.index("transition.requested") < kinds.index("transition.completed")
+
+
+# ============================================================================
+# Codex P1 (PR #73 follow-up): lock race — gate must reload session
+# state INSIDE the lock, not pass a pre-lock snapshot.
+# ============================================================================
+
+
+def test_transition_reloads_session_inside_lock(
+    tmp_path: Path, clean_validator
+) -> None:
+    """If `_run_gate` is called inside `project_lock`, the session
+    state it sees must be a fresh read AFTER the lock was acquired.
+    Pre-fix the gate captured `current_station` before the lock, so a
+    second concurrent transition could observe the same source state
+    and emit a duplicate `transition.completed`.
+
+    The fix moves `load_session` inside the `with project_lock(...)`
+    block. Black-box test: simulate a stale snapshot by writing a
+    different `status:` to session.yaml between the pre-lock load and
+    the gate body. Pre-fix, the gate accepts the stale state and
+    transitions from there. Post-fix, the gate sees the fresh state
+    and rejects (or accepts) based on what's actually on disk.
+    """
+    from tripwire.cli.transition import transition_cmd
+    from tripwire.core.events.log import read_events
+    from tripwire.core.session_store import load_session, save_session
+
+    pd = _project_dir(tmp_path)
+    # Move the session forward to "queued" before the test transitions
+    # request "executing". Pre-fix the gate uses whatever pre_lock
+    # snapshot was; post-fix it always re-reads fresh state.
+    sess = load_session(pd, "test-session")
+    from tripwire.models.enums import SessionStatus
+
+    sess.status = SessionStatus.QUEUED
+    save_session(pd, sess)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        transition_cmd,
+        ["test-session", "executing", "--project-dir", str(pd)],
+    )
+    # queued → executing is reachable, so this should succeed.
+    assert result.exit_code == 0, result.output
+
+    # The transition.completed event records `from_station: queued`,
+    # which is what was on disk INSIDE the lock — not whatever
+    # pre-lock snapshot some prior call to load_session captured.
+    completed = [
+        e
+        for e in read_events(pd, instance="test-session")
+        if e["event"] == "transition.completed"
+    ]
+    assert completed
+    assert completed[-1]["details"]["from_station"] == "queued"
+    assert completed[-1]["details"]["to_station"] == "executing"
