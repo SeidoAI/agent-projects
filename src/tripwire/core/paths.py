@@ -269,6 +269,13 @@ TRIPWIRE_DIR = ".tripwire"
 TRIPWIRE_COMMANDS_SUBDIR = ".tripwire/commands"
 TRIPWIRE_SPAWN_SUBDIR = ".tripwire/spawn"
 
+# Concept-graph canvas positions live in a project-scoped sidecar so layout
+# edits don't churn content YAML, bump `updated_at`, or fan `file_changed`
+# events through the file watcher (`.tripwire/<non-events>` is filtered out
+# in `ui/file_watcher._should_ignore`).
+CONCEPT_LAYOUT_FILE = ".tripwire/concept-layout.json"
+CONCEPT_LAYOUT_LOCK = ".tripwire/.concept-layout.lock"
+
 
 def tripwire_dir(project_dir: Path) -> Path:
     """Per-project override root: `<project>/.tripwire/`."""
@@ -281,6 +288,15 @@ def project_commands_dir(project_dir: Path) -> Path:
 
 def project_spawn_dir(project_dir: Path) -> Path:
     return project_dir / TRIPWIRE_SPAWN_SUBDIR
+
+
+def concept_layout_path(project_dir: Path) -> Path:
+    """Per-project Concept Graph layout sidecar."""
+    return project_dir / CONCEPT_LAYOUT_FILE
+
+
+def concept_layout_lock_path(project_dir: Path) -> Path:
+    return project_dir / CONCEPT_LAYOUT_LOCK
 
 
 def resolve_command_path(project_dir: Path, command_name: str) -> Path:

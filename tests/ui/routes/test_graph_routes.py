@@ -166,9 +166,133 @@ class TestConceptGraph:
         assert r.status_code == 400
 
 
+class TestPatchConceptLayout:
+    """Batched layout PATCH that writes through `.tripwire/concept-layout.json`."""
+
+    def test_persists_batch_to_sidecar(
+        self, populated_client, graph_project, graph_project_id
+    ):
+        from tripwire.core.concept_layout import load_concept_layouts
+
+        r = populated_client.patch(
+            f"/api/projects/{graph_project_id}/graph/concept/layout",
+            json={
+                "user-model": {"x": 100.0, "y": 200.0},
+                "another-node": {"x": -5.5, "y": 0.0},
+            },
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["layouts"]["user-model"] == {"x": 100.0, "y": 200.0}
+        assert body["layouts"]["another-node"] == {"x": -5.5, "y": 0.0}
+
+        on_disk = load_concept_layouts(graph_project)
+        assert on_disk["user-model"] == (100.0, 200.0)
+        assert on_disk["another-node"] == (-5.5, 0.0)
+
+    def test_does_not_write_to_node_yaml(
+        self, populated_client, graph_project, graph_project_id
+    ):
+        # The whole point: layout updates must not modify content YAML.
+        node_path = graph_project / "nodes" / "user-model.yaml"
+        before = node_path.read_text(encoding="utf-8")
+        r = populated_client.patch(
+            f"/api/projects/{graph_project_id}/graph/concept/layout",
+            json={"user-model": {"x": 1.0, "y": 2.0}},
+        )
+        assert r.status_code == 200
+        after = node_path.read_text(encoding="utf-8")
+        assert before == after
+        assert "layout:" not in after
+
+    def test_partial_body_merges_with_existing(
+        self, populated_client, graph_project, graph_project_id
+    ):
+        from tripwire.core.concept_layout import (
+            load_concept_layouts,
+            save_concept_layouts,
+        )
+
+        save_concept_layouts(
+            graph_project, {"user-model": (10.0, 20.0), "kept": (3.0, 4.0)}
+        )
+        r = populated_client.patch(
+            f"/api/projects/{graph_project_id}/graph/concept/layout",
+            json={"user-model": {"x": 99.0, "y": 99.0}},
+        )
+        assert r.status_code == 200
+        merged = load_concept_layouts(graph_project)
+        assert merged == {"user-model": (99.0, 99.0), "kept": (3.0, 4.0)}
+
+    def test_empty_body_is_a_noop_200(
+        self, populated_client, graph_project, graph_project_id
+    ):
+        from tripwire.core.concept_layout import save_concept_layouts
+
+        save_concept_layouts(graph_project, {"user-model": (10.0, 20.0)})
+        r = populated_client.patch(
+            f"/api/projects/{graph_project_id}/graph/concept/layout",
+            json={},
+        )
+        assert r.status_code == 200
+        assert r.json()["layouts"]["user-model"] == {"x": 10.0, "y": 20.0}
+
+    def test_malformed_slug_returns_400(
+        self, populated_client, graph_project_id
+    ):
+        r = populated_client.patch(
+            f"/api/projects/{graph_project_id}/graph/concept/layout",
+            json={"BadSlug": {"x": 1.0, "y": 2.0}},
+        )
+        assert r.status_code == 400
+        assert r.json()["code"] == "node/bad_slug"
+
+    def test_missing_y_returns_422(
+        self, populated_client, graph_project_id
+    ):
+        r = populated_client.patch(
+            f"/api/projects/{graph_project_id}/graph/concept/layout",
+            json={"user-model": {"x": 1.0}},
+        )
+        assert r.status_code == 422
+
+    def test_unknown_node_id_is_accepted(
+        self, populated_client, graph_project, graph_project_id
+    ):
+        # Sidecar entries don't need to correspond to extant node YAMLs;
+        # the file watcher won't ever see this and orphans are harmless
+        # (a missing node just doesn't render, the position is kept).
+        from tripwire.core.concept_layout import load_concept_layouts
+
+        r = populated_client.patch(
+            f"/api/projects/{graph_project_id}/graph/concept/layout",
+            json={"never-existed": {"x": 1.0, "y": 2.0}},
+        )
+        assert r.status_code == 200
+        assert load_concept_layouts(graph_project)["never-existed"] == (1.0, 2.0)
+
+
+class TestConceptGraphReadsFromSidecar:
+    def test_has_saved_layout_flag_reflects_sidecar(
+        self, populated_client, graph_project, graph_project_id
+    ):
+        from tripwire.core.concept_layout import save_concept_layouts
+
+        save_concept_layouts(graph_project, {"user-model": (42.0, 84.0)})
+        r = populated_client.get(
+            f"/api/projects/{graph_project_id}/graph/concept"
+        )
+        assert r.status_code == 200
+        body = r.json()
+        target = next(n for n in body["nodes"] if n["id"] == "user-model")
+        assert target["data"]["has_saved_layout"] is True
+        assert target["position"] == {"x": 42.0, "y": 84.0}
+
+
 class TestOpenAPI:
     def test_registers_paths(self, populated_client):
         schema = populated_client.get("/openapi.json").json()
         paths = schema["paths"]
         assert "/api/projects/{project_id}/graph/deps" in paths
         assert "/api/projects/{project_id}/graph/concept" in paths
+        assert "/api/projects/{project_id}/graph/concept/layout" in paths

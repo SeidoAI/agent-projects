@@ -188,62 +188,13 @@ class TestReverseRefs:
         assert r.status_code == 400
 
 
-class TestPatchLayout:
-    """KUI-104 — persist a node's Concept Graph (x, y) into its YAML."""
-
-    def test_persists_layout_to_yaml(self, node_client, node_project, node_project_id):
-        from tripwire.core.node_store import load_node
-
-        r = node_client.patch(
-            f"/api/projects/{node_project_id}/nodes/user-model/layout",
-            json={"x": 120.5, "y": -44.0},
-        )
-        assert r.status_code == 200, r.text
-        loaded = load_node(node_project, "user-model")
-        assert loaded.layout is not None
-        assert loaded.layout.x == pytest.approx(120.5)
-        assert loaded.layout.y == pytest.approx(-44.0)
-
-    def test_returns_updated_node_summary(self, node_client, node_project_id):
-        r = node_client.patch(
-            f"/api/projects/{node_project_id}/nodes/user-model/layout",
-            json={"x": 1.0, "y": 2.0},
-        )
-        assert r.status_code == 200
-        body = r.json()
-        assert body["id"] == "user-model"
-        assert body["layout"] == {"x": 1.0, "y": 2.0}
-
-    def test_unknown_slug_returns_404(self, node_client, node_project_id):
-        r = node_client.patch(
-            f"/api/projects/{node_project_id}/nodes/does-not-exist/layout",
-            json={"x": 0.0, "y": 0.0},
-        )
-        assert r.status_code == 404
-        assert r.json()["code"] == "node/not_found"
-
-    def test_malformed_slug_returns_400(self, node_client, node_project_id):
-        r = node_client.patch(
-            f"/api/projects/{node_project_id}/nodes/BadSlug/layout",
-            json={"x": 0.0, "y": 0.0},
-        )
-        assert r.status_code == 400
-        assert r.json()["code"] == "node/bad_slug"
-
-    def test_missing_y_returns_422(self, node_client, node_project_id):
-        r = node_client.patch(
-            f"/api/projects/{node_project_id}/nodes/user-model/layout",
-            json={"x": 1.0},
-        )
-        assert r.status_code == 422
-
-
 class TestOpenAPI:
     def test_registers_paths(self, node_client):
         schema = node_client.get("/openapi.json").json()
         paths = schema["paths"]
         assert "/api/projects/{project_id}/nodes" in paths
         assert "/api/projects/{project_id}/nodes/{node_id}" in paths
-        assert "/api/projects/{project_id}/nodes/{node_id}/layout" in paths
         assert "/api/projects/{project_id}/nodes/check" in paths
         assert "/api/projects/{project_id}/refs/reverse/{node_id}" in paths
+        # Layout PATCH moved to /graph/concept/layout — see test_graph_routes.
+        assert "/api/projects/{project_id}/nodes/{node_id}/layout" not in paths

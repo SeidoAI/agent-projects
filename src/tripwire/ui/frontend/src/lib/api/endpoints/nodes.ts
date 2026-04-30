@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { apiGet, apiPatch } from "../client";
+import { apiGet } from "../client";
 import { queryKeys, staleTime } from "../queryKeys";
 
 export interface NodeSource {
@@ -73,11 +73,9 @@ export const nodesApi = {
     apiGet<ReverseRefsResult>(
       `/api/projects/${encodeURIComponent(pid)}/refs/reverse/${encodeURIComponent(nid)}`,
     ),
-  updateLayout: (pid: string, nid: string, layout: NodeLayout) =>
-    apiPatch<NodeDetail>(
-      `/api/projects/${encodeURIComponent(pid)}/nodes/${encodeURIComponent(nid)}/layout`,
-      layout,
-    ),
+  // Concept Graph layout persistence moved to graphApi.updateConceptLayout
+  // (PATCH /graph/concept/layout), batched into a single request that
+  // writes the project-scoped sidecar instead of N node YAMLs.
 };
 
 export function useNode(pid: string, nid: string) {

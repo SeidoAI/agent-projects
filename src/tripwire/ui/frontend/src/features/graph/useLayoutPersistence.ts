@@ -1,18 +1,24 @@
 import { useEffect, useMemo, useRef } from "react";
 
-import { type NodeLayout, nodesApi } from "@/lib/api/endpoints/nodes";
+import { type ConceptLayoutEntry, graphApi } from "@/lib/api/endpoints/graph";
+
+type NodeLayout = ConceptLayoutEntry;
 
 const DEBOUNCE_MS = 1500;
 
 /**
- * Buffers per-node (x, y) updates and PATCHes them to
- * `/api/projects/{pid}/nodes/{id}/layout` after the canvas settles.
+ * Buffers per-node (x, y) updates and flushes them as a single batched
+ * PATCH to `/api/projects/{pid}/graph/concept/layout` after the canvas
+ * settles.
  *
  * The Concept Graph (KUI-104) seeds positions with d3-force on first
- * load. As the simulation ticks we accumulate the latest position
- * per node, then debounce a flush to the backend so reload doesn't
- * re-shuffle the canvas. One PATCH per distinct node id; only the
- * last position in a debounce window is sent.
+ * load. As the simulation ticks we accumulate the latest position per
+ * node, then debounce a flush to the backend so reloads don't re-shuffle
+ * the canvas. The batched PATCH writes the project's
+ * `.tripwire/concept-layout.json` sidecar — never node YAMLs — so the
+ * file watcher does not classify the write as a node change. That's
+ * what prevents the self-amplifying re-seed loop the previous per-node
+ * PATCH design suffered from.
  */
 export interface UseLayoutPersistence {
   /** Buffer one or more node positions for eventual persistence. */
@@ -26,7 +32,7 @@ export function useLayoutPersistence(projectId: string): UseLayoutPersistence {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Tracks the project id that owns the *current* buffer. We pin
   // it at persist time (and again when projectId changes through a
-  // synchronous flush) so the eventual PATCHes always go to the
+  // synchronous flush) so the eventual PATCH always goes to the
   // project that produced the position. PM #25 round 3 P1: React
   // Router keeps the same component instance across `/p/:pid`
   // changes, so a debounced batch from project A can otherwise
@@ -43,12 +49,15 @@ export function useLayoutPersistence(projectId: string): UseLayoutPersistence {
       if (batch.size === 0) return;
       pendingRef.current = new Map();
       const pid = bufferOwnerRef.current;
-      // Fire-and-forget per node; failures don't block subsequent
-      // persistence attempts. The next debounce window will retry
-      // anything the canvas re-emits.
-      await Promise.allSettled(
-        Array.from(batch.entries()).map(([nid, layout]) => nodesApi.updateLayout(pid, nid, layout)),
-      );
+      const layouts = Object.fromEntries(batch);
+      // One HTTP call. A failure doesn't block subsequent persistence
+      // attempts; the next debounce window will retry anything the
+      // canvas re-emits.
+      try {
+        await graphApi.updateConceptLayout(pid, layouts);
+      } catch {
+        // swallow — see comment above
+      }
     };
   }, []);
 

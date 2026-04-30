@@ -13,11 +13,16 @@ function wrapperWith(qc: QueryClient) {
 
 function mockFetch() {
   return vi.spyOn(globalThis, "fetch").mockResolvedValue(
-    new Response(JSON.stringify({ id: "n1", layout: { x: 1, y: 2 } }), {
+    new Response(JSON.stringify({ layouts: {} }), {
       status: 200,
       headers: { "content-type": "application/json" },
     }),
   );
+}
+
+function bodyOf(call: unknown[] | undefined): Record<string, { x: number; y: number }> {
+  const init = call?.[1] as RequestInit | undefined;
+  return JSON.parse(String(init?.body)) as Record<string, { x: number; y: number }>;
 }
 
 describe("useLayoutPersistence", () => {
@@ -25,28 +30,7 @@ describe("useLayoutPersistence", () => {
     vi.restoreAllMocks();
   });
 
-  it("flush() PATCHes the latest position per node", async () => {
-    const fetchSpy = mockFetch();
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { result } = renderHook(() => useLayoutPersistence("p1"), {
-      wrapper: wrapperWith(qc),
-    });
-
-    await act(async () => {
-      result.current.persist({ "user-model": { x: 10, y: 20 } });
-      result.current.persist({ "user-model": { x: 11, y: 21 } });
-      result.current.persist({ "user-model": { x: 12, y: 22 } });
-      await result.current.flush();
-    });
-
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchSpy.mock.calls[0] ?? [];
-    expect(url).toBe("/api/projects/p1/nodes/user-model/layout");
-    expect(init?.method).toBe("PATCH");
-    expect(JSON.parse(String(init?.body))).toEqual({ x: 12, y: 22 });
-  });
-
-  it("flush() emits one PATCH per distinct node id", async () => {
+  it("flush() sends a single batched PATCH carrying every distinct node id", async () => {
     const fetchSpy = mockFetch();
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { result } = renderHook(() => useLayoutPersistence("p1"), {
@@ -55,24 +39,43 @@ describe("useLayoutPersistence", () => {
 
     await act(async () => {
       result.current.persist({
-        "user-model": { x: 1, y: 1 },
-        "auth-flow": { x: 2, y: 2 },
+        "user-model": { x: 10, y: 20 },
+        "auth-flow": { x: 1, y: 2 },
       });
+      result.current.persist({ "user-model": { x: 12, y: 22 } });
       await result.current.flush();
     });
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
-    const urls = fetchSpy.mock.calls.map((c) => String(c[0])).sort();
-    expect(urls).toEqual([
-      "/api/projects/p1/nodes/auth-flow/layout",
-      "/api/projects/p1/nodes/user-model/layout",
-    ]);
+    // Exactly one HTTP call — not one per node.
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0] ?? [];
+    expect(url).toBe("/api/projects/p1/graph/concept/layout");
+    expect(init?.method).toBe("PATCH");
+    expect(bodyOf(fetchSpy.mock.calls[0])).toEqual({
+      // Only the latest position per node survives in the batch.
+      "user-model": { x: 12, y: 22 },
+      "auth-flow": { x: 1, y: 2 },
+    });
+  });
+
+  it("flush() with an empty buffer is a no-op (no HTTP call)", async () => {
+    const fetchSpy = mockFetch();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result } = renderHook(() => useLayoutPersistence("p1"), {
+      wrapper: wrapperWith(qc),
+    });
+
+    await act(async () => {
+      await result.current.flush();
+    });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("flushes any pending batch on unmount (PM #25 P1)", async () => {
     // Regression: if the user navigates away within the debounce
     // window after a position change, the pending PATCH must still
-    // hit the wire — otherwise the YAML never gets written and the
+    // hit the wire — otherwise the sidecar never gets written and the
     // next page load re-runs d3-force as if nothing was saved.
     const fetchSpy = mockFetch();
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -85,18 +88,17 @@ describe("useLayoutPersistence", () => {
     });
     expect(fetchSpy).not.toHaveBeenCalled();
 
-    // Unmount before the debounce timer fires — but the cleanup
-    // hook must still flush the pending batch.
     await act(async () => {
       unmount();
-      // Let the flushed promise resolve before assertions.
       await Promise.resolve();
     });
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchSpy.mock.calls[0] ?? [];
-    expect(url).toBe("/api/projects/p1/nodes/user-model/layout");
-    expect(JSON.parse(String(init?.body))).toEqual({ x: 7, y: 8 });
+    const [url] = fetchSpy.mock.calls[0] ?? [];
+    expect(url).toBe("/api/projects/p1/graph/concept/layout");
+    expect(bodyOf(fetchSpy.mock.calls[0])).toEqual({
+      "user-model": { x: 7, y: 8 },
+    });
   });
 
   it("flushes the buffered batch to the OLD project when projectId changes (PM #25 round 3 P1)", async () => {
@@ -118,24 +120,21 @@ describe("useLayoutPersistence", () => {
     });
     expect(fetchSpy).not.toHaveBeenCalled();
 
-    // Navigate to project B before the debounce window expires.
     await act(async () => {
       rerender({ pid: "proj-b" });
       await Promise.resolve();
     });
 
-    // The buffered position should have been flushed to proj-a.
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const url = String(fetchSpy.mock.calls[0]?.[0] ?? "");
-    expect(url).toBe("/api/projects/proj-a/nodes/user-model/layout");
-    // No call against proj-b for that buffered node.
-    const proj_b_calls = fetchSpy.mock.calls.filter((c) =>
+    expect(url).toBe("/api/projects/proj-a/graph/concept/layout");
+    const projBCalls = fetchSpy.mock.calls.filter((c) =>
       String(c[0]).startsWith("/api/projects/proj-b/"),
     );
-    expect(proj_b_calls).toHaveLength(0);
+    expect(projBCalls).toHaveLength(0);
   });
 
-  it("debounces auto-flush — repeated persists collapse into one PATCH per node", async () => {
+  it("debounces auto-flush — repeated persists collapse into one PATCH per debounce window", async () => {
     vi.useFakeTimers();
     try {
       const fetchSpy = mockFetch();
@@ -147,7 +146,6 @@ describe("useLayoutPersistence", () => {
       act(() => {
         result.current.persist({ "user-model": { x: 1, y: 1 } });
       });
-      // Before the debounce window ends, no PATCH yet.
       act(() => {
         vi.advanceTimersByTime(500);
       });
@@ -163,14 +161,14 @@ describe("useLayoutPersistence", () => {
       });
       expect(fetchSpy).not.toHaveBeenCalled();
 
-      // Cross the debounce threshold from the most recent persist.
       await act(async () => {
         vi.advanceTimersByTime(500);
         await Promise.resolve();
       });
       expect(fetchSpy).toHaveBeenCalledTimes(1);
-      const init = fetchSpy.mock.calls[0]?.[1];
-      expect(JSON.parse(String(init?.body))).toEqual({ x: 9, y: 9 });
+      expect(bodyOf(fetchSpy.mock.calls[0])).toEqual({
+        "user-model": { x: 9, y: 9 },
+      });
     } finally {
       vi.useRealTimers();
     }

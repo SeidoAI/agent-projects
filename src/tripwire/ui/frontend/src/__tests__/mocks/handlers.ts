@@ -72,17 +72,15 @@ export const defaultHandlers = [
   http.get("/api/projects/:pid/refs/reverse/:nid", ({ params }) =>
     HttpResponse.json(makeReverseRefs({ node_id: String(params.nid) })),
   ),
-  // KUI-104 — Concept Graph layout persistence. Default returns the
-  // node detail with the supplied (x, y) so tests don't need a
-  // bespoke handler just to round-trip the PATCH the canvas emits
-  // after d3-force seeding settles.
-  http.patch("/api/projects/:pid/nodes/:nid/layout", async ({ request, params }) => {
-    const body = (await request.json()) as { x: number; y: number };
-    return HttpResponse.json(makeNodeDetail({ id: String(params.nid), layout: body }));
-  }),
-
   // Graph
   http.get("/api/projects/:pid/graph/concept", () => HttpResponse.json(makeEmptyGraph())),
+  // KUI-104 — Concept Graph layout persistence (sidecar batch). Default
+  // echoes the body back so tests don't need a bespoke handler just to
+  // round-trip the PATCH the canvas emits after d3-force seeding settles.
+  http.patch("/api/projects/:pid/graph/concept/layout", async ({ request }) => {
+    const body = (await request.json()) as Record<string, { x: number; y: number }>;
+    return HttpResponse.json({ layouts: body });
+  }),
 
   // Enums
   http.get("/api/projects/:pid/enums/:name", ({ params }) => {

@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import re
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Body, Depends, Query, Response
+from pydantic import BaseModel, ConfigDict
 
 from tripwire.ui.dependencies import ProjectContext, get_project
 from tripwire.ui.routes._common import envelope_exception
@@ -32,6 +33,22 @@ router = APIRouter(prefix="/api/projects/{project_id}/graph", tags=["graph"])
 
 _DEPTH_MAX = 10
 _FOCUS_RE = re.compile(r"^(?:[A-Z][A-Z0-9]*-\d+|[a-z][a-z0-9-]*)$")
+_NODE_SLUG_RE = re.compile(r"^[a-z][a-z0-9-]*$")
+
+
+class LayoutEntry(BaseModel):
+    """One node's persisted Concept Graph position."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    x: float
+    y: float
+
+
+class ConceptLayoutResponse(BaseModel):
+    """Response for `PATCH /graph/concept/layout`."""
+
+    layouts: dict[str, LayoutEntry]
 
 
 def _validate_focus(focus: str | None) -> None:
@@ -89,4 +106,41 @@ async def get_concept_graph(
         focus=focus,
         upstream=upstream,
         downstream=downstream,
+    )
+
+
+@router.patch("/concept/layout", response_model=ConceptLayoutResponse)
+def patch_concept_layout(
+    body: dict[str, LayoutEntry] = Body(...),  # noqa: B008
+    project: ProjectContext = Depends(get_project),  # noqa: B008
+) -> ConceptLayoutResponse:
+    """Merge a batch of `(node_id -> {x, y})` into the layout sidecar.
+
+    One HTTP call per debounced flush replaces the per-node PATCH that
+    used to write through `nodes/<id>.yaml`. The sidecar lives at
+    `.tripwire/concept-layout.json` so the file watcher does not classify
+    these writes as node changes — see `core/concept_layout.py`.
+
+    Sync `def` (not `async def`) so FastAPI runs the route on its
+    threadpool: the merge does sync filesystem I/O under a `flock`, and
+    blocking the event loop is what made the original layout PATCH starve
+    unrelated requests.
+    """
+    for node_id in body:
+        if not _NODE_SLUG_RE.match(node_id):
+            raise envelope_exception(
+                400,
+                code="node/bad_slug",
+                detail=(
+                    f"Layout key {node_id!r} is not a valid node slug "
+                    f"(lowercase letter first, then alphanumerics or hyphens)."
+                ),
+            )
+
+    from tripwire.core.concept_layout import merge_concept_layouts
+
+    updates = {nid: (entry.x, entry.y) for nid, entry in body.items()}
+    merged = merge_concept_layouts(project.project_dir, updates)
+    return ConceptLayoutResponse(
+        layouts={nid: LayoutEntry(x=x, y=y) for nid, (x, y) in merged.items()}
     )

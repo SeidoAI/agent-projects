@@ -17,11 +17,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from tripwire.core import graph_cache
 from tripwire.core.freshness import check_node_freshness
 from tripwire.core.node_store import list_nodes as _core_list_nodes
-from tripwire.core.node_store import load_node, save_node
+from tripwire.core.node_store import load_node
 from tripwire.core.store import ProjectNotFoundError, load_project
 from tripwire.models.graph import FreshnessStatus
 from tripwire.models.node import NODE_ID_PATTERN
-from tripwire.models.node import NodeLayout as ModelNodeLayout
 
 logger = logging.getLogger("tripwire.ui.services.node_service")
 
@@ -306,23 +305,6 @@ def get_node(project_dir: Path, node_id: str) -> NodeDetail:
     )
 
 
-def update_node_layout(
-    project_dir: Path, node_id: str, *, x: float, y: float
-) -> NodeDetail:
-    """Persist a node's Concept Graph (x, y) and return the updated detail.
-
-    The graph canvas calls this once per node after the d3-force seeding
-    settles. Subsequent loads read the stored layout and skip the
-    simulation. Wraps :func:`tripwire.core.node_store.save_node` so the
-    graph cache invalidates automatically.
-    """
-    _require_valid_id(node_id)
-    node = load_node(project_dir, node_id)
-    node.layout = ModelNodeLayout(x=x, y=y)
-    save_node(project_dir, node)
-    return get_node(project_dir, node_id)
-
-
 def check_all_freshness(project_dir: Path) -> FreshnessReport:
     """Live freshness check across every active node with a source.
 
@@ -397,5 +379,4 @@ __all__ = [
     "get_node",
     "list_nodes",
     "reverse_refs",
-    "update_node_layout",
 ]

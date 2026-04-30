@@ -44,11 +44,13 @@ class NodeSource(BaseModel):
 
 
 class NodeLayout(BaseModel):
-    """Persisted (x, y) position used by the Concept Graph canvas (KUI-104).
+    """Deprecated — Concept Graph positions live in `.tripwire/concept-layout.json`.
 
-    First page-load runs d3-force on the client and PATCHes the resting
-    position back to each node's YAML. Subsequent loads read the stored
-    layout and skip the simulation, so reloads don't re-shuffle.
+    Retained on :class:`ConceptNode` for backward parsing only: any node
+    YAML still carrying a `layout: {x, y}` key from before the sidecar
+    migration continues to load. Nothing reads or writes this field after
+    `core.concept_layout.bootstrap_from_yaml_if_absent` has run; the
+    orphan key in YAML is harmless and gets ignored.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -78,8 +80,8 @@ class ConceptNode(BaseModel):
 
     source: NodeSource | None = None
 
-    # Persisted Concept Graph canvas position (KUI-104). Optional —
-    # nodes without a layout get fresh d3-force seeding on first load.
+    # Deprecated: layout moved to `.tripwire/concept-layout.json`. Field
+    # is retained so node YAMLs written before the migration still parse.
     layout: NodeLayout | None = None
 
     related: list[str] = Field(default_factory=list)

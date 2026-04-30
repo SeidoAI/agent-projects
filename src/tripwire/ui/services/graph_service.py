@@ -378,27 +378,22 @@ def build_dependency_graph(
 
 
 def _saved_layouts(project_dir: Path) -> dict[str, tuple[float, float]]:
-    """Read every node's persisted (x, y) layout for the canvas (KUI-104).
+    """Read persisted (x, y) layouts from the project's layout sidecar.
 
-    Returns an empty dict when the nodes dir is missing or unreadable —
-    callers fall back to the layered BFS positions.
+    Sidecar lives at `.tripwire/concept-layout.json` (see
+    `core/concept_layout.py`). On first read after upgrade we lift any
+    pre-existing `node.layout` values out of node YAMLs into the sidecar;
+    subsequent reads ignore the YAML field. Returns an empty dict when
+    the sidecar is missing or corrupt — callers fall back to the layered
+    BFS positions.
     """
-    from tripwire.core.node_store import list_nodes as _list_nodes
-    from tripwire.core.paths import nodes_dir
+    from tripwire.core.concept_layout import (
+        bootstrap_from_yaml_if_absent,
+        load_concept_layouts,
+    )
 
-    if not nodes_dir(project_dir).is_dir():
-        return {}
-    out: dict[str, tuple[float, float]] = {}
-    try:
-        for node in _list_nodes(project_dir):
-            if node.layout is not None:
-                out[node.id] = (node.layout.x, node.layout.y)
-    except (OSError, ValueError) as exc:
-        # Best effort — a malformed node YAML or unreadable file
-        # shouldn't prevent the graph from rendering. Fall back to
-        # the layered BFS positions for any unreadable layouts.
-        logger.warning("graph_service: failed to read saved layouts: %s", exc)
-    return out
+    bootstrap_from_yaml_if_absent(project_dir)
+    return load_concept_layouts(project_dir)
 
 
 def build_concept_graph(
@@ -410,10 +405,11 @@ def build_concept_graph(
 ) -> ReactFlowGraph:
     """Build the full concept graph (issues + nodes + all edge types).
 
-    Per KUI-104, individual concept-node files may carry a persisted
-    ``layout: {x, y}``. When present, that overrides the deterministic
-    layered BFS so the canvas reuses the user-blessed position from
-    the previous d3-force run instead of re-shuffling on every reload.
+    Per KUI-104, the canvas remembers per-node `(x, y)` positions across
+    reloads via `.tripwire/concept-layout.json`. When a position is in the
+    sidecar it overrides the deterministic layered BFS so the canvas
+    reuses the user-blessed position from the previous d3-force run
+    instead of re-shuffling on every reload.
     """
     result: FullGraphResult = build_full_graph(project_dir)
 

@@ -1,10 +1,11 @@
-"""Unit tests for the optional `layout: {x, y}` field on ConceptNode (KUI-104).
+"""Backward-parsing tests for the deprecated ConceptNode.layout field (KUI-104).
 
-The Concept Graph screen seeds positions with d3-force on first load, then
-persists each node's resting (x, y) into its YAML so a reload uses the
-stored layout instead of re-running the force simulation. This module
-covers the schema half of that round trip; the route-level half lives in
-`tests/ui/routes/test_nodes_routes.py::TestPatchLayout`.
+Concept Graph positions live in `.tripwire/concept-layout.json` — see
+`tests/unit/core/test_concept_layout.py`. The `layout: {x, y}` key on
+:class:`ConceptNode` is retained so node YAMLs written before the
+sidecar migration still parse; this module pins that backward-compat
+surface down. Nothing in the running app reads or writes the YAML field
+after `core.concept_layout.bootstrap_from_yaml_if_absent` has run.
 """
 
 from __future__ import annotations
