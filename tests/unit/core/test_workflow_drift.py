@@ -200,9 +200,7 @@ def test_cli_drift_report_runs_clean(tmp_path: Path) -> None:
 
     pd = _project_dir(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(
-        drift_cmd, ["report", "--project-dir", str(pd)]
-    )
+    result = runner.invoke(drift_cmd, ["findings", "--project-dir", str(pd)])
     assert result.exit_code == 0, result.output
     # Empty drift = "clean" output.
     assert "no drift" in result.output.lower() or result.output.strip() == ""
@@ -222,9 +220,7 @@ def test_cli_drift_report_surfaces_findings(tmp_path: Path) -> None:
         details={"from_station": "queued", "to_station": "executing"},
     )
     runner = CliRunner()
-    result = runner.invoke(
-        drift_cmd, ["report", "--project-dir", str(pd)]
-    )
+    result = runner.invoke(drift_cmd, ["findings", "--project-dir", str(pd)])
     assert result.exit_code != 0
     # The CLI must mention the drift code(s) so the agent can act.
     assert "drift/prompt_check_missing" in result.output
@@ -248,6 +244,6 @@ def test_cli_drift_report_filters_by_instance(tmp_path: Path) -> None:
     # Filter to a clean instance — no findings.
     result = runner.invoke(
         drift_cmd,
-        ["report", "--project-dir", str(pd), "--instance", "clean"],
+        ["findings", "--project-dir", str(pd), "--instance", "clean"],
     )
     assert result.exit_code == 0

@@ -123,6 +123,7 @@ cli.add_command(workspace_cmd)
 cli.add_command(tripwires_cmd)
 cli.add_command(events_cmd)
 cli.add_command(transition_cmd)
+cli.add_command(drift_cmd)
 
 
 if __name__ == "__main__":
