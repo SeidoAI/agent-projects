@@ -14,7 +14,9 @@ function isActionable(session: SessionSummary, statusIndex: Map<string, string>)
   if (session.blocked_by_sessions.length === 0) return true;
   return session.blocked_by_sessions.every((blocker) => {
     const s = statusIndex.get(blocker);
-    return s === "completed" || s === "reviewing";
+    // SessionStatus values: blockers count as "done from this session's
+    // perspective" once they're completed/verified or in review.
+    return s === "completed" || s === "verified" || s === "in_review";
   });
 }
 
