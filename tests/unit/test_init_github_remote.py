@@ -19,9 +19,9 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from tripwire.cli import init as init_module
 from tripwire.cli.init import init_cmd
 from tripwire.core import github_client
+from tripwire.core import init_github as init_module
 
 # ============================================================================
 # Helpers
