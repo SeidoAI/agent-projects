@@ -29,6 +29,27 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 
+# Init-time helpers (template tree, GitHub, workspace) live in core/.
+# These are aliased under the underscore names init_cmd already calls;
+# on ValueError surface as InitError (preserves the original CLI UX).
+from tripwire.core.init_github import (
+    git_init as _git_init_core,
+)
+from tripwire.core.init_github import (
+    record_repo_url_in_project_yaml as _record_repo_url_in_project_yaml,
+)
+from tripwire.core.init_github import (
+    resolve_github_target as _resolve_github_target_core,
+)
+from tripwire.core.init_github import (
+    setup_github_remote as _setup_github_remote_core,
+)
+from tripwire.core.init_templates import (
+    copy_templates as _copy_templates_core,
+)
+from tripwire.core.init_templates import (
+    create_project_dirs as _create_project_dirs,
+)
 from tripwire.templates import get_templates_dir
 
 KEY_PREFIX_PATTERN = re.compile(r"^[A-Z][A-Z0-9]*$")
@@ -226,16 +247,6 @@ def _extract_key_prefix(name: str) -> str | None:
     return prefix
 
 
-# Template-tree copy + Jinja rendering live in core/init_templates.py.
-# Aliased under the underscore names that init_cmd already calls.
-from tripwire.core.init_templates import (
-    copy_templates as _copy_templates_core,
-)
-from tripwire.core.init_templates import (
-    create_project_dirs as _create_project_dirs,
-)
-
-
 def _copy_templates(
     templates_dir: Path, target_dir: Path, context: dict[str, Any]
 ) -> list[Path]:
@@ -244,28 +255,6 @@ def _copy_templates(
         return _copy_templates_core(templates_dir, target_dir, context)
     except ValueError as exc:
         raise InitError(str(exc)) from exc
-
-
-# ============================================================================
-# Git init
-# ============================================================================
-
-
-# Git + GitHub remote setup (v0.7.6 §2.A) lives in core/init_github.py.
-# Import the public-named versions and alias them under the underscore
-# names that init_cmd already calls; on ValueError surface as InitError.
-from tripwire.core.init_github import (
-    git_init as _git_init_core,
-)
-from tripwire.core.init_github import (
-    record_repo_url_in_project_yaml as _record_repo_url_in_project_yaml,
-)
-from tripwire.core.init_github import (
-    resolve_github_target as _resolve_github_target_core,
-)
-from tripwire.core.init_github import (
-    setup_github_remote as _setup_github_remote_core,
-)
 
 
 def _git_init(target_dir: Path) -> None:

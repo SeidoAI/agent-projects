@@ -2412,35 +2412,16 @@ def check_pm_response_followups_resolve(
     return results
 
 
+# ALL_CHECKS is built from themed groupings in `validator/checks/`.
+# Each constant there (IDENTITY_CHECKS, ENUM_CHECKS, etc.) groups
+# related check functions; the aggregator concatenates them in the
+# canonical run order so finding output ordering stays byte-stable.
+# The function bodies still live in this file — physical per-file
+# extraction is a future cycle.
+from tripwire.core.validator.checks import ALL_CHECKS as _THEMED_CHECKS  # noqa: E402
+
 ALL_CHECKS = [
-    check_uuid_present,
-    check_id_format,
-    check_enum_values,
-    check_reference_integrity,
-    check_bidirectional_related,
-    check_issue_body_structure,
-    check_status_transitions,
-    check_freshness,
-    check_manifest_schema,
-    check_manifest_phase_ownership_consistent,
-    check_artifact_presence,
-    check_id_collisions,
-    check_sequence_drift,
-    check_timestamps,
-    check_comment_provenance,
-    check_project_standards,
-    check_coverage_heuristics,
-    check_phase_requirements,
-    check_handoff_artifact,
-    check_quality_consistency,
-    check_session_issue_coherence,
-    check_issue_artifact_presence,
-    # KUI-86 (§A3) added these two as in-file functions; they need access
-    # to ``session_review_artifacts.parse_*`` helpers and the new
-    # pm-response.yaml format. Keep them here rather than splitting into
-    # the lint dir so the merge with main stays minimal.
-    check_pm_response_covers_self_review,
-    check_pm_response_followups_resolve,
+    *_THEMED_CHECKS,
     # KUI-89 (§A9) — project-state lint rules under ``./lint/``.
     *LINT_CHECKS,
 ]

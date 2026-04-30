@@ -25,7 +25,6 @@ import subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import click
 from rich.console import Console
@@ -44,8 +43,29 @@ from tripwire.core.session_check import (
     strict_check,
 )
 from tripwire.core.session_readiness import check_readiness
+from tripwire.core.session_review_writer import (
+    gather_pr_files as _gather_pr_files,
+)
+from tripwire.core.session_review_writer import (
+    gather_pr_number as _gather_pr_number,
+)
+from tripwire.core.session_review_writer import (
+    render_verified_md as _render_verified_md,  # noqa: F401  — re-exported for tests
+)
+from tripwire.core.session_review_writer import (
+    write_review_json as _write_review_json,
+)
+from tripwire.core.session_review_writer import (
+    write_verified_for_session as _write_verified_for_session,
+)
 from tripwire.core.session_store import list_sessions, load_session, save_session
 from tripwire.core.task_checklist import parse_task_checklist
+from tripwire.core.tripwire_state import (
+    record_bypass as _record_tripwire_bypass,
+)
+from tripwire.core.tripwire_state import (
+    write_ack_marker as _write_ack_marker_core,
+)
 from tripwire.models.enums import SessionStatus
 from tripwire.models.session import EngagementEntry
 
@@ -1900,12 +1920,6 @@ def session_complete_cmd(
         )
 
 
-from tripwire.core.tripwire_state import (
-    record_bypass as _record_tripwire_bypass,
-    write_ack_marker as _write_ack_marker_core,
-)
-
-
 def _write_tripwire_ack(
     *,
     project_dir: Path,
@@ -1930,14 +1944,6 @@ def _write_tripwire_ack(
 # ----------------------------------------------------------------------------
 # `tripwire session review` — PR diff vs. issue specs
 # ----------------------------------------------------------------------------
-
-
-from tripwire.core.session_review_writer import (
-    gather_pr_files as _gather_pr_files,
-    gather_pr_number as _gather_pr_number,
-    render_verified_md as _render_verified_md,  # noqa: F401  — re-exported for tests
-    write_verified_for_session as _write_verified_for_session,
-)
 
 
 @session_cmd.command("review")
@@ -2094,11 +2100,6 @@ def session_review_cmd(
     _write_review_json(resolved, session, report)
 
     raise click.exceptions.Exit(report.exit_code)
-
-
-from tripwire.core.session_review_writer import (
-    write_review_json as _write_review_json,
-)
 
 
 # ----------------------------------------------------------------------------
