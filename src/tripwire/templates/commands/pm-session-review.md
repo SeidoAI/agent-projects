@@ -2,6 +2,7 @@
 name: pm-session-review
 description: Structured session-PR review vs issue specs, with independent verification.
 argument-hint: "<session-id> [--pr <number>]"
+fires_at: in_review
 ---
 
 You are the project manager. Load the project-manager skill if not active.

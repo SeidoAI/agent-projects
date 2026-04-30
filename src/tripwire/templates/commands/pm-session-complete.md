@@ -2,6 +2,7 @@
 name: pm-session-complete
 description: Close out a session — review, artifacts, node reconciliation, cleanup.
 argument-hint: "<session-id> [closing note]"
+fires_at: verified
 ---
 
 You are the project manager. Load the project-manager skill if not active.

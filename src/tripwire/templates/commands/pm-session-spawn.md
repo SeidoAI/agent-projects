@@ -2,6 +2,7 @@
 name: pm-session-spawn
 description: Spawn a queued session locally via Claude Code subprocess.
 argument-hint: "<session-id>"
+fires_at: executing
 ---
 
 You are the project manager. Load the project-manager skill if not
