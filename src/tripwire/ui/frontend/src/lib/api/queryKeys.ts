@@ -48,6 +48,13 @@ export const queryKeys = {
   workflow: (pid: string) => ["projects", pid, "workflow"] as const,
   events: (pid: string, params: object) => ["projects", pid, "events", params] as const,
 
+  // v0.9 — workflow events log (KUI-155, KUI-156). Distinct from
+  // `events` above (v0.8 emitter); reads the v0.9 events log.
+  workflowEvents: (pid: string, params: object) =>
+    ["projects", pid, "workflow-events", params] as const,
+  workflowStats: (pid: string, params: object) =>
+    ["projects", pid, "workflow-stats", params] as const,
+
   // v2 (declared but unused in v1 — placeholder to avoid churn later)
   containers: () => ["containers"] as const,
   messages: (sid: string) => ["messages", sid] as const,

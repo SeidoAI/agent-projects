@@ -97,6 +97,14 @@ export const defaultHandlers = [
   ),
   http.get("/api/projects/:pid/events", () => HttpResponse.json({ events: [], next_cursor: null })),
 
+  // v0.9 — workflow events log + stats (KUI-155, KUI-156).
+  http.get("/api/projects/:pid/workflow-events", () =>
+    HttpResponse.json({ events: [], total: 0 }),
+  ),
+  http.get("/api/projects/:pid/workflow-stats", () =>
+    HttpResponse.json({ total: 0, by_kind: {}, by_instance: {}, top_rules: [] }),
+  ),
+
   // Artifacts
   http.get("/api/projects/:pid/artifact-manifest", () => HttpResponse.json(makeArtifactManifest())),
   http.get("/api/projects/:pid/sessions/:sid/artifacts", () =>

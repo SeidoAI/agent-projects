@@ -3,10 +3,12 @@ import { createBrowserRouter } from "react-router-dom";
 import { StandaloneArtifactViewer } from "@/features/artifacts/StandaloneArtifactViewer";
 import { Board } from "@/features/board/Board";
 import { ProjectDashboard } from "@/features/dashboard/ProjectDashboard";
+import { EventLog } from "@/features/events/EventLog";
 import { ConceptGraph } from "@/features/graph/ConceptGraph";
 import { IssueDetail } from "@/features/issues/IssueDetail";
 import { LiveMonitor } from "@/features/live/LiveMonitor";
 import { NodeDetail } from "@/features/nodes/NodeDetail";
+import { ProcessQuality } from "@/features/process-quality/ProcessQuality";
 import { SessionDetail } from "@/features/sessions/SessionDetail";
 import { SessionList } from "@/features/sessions/SessionList";
 import { WorkflowMap } from "@/features/workflow/WorkflowMap";
@@ -31,6 +33,8 @@ export const router = createBrowserRouter([
         element: <StandaloneArtifactViewer />,
       },
       { path: "workflow", element: <WorkflowMap /> },
+      { path: "events", element: <EventLog /> },
+      { path: "process-quality", element: <ProcessQuality /> },
       { path: "sessions/:sid/live", element: <LiveMonitor /> },
     ],
   },
