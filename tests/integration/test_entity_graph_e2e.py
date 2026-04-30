@@ -221,9 +221,7 @@ def test_pin_staleness_fires_when_target_contract_advances(tmp_path: Path) -> No
 
     after = validate_project(proj, strict=False, fix=False)
     stale = [
-        f
-        for f in [*after.errors, *after.warnings]
-        if f.code == "references/stale_pin"
+        f for f in [*after.errors, *after.warnings] if f.code == "references/stale_pin"
     ]
     assert len(stale) == 1
     assert "auth-system" in stale[0].message

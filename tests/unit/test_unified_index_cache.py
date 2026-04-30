@@ -45,7 +45,9 @@ def _make_issue(project_dir: Path, key: str, body: str = "") -> None:
     save_issue(project_dir, issue, update_cache=False)
 
 
-def _write_session(project_dir: Path, sid: str, *, agent: str, issues: list[str], body: str = "") -> None:
+def _write_session(
+    project_dir: Path, sid: str, *, agent: str, issues: list[str], body: str = ""
+) -> None:
     sdir = project_dir / "sessions" / sid
     sdir.mkdir(parents=True, exist_ok=True)
     fm = {
@@ -162,9 +164,7 @@ def test_unified_index_returns_session_when_querying_downstream_of_issue(
 ) -> None:
     _make_project(tmp_path)
     _make_issue(tmp_path, "TST-1")
-    _write_session(
-        tmp_path, "session-cross", agent="developer", issues=["TST-1"]
-    )
+    _write_session(tmp_path, "session-cross", agent="developer", issues=["TST-1"])
 
     cache = full_rebuild(tmp_path)
     idx = UnifiedIndex(project_dir=tmp_path, cache=cache)

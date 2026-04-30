@@ -28,7 +28,6 @@ from typing import Any
 
 import yaml
 
-from tripwire.core import paths
 from tripwire.core.graph import refs as graph_refs
 from tripwire.core.validator import load_context, validate_project
 
@@ -70,7 +69,7 @@ def compute_coherence(project_dir: Path) -> CoherenceReport:
     # drift report just rolls up the counts.
     try:
         report = validate_project(project_dir, strict=False, fix=False)
-    except Exception:  # noqa: BLE001
+    except Exception:
         # Validator failure shouldn't fail drift reporting outright.
         report = None
 
@@ -112,7 +111,7 @@ def _count_stale_concepts(project_dir: Path) -> int:
 
     try:
         ctx = load_context(project_dir)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return 0
 
     count = 0
@@ -122,7 +121,7 @@ def _count_stale_concepts(project_dir: Path) -> int:
             continue
         try:
             result = compute_freshness(project_dir, node)
-        except Exception:  # noqa: BLE001
+        except Exception:
             continue
         if result.status == FreshnessStatus.STALE:
             count += 1
@@ -135,9 +134,7 @@ def _count_workflow_drift_events(project_dir: Path) -> int:
     if not log_path.is_file():
         return 0
 
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(
-        days=WORKFLOW_DRIFT_WINDOW_DAYS
-    )
+    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=WORKFLOW_DRIFT_WINDOW_DAYS)
 
     count = 0
     try:
@@ -171,8 +168,8 @@ def _count_workflow_drift_events(project_dir: Path) -> int:
 
 
 __all__ = [
-    "CoherenceReport",
     "WEIGHTS",
+    "CoherenceReport",
     "compute_coherence",
 ]
 

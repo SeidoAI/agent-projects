@@ -6,7 +6,7 @@ Moved in v0.9 (KUI-131). New code should import from
 
 from __future__ import annotations
 
-from tripwire.core.graph.refs import *  # noqa: F401,F403
+from tripwire.core.graph.refs import *  # noqa: F403
 from tripwire.core.graph.refs import (  # noqa: F401
     FENCE_PATTERN,
     REFERENCE_PATTERN,

@@ -167,7 +167,7 @@ def _apply_update(
         node_id=node.id,
         status=FreshnessStatus.FRESH,
         detail=(
-            f"updated content_hash"
+            "updated content_hash"
             + (f"; version bumped to v{refreshed.version}" if bump_contract else "")
         ),
         current_hash=new_hash,

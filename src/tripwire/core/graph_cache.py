@@ -8,7 +8,7 @@ existing call sites — `from tripwire.core.graph_cache import …` and
 
 from __future__ import annotations
 
-from tripwire.core.graph.cache import *  # noqa: F401,F403
+from tripwire.core.graph.cache import *  # noqa: F403
 from tripwire.core.graph.cache import (  # noqa: F401
     CACHE_VERSION,
     COMMENTS_SUBDIR,

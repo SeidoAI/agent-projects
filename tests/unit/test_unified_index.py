@@ -172,11 +172,11 @@ class TestUnifiedIndexFacade:
         )
         # upstream of KUI-1: things KUI-1 references / depends on
         # => user-model, KUI-2
-        up = {n for n in idx.upstream("KUI-1")}
+        up = set(idx.upstream("KUI-1"))
         assert up == {"user-model", "KUI-2"}
         # downstream of KUI-1: things that point at KUI-1
         # => KUI-3 (implements)
-        down = {n for n in idx.downstream("KUI-1")}
+        down = set(idx.downstream("KUI-1"))
         assert down == {"KUI-3"}
 
     def test_upstream_with_kind_filter(self):
@@ -186,7 +186,7 @@ class TestUnifiedIndexFacade:
         )
         # KUI-1 has refs (-> user-model) and depends_on (-> KUI-2).
         # Filter to refs only.
-        up = {n for n in idx.upstream("KUI-1", kinds=["refs"])}
+        up = set(idx.upstream("KUI-1", kinds=["refs"]))
         assert up == {"user-model"}
 
     def test_distance_2_transitive_closure(self):
@@ -195,9 +195,7 @@ class TestUnifiedIndexFacade:
             GraphEdge(from_id="A", to_id="B", type="references"),
             GraphEdge(from_id="B", to_id="C", type="references"),
         ]
-        idx = graph_index.UnifiedIndex(
-            project_dir=Path("/tmp/proj"), cache=cache
-        )
+        idx = graph_index.UnifiedIndex(project_dir=Path("/tmp/proj"), cache=cache)
         up_d1 = set(idx.upstream("A", distance=1))
         up_d2 = set(idx.upstream("A", distance=2))
         assert up_d1 == {"B"}

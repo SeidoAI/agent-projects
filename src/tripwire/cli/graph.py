@@ -21,7 +21,6 @@ which is a thin facade over the cache (`graph/index.yaml`).
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import click
@@ -40,7 +39,6 @@ from tripwire.core.store import (
     list_issues,
     load_project,
 )
-
 
 # ---------------------------------------------------------------------------
 # Top-level group
@@ -199,9 +197,7 @@ def render_cmd(
         raise click.ClickException(str(exc)) from exc
 
     if upstream_id and downstream_id:
-        raise click.ClickException(
-            "Cannot specify both --upstream and --downstream."
-        )
+        raise click.ClickException("Cannot specify both --upstream and --downstream.")
 
     rendered = _render(
         resolved,
@@ -341,9 +337,7 @@ def _run_query(
     ensure_fresh(resolved)
 
     idx = graph_index.load(resolved)
-    kind_list = (
-        [k.strip() for k in kinds.split(",") if k.strip()] if kinds else None
-    )
+    kind_list = [k.strip() for k in kinds.split(",") if k.strip()] if kinds else None
 
     if direction == "upstream":
         ids = idx.upstream(node_id, kinds=kind_list, distance=distance)
@@ -352,11 +346,7 @@ def _run_query(
 
     if node_types:
         wanted_types = {t.strip() for t in node_types.split(",") if t.strip()}
-        ids = [
-            i
-            for i in ids
-            if _node_kind_for(idx, i) in wanted_types
-        ]
+        ids = [i for i in ids if _node_kind_for(idx, i) in wanted_types]
 
     payload = {"id": node_id, "direction": direction, "ids": ids}
     if output_format == "json":

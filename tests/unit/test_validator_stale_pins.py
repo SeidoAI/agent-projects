@@ -13,8 +13,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from tripwire.core.validator._types import LoadedEntity, ValidationContext
 from tripwire.core.validator.checks.references import check_no_stale_pins
 from tripwire.models import ConceptNode, Issue

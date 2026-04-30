@@ -39,8 +39,8 @@ from typing import TYPE_CHECKING
 import yaml
 
 from tripwire.core import paths
-from tripwire.core.parser import parse_frontmatter_body
 from tripwire.core.graph.refs import extract_references
+from tripwire.core.parser import parse_frontmatter_body
 from tripwire.models.graph import FileFingerprint, GraphEdge, GraphIndex
 from tripwire.models.issue import Issue
 from tripwire.models.node import ConceptNode
@@ -543,9 +543,7 @@ def _load_session_file(
     return issues, body
 
 
-def _load_comment_file(
-    project_dir: Path, rel_path: str
-) -> tuple[str, str] | None:
+def _load_comment_file(project_dir: Path, rel_path: str) -> tuple[str, str] | None:
     """Parse a comment file. Returns (issue_key, body) or None."""
     abs_path = project_dir / rel_path
     if not abs_path.exists():
@@ -689,9 +687,7 @@ def full_rebuild(project_dir: Path) -> GraphIndex:
                     continue
                 issues, body = parsed_sess
                 cache.files[rel_path] = _fingerprint_session(abs_path, body)
-                cache.edges.extend(
-                    _session_edges(sdir.name, rel_path, issues, body)
-                )
+                cache.edges.extend(_session_edges(sdir.name, rel_path, issues, body))
 
         # Pass 4: comment files (KUI-132 / A7)
         if issues_root.is_dir():
@@ -782,9 +778,7 @@ def update_cache_for_file(project_dir: Path, rel_path: str) -> bool:
                     sid = session_id_from_rel_path(rel_path)
                     if sid is not None:
                         cache.files[rel_path] = _fingerprint_session(abs_path, body)
-                        cache.edges.extend(
-                            _session_edges(sid, rel_path, issues, body)
-                        )
+                        cache.edges.extend(_session_edges(sid, rel_path, issues, body))
             elif kind == "comment":
                 parsed_cmt = _load_comment_file(project_dir, rel_path)
                 if parsed_cmt is not None:

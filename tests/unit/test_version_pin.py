@@ -22,7 +22,6 @@ from tripwire.models import (
     RepoEntry,
 )
 
-
 # ---------------------------------------------------------------------------
 # Version field — every entity defaults to 1
 # ---------------------------------------------------------------------------
@@ -137,11 +136,7 @@ def test_extract_references_with_pins():
 
 
 def test_extract_references_with_pins_skips_code_blocks():
-    body = (
-        "Inline [[user-model@v3]].\n"
-        "```\n[[ignored@v9]]\n```\n"
-        "After [[other@v1]].\n"
-    )
+    body = "Inline [[user-model@v3]].\n```\n[[ignored@v9]]\n```\nAfter [[other@v1]].\n"
     pairs = graph_refs.extract_references_with_pins(body)
     assert pairs == [
         ("user-model", 3),

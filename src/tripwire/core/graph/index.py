@@ -27,7 +27,6 @@ from tripwire.core.graph import cache as graph_cache
 from tripwire.core.graph import edges as graph_edges
 from tripwire.models.graph import EdgeKind, GraphEdge, GraphIndex
 
-
 # ---------------------------------------------------------------------------
 # Legacy → canonical edge-kind mapping
 # ---------------------------------------------------------------------------
@@ -155,9 +154,7 @@ class UnifiedIndex:
 
     # -- internal ---------------------------------------------------------
 
-    def _outgoing_adjacency(
-        self, kinds: Iterable[str] | None
-    ) -> dict[str, list[str]]:
+    def _outgoing_adjacency(self, kinds: Iterable[str] | None) -> dict[str, list[str]]:
         adj: dict[str, list[str]] = defaultdict(list)
         wanted = set(kinds) if kinds else None
         for e in self._cache.edges:
@@ -166,9 +163,7 @@ class UnifiedIndex:
             adj[e.from_id].append(e.to_id)
         return adj
 
-    def _incoming_adjacency(
-        self, kinds: Iterable[str] | None
-    ) -> dict[str, list[str]]:
+    def _incoming_adjacency(self, kinds: Iterable[str] | None) -> dict[str, list[str]]:
         adj: dict[str, list[str]] = defaultdict(list)
         wanted = set(kinds) if kinds else None
         for e in self._cache.edges:
