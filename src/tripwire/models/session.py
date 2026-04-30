@@ -181,6 +181,13 @@ class AgentSession(BaseModel):
     # arrive.
     current_state: str | None = None
 
+    # KUI-159: workflow station-instance id, format
+    # `{workflow}:{instance}:{station}:{n}`. Written by the
+    # `tripwire transition` gate runner each time the session enters a
+    # new station; absent when the session was created before the
+    # workflow runtime existed (transitions back-fill it on first run).
+    current_station_instance: str | None = None
+
     # Per-session orchestration override. None means use the project default.
     orchestration: SessionOrchestration | None = None
 

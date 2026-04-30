@@ -12,10 +12,11 @@ lockfile under ``.tripwire/locks/transition-<sid>.lock``.
 
 from __future__ import annotations
 
-import json
+import subprocess
 from pathlib import Path
 from textwrap import dedent
 
+import pytest
 from click.testing import CliRunner
 
 
@@ -54,6 +55,7 @@ def _project_dir(tmp_path: Path) -> Path:
     sessions_dir = tmp_path / "sessions" / "test-session"
     sessions_dir.mkdir(parents=True)
     (sessions_dir / "session.yaml").write_text(
+        "---\n"
         "uuid: 11111111-1111-4111-8111-111111111111\n"
         "id: test-session\n"
         "name: Test session\n"
@@ -62,13 +64,54 @@ def _project_dir(tmp_path: Path) -> Path:
         "repos: []\n"
         "status: planned\n"
         "created_at: 2026-04-30T00:00:00Z\n"
-        "updated_at: 2026-04-30T00:00:00Z\n",
+        "updated_at: 2026-04-30T00:00:00Z\n"
+        "---\n",
         encoding="utf-8",
     )
+    # Init git so lint rules that consult origin/main don't fail the
+    # transition gate's validate step. Skip the test if git is missing.
+    try:
+        subprocess.run(
+            ["git", "init", "-q", "--initial-branch=main", str(tmp_path)],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "config", "user.email", "test@test"],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "config", "user.name", "test"],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "add", "-A"],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(tmp_path), "commit", "-q", "-m", "init"],
+            check=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        pytest.skip("git not available")
     return tmp_path
 
 
-def test_transition_pass_path_advances_session(tmp_path: Path) -> None:
+@pytest.fixture
+def clean_validator(monkeypatch):
+    """Patch ``validate_project`` to return a clean report so happy-path
+    tests aren't subject to the lint rules' offline-mode warnings about
+    ``origin/main`` (those fire any time the project tracking repo isn't
+    fetched, which test fixtures aren't)."""
+    from tripwire.core.validator._types import ValidationReport
+
+    def _clean(*args, **kwargs):
+        return ValidationReport(exit_code=0, errors=[], warnings=[])
+
+    monkeypatch.setattr("tripwire.cli.transition.validate_project", _clean)
+    return _clean
+
+
+def test_transition_pass_path_advances_session(tmp_path: Path, clean_validator) -> None:
     """Happy path: gate passes, session.status flips, transition.completed
     emitted, station-instance id written."""
     from tripwire.cli.transition import transition_cmd
@@ -124,7 +167,9 @@ def test_transition_rejects_disallowed_target(tmp_path: Path) -> None:
     assert rows[0]["details"]["reason"].startswith("transition_not_reachable")
 
 
-def test_transition_increments_station_instance_n(tmp_path: Path) -> None:
+def test_transition_increments_station_instance_n(
+    tmp_path: Path, clean_validator
+) -> None:
     """Repeat visits to a station bump the {n} suffix."""
     from tripwire.cli.transition import transition_cmd
 
@@ -169,7 +214,9 @@ def test_transition_unknown_station_errors(tmp_path: Path) -> None:
     assert "unknown station" in result.output.lower()
 
 
-def test_transition_lockfile_serialises_concurrent(tmp_path: Path) -> None:
+def test_transition_lockfile_serialises_concurrent(
+    tmp_path: Path, clean_validator
+) -> None:
     """The lockfile path must be created when the gate runs."""
     from tripwire.cli.transition import transition_cmd
 
@@ -182,7 +229,9 @@ def test_transition_lockfile_serialises_concurrent(tmp_path: Path) -> None:
     assert (pd / ".tripwire").is_dir()
 
 
-def test_transition_completed_event_carries_station_instance(tmp_path: Path) -> None:
+def test_transition_completed_event_carries_station_instance(
+    tmp_path: Path, clean_validator
+) -> None:
     from tripwire.cli.transition import transition_cmd
     from tripwire.core.events.log import read_events
 
@@ -254,7 +303,7 @@ def test_transition_uses_validate_project_for_filesystem_gate(tmp_path: Path) ->
 
 
 def test_transition_emits_requested_before_completed_or_rejected(
-    tmp_path: Path,
+    tmp_path: Path, clean_validator
 ) -> None:
     """Event ordering: `transition.requested` always precedes
     `transition.completed` or `transition.rejected` for the same call."""
