@@ -1,7 +1,8 @@
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, PanelRightClose } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { MarkdownBody } from "@/components/MarkdownBody";
+import { Button } from "@/components/ui/button";
 import { Stamp } from "@/components/ui/stamp";
 import type { ReactFlowEdge, ReactFlowNode } from "@/lib/api/endpoints/graph";
 import type { InboxItem } from "@/lib/api/endpoints/inbox";
@@ -34,6 +35,7 @@ export interface GraphRailProps {
   referencingInbox: InboxItem[];
   onSelectNeighbour: (id: string) => void;
   onOpenInboxEntry?: (entryId: string) => void;
+  onCollapse: () => void;
 }
 
 const VERSION_PREFIX = "sha256:";
@@ -46,6 +48,7 @@ export function GraphRail({
   referencingInbox,
   onSelectNeighbour,
   onOpenInboxEntry,
+  onCollapse,
 }: GraphRailProps) {
   const { data: detail, isLoading } = useNode(projectId, node?.id ?? "");
 
@@ -55,9 +58,14 @@ export function GraphRail({
         data-testid="graph-rail"
         className="flex w-80 shrink-0 flex-col items-start gap-2 border-(--color-edge) border-l bg-(--color-paper) px-5 py-4"
       >
-        <p className="font-serif text-[14px] italic text-(--color-ink-3)">
-          No concept selected. Click a node to inspect it.
-        </p>
+        <div className="flex w-full items-center justify-between">
+          <p className="font-serif text-[14px] italic text-(--color-ink-3)">
+            No concept selected.
+          </p>
+          <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse panel">
+            <PanelRightClose className="h-4 w-4" />
+          </Button>
+        </div>
       </aside>
     );
   }
@@ -89,15 +97,20 @@ export function GraphRail({
       className="flex w-80 shrink-0 flex-col gap-4 overflow-y-auto border-(--color-edge) border-l bg-(--color-paper) px-5 py-4"
     >
       <header className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Stamp tone={stale ? "tripwire" : "default"} variant="status">
-            {kind}
-          </Stamp>
-          {stale ? (
-            <Stamp tone="tripwire" variant="status">
-              stale
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Stamp tone={stale ? "tripwire" : "default"} variant="status">
+              {kind}
             </Stamp>
-          ) : null}
+            {stale ? (
+              <Stamp tone="tripwire" variant="status">
+                stale
+              </Stamp>
+            ) : null}
+          </div>
+          <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse panel">
+            <PanelRightClose className="h-4 w-4" />
+          </Button>
         </div>
         <h2 className="font-sans font-semibold text-[20px] text-(--color-ink) leading-tight tracking-[-0.01em]">
           [[{label}]]

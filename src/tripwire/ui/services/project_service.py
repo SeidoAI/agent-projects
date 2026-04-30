@@ -252,6 +252,22 @@ def reload_project_index() -> None:
 # ---------------------------------------------------------------------------
 
 
+def find_project_by_identity(name: str, key_prefix: str) -> ProjectSummary:
+    """Return the first project whose name and key_prefix match.
+
+    Tries the cached discovery first; if nothing matches, forces a rescan.
+    Raises ``KeyError`` when no match is found after rescanning.
+    """
+    for summary in list_projects():
+        if summary.name == name and summary.key_prefix == key_prefix:
+            return summary
+    reload_project_index()
+    for summary in list_projects():
+        if summary.name == name and summary.key_prefix == key_prefix:
+            return summary
+    raise KeyError(f"name={name!r} key_prefix={key_prefix!r}")
+
+
 def list_projects() -> list[ProjectSummary]:
     """Return every discovered project as a :class:`ProjectSummary`.
 

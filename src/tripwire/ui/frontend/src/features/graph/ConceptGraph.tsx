@@ -1,13 +1,15 @@
+import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { useProjectShell } from "@/app/ProjectShell";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ReactFlowNode } from "@/lib/api/endpoints/graph";
 import { type InboxItem, useInbox } from "@/lib/api/endpoints/inbox";
 import { cn } from "@/lib/utils";
 import { GraphLegend } from "./GraphLegend";
 import { GraphRail } from "./GraphRail";
-import { GraphSidebar } from "./GraphSidebar";
+import { GraphSidebar, colorForKind } from "./GraphSidebar";
 import { useConceptGraph } from "./hooks/useGraph";
 import { useGraphLayout } from "./useGraphLayout";
 import { useLayoutPersistence } from "./useLayoutPersistence";
@@ -102,6 +104,8 @@ export function ConceptGraph() {
   const { data: inbox } = useInbox(projectId);
   const persistence = useLayoutPersistence(projectId);
   const [focus, setFocus] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [railOpen, setRailOpen] = useState(true);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState(DEFAULT_CANVAS);
 
@@ -192,8 +196,8 @@ export function ConceptGraph() {
   const bbox = computeBBox(layout.positions, size);
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] grid-cols-[240px_minmax(0,1fr)_320px] bg-(--color-paper) text-(--color-ink)">
-      <header className="col-span-3 border-(--color-edge) border-b px-7 py-4">
+    <div className="flex min-h-full flex-col bg-(--color-paper) text-(--color-ink)">
+      <header className="border-(--color-edge) border-b px-7 py-4">
         <div className="font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
           chapter 05 · concept graph
         </div>
@@ -204,8 +208,30 @@ export function ConceptGraph() {
           Every concept the team has named, who cites it, and how fresh it is.
         </p>
       </header>
+      <div className="border-(--color-edge) border-b px-7 py-3">
+        <GraphLegend />
+      </div>
 
-      <GraphSidebar graph={data} selectedId={focus} onSelect={setFocus} />
+      <div className={cn("sticky top-0 flex h-[calc(100vh-3.5rem)] min-h-0", railOpen ? "" : "")}>
+      {sidebarOpen ? (
+        <GraphSidebar
+          graph={data}
+          selectedId={focus}
+          onSelect={setFocus}
+          onCollapse={() => setSidebarOpen(false)}
+        />
+      ) : (
+        <div className="flex items-start justify-start border-(--color-edge) border-r bg-(--color-paper-2) p-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Expand panel"
+          >
+            <PanelLeftOpen className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
 
       <section
         ref={canvasRef}
@@ -214,7 +240,7 @@ export function ConceptGraph() {
         // the sidebar (PM #25 round 2 P1). The SVG below sizes to
         // the layout's bbox in pixels, so when the layout exceeds
         // the visible canvas this <section> scrolls vertically.
-        className="relative min-h-0 overflow-auto bg-(--color-paper-2)"
+        className="relative min-h-0 flex-1 overflow-auto bg-(--color-paper-2)"
       >
         <svg
           role="img"
@@ -276,6 +302,8 @@ export function ConceptGraph() {
             const isNeighbour = neighbours.has(node.id);
             const dim = focus !== null && !isFocus && !isNeighbour;
             const stale = node.data?.status === "stale";
+            const nodeType = String(node.data?.type ?? "concept");
+            const typeColor = colorForKind(nodeType);
             const r = NODE_RADIUS;
             const inboxCount = inboxByNode.get(node.id)?.length ?? 0;
             return (
@@ -289,7 +317,7 @@ export function ConceptGraph() {
                 data-focus={isFocus ? "true" : "false"}
                 data-dim={dim ? "true" : "false"}
                 opacity={dim ? 0.35 : 1}
-                style={{ cursor: "pointer", transition: "opacity 200ms ease" }}
+                style={{ cursor: "pointer", transition: "opacity 200ms ease", outline: "none" }}
                 onClick={() => setFocus(node.id)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
@@ -304,8 +332,9 @@ export function ConceptGraph() {
                   cx={pos.x}
                   cy={pos.y}
                   r={r}
-                  fill={isFocus ? "var(--color-ink)" : "var(--color-paper-2)"}
-                  stroke={stale ? "#c8861f" : "var(--color-ink)"}
+                  fill={typeColor}
+                  fillOpacity={isFocus ? 1 : 0.5}
+                  stroke={stale ? "#c8861f" : typeColor}
                   strokeWidth={isFocus ? 2.2 : stale ? 1.6 : 1.1}
                   strokeDasharray={stale ? "3 2" : "0"}
                 />
@@ -374,8 +403,6 @@ export function ConceptGraph() {
           })}
         </svg>
 
-        <GraphLegend />
-
         <div
           className={cn(
             "pointer-events-none absolute top-3 right-3 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) px-2 py-1",
@@ -386,14 +413,29 @@ export function ConceptGraph() {
         </div>
       </section>
 
-      <GraphRail
-        projectId={projectId}
-        node={focusedNode}
-        incident={incidentEdges}
-        allNodes={concepts}
-        referencingInbox={focus ? (inboxByNode.get(focus) ?? []) : []}
-        onSelectNeighbour={setFocus}
-      />
+      {railOpen ? (
+        <GraphRail
+          projectId={projectId}
+          node={focusedNode}
+          incident={incidentEdges}
+          allNodes={concepts}
+          referencingInbox={focus ? (inboxByNode.get(focus) ?? []) : []}
+          onSelectNeighbour={setFocus}
+          onCollapse={() => setRailOpen(false)}
+        />
+      ) : (
+        <div className="flex items-start justify-end border-(--color-edge) border-l bg-(--color-paper) p-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setRailOpen(true)}
+            aria-label="Expand panel"
+          >
+            <PanelRightOpen className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+      </div>
     </div>
   );
 }
