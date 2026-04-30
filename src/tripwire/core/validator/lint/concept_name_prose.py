@@ -35,9 +35,11 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
     if not ctx.nodes or not ctx.issues:
         return []
 
-    min_issues: int = get_threshold(
+    min_issues = get_threshold(
         ctx.project_config, "concept_name_prose", "min_issues"
-    ) or 2
+    )
+    if min_issues is None:
+        min_issues = 2
 
     rel_by_id = {e.model.id: e.rel_path for e in ctx.nodes}
     results: list[CheckResult] = []

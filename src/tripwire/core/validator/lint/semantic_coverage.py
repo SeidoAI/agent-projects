@@ -41,9 +41,11 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
     if not ctx.issues:
         return []
 
-    min_refs: int = get_threshold(
+    min_refs = get_threshold(
         ctx.project_config, "semantic_coverage", "min_ac_node_refs"
-    ) or 1
+    )
+    if min_refs is None:
+        min_refs = 1
 
     results: list[CheckResult] = []
     for entity in ctx.issues:

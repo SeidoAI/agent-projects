@@ -28,12 +28,16 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
     if not ctx.issues:
         return []
 
-    max_children: int = get_threshold(
+    max_children = get_threshold(
         ctx.project_config, "mega_issue", "max_children"
-    ) or 8
-    max_sessions: int = get_threshold(
+    )
+    if max_children is None:
+        max_children = 8
+    max_sessions = get_threshold(
         ctx.project_config, "mega_issue", "max_sessions"
-    ) or 6
+    )
+    if max_sessions is None:
+        max_sessions = 6
 
     children_by_parent: dict[str, list[str]] = defaultdict(list)
     for entity in ctx.issues:

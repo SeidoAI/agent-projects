@@ -41,12 +41,12 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
     node_count = len(ctx.nodes)
     ratio = node_count / active_issues
 
-    min_ratio: float = get_threshold(
-        ctx.project_config, "node_ratio", "min_ratio"
-    ) or 0.10
-    max_ratio: float = get_threshold(
-        ctx.project_config, "node_ratio", "max_ratio"
-    ) or 5.0
+    min_ratio = get_threshold(ctx.project_config, "node_ratio", "min_ratio")
+    if min_ratio is None:
+        min_ratio = 0.10
+    max_ratio = get_threshold(ctx.project_config, "node_ratio", "max_ratio")
+    if max_ratio is None:
+        max_ratio = 5.0
 
     results: list[CheckResult] = []
     if ratio < min_ratio:

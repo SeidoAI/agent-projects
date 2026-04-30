@@ -233,6 +233,15 @@ class ProjectConfig(BaseModel):
     # time and used by the generated `.github/workflows/tripwire.yml`.
     tripwire_version: str | None = None
 
+    # v0.9 (KUI-149 / D7): per-project threshold overrides for the lint
+    # rules. Shape `{lint_name: {threshold_name: value}}`; missing keys
+    # fall back to packaged defaults (see
+    # tripwire.core.validator.lint._thresholds.DEFAULT_THRESHOLDS). Free-
+    # form because lints come and go between releases — every key is
+    # advisory. A `_schema_version` field is intentionally absent until
+    # the v1.0 contract publishes (TW1-4).
+    lint_config: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
     # v0.7.6: SSH URL of the project-tracking repo on GitHub (the repo that
     # holds this project.yaml). Recorded by `tripwire init` after auto-creating
     # the repo; absent on pre-v0.7.6 projects. Disambiguates from `repos:`
