@@ -156,6 +156,7 @@ class TestAppIntegration:
         assert r.status_code == 404
         assert r.json() == {"detail": "integration", "code": "test/not_found"}
 
+
 @pytest.mark.parametrize(
     "status,code,detail",
     [

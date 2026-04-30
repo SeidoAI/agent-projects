@@ -53,9 +53,7 @@ class TestScaffoldText:
         target = tmp_path / "p"
         _init_project(runner, target)
 
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         assert result.exit_code == 0, result.output
 
         for section in (
@@ -78,9 +76,7 @@ class TestScaffoldText:
         target = tmp_path / "p"
         _init_project(runner, target, name="my-project", key_prefix="MP")
 
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         assert "PROJECT: my-project (MP)" in result.output
         assert "next issue key: MP-1" in result.output
 
@@ -90,9 +86,7 @@ class TestScaffoldText:
         target = tmp_path / "p"
         _init_project(runner, target, repos="SeidoAI/backend,SeidoAI/frontend")
 
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         assert "SeidoAI/backend" in result.output
         assert "SeidoAI/frontend" in result.output
         assert "(no local clone)" in result.output
@@ -101,9 +95,7 @@ class TestScaffoldText:
         target = tmp_path / "p"
         _init_project(runner, target)
 
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         for enum_name in (
             "issue_status",
             "priority",
@@ -124,9 +116,7 @@ class TestScaffoldText:
     ) -> None:
         target = tmp_path / "p"
         _init_project(runner, target)
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         # A few representative values
         assert "backlog" in result.output
         assert "in_progress" in result.output
@@ -141,9 +131,7 @@ class TestScaffoldText:
         target = tmp_path / "p"
         _init_project(runner, target)
 
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         # All Step 9 and Step 10 content present → no "missing" placeholders.
         assert "(no manifest.yaml present" not in result.output
         assert "(pattern file missing" not in result.output
@@ -179,9 +167,7 @@ class TestScaffoldText:
             if p.exists():
                 _shutil.rmtree(p)
 
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         assert "(no manifest.yaml present" in result.output
         assert "(pattern file missing" in result.output
         assert "(no templates shipped yet" in result.output
@@ -191,9 +177,7 @@ class TestScaffoldText:
     ) -> None:
         target = tmp_path / "p"
         _init_project(runner, target)
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         assert "tripwire validate --strict" in result.output
 
     def test_id_allocation_instructions_present(
@@ -201,9 +185,7 @@ class TestScaffoldText:
     ) -> None:
         target = tmp_path / "p"
         _init_project(runner, target)
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         assert "tripwire next-key --type issue" in result.output
         assert "uuid4" in result.output
         assert "Do NOT hand-write UUIDs" in result.output
@@ -375,9 +357,7 @@ class TestScaffoldRicherProject:
             )
         )
 
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         assert "plan.md (planning, required) [approval_gate]" in result.output
         assert "task-checklist.md (planning, required)" in result.output
 
@@ -391,9 +371,7 @@ class TestScaffoldRicherProject:
         orch_dir.mkdir(exist_ok=True)
         (orch_dir / "default.yaml").write_text("name: default\nevents: {}\n")
 
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         assert "(pattern file missing" not in result.output
 
     def test_templates_listed(self, runner: CliRunner, tmp_path: Path) -> None:
@@ -401,9 +379,7 @@ class TestScaffoldRicherProject:
         _init_project(runner, target)
         # Step 9 already ships `issue_templates/default.yaml.j2`.
 
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         assert "issue_templates/default.yaml.j2" in result.output
 
     def test_skill_examples_listed(self, runner: CliRunner, tmp_path: Path) -> None:
@@ -411,9 +387,7 @@ class TestScaffoldRicherProject:
         _init_project(runner, target)
         # Step 10 already ships the full set of skill examples.
 
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         assert "issue-fully-formed.yaml" in result.output
         assert "node-endpoint.yaml" in result.output
 
@@ -427,9 +401,7 @@ class TestScaffoldErrors:
     def test_missing_project_yaml_clean_error(
         self, runner: CliRunner, tmp_path: Path
     ) -> None:
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(tmp_path)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(tmp_path)])
         assert result.exit_code != 0
         assert "project.yaml not found" in result.output
 
@@ -464,7 +436,5 @@ class TestScaffoldReflectsState:
         raw["next_issue_number"] = 42
         (target / "project.yaml").write_text(yaml.safe_dump(raw, sort_keys=False))
 
-        result = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         assert "next issue key: TST-42" in result.output

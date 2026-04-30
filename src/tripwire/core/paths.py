@@ -176,7 +176,9 @@ def session_plan_path(project_dir: Path, session_id: str) -> Path:
     subdir-aware artifact contract. The pre-v0.8 flat-layout fallback
     was removed in KUI-158 once every session was migrated.
     """
-    return session_dir(project_dir, session_id) / SESSION_ARTIFACTS_SUBDIR / SESSION_PLAN
+    return (
+        session_dir(project_dir, session_id) / SESSION_ARTIFACTS_SUBDIR / SESSION_PLAN
+    )
 
 
 def session_artifacts_dir(project_dir: Path, session_id: str) -> Path:

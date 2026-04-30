@@ -41,7 +41,9 @@ def _write_session_artifacts(
     if plan:
         (artifacts_dir / "plan.md").write_text(plan, encoding="utf-8")
     if task_checklist:
-        (artifacts_dir / "task-checklist.md").write_text(task_checklist, encoding="utf-8")
+        (artifacts_dir / "task-checklist.md").write_text(
+            task_checklist, encoding="utf-8"
+        )
     if verification_checklist:
         (artifacts_dir / "verification-checklist.md").write_text(
             verification_checklist, encoding="utf-8"
@@ -185,7 +187,11 @@ class TestPlanUnfilled:
         )
         # Overwrite plan.md with placeholder content from the scaffold template.
         (
-            tmp_path_project / "sessions" / "session-plan-placeholder" / "artifacts" / "plan.md"
+            tmp_path_project
+            / "sessions"
+            / "session-plan-placeholder"
+            / "artifacts"
+            / "plan.md"
         ).write_text(
             "# Plan — <session-id>\n\n## Goal\nWhat is this session trying "
             "to achieve, in one paragraph?\n\n## Issues in scope\n- <KEY>: title\n",
@@ -207,7 +213,11 @@ class TestPlanUnfilled:
         # Even without `<>` placeholders, the literal scaffold-doc string
         # "What to read, what to understand" reveals an unfilled plan.
         (
-            tmp_path_project / "sessions" / "session-plan-scaffold-string" / "artifacts" / "plan.md"
+            tmp_path_project
+            / "sessions"
+            / "session-plan-scaffold-string"
+            / "artifacts"
+            / "plan.md"
         ).write_text(
             "# Plan — example\n\n## Goal\n"
             + ("Filler text to push past the 200-character body floor. " * 10)
@@ -228,7 +238,13 @@ class TestPlanUnfilled:
             save_test_session,
             save_test_issue,
         )
-        (tmp_path_project / "sessions" / "session-plan-short" / "artifacts" / "plan.md").write_text(
+        (
+            tmp_path_project
+            / "sessions"
+            / "session-plan-short"
+            / "artifacts"
+            / "plan.md"
+        ).write_text(
             "# Plan — example\n\n## Goal\nDo the thing.\n",
             encoding="utf-8",
         )
@@ -593,7 +609,11 @@ class TestAggregate:
 
         # Drop plan.md to a placeholder.
         (
-            tmp_path_project / "sessions" / "session-clean-aggregate" / "artifacts" / "plan.md"
+            tmp_path_project
+            / "sessions"
+            / "session-clean-aggregate"
+            / "artifacts"
+            / "plan.md"
         ).write_text("# <fill>\n", encoding="utf-8")
         dirty = strict_check(tmp_path_project, "session-clean-aggregate")
         assert any_blocking_error(dirty) is True

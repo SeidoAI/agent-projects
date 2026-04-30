@@ -64,10 +64,10 @@ def test_start_invokes_popen_with_expected_argv(tmp_path):
     fake_proc.pid = 12345
 
     with (
+        patch("tripwire.runtimes.base._sp.Popen", return_value=fake_proc) as mock_popen,
         patch(
-            "tripwire.runtimes.base._sp.Popen", return_value=fake_proc
-        ) as mock_popen,
-        patch("tripwire.runtimes.monitor_runner.spawn_monitor_runner", return_value=None),
+            "tripwire.runtimes.monitor_runner.spawn_monitor_runner", return_value=None
+        ),
     ):
         result = ClaudeRuntime().start(prepped)
 
@@ -98,10 +98,10 @@ def test_start_with_resume_uses_resume_flag_not_session_id(tmp_path):
     fake_proc.pid = 67890
 
     with (
+        patch("tripwire.runtimes.base._sp.Popen", return_value=fake_proc) as mock_popen,
         patch(
-            "tripwire.runtimes.base._sp.Popen", return_value=fake_proc
-        ) as mock_popen,
-        patch("tripwire.runtimes.monitor_runner.spawn_monitor_runner", return_value=None),
+            "tripwire.runtimes.monitor_runner.spawn_monitor_runner", return_value=None
+        ),
     ):
         ClaudeRuntime().start(prepped)
 

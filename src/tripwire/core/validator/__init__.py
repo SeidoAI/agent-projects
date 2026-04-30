@@ -1229,8 +1229,6 @@ def check_manifest_phase_ownership_consistent(
     return results
 
 
-
-
 def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
     """Sessions at status=completed must have all required artifacts.
 

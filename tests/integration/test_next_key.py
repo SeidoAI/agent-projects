@@ -248,16 +248,12 @@ class TestScaffoldIntegration:
         target = tmp_path / "p"
         _init_project(runner, target)
 
-        scaffold = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        scaffold = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         assert "next issue key: TST-1" in scaffold.output
 
         allocated = runner.invoke(cli, ["next-key", "--project-dir", str(target)])
         assert allocated.output.strip() == "TST-1"
 
         # After allocation, scaffold should advance
-        scaffold_after = runner.invoke(
-            cli, ["brief", "--project-dir", str(target)]
-        )
+        scaffold_after = runner.invoke(cli, ["brief", "--project-dir", str(target)])
         assert "next issue key: TST-2" in scaffold_after.output
