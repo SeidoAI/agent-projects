@@ -814,6 +814,47 @@ def _emit_check_result(
         logger.exception("validator emission failed for %s", slug)
 
 
+def _emit_workflow_event(
+    *,
+    project_dir: Path,
+    check_fn: Any,
+    results: list[CheckResult],
+    session_id: str,
+) -> None:
+    """Append one ``validator.run`` row to the workflow events log
+    (KUI-123) for *check_fn*.
+
+    Skipped silently if the check has no ``__tripwire_workflow_station__``
+    attribute (legacy / unregistered) — the workflow log demands
+    ``workflow`` + ``station``. Failures are logged and swallowed; the
+    log is best-effort, not load-bearing.
+    """
+    pair = getattr(check_fn, "__tripwire_workflow_station__", None)
+    if pair is None:
+        return
+    workflow, station = pair
+    slug = check_fn.__name__.removeprefix("check_")
+    has_error = any(r.severity == "error" for r in results)
+    outcome = "fail" if has_error else "pass"
+    try:
+        from tripwire.core.events.log import emit_event
+
+        emit_event(
+            project_dir,
+            workflow=workflow,
+            instance=session_id,
+            station=station,
+            event="validator.run",
+            details={
+                "id": f"v_{slug}",
+                "outcome": outcome,
+                "findings": len(results),
+            },
+        )
+    except Exception:
+        logger.exception("workflow events emission failed for %s", slug)
+
+
 def validate_project(
     project_dir: Path,
     *,
@@ -890,6 +931,12 @@ def validate_project(
         )
         _emit_check_result(
             emitter=emitter,
+            check_fn=check,
+            results=results,
+            session_id=sid,
+        )
+        _emit_workflow_event(
+            project_dir=project_dir,
             check_fn=check,
             results=results,
             session_id=sid,

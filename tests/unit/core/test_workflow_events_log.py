@@ -103,12 +103,20 @@ def test_read_events_filters_by_workflow(tmp_path: Path) -> None:
 
     pd = _project_dir(tmp_path)
     emit_event(
-        pd, workflow="coding-session", instance="s", station="executing",
-        event="e", details={},
+        pd,
+        workflow="coding-session",
+        instance="s",
+        station="executing",
+        event="e",
+        details={},
     )
     emit_event(
-        pd, workflow="other-workflow", instance="s", station="executing",
-        event="e", details={},
+        pd,
+        workflow="other-workflow",
+        instance="s",
+        station="executing",
+        event="e",
+        details={},
     )
     rows = list(read_events(pd, workflow="coding-session"))
     assert len(rows) == 1
@@ -121,8 +129,12 @@ def test_read_events_filters_by_session_instance(tmp_path: Path) -> None:
     pd = _project_dir(tmp_path)
     for inst in ("a", "b", "a"):
         emit_event(
-            pd, workflow="w", instance=inst, station="s",
-            event="e", details={},
+            pd,
+            workflow="w",
+            instance=inst,
+            station="s",
+            event="e",
+            details={},
         )
     rows = list(read_events(pd, instance="a"))
     assert len(rows) == 2
@@ -135,8 +147,12 @@ def test_read_events_filters_by_event_kind(tmp_path: Path) -> None:
     pd = _project_dir(tmp_path)
     for kind in ("validator.run", "tripwire.fired", "validator.run"):
         emit_event(
-            pd, workflow="w", instance="i", station="s",
-            event=kind, details={},
+            pd,
+            workflow="w",
+            instance="i",
+            station="s",
+            event=kind,
+            details={},
         )
     rows = list(read_events(pd, event="validator.run"))
     assert len(rows) == 2
@@ -158,11 +174,21 @@ def test_emit_event_validates_required_fields(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError):
         emit_event(
-            pd, workflow="", instance="i", station="s", event="e", details={},
+            pd,
+            workflow="",
+            instance="i",
+            station="s",
+            event="e",
+            details={},
         )
     with pytest.raises(ValueError):
         emit_event(
-            pd, workflow="w", instance="i", station="s", event="", details={},
+            pd,
+            workflow="w",
+            instance="i",
+            station="s",
+            event="",
+            details={},
         )
 
 
@@ -177,8 +203,12 @@ def test_cli_events_tail_shows_recent(tmp_path: Path) -> None:
     pd = _project_dir(tmp_path)
     for i in range(3):
         emit_event(
-            pd, workflow="w", instance="i", station="s",
-            event="e", details={"i": i},
+            pd,
+            workflow="w",
+            instance="i",
+            station="s",
+            event="e",
+            details={"i": i},
         )
 
     runner = CliRunner()
@@ -202,12 +232,20 @@ def test_cli_events_filter_narrows_results(tmp_path: Path) -> None:
 
     pd = _project_dir(tmp_path)
     emit_event(
-        pd, workflow="w", instance="a", station="s",
-        event="validator.run", details={},
+        pd,
+        workflow="w",
+        instance="a",
+        station="s",
+        event="validator.run",
+        details={},
     )
     emit_event(
-        pd, workflow="w", instance="b", station="s",
-        event="tripwire.fired", details={},
+        pd,
+        workflow="w",
+        instance="b",
+        station="s",
+        event="tripwire.fired",
+        details={},
     )
 
     runner = CliRunner()
@@ -215,8 +253,10 @@ def test_cli_events_filter_narrows_results(tmp_path: Path) -> None:
         events_cmd,
         [
             "filter",
-            "--project-dir", str(pd),
-            "--event", "validator.run",
+            "--project-dir",
+            str(pd),
+            "--event",
+            "validator.run",
         ],
     )
     assert result.exit_code == 0, result.output

@@ -193,7 +193,8 @@ def fire_event(
         prior_fires = _count_prior_fires(project_dir, session_id, tw.id)
         prompt = tw.fire(ctx)
 
-        if prior_fires >= 2:
+        escalated = prior_fires >= 2
+        if escalated:
             # Third (or later) fire on the same session escalates.
             escalation = (
                 f"Tripwire {tw.id!r} has fired {prior_fires + 1} times on session "
@@ -202,34 +203,76 @@ def fire_event(
                 f"{prompt}"
             )
             result.escalated = True
-            payload = _build_payload(
-                tripwire_id=tw.id,
-                session_id=session_id,
-                event=event,
-                blocks=tw.blocks,
-                prompt=prompt,
-                escalated=True,
-            )
-            event_path = emitter.emit("firings", payload)
-            result.fires.append((tw.id, event_path))
-            result.prompts.append(escalation)
+            display_prompt = escalation
         else:
-            payload = _build_payload(
-                tripwire_id=tw.id,
-                session_id=session_id,
-                event=event,
-                blocks=tw.blocks,
-                prompt=prompt,
-                escalated=False,
-            )
-            event_path = emitter.emit("firings", payload)
-            result.fires.append((tw.id, event_path))
-            result.prompts.append(prompt)
+            display_prompt = prompt
+        payload = _build_payload(
+            tripwire_id=tw.id,
+            session_id=session_id,
+            event=event,
+            blocks=tw.blocks,
+            prompt=prompt,
+            escalated=escalated,
+        )
+        event_path = emitter.emit("firings", payload)
+        result.fires.append((tw.id, event_path))
+        result.prompts.append(display_prompt)
+        # KUI-123: also append to the workflow events log when the
+        # tripwire declares a station via `at = (...)`.
+        _emit_workflow_event(
+            project_dir=project_dir,
+            tripwire=tw,
+            session_id=session_id,
+            event=event,
+            escalated=escalated,
+        )
 
         if tw.blocks:
             result.blocked = True
 
     return result
+
+
+def _emit_workflow_event(
+    *,
+    project_dir: Path,
+    tripwire: Tripwire,
+    session_id: str,
+    event: str,
+    escalated: bool,
+) -> None:
+    """Append one ``tripwire.fired`` row to the workflow events log
+    (KUI-123) when the tripwire declares an ``at = (workflow, station)``.
+
+    Tripwires without ``at`` are silently skipped. Best-effort: emission
+    failures don't sink the fire — the legacy `.tripwire/events/firings`
+    channel above stays authoritative for the UI."""
+    pair = getattr(tripwire.__class__, "at", ())
+    if not isinstance(pair, tuple) or len(pair) != 2:
+        return
+    workflow, station = pair
+    if not isinstance(workflow, str) or not isinstance(station, str):
+        return
+    try:
+        from tripwire.core.events.log import emit_event as _emit
+
+        _emit(
+            project_dir,
+            workflow=workflow,
+            instance=session_id,
+            station=station,
+            event="tripwire.fired",
+            details={
+                "id": tripwire.id,
+                "fires_on": event,
+                "blocks": bool(tripwire.blocks),
+                "escalated": escalated,
+            },
+        )
+    except Exception:
+        # Best-effort log; the legacy `.tripwire/events/firings` write
+        # above is the authoritative record for the UI.
+        pass
 
 
 def _opt_out_sessions(project) -> set[str]:
