@@ -110,6 +110,7 @@ from tripwire.core.validator.checks.structure import (
     check_issue_body_structure,
     check_status_transitions,
 )
+from tripwire.core.validator.checks.workflow import check_workflow_well_formed
 from tripwire.models.comment import Comment
 from tripwire.models.issue import Issue
 from tripwire.models.node import ConceptNode
@@ -974,6 +975,7 @@ __all__ = [
     "check_status_transitions",
     "check_timestamps",
     "check_uuid_present",
+    "check_workflow_well_formed",
     "load_context",
     "validate_project",
 ]

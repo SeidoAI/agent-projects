@@ -65,9 +65,14 @@ VERBATIM_TEMPLATE_MAPPINGS: tuple[tuple[str, str], ...] = (
 )
 
 # Standalone files (at `templates/` root, not under a subdirectory) that
-# should be rendered into the project root. `standards.md.j2` is the
-# only one in v0.
-ROOT_J2_FILES: tuple[tuple[str, str], ...] = (("standards.md.j2", "standards.md"),)
+# should be rendered into the project root. `standards.md.j2` shipped
+# in v0; `workflow.yaml.j2` joins it in v0.9 (KUI-119) — it plants the
+# default `coding-session` workflow into every freshly-initialised
+# project so the workflow-runtime gates have something to read against.
+ROOT_J2_FILES: tuple[tuple[str, str], ...] = (
+    ("standards.md.j2", "standards.md"),
+    ("workflow.yaml.j2", "workflow.yaml"),
+)
 
 CREATED_DIRS = [
     paths.ISSUES_DIR,

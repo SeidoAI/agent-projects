@@ -1,0 +1,32 @@
+# Per-project workflow definitions. v0.9 ships `coding-session`; later
+# versions add `inbox-handling`, `issue-lifecycle`, `concept-freshness`,
+# `pr-lifecycle`. Each workflow is a typed lifecycle graph: stations
+# with declared validators, tripwires, and prompt-checks; transitions
+# between stations gated by the runtime; an append-only events log
+# substrate.
+#
+# Schema reference: docs/specs/2026-04-30-v09-workflow-substrate.md
+#
+# Conditional next: equality only (`==`, `!=`). Predicate fields are
+# dot-paths into the workflow context (e.g. `agent.role`).
+
+workflows:
+  coding-session:
+    actor: coding-agent
+    trigger: session.spawn
+    stations:
+      - id: planned
+        next: queued
+      - id: queued
+        next: executing
+        prompt_checks: [pm-session-queue]
+      - id: executing
+        next: in_review
+        prompt_checks: [pm-session-spawn]
+      - id: in_review
+        next: verified
+        prompt_checks: [pm-session-review]
+      - id: verified
+        next: completed
+      - id: completed
+        terminal: true

@@ -49,6 +49,7 @@ from tripwire.core.validator.checks.structure import (
     check_issue_body_structure,
     check_status_transitions,
 )
+from tripwire.core.validator.checks.workflow import check_workflow_well_formed
 
 # Identity: every entity has a uuid, the right id format, no collisions,
 # the next-id counter is consistent, timestamps are parseable.
@@ -106,8 +107,14 @@ QUALITY_CHECKS = [
     check_quality_consistency,
 ]
 
+# Workflow: well-formedness of `<project>/workflow.yaml` (KUI-119).
+WORKFLOW_CHECKS = [check_workflow_well_formed]
+
 # Canonical run order: matches the pre-split ALL_CHECKS literal so finding
-# output ordering stays byte-stable.
+# output ordering stays byte-stable. The workflow check is appended at
+# the END so it doesn't perturb the byte-stable position of any
+# pre-existing check (KUI-119 — workflow.yaml is opt-in for v0.9; ALL
+# legacy projects without one see no findings from this check).
 ALL_CHECKS = [
     check_uuid_present,
     check_id_format,
@@ -134,6 +141,7 @@ ALL_CHECKS = [
     check_issue_artifact_presence,
     check_pm_response_covers_self_review,
     check_pm_response_followups_resolve,
+    check_workflow_well_formed,
 ]
 
 
@@ -146,4 +154,5 @@ __all__ = [
     "QUALITY_CHECKS",
     "REFERENCE_CHECKS",
     "STRUCTURE_CHECKS",
+    "WORKFLOW_CHECKS",
 ]
