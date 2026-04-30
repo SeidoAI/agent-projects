@@ -41,6 +41,7 @@ from tripwire.core.validator.checks.quality import (
 )
 from tripwire.core.validator.checks.references import (
     check_bidirectional_related,
+    check_no_stale_pins,
     check_reference_integrity,
 )
 from tripwire.core.validator.checks.structure import (
@@ -66,6 +67,7 @@ ENUM_CHECKS = [check_enum_values]
 REFERENCE_CHECKS = [
     check_reference_integrity,
     check_bidirectional_related,
+    check_no_stale_pins,
 ]
 
 # Structure: required Markdown sections in issue bodies, status transitions,
@@ -112,6 +114,7 @@ ALL_CHECKS = [
     check_enum_values,
     check_reference_integrity,
     check_bidirectional_related,
+    check_no_stale_pins,
     check_issue_body_structure,
     check_status_transitions,
     check_freshness,

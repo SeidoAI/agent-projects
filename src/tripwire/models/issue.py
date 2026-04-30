@@ -40,6 +40,9 @@ class Issue(BaseModel):
     # Bare `[[id]]` resolves to the latest; `[[id@vN]]` pins to N.
     version: int = 1
 
+    # KUI-127 / A2: PM-set marker for the latest contract-change version.
+    contract_changed_at: int | None = None
+
     title: str
     status: IssueStatus = IssueStatus.BACKLOG
     priority: str

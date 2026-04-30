@@ -77,6 +77,11 @@ class ConceptNode(BaseModel):
     # Integer schema/contract version. KUI-126 / A1.
     version: int = 1
 
+    # KUI-127 / A2: PM-set marker recording the most recent version
+    # whose bump introduced a contract change. Pins to versions strictly
+    # below this value are stale (validator emits references/stale_pin).
+    contract_changed_at: int | None = None
+
     type: str
     name: str
     description: str | None = None

@@ -154,6 +154,9 @@ class AgentSession(BaseModel):
     # Integer schema/contract version. KUI-126 / A1.
     version: int = 1
 
+    # KUI-127 / A2: PM-set marker for the latest contract-change version.
+    contract_changed_at: int | None = None
+
     name: str
     agent: str  # references agents/<id>.yaml in the project repo
     issues: list[str] = Field(default_factory=list)
