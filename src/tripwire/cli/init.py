@@ -21,66 +21,43 @@ agent to start scoping from raw planning docs.
 from __future__ import annotations
 
 import re
-import shutil
-import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import click
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from rich.console import Console
 from rich.panel import Panel
 
-from tripwire.core import github_client, paths
+# Init-time helpers (template tree, GitHub, workspace) live in core/.
+# These are aliased under the underscore names init_cmd already calls;
+# on ValueError surface as InitError (preserves the original CLI UX).
+from tripwire.core.init_github import (
+    git_init as _git_init_core,
+)
+from tripwire.core.init_github import (
+    record_repo_url_in_project_yaml as _record_repo_url_in_project_yaml,
+)
+from tripwire.core.init_github import (
+    resolve_github_target as _resolve_github_target_core,
+)
+from tripwire.core.init_github import (
+    setup_github_remote as _setup_github_remote_core,
+)
+from tripwire.core.init_templates import (
+    copy_templates as _copy_templates_core,
+)
+from tripwire.core.init_templates import (
+    create_project_dirs as _create_project_dirs,
+)
 from tripwire.templates import get_templates_dir
 
 KEY_PREFIX_PATTERN = re.compile(r"^[A-Z][A-Z0-9]*$")
-CREATED_DIRS = [
-    paths.ISSUES_DIR,
-    paths.NODES_DIR,
-    paths.SESSIONS_DIR,
-    paths.PLANS_DIR,
-]
-PROJECT_TEMPLATE_SUBDIR = "project"
 
-# Template subdirectories that get Jinja2-rendered at init time.
-# Files under these directories are RENDERED through Jinja with the
-# project context (project_name, key_prefix, etc.) and the `.j2` suffix
-# is stripped in the destination filename.
-JINJA_RENDERED_SUBDIRS: tuple[str, ...] = (PROJECT_TEMPLATE_SUBDIR,)
-
-# Mapping from source subdirectory under `templates/` to destination
-# relative path under the project root. Files are copied verbatim
-# (including any `.j2` suffix — agents render these at runtime).
-#
-# `project` is handled separately because its files are rendered into
-# the project root.
-#
-# `agent_templates` → `agents` is a rename (the source name is clearer
-# for the package, but the destination name matches the rest of the
-# plan's layout).
-#
-# `artifacts` is the one exception that stays nested under `templates/`
-# in the destination — it's the set of templates that SESSIONS use to
-# produce their session artifacts at runtime.
-VERBATIM_TEMPLATE_MAPPINGS: tuple[tuple[str, str], ...] = (
-    ("enums", "enums"),
-    ("issue_templates", "issue_templates"),
-    ("comment_templates", "comment_templates"),
-    ("artifacts", "templates/artifacts"),
-    ("scoping-artifacts", "plans/artifacts"),
-    ("agent_templates", "agents"),
-    ("session_templates", "session_templates"),
-    ("orchestration", "orchestration"),
-    ("skills", ".claude/skills"),
-    ("commands", ".claude/commands"),
-)
-
-# Standalone files (at `templates/` root, not under a subdirectory) that
-# should be rendered into the project root. `standards.md.j2` is the
-# only one in v0.
-ROOT_J2_FILES: tuple[tuple[str, str], ...] = (("standards.md.j2", "standards.md"),)
+# Constants describing the template-tree layout (CREATED_DIRS,
+# JINJA_RENDERED_SUBDIRS, VERBATIM_TEMPLATE_MAPPINGS, ROOT_J2_FILES)
+# now live in core/init_templates.py — there's only one consumer here
+# (the `_copy_templates` wrapper) so we don't re-export them.
 
 console = Console()
 
@@ -270,165 +247,19 @@ def _extract_key_prefix(name: str) -> str | None:
     return prefix
 
 
-# ============================================================================
-# Template rendering and copying
-# ============================================================================
-
-
-def _jinja_env(templates_dir: Path) -> Environment:
-    """Construct a Jinja2 environment rooted at the templates directory.
-
-    `StrictUndefined` catches typos in template variables — better to fail
-    the init than silently produce a file with `{{ missing_var }}`.
-    """
-    return Environment(
-        loader=FileSystemLoader(str(templates_dir)),
-        undefined=StrictUndefined,
-        keep_trailing_newline=True,
-        autoescape=False,
-    )
-
-
 def _copy_templates(
     templates_dir: Path, target_dir: Path, context: dict[str, Any]
 ) -> list[Path]:
-    """Copy the packaged templates tree into the target.
-
-    Three distinct code paths:
-
-    1. **Jinja-rendered subdirs** (`templates/project/*`): files with a
-       `.j2` suffix are rendered through Jinja with the init context and
-       the suffix is stripped. Other files are copied verbatim.
-
-    2. **Verbatim subdirs** (`templates/enums/`, `templates/issue_templates/`,
-       etc.): files are copied as-is. `.j2` files keep their suffix
-       because agents render them at runtime. The source subdir name may
-       map to a different destination name (see `VERBATIM_TEMPLATE_MAPPINGS`).
-
-    3. **Root-level files** (`templates/standards.md.j2`): Jinja-rendered
-       into the project root per `ROOT_J2_FILES`.
-
-    `__init__.py` markers are never copied into target projects.
-    """
-    env = _jinja_env(templates_dir)
-    written: list[Path] = []
-
-    # 1. Jinja-rendered subdirs (currently only `project/`).
-    for subdir in JINJA_RENDERED_SUBDIRS:
-        source_root = templates_dir / subdir
-        if not source_root.is_dir():
-            raise InitError(
-                f"Packaged templates directory missing: {source_root}. "
-                "This is a package installation problem."
-            )
-        for source in sorted(source_root.rglob("*")):
-            if source.is_dir() or source.name == "__init__.py":
-                continue
-            rel = source.relative_to(source_root)
-            dest = target_dir / _map_destination(rel)
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if source.suffix == ".j2":
-                template_name = str(Path(subdir) / rel)
-                rendered = env.get_template(template_name).render(**context)
-                dest.write_text(rendered, encoding="utf-8")
-            else:
-                shutil.copy2(source, dest)
-            written.append(dest)
-
-    # 2. Verbatim subdirs — copied as-is, with optional rename.
-    for src_subdir, dest_subdir in VERBATIM_TEMPLATE_MAPPINGS:
-        source_root = templates_dir / src_subdir
-        if not source_root.is_dir():
-            # Subdir doesn't exist yet (e.g. `skills` before Step 10).
-            continue
-        dest_root = target_dir / dest_subdir
-        for source in sorted(source_root.rglob("*")):
-            if source.is_dir() or source.name == "__init__.py":
-                continue
-            rel = source.relative_to(source_root)
-            dest = dest_root / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, dest)
-            written.append(dest)
-
-    # 3. Root-level Jinja files.
-    for src_name, dest_name in ROOT_J2_FILES:
-        source = templates_dir / src_name
-        if not source.is_file():
-            continue
-        dest = target_dir / dest_name
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        rendered = env.get_template(src_name).render(**context)
-        dest.write_text(rendered, encoding="utf-8")
-        written.append(dest)
-
-    return written
-
-
-def _map_destination(rel: Path) -> Path:
-    """Translate a template-relative path to its destination path.
-
-    - `gitignore.j2` → `.gitignore`
-    - `foo.yaml.j2` → `foo.yaml`
-    - `foo.md.j2` → `foo.md`
-    - Everything else: strip the `.j2` extension if present.
-    """
-    if rel.name == "gitignore.j2":
-        return rel.with_name(".gitignore")
-    if rel.suffix == ".j2":
-        return rel.with_suffix("")
-    return rel
-
-
-def _create_project_dirs(target_dir: Path) -> list[Path]:
-    """Create the empty project subdirectories with `.gitkeep` markers."""
-    created: list[Path] = []
-    for rel in CREATED_DIRS:
-        dir_path = target_dir / rel
-        dir_path.mkdir(parents=True, exist_ok=True)
-        gitkeep = dir_path / ".gitkeep"
-        if not gitkeep.exists():
-            gitkeep.touch()
-        created.append(dir_path)
-    return created
-
-
-# ============================================================================
-# Git init
-# ============================================================================
+    """CLI wrapper — see :func:`tripwire.core.init_templates.copy_templates`."""
+    try:
+        return _copy_templates_core(templates_dir, target_dir, context)
+    except ValueError as exc:
+        raise InitError(str(exc)) from exc
 
 
 def _git_init(target_dir: Path) -> None:
-    """Run `git init` and `git add` in the target directory.
-
-    Failures are reported as warnings, not errors — a user can always run
-    `git init` manually afterwards.
-    """
-    try:
-        subprocess.run(
-            ["git", "init", "--initial-branch=main"],
-            cwd=target_dir,
-            capture_output=True,
-            check=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-        console.print(
-            f"[yellow]Warning:[/yellow] git init failed ({exc}). "
-            "Run `git init` manually if you want version control."
-        )
-        return
-    # Stage the initial tree so the user can commit immediately.
-    subprocess.run(
-        ["git", "add", "."],
-        cwd=target_dir,
-        capture_output=True,
-        check=False,
-    )
-
-
-# ============================================================================
-# GitHub remote setup (v0.7.6 item A)
-# ============================================================================
+    """CLI wrapper — see :func:`tripwire.core.init_github.git_init`."""
+    _git_init_core(target_dir, console=console)
 
 
 def _resolve_github_target(
@@ -439,37 +270,17 @@ def _resolve_github_target(
     token: str,
     non_interactive: bool,
 ) -> tuple[str, str]:
-    """Resolve `(owner, name)` for the project-tracking repo.
-
-    Defaults: owner = the authenticated user behind ``token``, name =
-    the target directory's basename. Either can be overridden by flag.
-    Interactive mode confirms the result via prompt.
-    """
-    name = github_repo or target_dir.name
-    owner = github_owner or github_client._authenticated_owner(token) or ""
-
-    if non_interactive:
-        if not owner:
-            raise InitError(
-                "Could not determine GitHub owner. Pass --github-owner "
-                "explicitly or check that your token has user-read scope."
-            )
-        return owner, name
-
-    full = click.prompt(
-        "GitHub project-tracking repo (<owner>/<name>)",
-        default=f"{owner}/{name}" if owner else "",
-        type=str,
-    ).strip()
-    if "/" not in full:
-        raise InitError(
-            f"Invalid GitHub slug {full!r}; expected `<owner>/<name>` (e.g. "
-            "alice/my-project)."
+    """CLI wrapper — see :func:`tripwire.core.init_github.resolve_github_target`."""
+    try:
+        return _resolve_github_target_core(
+            target_dir,
+            github_owner=github_owner,
+            github_repo=github_repo,
+            token=token,
+            non_interactive=non_interactive,
         )
-    owner, name = full.split("/", 1)
-    if not owner or not name:
-        raise InitError(f"Invalid GitHub slug {full!r}; both parts required.")
-    return owner, name
+    except ValueError as exc:
+        raise InitError(str(exc)) from exc
 
 
 def _setup_github_remote(
@@ -482,158 +293,20 @@ def _setup_github_remote(
     github_repo: str | None,
     non_interactive: bool,
 ) -> str | None:
-    """Create or attach the GitHub project-tracking repo and configure git.
-
-    Implements v0.7.6 spec §2.A.1 steps 2-5:
-
-    1. Resolve the GitHub target (owner + name).
-    2. Check whether the repo exists.
-    3. Create it if missing (unless ``no_github_repo``).
-    4. Add the remote.
-    5. Push the initial commit (unless ``no_push``).
-
-    Returns the SSH URL the remote was configured with, or None if the
-    flow short-circuited (caller already handled ``--no-remote``).
-    """
-    token = github_client.resolve_token()
-    if token is None:
-        raise InitError(
-            "No GitHub token found. Set GITHUB_TOKEN, run `gh auth login`, "
-            "or pass --no-remote to skip remote setup."
+    """CLI wrapper — see :func:`tripwire.core.init_github.setup_github_remote`."""
+    try:
+        return _setup_github_remote_core(
+            target_dir,
+            no_github_repo=no_github_repo,
+            no_push=no_push,
+            public=public,
+            github_owner=github_owner,
+            github_repo=github_repo,
+            non_interactive=non_interactive,
+            console=console,
         )
-
-    owner, name = _resolve_github_target(
-        target_dir,
-        github_owner=github_owner,
-        github_repo=github_repo,
-        token=token,
-        non_interactive=non_interactive,
-    )
-
-    ssh_url = f"git@github.com:{owner}/{name}.git"
-
-    if no_github_repo:
-        # Operator pre-created the repo (Terraform / manual / org policy).
-        # Skip the API check and the create call; just wire git up.
-        console.print(
-            f"  [dim]· Skipping GitHub API check (--no-github-repo); using "
-            f"{owner}/{name}[/dim]"
-        )
-    else:
-        if github_client.repo_exists(owner, name, token=token):
-            console.print(f"  [dim]✓ Using existing GitHub repo {owner}/{name}[/dim]")
-        else:
-            visibility = "public" if public else "private"
-            console.print(
-                f"  [green]+[/green] Creating {visibility} GitHub repo {owner}/{name}"
-            )
-            response = github_client.create_repo(
-                owner,
-                name,
-                private=not public,
-                description=f"Tripwire project-tracking repo for {name}",
-                token=token,
-            )
-            # Prefer the API-returned ssh_url so we honour any host
-            # variation the caller has on their GitHub Enterprise install.
-            ssh_url = response.get("ssh_url") or ssh_url
-
-    # Step 4: add the remote (idempotent — `git remote set-url` if it
-    # already points somewhere).
-    _git_set_remote(target_dir, ssh_url)
-
-    # Step 5: push the initial commit, unless opted out.
-    if not no_push:
-        _git_initial_commit_and_push(target_dir)
-
-    return ssh_url
-
-
-def _git_set_remote(target_dir: Path, ssh_url: str) -> None:
-    """Add the `origin` remote, switching url if already set.
-
-    Robust to operators who ran `git remote add origin ...` themselves
-    before re-running init — `set-url` overwrites without complaint.
-    """
-    existing = subprocess.run(
-        ["git", "remote", "get-url", "origin"],
-        cwd=target_dir,
-        capture_output=True,
-        check=False,
-    )
-    if existing.returncode == 0:
-        subprocess.run(
-            ["git", "remote", "set-url", "origin", ssh_url],
-            cwd=target_dir,
-            check=False,
-            capture_output=True,
-        )
-    else:
-        subprocess.run(
-            ["git", "remote", "add", "origin", ssh_url],
-            cwd=target_dir,
-            check=False,
-            capture_output=True,
-        )
-
-
-def _git_initial_commit_and_push(target_dir: Path) -> None:
-    """Create the initial commit (if absent) and push to `origin/main`.
-
-    `git init` + `git add .` already happened in `_git_init`; we just
-    need to seal it with a commit and push. Failures are surfaced as
-    warnings, not errors — the operator can finish manually if push
-    fails for network reasons.
-    """
-    # Skip the commit if HEAD already points somewhere (re-runs).
-    head = subprocess.run(
-        ["git", "rev-parse", "--verify", "HEAD"],
-        cwd=target_dir,
-        capture_output=True,
-        check=False,
-    )
-    if head.returncode != 0:
-        commit = subprocess.run(
-            ["git", "commit", "-m", "Initial tripwire scaffold"],
-            cwd=target_dir,
-            capture_output=True,
-            check=False,
-        )
-        if commit.returncode != 0:
-            console.print(
-                "[yellow]Warning:[/yellow] initial commit failed "
-                f"({commit.stderr.decode(errors='replace').strip()}). "
-                "Commit and push manually: "
-                "`git commit -m 'init' && git push -u origin main`."
-            )
-            return
-
-    push = subprocess.run(
-        ["git", "push", "-u", "origin", "main"],
-        cwd=target_dir,
-        capture_output=True,
-        check=False,
-    )
-    if push.returncode != 0:
-        console.print(
-            "[yellow]Warning:[/yellow] git push failed "
-            f"({push.stderr.decode(errors='replace').strip()}). "
-            "Push manually: `git push -u origin main`."
-        )
-
-
-def _record_repo_url_in_project_yaml(target_dir: Path, ssh_url: str) -> None:
-    """Write `project_repo_url: <url>` into the freshly-stamped project.yaml.
-
-    The Jinja template emits the line conditionally on the context dict;
-    by the time we know the URL, the file is already written. Append
-    rather than re-render to keep the change minimal and side-effect-free.
-    """
-    from tripwire.core.store import load_project, save_project
-
-    cfg = load_project(target_dir)
-    cfg = cfg.model_copy(update={"project_repo_url": ssh_url})
-    save_project(target_dir, cfg)
+    except ValueError as exc:
+        raise InitError(str(exc)) from exc
 
 
 # ============================================================================
@@ -649,104 +322,20 @@ def _link_to_workspace(
     project_name: str,
     copy_nodes: str | None,
 ) -> None:
-    """Link the newly-init'd project to a workspace + optionally copy nodes.
+    """CLI wrapper — see :func:`tripwire.core.init_workspace.link_to_workspace`."""
+    from tripwire.core.init_workspace import link_to_workspace
 
-    Uses the internal Python API directly (no subprocess / no ``uv``
-    dependency) so this works in any install environment.
-    """
-    import os
-
-    from tripwire.core.store import load_project as _load_project
-    from tripwire.core.store import save_project as _save_project
-    from tripwire.core.workspace_store import (
-        add_project as _ws_add_project,
-    )
-    from tripwire.core.workspace_store import (
-        workspace_exists as _ws_exists,
-    )
-    from tripwire.models.project import ProjectWorkspacePointer
-    from tripwire.models.workspace import WorkspaceProjectEntry
-
-    slug = key_prefix.lower()
-
-    if not _ws_exists(workspace_path):
-        raise InitError(f"No workspace.yaml at {workspace_path}")
-
-    # Compute relative paths from each side.
     try:
-        pointer_path = os.path.relpath(workspace_path, target_dir)
-    except ValueError:
-        pointer_path = str(workspace_path)
-    try:
-        ws_relative_back = os.path.relpath(target_dir, workspace_path)
-    except ValueError:
-        ws_relative_back = str(target_dir)
-
-    # Write workspace-side FIRST so that if it fails (e.g. duplicate
-    # slug) the project-side pointer hasn't been written yet — avoiding
-    # a one-sided link.
-    try:
-        _ws_add_project(
-            workspace_path,
-            WorkspaceProjectEntry(
-                slug=slug,
-                name=project_name,
-                path=ws_relative_back,
-            ),
+        link_to_workspace(
+            target_dir=target_dir,
+            workspace_path=workspace_path,
+            key_prefix=key_prefix,
+            project_name=project_name,
+            copy_nodes=copy_nodes,
+            console=console,
         )
     except ValueError as exc:
-        raise InitError(f"Failed to register in workspace: {exc}") from exc
-
-    cfg = _load_project(target_dir)
-    cfg_new = cfg.model_copy(
-        update={"workspace": ProjectWorkspacePointer(path=pointer_path)}
-    )
-    _save_project(target_dir, cfg_new)
-
-    console.print(
-        f"[dim]✓ Linked {project_name} to workspace at {workspace_path}[/dim]"
-    )
-
-    if copy_nodes:
-        from datetime import datetime, timezone
-
-        from tripwire.core.node_store import node_exists, save_node
-
-        node_ids = [nid.strip() for nid in copy_nodes.split(",") if nid.strip()]
-        head_sha = _git_head_short(workspace_path)
-        copied = 0
-        for nid in node_ids:
-            if node_exists(target_dir, nid):
-                console.print(
-                    f"[yellow]⚠ {nid}: already exists locally, skipped[/yellow]"
-                )
-                continue
-            try:
-                from tripwire.core.parser import parse_frontmatter_body
-                from tripwire.core.paths import workspace_node_path
-                from tripwire.models.node import ConceptNode
-
-                ws_node_path = workspace_node_path(workspace_path, nid)
-                if not ws_node_path.is_file():
-                    console.print(f"[yellow]⚠ {nid}: not found in workspace[/yellow]")
-                    continue
-                text = ws_node_path.read_text(encoding="utf-8")
-                fm, _body = parse_frontmatter_body(text)
-                canonical = ConceptNode.model_validate(fm)
-                local_copy = canonical.model_copy(
-                    update={
-                        "origin": "workspace",
-                        "scope": "workspace",
-                        "workspace_sha": head_sha,
-                        "workspace_pulled_at": datetime.now(tz=timezone.utc),
-                    }
-                )
-                save_node(target_dir, local_copy, update_cache=False)
-                copied += 1
-            except Exception as exc:
-                console.print(f"[yellow]⚠ {nid}: copy failed: {exc}[/yellow]")
-        if copied:
-            console.print(f"[dim]✓ Copied {copied} node(s) from workspace[/dim]")
+        raise InitError(str(exc)) from exc
 
 
 def _write_initial_readme(target_dir: Path) -> None:
@@ -769,19 +358,6 @@ def _write_initial_readme(target_dir: Path) -> None:
     readme_path = target_dir / "README.md"
     readme_path.write_text(rendered, encoding="utf-8")
     console.print(f"  [green]+[/green] {readme_path.relative_to(target_dir)}")
-
-
-def _git_head_short(repo_dir: Path) -> str:
-    """Return short SHA of HEAD in a git repo."""
-    import subprocess as _subprocess
-
-    return _subprocess.run(
-        ["git", "rev-parse", "--short", "HEAD"],
-        cwd=repo_dir,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
 
 
 @click.command(name="init")

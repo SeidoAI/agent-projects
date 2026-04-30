@@ -25,7 +25,6 @@ import subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 import click
 from rich.console import Console
@@ -44,8 +43,29 @@ from tripwire.core.session_check import (
     strict_check,
 )
 from tripwire.core.session_readiness import check_readiness
+from tripwire.core.session_review_writer import (
+    gather_pr_files as _gather_pr_files,
+)
+from tripwire.core.session_review_writer import (
+    gather_pr_number as _gather_pr_number,
+)
+from tripwire.core.session_review_writer import (
+    render_verified_md as _render_verified_md,  # noqa: F401  — re-exported for tests
+)
+from tripwire.core.session_review_writer import (
+    write_review_json as _write_review_json,
+)
+from tripwire.core.session_review_writer import (
+    write_verified_for_session as _write_verified_for_session,
+)
 from tripwire.core.session_store import list_sessions, load_session, save_session
 from tripwire.core.task_checklist import parse_task_checklist
+from tripwire.core.tripwire_state import (
+    record_bypass as _record_tripwire_bypass,
+)
+from tripwire.core.tripwire_state import (
+    write_ack_marker as _write_ack_marker_core,
+)
 from tripwire.models.enums import SessionStatus
 from tripwire.models.session import EngagementEntry
 
@@ -962,115 +982,20 @@ def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
 def session_reopen_cmd(session_id: str, reason: str, project_dir: Path) -> None:
     """Move a completed session back to ``paused`` for PR-fix iteration.
 
-    The companion command to ``session complete``: when a PR review
-    surfaces fixes, the PM runs ``session reopen <id> --reason '...'``
-    to flip the lifecycle back so ``session spawn <id> --resume`` can
-    re-engage the agent. Side-effects:
-
-    - Status: ``completed`` → ``paused`` (the lifecycle slot ``--resume``
-      already accepts).
-    - Each recorded draft PR is flipped ready→draft via
-      ``gh pr ready --undo`` so the "draft while work is happening,
-      ready when merge-ready" contract stays consistent.
-    - A ``## PM follow-up`` section is appended to the session's
-      plan.md if the section is not already present, with a placeholder
-      pointing at the PR URL(s). Closes the "PM forgot to update plan"
-      failure mode.
-    - One JSON line is appended to
-      ``~/.tripwire/logs/<project-slug>/audit.jsonl`` with the reason
-      and timestamp.
+    Thin wrapper — see :func:`tripwire.core.session_reopen.reopen_session`
+    for the side-effect contract.
     """
-    import os
-
-    from tripwire.core import paths
-    from tripwire.core.store import load_project
-    from tripwire.ui.services._atomic_write import append_jsonl
+    from tripwire.core.session_reopen import reopen_session
 
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
     try:
-        session = load_session(resolved, session_id)
+        reopen_session(resolved, session_id, reason)
     except FileNotFoundError as exc:
         raise click.ClickException(f"session '{session_id}' not found") from exc
-
-    if session.status != "completed":
-        raise click.ClickException(
-            f"session '{session_id}' is '{session.status}', must be "
-            f"'completed' to reopen"
-        )
-
-    # Flip recorded draft PRs ready → draft. Best-effort: keeps the
-    # reopen transition usable even when gh hiccups.
-    for wt in session.runtime_state.worktrees:
-        if not wt.draft_pr_url:
-            continue
-        try:
-            subprocess.run(
-                ["gh", "pr", "ready", wt.draft_pr_url, "--undo"],
-                cwd=wt.worktree_path,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-        except (subprocess.SubprocessError, OSError, FileNotFoundError):
-            pass
-
-    # Append a `## PM follow-up` stub to plan.md when missing so the
-    # resumed agent has a place to read PM directives even if the PM
-    # forgot to add one.
-    plan_path = paths.session_plan_path(resolved, session_id)
-    if plan_path.is_file():
-        plan_text = plan_path.read_text(encoding="utf-8")
-        if "## PM follow-up" not in plan_text:
-            pr_lines = [
-                f"- {wt.draft_pr_url}"
-                for wt in session.runtime_state.worktrees
-                if wt.draft_pr_url
-            ]
-            stub_lines = ["", "## PM follow-up", "", f"Reopened: {reason}.", ""]
-            if pr_lines:
-                stub_lines.append("PR(s) under review:")
-                stub_lines.extend(pr_lines)
-                stub_lines.append("")
-            stub_lines.append(
-                "Address each PM finding in priority order; see the "
-                "PR comments for specifics."
-            )
-            stub_lines.append("")
-            sep = "" if plan_text.endswith("\n") else "\n"
-            plan_path.write_text(
-                plan_text + sep + "\n".join(stub_lines), encoding="utf-8"
-            )
-
-    # Status: completed → paused (the slot `spawn --resume` already
-    # accepts).
-    session.status = SessionStatus.PAUSED
-    session.updated_at = datetime.now(tz=timezone.utc)
-    save_session(resolved, session)
-
-    # Audit-log the reopen so the "how many round trips this session
-    # took" history is queryable later.
-    try:
-        proj = load_project(resolved)
-        proj_slug = proj.name.lower().replace(" ", "-")
-    except Exception:
-        proj_slug = "unknown"
-    override = os.environ.get("TRIPWIRE_LOG_DIR")
-    log_root = Path(override) if override else Path.home() / ".tripwire" / "logs"
-    audit_path = log_root / proj_slug / "audit.jsonl"
-    append_jsonl(
-        audit_path,
-        {
-            "action": "session_reopen",
-            "session_id": session_id,
-            "reason": reason,
-            "timestamp": datetime.now(tz=timezone.utc)
-            .isoformat(timespec="milliseconds")
-            .replace("+00:00", "Z"),
-        },
-    )
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
 
     click.echo(f"Session '{session_id}' reopened (→ paused). Reason: {reason}")
     click.echo(f"Spawn the resumed agent: tripwire session spawn {session_id} --resume")
@@ -1643,83 +1568,19 @@ def session_cost_cmd(
     show_default=True,
 )
 def session_analyze_routing_cmd(project_dir: Path, output_format: str) -> None:
-    """Aggregate ``.routing_telemetry.jsonl`` rows by (provider, model, effort, task_kind).
+    """Aggregate ``.routing_telemetry.jsonl`` rows by route.
 
-    Produces ``$/merged-PR`` per route plus sample size + total cost.
-    Manual interpretation today; auto-tuning the routing table is
-    v0.8 scope. Routes with zero merged sessions report
-    ``cost_per_merged_pr`` as ``null`` rather than infinity so the JSON
-    stays consumable by downstream tools.
+    Thin wrapper — see :func:`tripwire.core.routing_analysis.aggregate_routes`
+    for the per-route metrics computed.
     """
+    from tripwire.core.routing_analysis import aggregate_routes, render_routing_table
     from tripwire.core.routing_telemetry import read_telemetry
 
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
     rows = read_telemetry(resolved)
-
-    @dataclass
-    class _RouteAgg:
-        provider: str
-        model: str
-        effort: str
-        task_kind: str | None
-        n: int = 0
-        merged: int = 0
-        total_cost_usd: float = 0.0
-        total_duration_min: int = 0
-        re_engages: int = 0
-        ci_failures: int = 0
-
-    agg: dict[tuple, _RouteAgg] = {}
-    for r in rows:
-        key = (
-            r.get("provider", "claude"),
-            r.get("model", "opus"),
-            r.get("effort", "xhigh"),
-            r.get("task_kind"),
-        )
-        if key not in agg:
-            agg[key] = _RouteAgg(
-                provider=key[0], model=key[1], effort=key[2], task_kind=key[3]
-            )
-        bucket = agg[key]
-        bucket.n += 1
-        if r.get("merged"):
-            bucket.merged += 1
-        bucket.total_cost_usd += float(r.get("cost_usd") or 0.0)
-        bucket.total_duration_min += int(r.get("duration_min") or 0)
-        bucket.re_engages += int(r.get("re_engages") or 0)
-        bucket.ci_failures += int(r.get("ci_failures") or 0)
-
-    routes_payload: list[dict[str, Any]] = []
-    for bucket in agg.values():
-        cost_per_merged = (
-            bucket.total_cost_usd / bucket.merged if bucket.merged else None
-        )
-        routes_payload.append(
-            {
-                "provider": bucket.provider,
-                "model": bucket.model,
-                "effort": bucket.effort,
-                "task_kind": bucket.task_kind,
-                "n": bucket.n,
-                "merged": bucket.merged,
-                "total_cost_usd": round(bucket.total_cost_usd, 4),
-                "cost_per_merged_pr": (
-                    round(cost_per_merged, 4) if cost_per_merged is not None else None
-                ),
-                "avg_duration_min": (
-                    round(bucket.total_duration_min / bucket.n, 1) if bucket.n else 0.0
-                ),
-                "total_re_engages": bucket.re_engages,
-                "total_ci_failures": bucket.ci_failures,
-            }
-        )
-
-    routes_payload.sort(
-        key=lambda x: (x["cost_per_merged_pr"] is None, x["cost_per_merged_pr"] or 0)
-    )
+    routes_payload = aggregate_routes(rows)
 
     if output_format == "json":
         click.echo(
@@ -1729,37 +1590,7 @@ def session_analyze_routing_cmd(project_dir: Path, output_format: str) -> None:
         )
         return
 
-    if not routes_payload:
-        click.echo("No routing telemetry yet. Run a session through to completion.")
-        return
-
-    table = Table(title="Routing analysis", show_header=True)
-    table.add_column("provider")
-    table.add_column("model")
-    table.add_column("effort")
-    table.add_column("task_kind")
-    table.add_column("n", justify="right")
-    table.add_column("merged", justify="right")
-    table.add_column("$/merged", justify="right")
-    table.add_column("avg dur", justify="right")
-    table.add_column("re-eng", justify="right")
-    for r in routes_payload:
-        table.add_row(
-            r["provider"],
-            r["model"],
-            r["effort"],
-            r["task_kind"] or "—",
-            str(r["n"]),
-            str(r["merged"]),
-            (
-                f"${r['cost_per_merged_pr']:.2f}"
-                if r["cost_per_merged_pr"] is not None
-                else "—"
-            ),
-            f"{r['avg_duration_min']:.1f}m",
-            str(r["total_re_engages"]),
-        )
-    console.print(table)
+    render_routing_table(routes_payload, console)
 
 
 @session_cmd.command("agenda")
@@ -1920,69 +1751,36 @@ def session_log_cmd(
 ) -> None:
     """Show all tripwire fires for a session, with timestamps and acks.
 
-    Reads ``.tripwire/events/firings/<sid>/*.json`` (written by
-    ``FileEmitter`` from the registry) and joins each entry against
-    the per-tripwire ack marker. Distinct from ``tripwire session
-    logs`` (plural) which surfaces agent stdout/stderr — this is the
-    process-event surface added by KUI-99.
+    Thin wrapper — see :func:`tripwire.core.session_log.enumerate_fires`.
     """
-    import json as _json
-
     from tripwire.cli.tripwires import _is_pm
+    from tripwire.core.session_log import enumerate_fires
 
     resolved = project_dir.expanduser().resolve()
-    fire_dir = resolved / ".tripwire" / "events" / "firings" / session_id
 
     if web:
         click.echo(
             f"Tripwire Log: http://localhost:8000/tripwires?session_id={session_id}"
         )
 
-    if not fire_dir.is_dir():
-        click.echo(f"No tripwire fires for session {session_id!r}.")
-        return
-
-    files = sorted(fire_dir.glob("*.json"))
-    if not files:
+    entries = list(enumerate_fires(resolved, session_id))
+    if not entries:
         click.echo(f"No tripwire fires for session {session_id!r}.")
         return
 
     pm_mode = _is_pm()
-
-    for path in files:
-        try:
-            payload = _json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, _json.JSONDecodeError):
-            click.echo(f"  <unreadable: {path.name}>")
+    for entry in entries:
+        if entry.unreadable:
+            name = entry.source_path.name if entry.source_path else "?"
+            click.echo(f"  <unreadable: {name}>")
             continue
-
-        tw_id = payload.get("tripwire_id", "?")
-        fired_at = payload.get("fired_at", "?")
-        event = payload.get("event", "?")
-        escalated = payload.get("escalated", False)
-
-        marker_path = resolved / ".tripwire" / "acks" / f"{tw_id}-{session_id}.json"
-        ack_status = "unacked"
-        ack_detail = ""
-        if marker_path.is_file():
-            try:
-                marker = _json.loads(marker_path.read_text(encoding="utf-8"))
-                if marker.get("declared_no_findings"):
-                    ack_status = "acked (declared_no_findings)"
-                elif marker.get("fix_commits"):
-                    fixes = marker["fix_commits"]
-                    ack_status = "acked"
-                    ack_detail = f"  fix_commits={','.join(fixes)}"
-            except (OSError, _json.JSONDecodeError):
-                ack_status = "acked (unreadable marker)"
-
-        flag = " ESCALATED" if escalated else ""
+        flag = " ESCALATED" if entry.escalated else ""
         click.echo(
-            f"  {fired_at}  {tw_id}  on={event}  status={ack_status}{ack_detail}{flag}"
+            f"  {entry.fired_at}  {entry.tripwire_id}  on={entry.event}  "
+            f"status={entry.ack_status}{entry.ack_detail}{flag}"
         )
-
         if reveal and pm_mode:
-            body = payload.get("prompt_revealed") or "(prompt not persisted)"
+            body = entry.prompt_revealed or "(prompt not persisted)"
             indented = "\n".join("    " + line for line in body.splitlines())
             click.echo(indented)
 
@@ -2130,166 +1928,22 @@ def _write_tripwire_ack(
     fix_commits: list[str],
     declared_no_findings: bool,
 ) -> None:
-    """Write the tripwire ack marker, validating substantiveness.
-
-    Raises ``click.ClickException`` if the caller didn't supply enough
-    substance — the marker check would reject the same case at the
-    next fire, so we surface it now rather than letting the agent
-    "ack" something that won't unblock.
-    """
-    import json as _json
-    from datetime import datetime as _dt
-    from datetime import timezone as _tz
-
-    if not fix_commits and not declared_no_findings:
-        raise click.ClickException(
-            "Tripwire ack requires substance: pass at least one "
-            "`--fix-commit <sha>` OR `--declared-no-findings`. The "
-            "marker substantiveness check would reject an empty ack."
+    """Thin click wrapper — see ``core.tripwire_state.write_ack_marker``."""
+    try:
+        _write_ack_marker_core(
+            project_dir=project_dir,
+            session_id=session_id,
+            tripwire_id=tripwire_id,
+            fix_commits=fix_commits,
+            declared_no_findings=declared_no_findings,
         )
-
-    marker = project_dir / ".tripwire" / "acks" / f"{tripwire_id}-{session_id}.json"
-    marker.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "tripwire_id": tripwire_id,
-        "session_id": session_id,
-        "acked_at": _dt.now(tz=_tz.utc).isoformat(),
-        "fix_commits": list(fix_commits),
-        "declared_no_findings": bool(declared_no_findings),
-    }
-    marker.write_text(_json.dumps(payload, indent=2), encoding="utf-8")
-
-
-def _record_tripwire_bypass(*, project_dir: Path, session_id: str, event: str) -> None:
-    """Append a one-line audit entry when `--no-tripwires` is used.
-
-    The audit log is the only durable record of the bypass — without
-    it, an agent could opt out of the tripwire silently and the PM
-    review would never know.
-    """
-    from datetime import datetime as _dt
-    from datetime import timezone as _tz
-
-    audit_dir = project_dir / ".tripwire" / "audit"
-    audit_dir.mkdir(parents=True, exist_ok=True)
-    log_path = audit_dir / "tripwire_bypass.log"
-    stamp = _dt.now(tz=_tz.utc).isoformat()
-    line = f"{stamp}\t{event}\t{session_id}\t--no-tripwires\n"
-    with log_path.open("a", encoding="utf-8") as fh:
-        fh.write(line)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
 
 
 # ----------------------------------------------------------------------------
 # `tripwire session review` — PR diff vs. issue specs
 # ----------------------------------------------------------------------------
-
-
-def _gather_pr_number(session) -> int | None:
-    import json as _json
-
-    for wt in session.runtime_state.worktrees:
-        try:
-            result = subprocess.run(
-                [
-                    "gh",
-                    "pr",
-                    "list",
-                    "--head",
-                    wt.branch,
-                    "--json",
-                    "number",
-                    "--limit",
-                    "1",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                prs = _json.loads(result.stdout)
-                if prs:
-                    return int(prs[0]["number"])
-        except (subprocess.SubprocessError, OSError, _json.JSONDecodeError):
-            continue
-    return None
-
-
-def _gather_pr_files(pr_number: int) -> list[str]:
-    import json as _json
-
-    try:
-        result = subprocess.run(
-            ["gh", "pr", "view", str(pr_number), "--json", "files"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        if result.returncode == 0:
-            data = _json.loads(result.stdout)
-            return [f["path"] for f in data.get("files", [])]
-    except (subprocess.SubprocessError, OSError, _json.JSONDecodeError):
-        pass
-    return []
-
-
-def _render_verified_md(
-    *, issue, criteria: list[str], verdict: str, stamp: str, deviations: list[str]
-) -> str:
-    """Render the shipped verified.md.j2 template with review context."""
-    from jinja2 import Environment, FileSystemLoader
-
-    import tripwire
-
-    template_root = Path(tripwire.__file__).parent / "templates" / "issue_artifacts"
-    env = Environment(
-        loader=FileSystemLoader(str(template_root)),
-        keep_trailing_newline=True,
-    )
-    template = env.get_template("verified.md.j2")
-    return template.render(
-        issue=issue,
-        criteria=criteria,
-        verdict=verdict,
-        verified_by="pm-agent",
-        verified_at=stamp,
-        deviations=deviations,
-    )
-
-
-def _write_verified_for_session(project_dir: Path, session, report) -> None:
-    """For each issue in the session, write or append issues/<key>/verified.md.
-
-    New file: rendered via ``templates/issue_artifacts/verified.md.j2``.
-    Existing file: append a ``## Re-review <date>`` section preserving history.
-    """
-    from tripwire.core import paths as _paths
-    from tripwire.core.store import load_issue
-
-    stamp = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
-    for ir in report.issue_reviews:
-        verified_path = _paths.issue_dir(project_dir, ir.key) / "verified.md"
-        if verified_path.is_file():
-            existing = verified_path.read_text(encoding="utf-8")
-            addition = (
-                f"\n\n## Re-review {stamp} (session {session.id})\n"
-                f"Verdict: {report.verdict}\n"
-            )
-            verified_path.write_text(existing + addition, encoding="utf-8")
-            continue
-
-        try:
-            issue = load_issue(project_dir, ir.key)
-        except FileNotFoundError:
-            continue
-        rendered = _render_verified_md(
-            issue=issue,
-            criteria=ir.criteria,
-            verdict=report.verdict,
-            stamp=stamp,
-            deviations=report.deviations.unspec_files,
-        )
-        verified_path.parent.mkdir(parents=True, exist_ok=True)
-        verified_path.write_text(rendered, encoding="utf-8")
 
 
 @session_cmd.command("review")
@@ -2446,40 +2100,6 @@ def session_review_cmd(
     _write_review_json(resolved, session, report)
 
     raise click.exceptions.Exit(report.exit_code)
-
-
-def _write_review_json(project_dir: Path, session, report) -> None:
-    """Persist sessions/<id>/review.json for the complete-time gate."""
-    import json as _json
-
-    review_path = project_dir / "sessions" / session.id / "review.json"
-    review_path.parent.mkdir(parents=True, exist_ok=True)
-
-    head_sha = None
-    if session.runtime_state.worktrees:
-        wt_path = Path(session.runtime_state.worktrees[0].worktree_path)
-        if wt_path.is_dir():
-            try:
-                result = subprocess.run(
-                    ["git", "-C", str(wt_path), "rev-parse", "HEAD"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                )
-                if result.returncode == 0:
-                    head_sha = result.stdout.strip() or None
-            except (subprocess.SubprocessError, OSError):
-                pass
-
-    payload = {
-        "session_id": session.id,
-        "verdict": report.verdict,
-        "exit_code": report.exit_code,
-        "pr_number": report.pr_number,
-        "head_sha": head_sha,
-        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
-    }
-    review_path.write_text(_json.dumps(payload, indent=2), encoding="utf-8")
 
 
 # ----------------------------------------------------------------------------

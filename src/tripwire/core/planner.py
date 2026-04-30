@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tripwire.cli.init import (
+from tripwire.core.init_templates import (
     CREATED_DIRS,
     JINJA_RENDERED_SUBDIRS,
     ROOT_J2_FILES,
