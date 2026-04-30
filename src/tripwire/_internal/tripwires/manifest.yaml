@@ -19,6 +19,8 @@ session.complete:
     class: tripwire._internal.tripwires.stopped_to_ask.StoppedToAskTripwire
   - id: write-count
     class: tripwire._internal.tripwires.write_count.WriteCountTripwire
+  - id: cost-ceiling
+    class: tripwire._internal.tripwires.cost_ceiling.CostCeilingTripwire
 issue.close: []
 pr.open: []
 validate.run: []
