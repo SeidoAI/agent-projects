@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tripwire.core import paths
 from tripwire.core.validator._types import CheckResult, ValidationContext
+from tripwire.core.workflow.registry import registers_at
 from tripwire.models.enums import SessionStatus
 from tripwire.models.manifest import ArtifactManifest
 from tripwire.models.session import AgentSession
@@ -37,6 +38,7 @@ def _load_manifest(
     return manifest, findings
 
 
+@registers_at("coding-session", "in_review")
 def check_manifest_schema(ctx: ValidationContext) -> list[CheckResult]:
     """`templates/artifacts/manifest.yaml` parses and matches the schema.
 
@@ -47,6 +49,7 @@ def check_manifest_schema(ctx: ValidationContext) -> list[CheckResult]:
     return findings
 
 
+@registers_at("coding-session", "in_review")
 def check_manifest_phase_ownership_consistent(
     ctx: ValidationContext,
 ) -> list[CheckResult]:
@@ -83,6 +86,7 @@ def check_manifest_phase_ownership_consistent(
     return results
 
 
+@registers_at("coding-session", "in_review")
 def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
     """Sessions at status=completed must have all required artifacts.
 
@@ -121,6 +125,7 @@ def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
     return results
 
 
+@registers_at("coding-session", "in_review")
 def check_issue_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
     """Every issue at status ≥ required_at_status must have its artifact file.
 

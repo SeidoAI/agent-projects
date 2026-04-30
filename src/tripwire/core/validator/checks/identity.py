@@ -7,9 +7,11 @@ from datetime import datetime
 from tripwire.core.id_generator import parse_key
 from tripwire.core.store import PROJECT_CONFIG_FILENAME
 from tripwire.core.validator._types import CheckResult, LoadedEntity, ValidationContext
+from tripwire.core.workflow.registry import registers_at
 from tripwire.models.issue import Issue
 
 
+@registers_at("coding-session", "executing")
 def check_uuid_present(ctx: ValidationContext) -> list[CheckResult]:
     """Every loaded entity must carry a `uuid` field.
 
@@ -40,6 +42,7 @@ def check_uuid_present(ctx: ValidationContext) -> list[CheckResult]:
     return results
 
 
+@registers_at("coding-session", "executing")
 def check_id_format(ctx: ValidationContext) -> list[CheckResult]:
     """Issue IDs must match `<key_prefix>-<N>` from project.yaml.
 
@@ -81,6 +84,7 @@ def check_id_format(ctx: ValidationContext) -> list[CheckResult]:
     return results
 
 
+@registers_at("coding-session", "executing")
 def check_id_collisions(ctx: ValidationContext) -> list[CheckResult]:
     """Two entity files claiming the same id with different uuids → error."""
     results: list[CheckResult] = []
@@ -116,6 +120,7 @@ def check_id_collisions(ctx: ValidationContext) -> list[CheckResult]:
     return results
 
 
+@registers_at("coding-session", "executing")
 def check_sequence_drift(ctx: ValidationContext) -> list[CheckResult]:
     """`project.yaml.next_issue_number` must be at least max(existing keys) + 1."""
     if ctx.project_config is None:
@@ -146,6 +151,7 @@ def check_sequence_drift(ctx: ValidationContext) -> list[CheckResult]:
     return []
 
 
+@registers_at("coding-session", "executing")
 def check_timestamps(ctx: ValidationContext) -> list[CheckResult]:
     """Every entity should have parseable created_at / updated_at where applicable."""
     results: list[CheckResult] = []

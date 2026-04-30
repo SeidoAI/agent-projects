@@ -19,9 +19,11 @@ import yaml
 
 from tripwire.core.validator._types import CheckResult, ValidationContext
 from tripwire.core.workflow.loader import WORKFLOW_FILENAME, load_workflows
+from tripwire.core.workflow.registry import registers_at
 from tripwire.core.workflow.schema import validate_workflow_spec
 
 
+@registers_at("coding-session", "executing")
 def check_workflow_well_formed(ctx: ValidationContext) -> list[CheckResult]:
     """Validate ``<project>/workflow.yaml`` shape and references.
 

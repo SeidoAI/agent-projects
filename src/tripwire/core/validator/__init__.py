@@ -781,6 +781,12 @@ def _emit_check_result(
     returns ten findings emits one `validator_fail`, not ten. The
     validator id mirrors `workflow_service`: `v_<slug>` where `<slug>` is
     the function name with the `check_` prefix stripped.
+
+    Reads ``check_fn.__tripwire_workflow_station__`` (set by
+    :func:`tripwire.core.workflow.registry.registers_at`) so the
+    payload carries the (workflow, station) the check is registered
+    against — the runtime gates and drift report consume this. KUI-120
+    is the registry-consume contract.
     """
     if isinstance(emitter, NullEmitter):
         return
@@ -789,6 +795,7 @@ def _emit_check_result(
     fired_at = _isoformat_z(datetime.now(timezone.utc))
     kind = "validator_fail" if has_error else "validator_pass"
     event_id = f"evt-{fired_at}-{kind}-{slug}-{session_id}"
+    pair = getattr(check_fn, "__tripwire_workflow_station__", None)
     payload: dict[str, Any] = {
         "id": event_id,
         "kind": kind,
@@ -797,6 +804,9 @@ def _emit_check_result(
         "validator_id": f"v_{slug}",
         "findings": [r.to_json() for r in results],
     }
+    if pair is not None:
+        payload["workflow"] = pair[0]
+        payload["station"] = pair[1]
     try:
         emitter.emit("validator_runs", payload)
     except Exception:
