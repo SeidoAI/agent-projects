@@ -78,6 +78,9 @@ def test_validate_byte_stable_after_registration(tmp_path) -> None:
         "check_enum_values",
         "check_reference_integrity",
         "check_bidirectional_related",
+        # KUI-127 (v0.9 entity-graph-substrate, PR #74) added stale-pin
+        # validation in the references group; canonical position is here.
+        "check_no_stale_pins",
         "check_issue_body_structure",
         "check_status_transitions",
         "check_freshness",
