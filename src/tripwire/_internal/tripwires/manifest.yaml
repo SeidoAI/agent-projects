@@ -11,6 +11,8 @@
 session.complete:
   - id: self-review
     class: tripwire._internal.tripwires.self_review.SelfReviewTripwire
+  - id: phase-transition
+    class: tripwire._internal.tripwires.phase_transition.PhaseTransitionTripwire
 issue.close: []
 pr.open: []
 validate.run: []

@@ -115,6 +115,17 @@ class Tripwire(ABC):
     def is_acknowledged(self, ctx: TripwireContext) -> bool:
         """Return True iff this tripwire has been acknowledged for ``ctx``."""
 
+    def should_fire(self, ctx: TripwireContext) -> bool:
+        """Return True iff this tripwire's observed pattern is present.
+
+        Default ``True`` preserves the v0.8 always-fire behaviour
+        (e.g. ``self-review``). Conditional tripwires (the v0.9
+        deviation set) override this to stay silent when their
+        pattern is absent — without this gate, every session.complete
+        would surface five prompts regardless of relevance.
+        """
+        return True
+
 
 @dataclass
 class FireResult:
@@ -188,6 +199,9 @@ def fire_event(
 
     for tw in tripwires:
         if tw.is_acknowledged(ctx):
+            continue
+
+        if not tw.should_fire(ctx):
             continue
 
         prior_fires = _count_prior_fires(project_dir, session_id, tw.id)

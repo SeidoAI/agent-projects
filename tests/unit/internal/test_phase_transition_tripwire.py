@@ -34,6 +34,7 @@ def _seed_project(
     """
     project_yaml = {
         "name": "demo-project",
+        "key_prefix": "DEM",
         "phase": phase,
         "repos": {"SeidoAI/demo": {"local": "."}},
     }
@@ -110,7 +111,7 @@ def test_should_fire_clean_transition(tmp_path: Path) -> None:
         ],
     )
     tw = PhaseTransitionTripwire()
-    assert tw.should_fire(tmp_path) is False
+    assert tw.should_fire(_ctx(tmp_path)) is False
 
 
 def test_should_fire_open_prev_phase_issue(tmp_path: Path) -> None:
@@ -124,7 +125,7 @@ def test_should_fire_open_prev_phase_issue(tmp_path: Path) -> None:
         ],
     )
     tw = PhaseTransitionTripwire()
-    assert tw.should_fire(tmp_path) is True
+    assert tw.should_fire(_ctx(tmp_path)) is True
 
 
 def test_should_fire_silent_at_scoping(tmp_path: Path) -> None:
@@ -137,7 +138,7 @@ def test_should_fire_silent_at_scoping(tmp_path: Path) -> None:
         ],
     )
     tw = PhaseTransitionTripwire()
-    assert tw.should_fire(tmp_path) is False
+    assert tw.should_fire(_ctx(tmp_path)) is False
 
 
 def test_should_fire_ignores_unrelated_phase_label(tmp_path: Path) -> None:
@@ -151,7 +152,7 @@ def test_should_fire_ignores_unrelated_phase_label(tmp_path: Path) -> None:
         ],
     )
     tw = PhaseTransitionTripwire()
-    assert tw.should_fire(tmp_path) is False
+    assert tw.should_fire(_ctx(tmp_path)) is False
 
 
 def test_acknowledged_with_substantive_marker(tmp_path: Path) -> None:
