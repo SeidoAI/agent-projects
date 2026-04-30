@@ -5,15 +5,6 @@ invariants, enum-value validity, reference integrity, etc. The aggregator
 :data:`ALL_CHECKS` rebuilds the canonical run order by concatenating
 the themed lists in the same order they appeared pre-split.
 
-The function bodies still live in :mod:`tripwire.core.validator` (the
-god-file decomposition does the relocation in a later cycle); this
-module's job is to make the registry discoverable.
-
-Why themed lists, not one-file-per-check: ~24 checks would mean ~24
-files. Each is already a well-named function; per-file isolation costs
-more discoverability than it saves. Themed groupings strike a balance
-that future work can refine.
-
 The four ``LINT_CHECKS`` (under ``validator/lint/``) are appended to
 ``ALL_CHECKS`` separately because they're stateful rules that already
 own their own files — see ``lint/__init__.py``.
@@ -21,31 +12,41 @@ own their own files — see ``lint/__init__.py``.
 
 from __future__ import annotations
 
-from tripwire.core.validator import (
+from tripwire.core.validator.checks.artifacts import (
     check_artifact_presence,
-    check_bidirectional_related,
-    check_comment_provenance,
-    check_coverage_heuristics,
-    check_enum_values,
-    check_freshness,
-    check_handoff_artifact,
-    check_id_collisions,
-    check_id_format,
     check_issue_artifact_presence,
-    check_issue_body_structure,
     check_manifest_phase_ownership_consistent,
     check_manifest_schema,
-    check_phase_requirements,
+)
+from tripwire.core.validator.checks.coherence import (
+    check_comment_provenance,
+    check_freshness,
     check_pm_response_covers_self_review,
     check_pm_response_followups_resolve,
-    check_project_standards,
-    check_quality_consistency,
-    check_reference_integrity,
-    check_sequence_drift,
     check_session_issue_coherence,
-    check_status_transitions,
+)
+from tripwire.core.validator.checks.enums import check_enum_values
+from tripwire.core.validator.checks.identity import (
+    check_id_collisions,
+    check_id_format,
+    check_sequence_drift,
     check_timestamps,
     check_uuid_present,
+)
+from tripwire.core.validator.checks.quality import (
+    check_coverage_heuristics,
+    check_phase_requirements,
+    check_project_standards,
+    check_quality_consistency,
+)
+from tripwire.core.validator.checks.references import (
+    check_bidirectional_related,
+    check_reference_integrity,
+)
+from tripwire.core.validator.checks.structure import (
+    check_handoff_artifact,
+    check_issue_body_structure,
+    check_status_transitions,
 )
 
 # Identity: every entity has a uuid, the right id format, no collisions,
@@ -103,31 +104,24 @@ QUALITY_CHECKS = [
     check_quality_consistency,
 ]
 
-# Canonical run order: concatenate themes in the same order they
-# appeared in the pre-split ALL_CHECKS, so finding output ordering
-# stays byte-stable.
+# Canonical run order: matches the pre-split ALL_CHECKS literal so finding
+# output ordering stays byte-stable.
 ALL_CHECKS = [
-    # Identity (uuid_present, id_format) ran before enums historically.
     check_uuid_present,
     check_id_format,
-    # Enums.
-    *ENUM_CHECKS,
-    # References + structure.
-    *REFERENCE_CHECKS,
+    check_enum_values,
+    check_reference_integrity,
+    check_bidirectional_related,
     check_issue_body_structure,
     check_status_transitions,
-    # Coherence (freshness ran before manifests historically).
     check_freshness,
-    # Artifacts.
     check_manifest_schema,
     check_manifest_phase_ownership_consistent,
     check_artifact_presence,
-    # Identity (id_collisions, sequence_drift, timestamps) ran after artifacts.
     check_id_collisions,
     check_sequence_drift,
     check_timestamps,
     check_comment_provenance,
-    # Quality.
     check_project_standards,
     check_coverage_heuristics,
     check_phase_requirements,
