@@ -974,12 +974,25 @@ def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
     help="Why are you reopening? Recorded in the audit log.",
 )
 @click.option(
+    "--reset-acks",
+    "reset_acks",
+    is_flag=True,
+    default=False,
+    help=(
+        "Delete `.tripwire/acks/*-<session_id>.json` so the agent "
+        "re-encounters every tripwire on resume. Use after substantial "
+        "rework (PR closed + reopened, plan.md materially edited)."
+    ),
+)
+@click.option(
     "--project-dir",
     type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
     default=".",
     show_default=True,
 )
-def session_reopen_cmd(session_id: str, reason: str, project_dir: Path) -> None:
+def session_reopen_cmd(
+    session_id: str, reason: str, reset_acks: bool, project_dir: Path
+) -> None:
     """Move a completed session back to ``paused`` for PR-fix iteration.
 
     Thin wrapper — see :func:`tripwire.core.session_reopen.reopen_session`
@@ -991,13 +1004,17 @@ def session_reopen_cmd(session_id: str, reason: str, project_dir: Path) -> None:
     _require_project(resolved)
 
     try:
-        reopen_session(resolved, session_id, reason)
+        result = reopen_session(
+            resolved, session_id, reason, reset_acks=reset_acks
+        )
     except FileNotFoundError as exc:
         raise click.ClickException(f"session '{session_id}' not found") from exc
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
 
     click.echo(f"Session '{session_id}' reopened (→ paused). Reason: {reason}")
+    if reset_acks:
+        click.echo(f"Reset {result.acks_reset_count} tripwire ack(s).")
     click.echo(f"Spawn the resumed agent: tripwire session spawn {session_id} --resume")
 
 
