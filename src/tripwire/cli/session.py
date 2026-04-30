@@ -1831,6 +1831,19 @@ def session_log_cmd(
     help="Acknowledge the tripwire with an explicit no-findings declaration.",
 )
 @click.option(
+    "--tripwire-id",
+    "tripwire_id",
+    type=str,
+    default="self-review",
+    show_default=True,
+    help=(
+        "Which tripwire to ack. Defaults to `self-review` for backward "
+        "compat. Use the id of any v0.9 deviation tripwire fired on "
+        "session.complete (phase-transition, followups-not-filed, "
+        "stopped-to-ask, write-count, cost-ceiling)."
+    ),
+)
+@click.option(
     "--no-tripwires",
     is_flag=True,
     default=False,
@@ -1852,6 +1865,7 @@ def session_complete_cmd(
     ack: bool,
     fix_commits: tuple[str, ...],
     declared_no_findings: bool,
+    tripwire_id: str,
     no_tripwires: bool,
     web: bool,
 ) -> None:
@@ -1885,12 +1899,12 @@ def session_complete_cmd(
         _write_tripwire_ack(
             project_dir=resolved,
             session_id=session_id,
-            tripwire_id="self-review",
+            tripwire_id=tripwire_id,
             fix_commits=list(fix_commits),
             declared_no_findings=declared_no_findings,
         )
         click.echo(
-            f"Tripwire 'self-review' acknowledged for session {session_id}. "
+            f"Tripwire {tripwire_id!r} acknowledged for session {session_id}. "
             f"Re-run without --ack to invoke close-out."
         )
         return

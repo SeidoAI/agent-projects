@@ -226,15 +226,17 @@ def _session_key_files(project_dir: Path, session_id: str) -> list[str]:
 
 
 def _session_touched_files(project_dir: Path, session_id: str) -> list[str]:
-    """Return the union of files touched by HEAD relative to main.
+    """Return the union of files touched by HEAD relative to base_branch.
 
-    Best-effort; missing git or detached repos return ``[]``. The
-    function is monkeypatched in unit tests so the heuristic logic
-    can be exercised without seeding a real git history.
+    Reads ``project.yaml.base_branch`` (canonical source) and runs
+    ``git diff --name-only <base>...HEAD``. Falls back to ``main`` if
+    project.yaml is missing or unreadable. Best-effort: missing git
+    or unreachable refs return ``[]``. Monkeypatched in unit tests.
     """
+    base_branch = _resolve_base_branch(project_dir)
     try:
         out = subprocess.check_output(
-            ["git", "diff", "--name-only", "main...HEAD"],
+            ["git", "diff", "--name-only", f"{base_branch}...HEAD"],
             cwd=project_dir,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -243,6 +245,30 @@ def _session_touched_files(project_dir: Path, session_id: str) -> list[str]:
     except (OSError, subprocess.SubprocessError):
         return []
     return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def _resolve_base_branch(project_dir: Path) -> str:
+    """Read ``project.yaml.base_branch`` or fall back to ``main``.
+
+    Codex P1 #1 on PR #79: hardcoding ``main`` silently breaks
+    scope-creep detection for repos using ``develop`` /
+    ``master`` / etc. Reading project.yaml directly avoids importing
+    the typed loader (which forbids extra fields and would reject
+    minimal test fixtures).
+    """
+    pyaml = project_dir / "project.yaml"
+    if not pyaml.is_file():
+        return "main"
+    try:
+        data = yaml.safe_load(pyaml.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return "main"
+    if not isinstance(data, dict):
+        return "main"
+    base = data.get("base_branch")
+    if isinstance(base, str) and base.strip():
+        return base.strip()
+    return "main"
 
 
 def _marker_substantive(marker_path: Path) -> bool:

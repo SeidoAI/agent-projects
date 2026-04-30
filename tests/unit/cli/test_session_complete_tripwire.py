@@ -93,9 +93,7 @@ def test_ack_with_tripwire_id_targets_specific_marker(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     target = tmp_path / ".tripwire" / "acks" / "phase-transition-fixture-1.json"
     assert target.is_file(), "phase-transition marker missing"
-    self_review_marker = (
-        tmp_path / ".tripwire" / "acks" / "self-review-fixture-1.json"
-    )
+    self_review_marker = tmp_path / ".tripwire" / "acks" / "self-review-fixture-1.json"
     assert not self_review_marker.exists(), (
         "self-review marker leaked when --tripwire-id targeted phase-transition"
     )
