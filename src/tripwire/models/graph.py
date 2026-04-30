@@ -15,6 +15,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class EdgeType(StrEnum):
+    """Legacy edge type strings preserved for on-disk YAML compatibility.
+
+    These are the strings actually written into `graph/index.yaml`. v0.9's
+    canonical taxonomy lives on :class:`EdgeKind`; the unified-index facade
+    in `core.graph.index` translates between them.
+    """
+
     REFERENCES = "references"  # issue body [[node-id]] → node
     BLOCKED_BY = "blocked_by"  # issue → issue (frontmatter)
     BLOCKS = "blocks"  # inverse of blocked_by, computed
@@ -22,6 +29,35 @@ class EdgeType(StrEnum):
     PARENT = "parent"  # issue → parent epic (frontmatter)
     RELATED = "related"  # node → node (frontmatter)
     SOURCE = "source"  # node → file location (frontmatter)
+
+
+class EdgeKind(StrEnum):
+    """The 7 canonical edge kinds in the v0.9 unified entity graph.
+
+    Each maps to one or more legacy :class:`EdgeType` strings via
+    `core.graph.index.canonical_kind`. New edge writers should emit
+    canonical kinds; legacy on-disk strings keep loading via the mapping.
+    """
+
+    REFS = "refs"  # body or related references (bidir)
+    DEPENDS_ON = "depends_on"  # blockers, prerequisites
+    IMPLEMENTS = "implements"  # issue → requirement
+    PRODUCED_BY = "produced-by"  # entity → its author/producer
+    SUPERSEDES = "supersedes"  # versioned replacement
+    ADDRESSED_BY = "addressed-by"  # need / want → solution
+    TRIPWIRE_FIRED_ON = "tripwire-fired-on"  # tripwire instance → entity
+
+
+class NodeKind(StrEnum):
+    """The 7 canonical entity types carried as nodes in the unified index."""
+
+    CONCEPT_NODE = "concept-node"
+    ISSUE = "issue"
+    SESSION = "session"
+    DECISION = "decision"
+    COMMENT = "comment"
+    PULL_REQUEST = "pull-request"
+    TRIPWIRE_INSTANCE = "tripwire-instance"
 
 
 class FreshnessStatus(StrEnum):
@@ -75,6 +111,14 @@ class GraphEdge(BaseModel):
     to_id: str = Field(alias="to")
     type: str
     source_file: str | None = None  # which file this edge came from
+
+    # v0.9 (KUI-131): per-edge provenance for the unified index.
+    # `via_artifact` names the file or other artifact that produced this
+    # edge (typically the same as `source_file`, but can differ for
+    # synthesized edges). `line` pins the line number for body refs so
+    # the UI can deep-link back to the prose that introduced the edge.
+    via_artifact: str | None = None
+    line: int | None = None
 
 
 class GraphNode(BaseModel):

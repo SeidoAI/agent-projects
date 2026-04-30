@@ -13,6 +13,6 @@ New code should import from the package modules directly:
 
 from __future__ import annotations
 
-from tripwire.core.graph import cache, concept, dependency, refs
+from tripwire.core.graph import cache, concept, dependency, index, refs
 
-__all__ = ["cache", "concept", "dependency", "refs"]
+__all__ = ["cache", "concept", "dependency", "index", "refs"]
