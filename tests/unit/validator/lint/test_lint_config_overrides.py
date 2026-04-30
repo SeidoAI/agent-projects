@@ -46,7 +46,8 @@ def test_concept_name_prose_threshold_override(
 def test_semantic_coverage_threshold_override(
     tmp_path_project: Path, save_test_issue, save_test_node
 ):
-    """Threshold lowered to 0 — issues with no AC refs no longer warn."""
+    """Threshold raised to 1 (default is 0/off) — issues with no AC
+    refs now warn."""
     save_test_node(tmp_path_project, node_id="auth-system", name="Auth System")
     body = (
         "## Context\n[[auth-system]]\n\n## Implements\nx\n\n"
@@ -58,11 +59,12 @@ def test_semantic_coverage_threshold_override(
     )
     save_test_issue(tmp_path_project, key="TMP-1", status="in_progress", body=body)
     _set_lint_config(
-        tmp_path_project, {"semantic_coverage": {"min_ac_node_refs": 0}}
+        tmp_path_project, {"semantic_coverage": {"min_ac_node_refs": 1}}
     )
 
     ctx = load_context(tmp_path_project)
-    assert semantic_coverage.check(ctx) == []
+    results = semantic_coverage.check(ctx)
+    assert any(r.code == "semantic_coverage/below_threshold" for r in results)
 
 
 def test_mega_issue_threshold_override(tmp_path_project: Path, save_test_issue):

@@ -35,7 +35,11 @@ DEFAULT_THRESHOLDS: dict[str, dict[str, Any]] = {
     },
     "semantic_coverage": {
         # Min `[[node-id]]` references in the AC section per active issue.
-        "min_ac_node_refs": 1,
+        # Defaults to 0 (off) — projects opt in via lint_config because the
+        # convention of putting concept refs in AC items is project-policy,
+        # not universal. See decisions.md D-1 in the v09-validators
+        # session for the rationale.
+        "min_ac_node_refs": 0,
     },
     "mega_issue": {
         # Warn when an issue has >= this many child issues OR sessions.
