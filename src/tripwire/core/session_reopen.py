@@ -40,10 +40,27 @@ class ReopenResult:
     audit_path: Path
     plan_updated: bool
     draft_prs_flipped: list[str] = field(default_factory=list)
+    # KUI-137 (B3): count of `.tripwire/acks/*-<sid>.json` markers
+    # deleted when the caller passed `reset_acks=True`. Always 0 in
+    # the default-flag case.
+    acks_reset_count: int = 0
 
 
-def reopen_session(project_dir: Path, session_id: str, reason: str) -> ReopenResult:
+def reopen_session(
+    project_dir: Path,
+    session_id: str,
+    reason: str,
+    *,
+    reset_acks: bool = False,
+) -> ReopenResult:
     """Flip a completed session back to ``paused`` and arm the resume path.
+
+    When ``reset_acks=True`` (KUI-137), every per-session tripwire ack
+    marker (files named ``<tripwire-id>-<session-id>.json`` under
+    ``<project_dir>/.tripwire/acks/``) is deleted before the audit-log
+    entry is written, and a ``session.acks_reset`` event is emitted.
+    Use this after substantial rework so the agent re-encounters every
+    tripwire fresh on resume.
 
     Raises:
         FileNotFoundError: session.yaml does not exist.
@@ -110,6 +127,12 @@ def reopen_session(project_dir: Path, session_id: str, reason: str) -> ReopenRes
     session.updated_at = datetime.now(tz=timezone.utc)
     save_session(project_dir, session)
 
+    # KUI-137: optional ack reset BEFORE the audit-log entry so the
+    # event ordering reflects what the agent will see on resume.
+    acks_reset_count = 0
+    if reset_acks:
+        acks_reset_count = _reset_session_acks(project_dir, session_id, reason)
+
     # Audit-log the reopen so the "how many round trips this session
     # took" history is queryable later.
     audit_path = _audit_path(project_dir)
@@ -131,7 +154,45 @@ def reopen_session(project_dir: Path, session_id: str, reason: str) -> ReopenRes
         audit_path=audit_path,
         plan_updated=plan_updated,
         draft_prs_flipped=flipped,
+        acks_reset_count=acks_reset_count,
     )
+
+
+def _reset_session_acks(project_dir: Path, session_id: str, reason: str) -> int:
+    """Delete `<project_dir>/.tripwire/acks/*-<session_id>.json` markers.
+
+    Returns the count of markers deleted. Also emits one
+    ``session_acks_reset`` event (skipped when zero markers existed —
+    no event for a no-op).
+    """
+    from tripwire.core.event_emitter import FileEmitter
+
+    acks_dir = project_dir / ".tripwire" / "acks"
+    suffix = f"-{session_id}.json"
+    deleted = 0
+    if acks_dir.is_dir():
+        for marker in acks_dir.iterdir():
+            if marker.is_file() and marker.name.endswith(suffix):
+                try:
+                    marker.unlink()
+                    deleted += 1
+                except OSError:
+                    # A marker we can't remove doesn't sink the reopen —
+                    # the agent will still see the prompt and the marker
+                    # path will simply still be substantive.
+                    continue
+
+    payload = {
+        "kind": "session_acks_reset",
+        "session_id": session_id,
+        "reason": reason,
+        "acks_reset_count": deleted,
+        "fired_at": datetime.now(tz=timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z"),
+    }
+    FileEmitter(project_dir).emit("session_acks_reset", payload)
+    return deleted
 
 
 def _audit_path(project_dir: Path) -> Path:

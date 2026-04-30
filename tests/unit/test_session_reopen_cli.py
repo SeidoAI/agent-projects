@@ -288,3 +288,124 @@ class TestSessionReopen:
         assert rec["session_id"] == "s1"
         assert rec["action"] == "session_reopen"
         assert rec["reason"] == "PR review feedback"
+
+
+class TestSessionReopenResetAcks:
+    """KUI-137 (B3) — `--reset-acks` wipes the per-session ack markers
+    so the agent re-encounters every tripwire after substantial rework."""
+
+    def _write_marker(self, project_dir: Path, tripwire_id: str, sid: str) -> Path:
+        marker = project_dir / ".tripwire" / "acks" / f"{tripwire_id}-{sid}.json"
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text("{}", encoding="utf-8")
+        return marker
+
+    def test_default_keeps_ack_markers(
+        self, tmp_path_project, save_test_session, monkeypatch, tmp_path
+    ):
+        save_test_session(tmp_path_project, "s1", status="completed", plan=True)
+        marker = self._write_marker(tmp_path_project, "self-review", "s1")
+        _stub_gh(monkeypatch)
+        monkeypatch.setenv("TRIPWIRE_LOG_DIR", str(tmp_path / "logs"))
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            [
+                "reopen",
+                "s1",
+                "--reason",
+                "x",
+                "--project-dir",
+                str(tmp_path_project),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert marker.is_file(), "default reopen must NOT delete ack markers"
+
+    def test_reset_acks_deletes_markers(
+        self, tmp_path_project, save_test_session, monkeypatch, tmp_path
+    ):
+        save_test_session(tmp_path_project, "s1", status="completed", plan=True)
+        m1 = self._write_marker(tmp_path_project, "self-review", "s1")
+        m2 = self._write_marker(tmp_path_project, "changelog-updated", "s1")
+        # Marker for a different session — must NOT be touched.
+        other = self._write_marker(tmp_path_project, "self-review", "other")
+        _stub_gh(monkeypatch)
+        monkeypatch.setenv("TRIPWIRE_LOG_DIR", str(tmp_path / "logs"))
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            [
+                "reopen",
+                "s1",
+                "--reason",
+                "PR comments",
+                "--reset-acks",
+                "--project-dir",
+                str(tmp_path_project),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert not m1.exists()
+        assert not m2.exists()
+        assert other.exists()
+        assert "Reset 2 tripwire ack(s)" in result.output
+
+    def test_reset_acks_emits_event(
+        self, tmp_path_project, save_test_session, monkeypatch, tmp_path
+    ):
+        save_test_session(tmp_path_project, "s1", status="completed", plan=True)
+        self._write_marker(tmp_path_project, "self-review", "s1")
+        _stub_gh(monkeypatch)
+        monkeypatch.setenv("TRIPWIRE_LOG_DIR", str(tmp_path / "logs"))
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            [
+                "reopen",
+                "s1",
+                "--reason",
+                "PR comments",
+                "--reset-acks",
+                "--project-dir",
+                str(tmp_path_project),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+
+        events_dir = (
+            tmp_path_project / ".tripwire" / "events" / "session_acks_reset" / "s1"
+        )
+        assert events_dir.is_dir()
+        event_files = list(events_dir.glob("*.json"))
+        assert len(event_files) == 1
+        payload = json.loads(event_files[0].read_text(encoding="utf-8"))
+        assert payload["session_id"] == "s1"
+        assert payload["reason"] == "PR comments"
+        assert payload["acks_reset_count"] == 1
+
+    def test_reset_acks_with_no_markers_no_op(
+        self, tmp_path_project, save_test_session, monkeypatch, tmp_path
+    ):
+        save_test_session(tmp_path_project, "s1", status="completed", plan=True)
+        _stub_gh(monkeypatch)
+        monkeypatch.setenv("TRIPWIRE_LOG_DIR", str(tmp_path / "logs"))
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            [
+                "reopen",
+                "s1",
+                "--reason",
+                "x",
+                "--reset-acks",
+                "--project-dir",
+                str(tmp_path_project),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        assert "Reset 0 tripwire ack(s)" in result.output

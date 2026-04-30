@@ -92,6 +92,7 @@ from tripwire.core.validator.checks.identity import (
     check_sequence_drift,
     check_timestamps,
     check_uuid_present,
+    uuid_v4_load_error,
 )
 from tripwire.core.validator.checks.quality import (
     check_coverage_heuristics,
@@ -206,6 +207,12 @@ def _load_nodes(ctx: ValidationContext) -> None:
                 )
             )
             continue
+        v4_err = uuid_v4_load_error(
+            kind="node", rel_path=rel, raw_frontmatter=frontmatter
+        )
+        if v4_err is not None:
+            ctx.node_load_errors.append(v4_err)
+            continue
         try:
             model = ConceptNode.model_validate({**frontmatter, "body": body})
         except ValueError as exc:
@@ -286,6 +293,12 @@ def _load_sessions(ctx: ValidationContext) -> None:
                 )
             )
             continue
+        v4_err = uuid_v4_load_error(
+            kind="session", rel_path=rel, raw_frontmatter=frontmatter
+        )
+        if v4_err is not None:
+            ctx.session_load_errors.append(v4_err)
+            continue
         try:
             model = AgentSession.model_validate({**frontmatter, "body": body})
         except ValueError as exc:
@@ -365,6 +378,12 @@ def _load_issues(ctx: ValidationContext) -> None:
                 )
             )
             continue
+        v4_err = uuid_v4_load_error(
+            kind="issue", rel_path=rel, raw_frontmatter=frontmatter
+        )
+        if v4_err is not None:
+            ctx.issue_load_errors.append(v4_err)
+            continue
         try:
             model = Issue.model_validate({**frontmatter, "body": body})
         except ValueError as exc:
@@ -423,6 +442,12 @@ def _load_comments(ctx: ValidationContext) -> None:
                         message=str(exc),
                     )
                 )
+                continue
+            v4_err = uuid_v4_load_error(
+                kind="comment", rel_path=rel, raw_frontmatter=frontmatter
+            )
+            if v4_err is not None:
+                ctx.comment_load_errors.append(v4_err)
                 continue
             try:
                 model = Comment.model_validate({**frontmatter, "body": body})

@@ -37,6 +37,7 @@ from tripwire.cli.scaffold import brief_cmd
 from tripwire.cli.session import session_cmd
 from tripwire.cli.status import status_cmd
 from tripwire.cli.templates import templates_cmd
+from tripwire.cli.test_tripwire import test_tripwire_cmd
 from tripwire.cli.transition import transition_cmd
 from tripwire.cli.tripwires import tripwires_cmd
 from tripwire.cli.ui import ui_cmd
@@ -123,6 +124,7 @@ cli.add_command(ui_cmd)
 cli.add_command(watch_cmd)
 cli.add_command(workspace_cmd)
 cli.add_command(tripwires_cmd)
+cli.add_command(test_tripwire_cmd)
 cli.add_command(events_cmd)
 cli.add_command(transition_cmd)
 cli.add_command(drift_cmd)

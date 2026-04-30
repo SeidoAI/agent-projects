@@ -378,6 +378,44 @@ class TestUuidPresence:
         assert "uuid/missing" in codes(report)
 
 
+class TestUuidV4:
+    """KUI-143 — uuids must be RFC 4122 v4 (variant bits 0b10).
+
+    The model field is typed ``UUID4``, so non-v4 values would also
+    surface as ``schema_invalid``; we promote them to a specific
+    ``uuid/not_v4`` code so the validator's catalogue is unambiguous.
+    """
+
+    def test_v3_uuid_is_error(self, empty_project: Path) -> None:
+        write_issue(empty_project, "TST-1", uuid="11111111-1111-3111-8111-111111111111")
+        report = validate_project(empty_project)
+        assert "uuid/not_v4" in codes(report)
+        # v4-pre-check skips schema validation, so no double-report.
+        assert "issue/schema_invalid" not in codes(report)
+
+    def test_v5_uuid_is_error(self, empty_project: Path) -> None:
+        write_issue(empty_project, "TST-1", uuid="11111111-1111-5111-8111-111111111111")
+        report = validate_project(empty_project)
+        assert "uuid/not_v4" in codes(report)
+
+    def test_invalid_variant_is_error(self, empty_project: Path) -> None:
+        # Variant nibble `c` = 0b1100 — Microsoft-compat variant,
+        # not RFC 4122 (which requires 0b10xx → 8/9/a/b).
+        write_issue(empty_project, "TST-1", uuid="11111111-1111-4111-c111-111111111111")
+        report = validate_project(empty_project)
+        assert "uuid/not_v4" in codes(report)
+
+    def test_unparseable_uuid_is_error(self, empty_project: Path) -> None:
+        write_issue(empty_project, "TST-1", uuid="not-a-uuid")
+        report = validate_project(empty_project)
+        assert "uuid/not_v4" in codes(report)
+
+    def test_v4_uuid_passes(self, empty_project: Path) -> None:
+        write_issue(empty_project, "TST-1", uuid="11111111-1111-4111-8111-111111111111")
+        report = validate_project(empty_project)
+        assert "uuid/not_v4" not in codes(report)
+
+
 class TestIdFormat:
     def test_wrong_prefix_is_error(self, empty_project: Path) -> None:
         write_issue(empty_project, "OTHER-1")
@@ -867,30 +905,33 @@ class TestCategorySummary:
 
 
 class TestUuidV4Validation:
-    """Pydantic UUID4 typing rejects non-v4 UUIDs at model_validate time
-    (KUI-158: replaced the standalone check_uuid_v4_version rule with
-    Pydantic-side enforcement)."""
+    """Non-v4 UUIDs are rejected at load time with the specific
+    ``uuid/not_v4`` code (KUI-143). The pre-KUI-143 contract surfaced
+    these as ``issue/schema_invalid`` via Pydantic UUID4 typing; the
+    catalogue-specific code makes the reason for the failure clear in
+    the validator output."""
 
     def test_real_uuid4_passes(self, empty_project: Path) -> None:
         import uuid
 
         write_issue(empty_project, "TST-1", uuid=str(uuid.uuid4()))
         report = validate_project(empty_project)
+        assert not any(e.code == "uuid/not_v4" for e in report.errors)
         assert not any(e.code == "issue/schema_invalid" for e in report.errors)
 
     def test_hand_crafted_uuid_fails(self, empty_project: Path) -> None:
-        # Version nibble is '1' (not '4') — UUID4 typing rejects.
+        # Version nibble is '1' (not '4') — emits uuid/not_v4 at load time.
         write_issue(empty_project, "TST-1", uuid="10a1b2c3-d4e5-1f6a-0b8c-9d0e1f2a3b4c")
         report = validate_project(empty_project)
-        assert any(e.code == "issue/schema_invalid" for e in report.errors)
+        assert any(e.code == "uuid/not_v4" for e in report.errors)
 
     def test_uuid_with_correct_version_but_wrong_variant(
         self, empty_project: Path
     ) -> None:
-        # Version nibble is '4' but variant is '0' (should be 8/9/a/b) — UUID4 rejects.
+        # Version nibble is '4' but variant is '0' (should be 8/9/a/b).
         write_issue(empty_project, "TST-1", uuid="10a1b2c3-d4e5-4f6a-0b8c-9d0e1f2a3b4c")
         report = validate_project(empty_project)
-        assert any(e.code == "issue/schema_invalid" for e in report.errors)
+        assert any(e.code == "uuid/not_v4" for e in report.errors)
 
 
 class TestCoverageWarnings:

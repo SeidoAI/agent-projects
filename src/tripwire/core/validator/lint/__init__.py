@@ -25,9 +25,14 @@ if TYPE_CHECKING:
     from tripwire.core.validator import CheckResult, ValidationContext
 
 from . import (
+    concept_name_prose,
     done_implies_issue_artifacts_on_main,
+    mega_issue,
     no_orphan_proj_branches,
+    node_ratio,
     self_review_implies_pm_response,
+    semantic_coverage,
+    stale_concept,
     worktree_paths_unique,
 )
 
@@ -38,4 +43,11 @@ LINT_CHECKS: list[CheckFunc] = [
     self_review_implies_pm_response.check,
     worktree_paths_unique.check,
     no_orphan_proj_branches.check,
+    # KUI-144 / KUI-145 / KUI-146 (D2/D3/D4): concept-graph quality lints.
+    stale_concept.check,
+    concept_name_prose.check,
+    semantic_coverage.check,
+    # KUI-147 / KUI-148 (D5/D6): scale + ratio detection lints.
+    mega_issue.check,
+    node_ratio.check,
 ]
