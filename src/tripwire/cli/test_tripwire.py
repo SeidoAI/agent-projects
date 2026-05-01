@@ -47,12 +47,20 @@ def _require_pm() -> None:
         )
 
 
+_DEFAULT_SESSION_ID = "_test"
+"""Default session id for ``test-tripwire``. Underscored so it can't
+collide with a real session id (real ids never start with ``_``) and
+filesystem-safe on Windows (the ack-marker filename is
+``<tripwire-id>-<session-id>.json`` — angle brackets are invalid on
+NTFS)."""
+
+
 @click.command("test-tripwire")
 @click.argument("tripwire_id")
 @click.option(
     "--session",
     "session_id",
-    default="<test>",
+    default=_DEFAULT_SESSION_ID,
     show_default=True,
     help="Session id used to seed the variation_index hash.",
 )

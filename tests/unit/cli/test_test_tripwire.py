@@ -90,6 +90,36 @@ def test_test_tripwire_session_overrides_variation_seed(
     assert a.output == b.output
 
 
+def test_test_tripwire_default_session_is_filesystem_safe(
+    tmp_path: Path, pm_role: Path
+) -> None:
+    """codex P2: default --session value must not contain Windows-invalid
+    filename characters (`<`, `>`, `:`, `\"`, `/`, `\\`, `|`, `?`, `*`).
+    The marker filename is `<tripwire-id>-<session-id>.json`, so an
+    unsafe default crashes the --ack path on Windows."""
+    _project(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "test-tripwire",
+            "self-review",
+            "--ack",
+            "--project-dir",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    # No marker file under acks/ should contain invalid characters.
+    acks = list((tmp_path / ".tripwire" / "acks").glob("*.json"))
+    assert acks, "--ack should have written a marker"
+    invalid = set('<>:"/\\|?*')
+    for marker in acks:
+        assert not (set(marker.name) & invalid), (
+            f"marker name {marker.name!r} contains Windows-invalid characters"
+        )
+
+
 def test_test_tripwire_ack_writes_marker(tmp_path: Path, pm_role: Path) -> None:
     _project(tmp_path)
     runner = CliRunner()

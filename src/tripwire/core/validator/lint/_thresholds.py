@@ -80,17 +80,54 @@ def get_threshold(
     1. ``project.yaml.lint_config[lint_name][threshold_name]`` (KUI-149).
     2. ``KIND_OVERRIDES[project.metadata.kind][lint_name][threshold_name]``.
     3. ``DEFAULT_THRESHOLDS[lint_name][threshold_name]``.
+
+    A project override that doesn't match the type of the package
+    default (e.g. user wrote ``"8"`` instead of ``8``) is treated as
+    absent and falls through to the next layer. Validator runs are
+    advisory state — a config typo must not crash validate.
     """
+    default = DEFAULT_THRESHOLDS.get(lint_name, {}).get(threshold_name)
+    expected_type = _expected_type(default)
+
     project_override = _project_override(project_config, lint_name, threshold_name)
-    if project_override is not None:
+    if _matches_type(project_override, expected_type):
         return project_override
 
     kind = _project_kind(project_config)
     kind_override = KIND_OVERRIDES.get(kind, {}).get(lint_name, {}).get(threshold_name)
-    if kind_override is not None:
+    if _matches_type(kind_override, expected_type):
         return kind_override
 
-    return DEFAULT_THRESHOLDS.get(lint_name, {}).get(threshold_name)
+    return default
+
+
+def _expected_type(default: Any) -> type | tuple[type, ...] | None:
+    """Return the type a config override must match for `default`."""
+    if default is None:
+        return None
+    if isinstance(default, bool):
+        return bool
+    if isinstance(default, int):
+        # Accept int OR float for int defaults (e.g. `8` or `8.0`); reject
+        # bool because bool is a subclass of int and would otherwise pass.
+        return (int, float)
+    if isinstance(default, float):
+        return (int, float)
+    return type(default)
+
+
+def _matches_type(value: Any, expected: type | tuple[type, ...] | None) -> bool:
+    """True iff `value` is non-None AND matches `expected` (with bool exclusion)."""
+    if value is None:
+        return False
+    if expected is None:
+        # Default is itself None — accept any non-None value verbatim.
+        return True
+    if isinstance(value, bool) and bool not in (
+        expected if isinstance(expected, tuple) else (expected,)
+    ):
+        return False
+    return isinstance(value, expected)
 
 
 def _project_kind(project_config: ProjectConfig | None) -> str:

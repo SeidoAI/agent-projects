@@ -88,3 +88,42 @@ def test_unknown_lint_key_ignored(
     ctx = load_context(tmp_path_project)
     # Loading still succeeds; existing checks still see defaults.
     assert ctx.project_config is not None
+
+
+def test_string_threshold_falls_back_to_default(
+    tmp_path_project: Path, save_test_issue
+):
+    """codex P1: a typo'd YAML override (string instead of int) must
+    NOT crash the validator on the lint's <= / >= comparison. The
+    threshold layer treats type-mismatched values as absent and falls
+    back to the package default."""
+    save_test_issue(tmp_path_project, key="TMP-1")
+    for n in range(9):
+        save_test_issue(tmp_path_project, key=f"TMP-{n + 2}", parent="TMP-1")
+    # User typo: quoted "8" instead of bare 8. Should NOT raise.
+    _set_lint_config(tmp_path_project, {"mega_issue": {"max_children": "8"}})
+
+    ctx = load_context(tmp_path_project)
+    results = mega_issue.check(ctx)
+    # Default max_children=8 still applied → 9 children fires.
+    assert any(r.code == "mega_issue/too_many_children" for r in results)
+
+
+def test_string_node_ratio_threshold_falls_back(
+    tmp_path_project: Path, save_test_issue
+):
+    """codex P1: float-valued thresholds also reject string overrides."""
+    from tripwire.core.validator.lint import node_ratio
+
+    for n in range(10):
+        save_test_issue(tmp_path_project, key=f"TMP-{n + 1}", status="in_progress")
+    _set_lint_config(
+        tmp_path_project,
+        {"node_ratio": {"min_ratio": "0.5", "max_ratio": "5.0"}},
+    )
+
+    ctx = load_context(tmp_path_project)
+    # Should not crash; default min_ratio=0.10 applies → 10 issues, 0
+    # nodes, ratio 0 < 0.10 → fires.
+    results = node_ratio.check(ctx)
+    assert any(r.code == "node_ratio/below_band" for r in results)
