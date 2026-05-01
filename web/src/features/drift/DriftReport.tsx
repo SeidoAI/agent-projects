@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useProjectShell } from "@/app/ProjectShell";
 import {
   type DriftBreakdown,
-  type WorkflowDriftEvent,
+  type WorkflowDriftFinding,
   useDriftReport,
 } from "@/lib/api/endpoints/drift";
 import { cn } from "@/lib/utils";
@@ -12,17 +12,16 @@ import { cn } from "@/lib/utils";
  * Drift Report — single screen at `/p/:projectId/drift` (KUI-157).
  *
  * Renders the unified coherence score (large numeric), a per-class
- * breakdown of drift signals, and a chronological drill-down list of
- * recent `workflow_drift` events. The drill-down is filterable by
- * drift class via clickable breakdown rows.
+ * breakdown of drift signals, and a drill-down list of active workflow
+ * drift findings. The drill-down is filterable by drift class via
+ * clickable breakdown rows.
  *
  * Score colouring follows the same palette used elsewhere: green
  * ≥80, amber 50-79, red <50. The page is dark-mode aware via the
  * existing Tailwind colour tokens.
  *
- * Per-event drill-down details aren't expanded inline (the full
- * inspector lives at the per-event log view); this screen surfaces
- * the headline metric and the events that drove it. Future work:
+ * This screen surfaces the headline metric and the workflow findings
+ * that drove it. Future work:
  * week-over-week sparkline (deferred — needs a historical snapshot
  * substrate that v0.9 doesn't ship).
  */
@@ -32,7 +31,7 @@ const CLASS_LABELS: Record<keyof DriftBreakdown, string> = {
   stale_pins: "Stale pins",
   unresolved_refs: "Unresolved references",
   stale_concepts: "Stale concepts",
-  workflow_drift_events: "Workflow drift events",
+  workflow_drift_findings: "Workflow drift findings",
 };
 
 export function DriftReport() {
@@ -55,7 +54,7 @@ export function DriftReport() {
     );
   }
 
-  const { score, breakdown, workflow_drift_events: events } = query.data;
+  const { score, breakdown, workflow_drift_findings: findings } = query.data;
   const scoreColor = scoreColorClass(score);
 
   return (
@@ -81,7 +80,7 @@ export function DriftReport() {
       </div>
 
       <DrillDownPanel
-        events={events}
+        findings={findings}
         activeClass={activeClass}
         onClear={() => setActiveClass(null)}
       />
@@ -139,7 +138,7 @@ function BreakdownPanel({
         {rows.map((row) => {
           const selected = activeClass === row.key;
           const drillable =
-            row.key === "workflow_drift_events" && row.count > 0;
+            row.key === "workflow_drift_findings" && row.count > 0;
           return (
             <li key={row.key}>
               <button
@@ -175,19 +174,19 @@ function BreakdownPanel({
 }
 
 function DrillDownPanel({
-  events,
+  findings,
   activeClass,
   onClear,
 }: {
-  events: WorkflowDriftEvent[];
+  findings: WorkflowDriftFinding[];
   activeClass: ClassFilter;
   onClear: () => void;
 }) {
   const filtered = useMemo(() => {
-    if (activeClass === null) return events;
-    if (activeClass !== "workflow_drift_events") return [];
-    return events;
-  }, [events, activeClass]);
+    if (activeClass === null) return findings;
+    if (activeClass !== "workflow_drift_findings") return [];
+    return findings;
+  }, [findings, activeClass]);
 
   if (filtered.length === 0) {
     return (
@@ -196,12 +195,12 @@ function DrillDownPanel({
         className="rounded-md border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
       >
         <h2 className="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Recent workflow-drift events
+          Workflow drift findings
         </h2>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           {activeClass === null
-            ? "No recent workflow_drift events recorded."
-            : "Drill-down for this class isn't surfaced on this screen — see the events log."}
+            ? "No active workflow drift findings."
+            : "Drill-down for this class isn't surfaced on this screen."}
         </p>
       </section>
     );
@@ -214,7 +213,7 @@ function DrillDownPanel({
     >
       <header className="mb-2 flex items-center justify-between">
         <h2 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Recent workflow-drift events ({filtered.length})
+          Workflow drift findings ({filtered.length})
         </h2>
         {activeClass !== null && (
           <button
@@ -226,16 +225,29 @@ function DrillDownPanel({
           </button>
         )}
       </header>
-      <ul className="flex flex-col gap-1 font-mono text-xs">
-        {filtered.map((ev, idx) => (
+      <ul className="flex flex-col gap-2 text-xs">
+        {filtered.map((finding, idx) => (
           <li
-            key={`${ev.at}-${idx}`}
-            className="flex items-baseline justify-between gap-3 border-b border-zinc-100 py-1 last:border-b-0 dark:border-zinc-800"
+            key={`${finding.code}-${finding.instance}-${finding.station ?? "none"}-${idx}`}
+            className="border-b border-zinc-100 py-2 last:border-b-0 dark:border-zinc-800"
           >
-            <span className="text-zinc-500 dark:text-zinc-400">{ev.at}</span>
-            <span className="font-medium text-zinc-800 dark:text-zinc-200">
-              {ev.kind ?? "(no kind)"}
-            </span>
+            <div className="flex flex-wrap items-center gap-2 font-mono">
+              <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                {finding.code}
+              </span>
+              <span className="text-zinc-500 dark:text-zinc-400">
+                {finding.workflow}:{finding.instance}
+              </span>
+              <span className="text-zinc-500 dark:text-zinc-400">
+                {finding.station ?? "-"}
+              </span>
+              <span className="uppercase text-zinc-500 dark:text-zinc-400">
+                {finding.severity}
+              </span>
+            </div>
+            <p className="mt-1 text-zinc-700 dark:text-zinc-300">
+              {finding.message}
+            </p>
           </li>
         ))}
       </ul>

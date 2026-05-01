@@ -103,9 +103,9 @@ export const defaultHandlers = [
         stale_pins: 0,
         unresolved_refs: 0,
         stale_concepts: 0,
-        workflow_drift_events: 0,
+        workflow_drift_findings: 0,
       },
-      workflow_drift_events: [],
+      workflow_drift_findings: [],
     }),
   ),
 

@@ -9,10 +9,9 @@ score. Higher is healthier. The signals are:
   any known entity. Heavy weight.
 - ``stale_concepts`` — concept nodes whose `source.content_hash`
   no longer matches the file on disk. Medium weight.
-- ``workflow_drift_events`` — events tagged ``workflow_drift`` in
-  the events log over the prior 7 days. Medium weight. Reads
-  ``.tripwire/events.log`` (KUI-123 substrate from
-  ``v09-workflow-substrate``); silently 0 if the log is absent.
+- ``workflow_drift_findings`` — active mismatches between declared
+  ``workflow.yaml`` stations and the canonical v0.9 workflow event log.
+  Medium weight. Reads ``events/*.jsonl`` via the KUI-123 substrate.
 
 Weights are starting values, calibrated by inspection rather than a
 data-driven study. ``decisions.md`` documents this; the PM can
@@ -22,14 +21,11 @@ recalibrate against the v0 PT corpus by adjusting :data:`WEIGHTS`.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
 
-import yaml
-
-from tripwire.core.graph import refs as graph_refs
 from tripwire.core.validator import load_context, validate_project
+from tripwire.core.workflow.drift import DriftFinding, detect_drift
+from tripwire.core.workflow.loader import load_workflows
 
 # Penalty per occurrence (point loss). The cap prevents one type of
 # drift from monopolising the headline score.
@@ -37,17 +33,15 @@ WEIGHTS: dict[str, dict[str, int]] = {
     "stale_pins": {"per": 5, "cap": 50},
     "unresolved_refs": {"per": 5, "cap": 50},
     "stale_concepts": {"per": 2, "cap": 20},
-    "workflow_drift_events": {"per": 2, "cap": 20},
+    "workflow_drift_findings": {"per": 2, "cap": 20},
 }
-
-EVENTS_LOG_REL = ".tripwire/events.log"
-WORKFLOW_DRIFT_WINDOW_DAYS = 7
 
 
 @dataclass
 class CoherenceReport:
     score: int
     breakdown: dict[str, int]
+    workflow_drift_findings: list[DriftFinding]
 
 
 def compute_coherence(project_dir: Path) -> CoherenceReport:
@@ -60,7 +54,7 @@ def compute_coherence(project_dir: Path) -> CoherenceReport:
         "stale_pins": 0,
         "unresolved_refs": 0,
         "stale_concepts": 0,
-        "workflow_drift_events": 0,
+        "workflow_drift_findings": 0,
     }
 
     # Run the validator to harvest two of the four signals at once:
@@ -86,8 +80,12 @@ def compute_coherence(project_dir: Path) -> CoherenceReport:
     # check already classifies as STALE / FRESH / NO_SOURCE etc.
     breakdown["stale_concepts"] = _count_stale_concepts(project_dir)
 
-    # Workflow-drift events: optional, depends on KUI-123 substrate.
-    breakdown["workflow_drift_events"] = _count_workflow_drift_events(project_dir)
+    # Workflow drift: compare declared workflows with the canonical v0.9
+    # append-only event log. Missing workflow.yaml or unreadable workflow
+    # declarations yield no workflow-drift findings; the other signals still
+    # report normally.
+    workflow_drift_findings = _collect_workflow_drift_findings(project_dir)
+    breakdown["workflow_drift_findings"] = len(workflow_drift_findings)
 
     score = 100
     for name, count in breakdown.items():
@@ -98,7 +96,11 @@ def compute_coherence(project_dir: Path) -> CoherenceReport:
         score -= penalty
     score = max(0, score)
 
-    return CoherenceReport(score=score, breakdown=breakdown)
+    return CoherenceReport(
+        score=score,
+        breakdown=breakdown,
+        workflow_drift_findings=workflow_drift_findings,
+    )
 
 
 def _count_stale_concepts(project_dir: Path) -> int:
@@ -128,54 +130,37 @@ def _count_stale_concepts(project_dir: Path) -> int:
     return count
 
 
-def _count_workflow_drift_events(project_dir: Path) -> int:
-    """Count `workflow_drift` events in the events log (last 7d)."""
-    log_path = project_dir / EVENTS_LOG_REL
-    if not log_path.is_file():
-        return 0
-
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=WORKFLOW_DRIFT_WINDOW_DAYS)
-
-    count = 0
+def _collect_workflow_drift_findings(project_dir: Path) -> list[DriftFinding]:
+    """Return workflow-drift findings for every declared workflow."""
     try:
-        with log_path.open(encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    record: Any = yaml.safe_load(line)
-                except yaml.YAMLError:
-                    continue
-                if not isinstance(record, dict):
-                    continue
-                if record.get("event") != "workflow_drift":
-                    continue
-                ts = record.get("at")
-                if isinstance(ts, str):
-                    try:
-                        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                    except ValueError:
-                        continue
-                    if dt.tzinfo is None:
-                        dt = dt.replace(tzinfo=timezone.utc)
-                    if dt < cutoff:
-                        continue
-                count += 1
-    except OSError:
-        return 0
-    return count
+        spec = load_workflows(project_dir)
+    except Exception:
+        return []
+
+    findings: list[DriftFinding] = []
+    for workflow_id in spec.workflows:
+        try:
+            findings.extend(detect_drift(project_dir, workflow_id=workflow_id))
+        except Exception:
+            continue
+    return findings
+
+
+def drift_finding_to_dict(finding: DriftFinding) -> dict[str, str | None]:
+    """Serialize a workflow drift finding for CLI/API JSON payloads."""
+    return {
+        "code": finding.code,
+        "workflow": finding.workflow,
+        "instance": finding.instance,
+        "station": finding.station,
+        "severity": finding.severity,
+        "message": finding.message,
+    }
 
 
 __all__ = [
     "WEIGHTS",
     "CoherenceReport",
     "compute_coherence",
+    "drift_finding_to_dict",
 ]
-
-
-# Suppress an unused import warning — graph_refs is imported because
-# `compute_coherence` may dispatch to it in a future iteration when
-# the report breaks down per-edge-kind drift; keeping the import
-# silent for now keeps the module small.
-_ = graph_refs
