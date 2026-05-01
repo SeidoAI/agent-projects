@@ -110,4 +110,43 @@ describe("EventLog", () => {
     render(<EventLog />, { wrapper: Wrapper });
     expect(screen.getByText(/no events yet/i)).toBeInTheDocument();
   });
+
+  it("renders distinct rows even when (workflow, instance, station, event, ts, details.id) collide", () => {
+    // Codex P1: events log emits at second granularity, so a dense
+    // burst of identical-tuple rows must still produce unique React
+    // keys + clickable rows. The synthId fallback adds an
+    // occurrence-count suffix `|#N` so each row gets its own key.
+    const collidingEvents = [
+      {
+        ts: "2026-04-30T14:00:00Z",
+        workflow: "coding-session",
+        instance: "sess-1",
+        station: "executing",
+        event: "validator.run",
+        details: { id: "v_uuid_present", outcome: "pass" },
+      },
+      {
+        ts: "2026-04-30T14:00:00Z",
+        workflow: "coding-session",
+        instance: "sess-1",
+        station: "executing",
+        event: "validator.run",
+        details: { id: "v_uuid_present", outcome: "pass" },
+      },
+      {
+        ts: "2026-04-30T14:00:00Z",
+        workflow: "coding-session",
+        instance: "sess-1",
+        station: "executing",
+        event: "validator.run",
+        details: { id: "v_uuid_present", outcome: "pass" },
+      },
+    ];
+    const Wrapper = withSeededRoute(collidingEvents);
+    render(<EventLog />, { wrapper: Wrapper });
+    const rows = screen.getAllByTestId("event-row");
+    // Three rows render even though their underlying tuples are
+    // identical — keys disambiguate via the per-render counter.
+    expect(rows).toHaveLength(3);
+  });
 });

@@ -86,7 +86,12 @@ def run_pm_review(
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
     started = now or datetime.now(tz=timezone.utc)
-    report = validate_project(project_dir, strict=True)
+    # Pass session_id through so the validator's per-check
+    # `validator.run` workflow events log under `instance=<session>`
+    # rather than the CLI sentinel (`_cli_validate`). Without this,
+    # `/workflow-stats` by-instance counts skew and the Event Log
+    # filter on the reviewed session misses the rerun rows.
+    report = validate_project(project_dir, strict=True, session_id=session_id)
     finished = datetime.now(tz=timezone.utc)
 
     checks = _partition_findings(report)
