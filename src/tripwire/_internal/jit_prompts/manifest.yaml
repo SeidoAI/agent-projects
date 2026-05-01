@@ -1,0 +1,16 @@
+# Built-in JIT prompt registry — event → prompt-class mapping.
+#
+# v0.8.0 ships the primitive plus the canonical first JIT prompt
+# (self-review on session.complete). Additional JIT prompts may reinforce
+# later lifecycle events.
+#
+# Five lifecycle events are wired through the registry; only the one
+# below has a registered JIT prompt in v0.8.0. Empty event keys are
+# explicitly listed so the loader's contract surface is the full set.
+session.complete:
+  - id: self-review
+    class: tripwire._internal.jit_prompts.self_review.SelfReviewJitPrompt
+issue.close: []
+pr.open: []
+validate.run: []
+session.resume: []
