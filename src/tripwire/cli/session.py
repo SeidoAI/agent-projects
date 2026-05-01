@@ -870,6 +870,12 @@ _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
 }
 
 
+# Default-on sweep: when transitioning into one of these states, also
+# advance member issues to the matching issue state via the v0.9.4
+# status contract (sweep_issues). User can override with --no-sweep-issues.
+_DEFAULT_SWEEP_ON_TRANSITION = frozenset({"in_review", "verified", "completed"})
+
+
 @session_cmd.command("transition")
 @click.argument("session_id")
 @click.argument("target_status")
@@ -879,8 +885,20 @@ _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     default=".",
     show_default=True,
 )
+@click.option(
+    "--sweep-issues/--no-sweep-issues",
+    default=None,
+    help=(
+        "Sweep member issues to the implied issue state for the target "
+        "session state (v0.9.4 status contract). Defaults to ON for "
+        "transitions into in_review / verified / completed; OFF otherwise."
+    ),
+)
 def session_transition_cmd(
-    session_id: str, target_status: str, project_dir: Path
+    session_id: str,
+    target_status: str,
+    project_dir: Path,
+    sweep_issues: bool | None,
 ) -> None:
     """Transition a session's status. Strict: rejects unknown statuses
     and disallowed jumps.
@@ -890,7 +908,12 @@ def session_transition_cmd(
     this is what unblocks ``tripwire session complete``. Other allowed
     flips cover the resume/review/abandon happy paths; everything else
     requires a direct yaml edit.
+
+    v0.9.4: ``--sweep-issues`` (default-on for in_review/verified/completed)
+    advances member issues to the matching issue state per the status
+    contract.
     """
+    from tripwire.core.status_contract import sweep_issues as _sweep_issues_fn
     from tripwire.models.enums import SessionStatus
 
     resolved = project_dir.expanduser().resolve()
@@ -919,6 +942,20 @@ def session_transition_cmd(
     session.updated_at = datetime.now(tz=timezone.utc)
     save_session(resolved, session)
     click.echo(f"Session '{session_id}' → {target_status}")
+
+    # Decide whether to sweep. Explicit user choice wins; fall back to the
+    # default-on set if not specified.
+    do_sweep = (
+        sweep_issues
+        if sweep_issues is not None
+        else target_status in _DEFAULT_SWEEP_ON_TRANSITION
+    )
+    if do_sweep:
+        changed = _sweep_issues_fn(resolved, session, target_status)
+        if changed:
+            click.echo(f"  swept {len(changed)} issue(s) → matching state:")
+            for k in changed:
+                click.echo(f"    {k}")
 
 
 @session_cmd.command("abandon")

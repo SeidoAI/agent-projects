@@ -235,11 +235,31 @@ function filterSessionsByStages(
   return [...offTrack, ...inFilter];
 }
 
-/** Issues not attached to any session — backlog/sprawl signal. */
+/** Issues not attached to any session AND not at a terminal status —
+ *  backlog/sprawl signal. v0.9.4: terminal-status issues (completed,
+ *  abandoned, plus the legacy aliases done/canceled for any pre-v0.9.4
+ *  data still on disk) drop out of the unassigned bucket; they belong
+ *  in their session's "completed" view, not in the agent's lap.
+ *
+ *  Pre-v0.9.4 the bucket was `!assigned`, which dragged every closed
+ *  issue here whenever its session terminated. The user-visible symptom
+ *  was every `done` issue showing under "unassigned" once Wave-N
+ *  closeout flipped the issue to terminal but didn't keep the session
+ *  membership tight. */
+const TERMINAL_ISSUE_STATUSES = new Set([
+  "completed",
+  "abandoned",
+  // Legacy aliases — accept on read until v1.0.
+  "done",
+  "canceled",
+]);
+
 function unassignedIssuesOf(sessions: SessionSummary[], issues: IssueSummary[]): IssueSummary[] {
   const assigned = new Set<string>();
   for (const s of sessions) for (const id of s.issues) assigned.add(id);
-  return issues.filter((i) => !assigned.has(i.id));
+  return issues.filter(
+    (i) => !assigned.has(i.id) && !TERMINAL_ISSUE_STATUSES.has(String(i.status)),
+  );
 }
 
 /** Compute the right-column view when a blocker is selected via

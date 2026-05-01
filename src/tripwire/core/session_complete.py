@@ -97,15 +97,15 @@ def complete_session(
     if dry_run:
         return result
 
-    for issue_key in session.issues:
-        try:
-            issue = load_issue(project_dir, issue_key)
-        except FileNotFoundError:
-            continue
-        if issue.status != "completed":
-            issue.status = "completed"
-            save_issue(project_dir, issue)
-            result.issues_closed.append(issue_key)
+    # v0.9.4: route through the canonical sweep helper. This advances any
+    # member issue that's behind the "completed" target on the lifecycle
+    # without backsliding ones that are already past it (e.g. a `deferred`
+    # issue stays deferred). Tests that previously asserted "every member
+    # issue ends at done" now assert "every on-path member issue ends at
+    # completed".
+    from tripwire.core.status_contract import sweep_issues
+
+    result.issues_closed = sweep_issues(project_dir, session, "completed")
 
     now = datetime.now(tz=timezone.utc)
     session.status = SessionStatus.COMPLETED
