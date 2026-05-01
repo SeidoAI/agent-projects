@@ -13,7 +13,7 @@ import { defineConfig } from "vite";
 function readTripwireVersion(): string {
   try {
     const pyproject = fs.readFileSync(
-      path.resolve(__dirname, "../../../../pyproject.toml"),
+      path.resolve(__dirname, "../pyproject.toml"),
       "utf-8",
     );
     const match = pyproject.match(/^version\s*=\s*"([^"]+)"/m);
@@ -55,7 +55,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "../static",
+    outDir: "../src/tripwire/ui/static",
     emptyOutDir: true,
     sourcemap: true,
   },

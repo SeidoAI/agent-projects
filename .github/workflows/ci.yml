@@ -47,27 +47,27 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: src/tripwire/ui/frontend/package-lock.json
+          cache-dependency-path: web/package-lock.json
       - name: Install frontend deps
         run: npm ci
-        working-directory: src/tripwire/ui/frontend
+        working-directory: web
       - name: Build frontend
         run: npm run build
-        working-directory: src/tripwire/ui/frontend
+        working-directory: web
 
   frontend-test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: src/tripwire/ui/frontend
+        working-directory: web
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: src/tripwire/ui/frontend/package-lock.json
+          cache-dependency-path: web/package-lock.json
       - name: Install
         run: npm ci
       - name: Vitest + coverage
@@ -85,7 +85,7 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: src/tripwire/ui/frontend/package-lock.json
+          cache-dependency-path: web/package-lock.json
       - uses: astral-sh/setup-uv@v8.1.0
         with:
           python-version: "3.13"
@@ -111,16 +111,16 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: src/tripwire/ui/frontend/package-lock.json
+          cache-dependency-path: web/package-lock.json
       - uses: astral-sh/setup-uv@v8.1.0
         with:
           python-version: "3.13"
       - name: Sync python deps
         run: uv sync
       - name: Build frontend statics
-        working-directory: src/tripwire/ui/frontend
+        working-directory: web
         run: |
           npm ci
           npm run build
       - name: Pytest e2e
-        run: uv run pytest -m e2e src/tripwire/ui/tests/e2e/ -v
+        run: uv run pytest -m e2e tests/ui/e2e/ -v

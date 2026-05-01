@@ -167,24 +167,15 @@ npm test -- src/__tests__/features/workflow
 npm run build
 ```
 
-Run frontend commands from `src/tripwire/ui/frontend` unless the tree is moved
-in a later branch. Do not move the frontend in this branch. The current worktree
-does not have `node_modules`; the first frontend test attempt failed with
-`vitest: command not found`.
+Run frontend commands from `web`. This worktree may not have `web/node_modules`;
+if local frontend checks fail with `vitest: command not found`, install deps or
+temporarily symlink `web/node_modules` from the main checkout's existing
+frontend install.
 
 ## Out Of Scope For This Branch
 
-Do not work on these here:
-
-- graph compatibility shims
-- artifact naming cleanup
-- `agent_type` vs `agent_types`
-- frontend relocation out of `src/tripwire/ui/frontend`
-- `/api/actions/finalize-session` gate bypass
-- root route redirect bug
-- artifact `sid` path traversal validation
-
-Those should each get separate branches/worktrees.
+The original single-slice JIT prompt branch scope has been widened: keep PR #83
+open and continue the remaining cleanup work on this branch.
 
 ## Commit Readiness Checklist
 

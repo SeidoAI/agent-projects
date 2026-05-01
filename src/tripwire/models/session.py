@@ -36,7 +36,7 @@ class RepoBinding(BaseModel):
     # Optional sub-tree prefix. When set, plan-file paths in
     # `**Files:**` blocks resolve relative to `<clone>/<path_prefix>` as
     # well as `<clone>`. Lets frontend plans say `src/app/router.tsx`
-    # instead of `src/tripwire/ui/frontend/src/app/router.tsx`.
+    # instead of `web/src/app/router.tsx`.
     path_prefix: str | None = None
 
 

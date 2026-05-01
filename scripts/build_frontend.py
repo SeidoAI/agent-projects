@@ -1,7 +1,7 @@
 """Build the React frontend and place the output where the wheel will pick it up.
 
-Runs ``npm ci`` + ``npm run build`` inside ``src/tripwire/ui/frontend/``.
-Vite is already configured (``build.outDir: '../static'`` in
+Runs ``npm ci`` + ``npm run build`` inside ``web/``.
+Vite is already configured (``build.outDir: '../src/tripwire/ui/static'`` in
 ``vite.config.ts``) to write the bundle into ``src/tripwire/ui/static/``,
 so no copy step is needed here.
 
@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FRONTEND_DIR = REPO_ROOT / "src" / "tripwire" / "ui" / "frontend"
+FRONTEND_DIR = REPO_ROOT / "web"
 STATIC_DIR = REPO_ROOT / "src" / "tripwire" / "ui" / "static"
 
 

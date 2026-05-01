@@ -35,9 +35,7 @@ def _static_bundle_present() -> bool:
 
 def test_root_serves_spa_when_bundle_built(tripwire_ui_server: dict) -> None:
     if not _static_bundle_present():
-        pytest.skip(
-            "React static bundle not built — run `npm run build` in src/tripwire/ui/frontend"
-        )
+        pytest.skip("React static bundle not built — run `npm run build` in web")
     r = httpx.get(tripwire_ui_server["base_url"] + "/", timeout=5.0)
     assert r.status_code == 200
     assert "text/html" in r.headers.get("content-type", "")

@@ -64,9 +64,6 @@ packages = ["src/tripwire"]
 # The React source (full npm project) stays out of the wheel — wheel
 # consumers only need the built bundle. `artifacts` re-adds the
 # gitignored static/ output so it ships even though .gitignore hides it.
-exclude = [
-    "src/tripwire/ui/frontend",
-]
 artifacts = [
     "src/tripwire/ui/static",
 ]
@@ -102,7 +99,7 @@ indent-style = "space"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-testpaths = ["tests", "src/tripwire/ui/tests"]
+testpaths = ["tests"]
 addopts = "-ra --strict-markers -m 'not e2e'"
 markers = [
     "e2e: end-to-end tests that boot the real CLI/server (opt-in via `-m e2e`)",

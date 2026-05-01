@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: src/tripwire/ui/frontend/package-lock.json
+          cache-dependency-path: web/package-lock.json
       - uses: astral-sh/setup-uv@v8.1.0
         with:
           python-version: "3.13"
@@ -25,10 +25,10 @@ jobs:
       # the npm output in CI logs and fails fast on a bad frontend build.
       - name: Install frontend deps
         run: npm ci
-        working-directory: src/tripwire/ui/frontend
+        working-directory: web
       - name: Build frontend
         run: npm run build
-        working-directory: src/tripwire/ui/frontend
+        working-directory: web
       - name: Build
         env:
           TRIPWIRE_SKIP_FRONTEND_BUILD: "1"

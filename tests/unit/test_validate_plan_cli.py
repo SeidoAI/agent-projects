@@ -164,16 +164,7 @@ class TestValidatePlanCli:
         clone root. Frontend plans can say `src/app/router.tsx`
         instead of the full monorepo path."""
         clone = tmp_path_project / "fake-clone"
-        existing_file = (
-            clone
-            / "src"
-            / "tripwire"
-            / "ui"
-            / "frontend"
-            / "src"
-            / "app"
-            / "router.tsx"
-        )
+        existing_file = clone / "web" / "src" / "app" / "router.tsx"
         existing_file.parent.mkdir(parents=True, exist_ok=True)
         existing_file.write_text("// router\n")
 
@@ -193,7 +184,7 @@ class TestValidatePlanCli:
                 {
                     "repo": "SeidoAI/fake",
                     "base_branch": "main",
-                    "path_prefix": "src/tripwire/ui/frontend",
+                    "path_prefix": "web",
                 }
             ],
         )
