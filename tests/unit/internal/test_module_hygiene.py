@@ -1,4 +1,4 @@
-"""Module hygiene tests for the ``_internal/tripwires`` package.
+"""Module hygiene tests for the ``_internal/jit_prompts`` package.
 
 The tripwire primitive's effectiveness depends on the executing
 agent NOT being able to read the prompts before they fire. We
@@ -9,7 +9,7 @@ enforce this with three checks:
 2. The skill loader (``runtimes/prep.py.copy_skills``) does not pull
    anything from ``_internal/`` into ``.claude/skills/``.
 3. No template, doc, or spec under ``src/tripwire/templates`` mentions
-   ``_internal/tripwires/`` or names a registered tripwire's prompt.
+   ``_internal/jit_prompts/`` or names a registered tripwire's prompt.
 
 These are not security boundaries — an agent that greps the source
 will find prompts. They are the "do not load by default" defence the
@@ -43,7 +43,7 @@ def test_public_init_does_not_re_export_internal() -> None:
         "tripwire/__init__.py references _internal — agents that "
         "`from tripwire import ...` would reach tripwire prompts."
     )
-    for name in ("Tripwire", "TripwireContext", "fire_event"):
+    for name in ("Tripwire", "JitPromptContext", "fire_event"):
         assert name not in init_src, (
             f"{name!r} appears in tripwire/__init__.py — that re-exports "
             f"a tripwire surface to the public namespace."
@@ -56,7 +56,7 @@ def test_internal_tripwires_directory_exists() -> None:
 
 def test_no_template_references_internal_tripwires() -> None:
     """Agent-visible templates must not name the internal tripwires path."""
-    needle = "_internal/tripwires"
+    needle = "_internal/jit_prompts"
     offenders: list[Path] = []
     for path in _TEMPLATES.rglob("*"):
         if not path.is_file():
@@ -86,5 +86,5 @@ def test_skill_loader_skips_internal() -> None:
     assert "templates" in prep_src and "skills" in prep_src
     # And must not reach into _internal.
     assert not re.search(r"_internal[\\/]tripwires", prep_src), (
-        "runtimes/prep.py references _internal/tripwires — that's the leak."
+        "runtimes/prep.py references _internal/jit_prompts — that's the leak."
     )

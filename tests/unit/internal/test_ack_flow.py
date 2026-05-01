@@ -20,8 +20,8 @@ from pathlib import Path
 
 import yaml
 
-from tripwire._internal.tripwires import TripwireContext, fire_event
-from tripwire._internal.tripwires.self_review import SelfReviewTripwire
+from tripwire._internal.jit_prompts import JitPromptContext, fire_event
+from tripwire._internal.jit_prompts.self_review import SelfReviewJitPrompt
 
 
 def _project(tmp_path: Path) -> None:
@@ -41,7 +41,7 @@ def _project(tmp_path: Path) -> None:
 
 
 def _write_substantive_marker(tmp_path: Path, sid: str) -> Path:
-    ctx = TripwireContext(project_dir=tmp_path, session_id=sid, project_id="fixture")
+    ctx = JitPromptContext(project_dir=tmp_path, session_id=sid, project_id="fixture")
     marker = ctx.ack_path("self-review")
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text(json.dumps({"fix_commits": ["c4f81e2"]}), encoding="utf-8")
@@ -67,7 +67,7 @@ def test_marker_requires_substance(tmp_path: Path) -> None:
     """Empty marker doesn't satisfy the substantiveness check."""
     _project(tmp_path)
     sid = "fixture-1"
-    ctx = TripwireContext(project_dir=tmp_path, session_id=sid, project_id="fixture")
+    ctx = JitPromptContext(project_dir=tmp_path, session_id=sid, project_id="fixture")
     marker = ctx.ack_path("self-review")
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text("{}", encoding="utf-8")
@@ -111,11 +111,11 @@ def test_loop_safety_third_fire_escalates(tmp_path: Path) -> None:
 
 def test_self_review_variation_seeded_by_project_and_session(tmp_path: Path) -> None:
     """`(project_id, session_id)` hash picks the variation; same input → same idx."""
-    tw = SelfReviewTripwire()
-    ctx_alpha_proj1 = TripwireContext(
+    tw = SelfReviewJitPrompt()
+    ctx_alpha_proj1 = JitPromptContext(
         project_dir=tmp_path, session_id="alpha", project_id="proj1"
     )
-    ctx_alpha_proj2 = TripwireContext(
+    ctx_alpha_proj2 = JitPromptContext(
         project_dir=tmp_path, session_id="alpha", project_id="proj2"
     )
     # Same project+session → same prompt.

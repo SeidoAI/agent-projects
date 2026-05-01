@@ -76,14 +76,14 @@ orchestration:
   plan_approval_required: false
   auto_merge_on_pass: false
 
-# v0.8.0 (KUI-99) — tripwire primitive opt-out + project-local extras.
-# Tripwires are hidden prompts registered against lifecycle events;
-# the canonical first one (self-review on session.complete) ships
-# enabled. Set `enabled: false` to disable ALL tripwires (including
-# the pre-push hook installed at session-spawn time). `opt_out` skips
-# tripwires for specific sessions; `extra` registers project-local
-# tripwires loaded from the project's own Python modules.
-tripwires:
+# v0.8.0 (KUI-99) — JIT prompt opt-out + project-local extras.
+# JIT prompts are prompts delivered at lifecycle events to reinforce
+# instructions at the moment they matter. Set `enabled: false` to disable
+# ALL JIT prompts (including the pre-push hook installed at session-spawn
+# time). `opt_out` skips JIT prompts for specific sessions; `extra`
+# registers project-local JIT prompts loaded from the project's own Python
+# modules.
+jit_prompts:
   enabled: true
   opt_out: []
   extra: []

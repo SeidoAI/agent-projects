@@ -100,9 +100,10 @@ class ProjectWorkspacePointer(BaseModel):
         return self
 
 
-class ProjectTripwireExtra(BaseModel):
-    """One entry in ``project.yaml.tripwires.extra`` — a project-local
-    tripwire registered alongside the built-ins.
+class ProjectJitPromptExtra(BaseModel):
+    """One entry in ``project.yaml.jit_prompts.extra``.
+
+    Project-local JIT prompts are registered alongside the built-ins.
 
     Either ``cls`` (a dotted Python path resolvable by ``import``) or
     ``module`` (a path to a project-local Python file) must be set.
@@ -117,24 +118,23 @@ class ProjectTripwireExtra(BaseModel):
     module: str | None = None
 
 
-class ProjectTripwiresConfig(BaseModel):
-    """``project.yaml.tripwires`` — opt-out + extras for the tripwire
-    primitive (KUI-99).
+class ProjectJitPromptsConfig(BaseModel):
+    """``project.yaml.jit_prompts`` — opt-out + extras for JIT prompts.
 
     ``enabled`` defaults to True; setting it False disables ALL
-    tripwires (including the built-in self-review) for the project AND
+    JIT prompts (including the built-in self-review) for the project AND
     suppresses pre-push hook installation at session-spawn time.
-    ``opt_out`` is a list of session IDs that bypass tripwires; it
+    ``opt_out`` is a list of session IDs that bypass JIT prompts; it
     lives at the project level on purpose so the executing agent
-    can't see "no tripwires here" in their session.yaml.
-    ``extra`` lets a project register its own tripwires.
+    can't see "no JIT prompts here" in their session.yaml.
+    ``extra`` lets a project register its own JIT prompts.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = True
     opt_out: list[str] = Field(default_factory=list)
-    extra: list[ProjectTripwireExtra] = Field(default_factory=list)
+    extra: list[ProjectJitPromptExtra] = Field(default_factory=list)
 
 
 class ArtifactManifestRequirements(BaseModel):
@@ -208,11 +208,11 @@ class ProjectConfig(BaseModel):
         default_factory=ArtifactManifestRequirements
     )
 
-    # v0.8.0 (KUI-99): tripwire primitive opt-out + project-local extras.
+    # v0.8.0 (KUI-99): JIT prompt primitive opt-out + project-local extras.
     # Defaults match the spec: enabled, no opt-outs, no extras. Setting
-    # ``enabled: false`` disables ALL tripwires for this project (and
+    # ``enabled: false`` disables ALL JIT prompts for this project (and
     # the pre-push hook installation in runtimes/prep.py).
-    tripwires: ProjectTripwiresConfig = Field(default_factory=ProjectTripwiresConfig)
+    jit_prompts: ProjectJitPromptsConfig = Field(default_factory=ProjectJitPromptsConfig)
 
     # v0.7b: per-project artifact manifest overrides layered on top of
     # templates/artifacts/manifest.yaml. Useful for adding project-specific

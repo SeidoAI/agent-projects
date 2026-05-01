@@ -665,25 +665,28 @@ def install_claude_settings(*, worktree: Path) -> None:
 def install_pre_push_hook(
     *, worktree: Path, project_dir: Path, session_id: str
 ) -> None:
-    """Install the tripwire pre-push hook in this worktree (KUI-99).
+    """Install the JIT prompt pre-push hook in this worktree (KUI-99).
 
-    Reads ``project.yaml.tripwires.enabled``; on False, skips
+    Reads ``project.yaml.jit_prompts.enabled``; on False, skips
     installation entirely. On True, renders
     ``templates/spawn/pre_push_hook.sh.j2`` into
     ``<worktree>/.git/hooks/pre-push`` and chmods it executable.
 
     The hook itself re-reads the project config on every push, so a
-    late ``tripwires.enabled: false`` flip works without re-install.
+    late ``jit_prompts.enabled: false`` flip works without re-install.
     """
     from jinja2 import Environment, FileSystemLoader
 
     from tripwire.core.store import load_project
 
     project = load_project(project_dir)
-    tripwires_cfg = getattr(project, "tripwires", None)
-    if tripwires_cfg is not None and getattr(tripwires_cfg, "enabled", True) is False:
+    jit_prompts_cfg = getattr(project, "jit_prompts", None)
+    if (
+        jit_prompts_cfg is not None
+        and getattr(jit_prompts_cfg, "enabled", True) is False
+    ):
         log.info(
-            "session %s: project.yaml.tripwires.enabled is False; skipping "
+            "session %s: project.yaml.jit_prompts.enabled is False; skipping "
             "pre-push hook install",
             session_id,
         )
@@ -838,9 +841,9 @@ def run(
 
     code_worktree = Path(worktrees[0].worktree_path)
 
-    # KUI-99: install the tripwire pre-push hook on every code worktree
+    # KUI-99: install the JIT prompt pre-push hook on every code worktree
     # so `git push` can't dodge `tripwire session complete`. Skipped
-    # when project.yaml.tripwires.enabled is False (the helper handles
+    # when project.yaml.jit_prompts.enabled is False (the helper handles
     # the check). Idempotent — overwrites any existing hook with the
     # current template.
     for wt in worktrees:

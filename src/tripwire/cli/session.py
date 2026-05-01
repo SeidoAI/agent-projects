@@ -60,11 +60,11 @@ from tripwire.core.session_review_writer import (
 )
 from tripwire.core.session_store import list_sessions, load_session, save_session
 from tripwire.core.task_checklist import parse_task_checklist
-from tripwire.core.tripwire_state import (
-    record_bypass as _record_tripwire_bypass,
+from tripwire.core.jit_prompt_state import (
+    record_bypass as _record_jit_prompt_bypass,
 )
-from tripwire.core.tripwire_state import (
-    write_ack_marker as _write_ack_marker_core,
+from tripwire.core.jit_prompt_state import (
+    write_jit_prompt_ack_marker as _write_jit_prompt_ack_marker_core,
 )
 from tripwire.models.enums import SessionStatus
 from tripwire.models.session import EngagementEntry
@@ -1722,7 +1722,7 @@ session_cmd.add_command(artifacts_list, name="artifacts")
 
 
 # ----------------------------------------------------------------------------
-# `tripwire session log` — per-session tripwire fire log (KUI-99)
+# `tripwire session log` — per-session JIT prompt fire log (KUI-99)
 # ----------------------------------------------------------------------------
 
 
@@ -1738,7 +1738,7 @@ session_cmd.add_command(artifacts_list, name="artifacts")
     "--web",
     is_flag=True,
     default=False,
-    help="Print a deep-link to the UI Tripwire Log filtered to this session.",
+    help="Print a deep-link to the UI JIT Prompt Log filtered to this session.",
 )
 @click.option(
     "--reveal",
@@ -1749,23 +1749,23 @@ session_cmd.add_command(artifacts_list, name="artifacts")
 def session_log_cmd(
     session_id: str, project_dir: Path, web: bool, reveal: bool
 ) -> None:
-    """Show all tripwire fires for a session, with timestamps and acks.
+    """Show all JIT prompt fires for a session, with timestamps and acks.
 
     Thin wrapper — see :func:`tripwire.core.session_log.enumerate_fires`.
     """
-    from tripwire.cli.tripwires import _is_pm
+    from tripwire.cli.jit_prompts import _is_pm
     from tripwire.core.session_log import enumerate_fires
 
     resolved = project_dir.expanduser().resolve()
 
     if web:
         click.echo(
-            f"Tripwire Log: http://localhost:8000/tripwires?session_id={session_id}"
+            f"JIT Prompt Log: http://localhost:8000/jit-prompts?session_id={session_id}"
         )
 
     entries = list(enumerate_fires(resolved, session_id))
     if not entries:
-        click.echo(f"No tripwire fires for session {session_id!r}.")
+        click.echo(f"No JIT prompt fires for session {session_id!r}.")
         return
 
     pm_mode = _is_pm()
@@ -1776,7 +1776,7 @@ def session_log_cmd(
             continue
         flag = " ESCALATED" if entry.escalated else ""
         click.echo(
-            f"  {entry.fired_at}  {entry.tripwire_id}  on={entry.event}  "
+            f"  {entry.fired_at}  {entry.jit_prompt_id}  on={entry.event}  "
             f"status={entry.ack_status}{entry.ack_detail}{flag}"
         )
         if reveal and pm_mode:
@@ -1799,7 +1799,7 @@ def session_log_cmd(
     is_flag=True,
     default=False,
     help=(
-        "Write the tripwire ack marker rather than running the close-out. "
+        "Write the JIT prompt ack marker rather than running the close-out. "
         "Requires `--fix-commit` (≥1) OR `--declared-no-findings`."
     ),
 )
@@ -1807,28 +1807,28 @@ def session_log_cmd(
     "--fix-commit",
     "fix_commits",
     multiple=True,
-    help="Commit SHA addressing a tripwire finding (use multiple times).",
+    help="Commit SHA addressing a JIT prompt finding (use multiple times).",
 )
 @click.option(
     "--declared-no-findings",
     is_flag=True,
     default=False,
-    help="Acknowledge the tripwire with an explicit no-findings declaration.",
+    help="Acknowledge the JIT prompt with an explicit no-findings declaration.",
 )
 @click.option(
-    "--no-tripwires",
+    "--no-jit-prompts",
     is_flag=True,
     default=False,
     help=(
-        "Bypass tripwire firing (still runs close-out gates). Logs an "
-        "audit entry to `.tripwire/audit/tripwire_bypass.log`."
+        "Bypass JIT prompt firing (still runs close-out gates). Logs an "
+        "audit entry to `.tripwire/audit/jit_prompt_bypass.log`."
     ),
 )
 @click.option(
     "--web",
     is_flag=True,
     default=False,
-    help="After complete, print a deep-link to the UI Tripwire Log.",
+    help="After complete, print a deep-link to the UI JIT Prompt Log.",
 )
 def session_complete_cmd(
     session_id: str,
@@ -1837,27 +1837,27 @@ def session_complete_cmd(
     ack: bool,
     fix_commits: tuple[str, ...],
     declared_no_findings: bool,
-    no_tripwires: bool,
+    no_jit_prompts: bool,
     web: bool,
 ) -> None:
     """Complete a session: verify PRs merged, close issues, cleanup.
 
-    The session.complete lifecycle event fires the tripwire registry
+    The session.complete lifecycle event fires the JIT prompt registry
     BEFORE the close-out gates run. On a first call (no marker), the
-    self-review tripwire returns its prompt on stdout and the command
+    self-review JIT prompt returns its prompt on stdout and the command
     exits 1. The agent acks via `--ack --fix-commit <sha>` (≥1) OR
     `--ack --declared-no-findings`, and then re-runs without `--ack`
     to invoke the close-out gates as in v0.7.x.
 
-    `--no-tripwires` bypasses the tripwire fire entirely (audit entry
-    written). `tripwires.enabled: false` in project.yaml disables them
+    `--no-jit-prompts` bypasses the JIT prompt fire entirely (audit entry
+    written). `jit_prompts.enabled: false` in project.yaml disables them
     project-wide.
 
     Close-out gates are unchanged from v0.7.9 §A4: PR merged, issue
     artifacts present, review.json exit_code ≤ 1. There are no bypass
     flags for the gates themselves.
     """
-    from tripwire._internal.tripwires import fire_event
+    from tripwire._internal.jit_prompts import fire_jit_prompt_event
     from tripwire.core.session_complete import (
         CompleteError,
         complete_session,
@@ -1867,27 +1867,27 @@ def session_complete_cmd(
     _require_project(resolved)
 
     if ack:
-        _write_tripwire_ack(
+        _write_jit_prompt_ack(
             project_dir=resolved,
             session_id=session_id,
-            tripwire_id="self-review",
+            jit_prompt_id="self-review",
             fix_commits=list(fix_commits),
             declared_no_findings=declared_no_findings,
         )
         click.echo(
-            f"Tripwire 'self-review' acknowledged for session {session_id}. "
+            f"JIT prompt 'self-review' acknowledged for session {session_id}. "
             f"Re-run without --ack to invoke close-out."
         )
         return
 
-    if no_tripwires:
-        _record_tripwire_bypass(
+    if no_jit_prompts:
+        _record_jit_prompt_bypass(
             project_dir=resolved,
             session_id=session_id,
             event="session.complete",
         )
     else:
-        fire = fire_event(
+        fire = fire_jit_prompt_event(
             project_dir=resolved,
             event="session.complete",
             session_id=session_id,
@@ -1916,24 +1916,24 @@ def session_complete_cmd(
 
     if web:
         click.echo(
-            f"  Tripwire Log: http://localhost:8000/tripwires?session_id={session_id}"
+            f"  JIT Prompt Log: http://localhost:8000/jit-prompts?session_id={session_id}"
         )
 
 
-def _write_tripwire_ack(
+def _write_jit_prompt_ack(
     *,
     project_dir: Path,
     session_id: str,
-    tripwire_id: str,
+    jit_prompt_id: str,
     fix_commits: list[str],
     declared_no_findings: bool,
 ) -> None:
-    """Thin click wrapper — see ``core.tripwire_state.write_ack_marker``."""
+    """Thin click wrapper — see ``core.jit_prompt_state.write_jit_prompt_ack_marker``."""
     try:
-        _write_ack_marker_core(
+        _write_jit_prompt_ack_marker_core(
             project_dir=project_dir,
             session_id=session_id,
-            tripwire_id=tripwire_id,
+            jit_prompt_id=jit_prompt_id,
             fix_commits=fix_commits,
             declared_no_findings=declared_no_findings,
         )

@@ -4,7 +4,7 @@ The hook lives at ``<worktree>/.git/hooks/pre-push`` and gates
 ``git push`` on the existence of a substantive ack marker for the
 self-review tripwire on this session. Two opt-outs:
 
-  * Per-call: ``tripwire session complete --no-tripwires`` writes an
+  * Per-call: ``tripwire session complete --no-jit-prompts`` writes an
     audit-log entry that the hook treats as bypass.
   * Per-project: ``tripwires.enabled: false`` in project.yaml — the
     hook checks the project config and short-circuits.
@@ -156,8 +156,8 @@ def test_hook_passes_with_bypass_audit_entry(tmp_path: Path) -> None:
 
     audit_dir = project_dir / ".tripwire" / "audit"
     audit_dir.mkdir(parents=True, exist_ok=True)
-    (audit_dir / "tripwire_bypass.log").write_text(
-        "2026-04-26T00:00:00+00:00\tsession.complete\tfixture-1\t--no-tripwires\n",
+    (audit_dir / "jit_prompt_bypass.log").write_text(
+        "2026-04-26T00:00:00+00:00\tsession.complete\tfixture-1\t--no-jit-prompts\n",
         encoding="utf-8",
     )
 

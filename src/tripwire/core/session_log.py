@@ -1,8 +1,8 @@
-"""Enumerate tripwire fires for a session, with ack-marker join.
+"""Enumerate JIT prompt fires for a session, with ack-marker join.
 
-Reads ``.tripwire/events/firings/<sid>/*.json`` (written by
+Reads ``.tripwire/events/jit_prompt_firings/<sid>/*.json`` (written by
 ``FileEmitter`` from the registry) and joins each entry against the
-per-tripwire ack marker at ``.tripwire/acks/<tw_id>-<sid>.json``.
+per-JIT-prompt ack marker at ``.tripwire/acks/<prompt_id>-<sid>.json``.
 
 The CLI wrapper at ``cli/session.py:session_log_cmd`` calls
 :func:`enumerate_fires` and renders each :class:`FireEntry` to stdout.
@@ -18,7 +18,7 @@ from pathlib import Path
 
 @dataclass
 class FireEntry:
-    """One tripwire fire for a session, with ack status joined.
+    """One JIT prompt fire for a session, with ack status joined.
 
     ``ack_status`` is one of ``"unacked"`` / ``"acked"`` /
     ``"acked (declared_no_findings)"`` / ``"acked (unreadable marker)"``.
@@ -26,7 +26,7 @@ class FireEntry:
     """
 
     fired_at: str
-    tripwire_id: str
+    jit_prompt_id: str
     event: str
     escalated: bool
     ack_status: str
@@ -43,7 +43,7 @@ def enumerate_fires(project_dir: Path, session_id: str) -> Iterator[FireEntry]:
     entry's ``unreadable=True`` flags a file that couldn't be parsed —
     the caller decides how to surface it.
     """
-    fire_dir = project_dir / ".tripwire" / "events" / "firings" / session_id
+    fire_dir = project_dir / ".tripwire" / "events" / "jit_prompt_firings" / session_id
     if not fire_dir.is_dir():
         return
 
@@ -53,7 +53,7 @@ def enumerate_fires(project_dir: Path, session_id: str) -> Iterator[FireEntry]:
         except (OSError, json.JSONDecodeError):
             yield FireEntry(
                 fired_at="?",
-                tripwire_id="?",
+                jit_prompt_id="?",
                 event="?",
                 escalated=False,
                 ack_status="?",
@@ -64,8 +64,10 @@ def enumerate_fires(project_dir: Path, session_id: str) -> Iterator[FireEntry]:
             )
             continue
 
-        tw_id = payload.get("tripwire_id", "?")
-        marker_path = project_dir / ".tripwire" / "acks" / f"{tw_id}-{session_id}.json"
+        prompt_id = payload.get("jit_prompt_id", "?")
+        marker_path = (
+            project_dir / ".tripwire" / "acks" / f"{prompt_id}-{session_id}.json"
+        )
         ack_status = "unacked"
         ack_detail = ""
         if marker_path.is_file():
@@ -82,7 +84,7 @@ def enumerate_fires(project_dir: Path, session_id: str) -> Iterator[FireEntry]:
 
         yield FireEntry(
             fired_at=payload.get("fired_at", "?"),
-            tripwire_id=tw_id,
+            jit_prompt_id=prompt_id,
             event=payload.get("event", "?"),
             escalated=bool(payload.get("escalated", False)),
             ack_status=ack_status,
