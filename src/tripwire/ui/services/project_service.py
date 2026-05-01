@@ -140,6 +140,54 @@ def _try_load_summary(abs_dir: Path) -> ProjectSummary | None:
     )
 
 
+def _is_worktree_copy(project_dir: Path) -> bool:
+    """Return True for common Tripwire/Git worktree project copies."""
+    name = project_dir.name
+    return name.startswith("worktree-") or "-wt-" in name
+
+
+def _prefer_project_summary(
+    existing: ProjectSummary, candidate: ProjectSummary
+) -> ProjectSummary:
+    """Pick the canonical summary when two paths share one project identity."""
+    existing_path = Path(existing.dir)
+    candidate_path = Path(candidate.dir)
+    existing_is_worktree = _is_worktree_copy(existing_path)
+    candidate_is_worktree = _is_worktree_copy(candidate_path)
+
+    if existing_is_worktree != candidate_is_worktree:
+        return candidate if not candidate_is_worktree else existing
+
+    return candidate if str(candidate_path) < str(existing_path) else existing
+
+
+def _deduplicate_summaries_by_identity(
+    summaries: list[ProjectSummary],
+) -> list[ProjectSummary]:
+    """Collapse path-level duplicates for the same logical Tripwire project."""
+    by_identity: dict[tuple[str, str], ProjectSummary] = {}
+
+    for summary in summaries:
+        key = (summary.name, summary.key_prefix)
+        existing = by_identity.get(key)
+        if existing is None:
+            by_identity[key] = summary
+            continue
+
+        preferred = _prefer_project_summary(existing, summary)
+        if preferred is not existing:
+            by_identity[key] = preferred
+        logger.info(
+            "Collapsed duplicate project identity %s/%s: kept %s, skipped %s",
+            summary.name,
+            summary.key_prefix,
+            preferred.dir,
+            summary.dir if preferred is existing else existing.dir,
+        )
+
+    return list(by_identity.values())
+
+
 def _should_prune(dirname: str) -> bool:
     return dirname in _PRUNE_DIRS or dirname.startswith(".")
 
@@ -211,12 +259,13 @@ def discover_projects(config: UserConfig) -> list[ProjectSummary]:
 
     # Build summaries
     summaries: list[ProjectSummary] = []
-    index: dict[str, Path] = {}
     for project_dir in candidates:
         summary = _try_load_summary(project_dir)
         if summary is not None:
             summaries.append(summary)
-            index[summary.id] = project_dir
+
+    summaries = _deduplicate_summaries_by_identity(summaries)
+    index = {summary.id: Path(summary.dir) for summary in summaries}
 
     _discovery_cache = (now, summaries)
     _project_index = index
