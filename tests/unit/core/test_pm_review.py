@@ -246,3 +246,28 @@ def test_run_pm_review_unknown_session_raises(tmp_path, clean_validator):
     pd = _scaffold_project(tmp_path)
     with pytest.raises(FileNotFoundError):
         run_pm_review(pd, session_id="does-not-exist")
+
+
+def test_run_pm_review_passes_session_id_to_validator(monkeypatch, tmp_path):
+    """Codex P2: ``validate_project`` is called with the reviewed
+    session id, not the CLI sentinel. Otherwise the
+    ``validator.run`` workflow events emitted during the review get
+    attributed to ``_cli_validate`` and skew ``/workflow-stats``.
+    """
+    from tripwire.core.pm_review import run_pm_review
+    from tripwire.core.validator._types import ValidationReport
+
+    captured: dict[str, object] = {}
+
+    def _spy(*args, **kwargs):
+        captured["session_id"] = kwargs.get("session_id")
+        captured["strict"] = kwargs.get("strict")
+        return ValidationReport(exit_code=0, errors=[], warnings=[])
+
+    monkeypatch.setattr("tripwire.core.pm_review.runner.validate_project", _spy)
+
+    pd = _scaffold_project(tmp_path)
+    run_pm_review(pd, session_id="pm-review-target")
+
+    assert captured["session_id"] == "pm-review-target"
+    assert captured["strict"] is True

@@ -58,10 +58,30 @@ export function EventLog() {
     setSearchParams(next, { replace: true });
   };
 
+  // Synthesize a stable per-row id. The events log emits at second
+  // granularity, so a single session/station can produce many rows
+  // with the same `(workflow, instance, station, event, ts)` tuple
+  // — codex P1. We disambiguate by also including `details.id`
+  // (pins validator/tripwire fires apart) and, when ties remain,
+  // an occurrence-count suffix `|#N`. The events array is the
+  // chronological tail of an append-only log; its prefix is stable
+  // across polls, so the suffix is reproducible across renders for
+  // the same row, keeping the URL `focus` link valid across refetch.
+  const keyedEvents = useMemo(() => {
+    const counts = new Map<string, number>();
+    return events.map((event) => {
+      const base = synthIdBase(event);
+      const n = (counts.get(base) ?? 0) + 1;
+      counts.set(base, n);
+      const key = n === 1 ? base : `${base}|#${n}`;
+      return { event, key };
+    });
+  }, [events]);
+
   const selectedId = searchParams.get("focus") ?? null;
   const selected = useMemo(
-    () => events.find((e) => synthId(e) === selectedId) ?? null,
-    [events, selectedId],
+    () => keyedEvents.find((e) => e.key === selectedId)?.event ?? null,
+    [keyedEvents, selectedId],
   );
 
   return (
@@ -96,14 +116,13 @@ export function EventLog() {
             <EmptyRow>No events yet — run a session to populate the log.</EmptyRow>
           ) : (
             <ul className="divide-y divide-(--color-edge)">
-              {events.map((event) => {
-                const id = synthId(event);
-                const isSelected = id === selectedId;
+              {keyedEvents.map(({ event, key }) => {
+                const isSelected = key === selectedId;
                 return (
-                  <li key={id}>
+                  <li key={key}>
                     <button
                       type="button"
-                      onClick={() => setFilter("focus" as never, id)}
+                      onClick={() => setFilter("focus" as never, key)}
                       data-testid="event-row"
                       data-event-kind={event.event}
                       className={
@@ -286,8 +305,12 @@ function summarize(event: WorkflowEvent): string {
   return event.station;
 }
 
-function synthId(event: WorkflowEvent): string {
+function synthIdBase(event: WorkflowEvent): string {
   // Events log doesn't carry an explicit id; derive one from
-  // (workflow, instance, station, event, ts) which is stable per row.
-  return `${event.workflow}|${event.instance}|${event.station}|${event.event}|${event.ts}`;
+  // (workflow, instance, station, event, ts, details.id). The
+  // base alone may still collide on dense same-second bursts of
+  // the same kind/id; the caller appends an occurrence-count
+  // suffix to disambiguate (see `keyedEvents` in EventLog).
+  const detailsId = (event.details as { id?: string } | null)?.id ?? "";
+  return `${event.workflow}|${event.instance}|${event.station}|${event.event}|${event.ts}|${detailsId}`;
 }
