@@ -124,3 +124,9 @@ jobs:
           npm run build
       - name: Pytest e2e
         run: uv run pytest -m e2e tests/ui/e2e/ -v
+      - name: Install Playwright browser
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Browser e2e
+        working-directory: web
+        run: npm run e2e

@@ -1,0 +1,6 @@
+name: ui-e2e
+key_prefix: E2E
+description: Browser e2e fixture for the Tripwire UI.
+phase: executing
+next_issue_number: 1
+next_session_number: 1
