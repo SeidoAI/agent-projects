@@ -7,7 +7,7 @@ WebSocket event, return the result DTO. The service layer owns:
 - the validator subprocess (via :func:`tripwire.core.validator.validate_project`,
   run on a background thread by the route);
 - the graph-cache rebuild (via
-  :func:`tripwire.core.graph_cache.ensure_fresh`);
+  :func:`tripwire.core.graph.cache.ensure_fresh`);
 - the phase-advance transaction — write `phase`, validate, revert on
   failure — with an `flock`-held ``project.yaml`` to avoid racing
   `tripwire next-key` or another advance_phase;
@@ -30,7 +30,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from tripwire.core import graph_cache, paths
+from tripwire.core import paths
+from tripwire.core.graph import cache as graph_cache
 from tripwire.core.locks import project_lock
 from tripwire.core.parser import serialize_frontmatter_body
 from tripwire.core.session_complete import CompleteError, complete_session

@@ -68,7 +68,7 @@ artifacts:
   Valid phases: `planning`, `implementing`, `verifying`, `completion`
   (or a project-defined phase).
 - `produced_by` — which agent writes the initial version. Values come
-  from `templates/enums/agent_types.yaml`: `pm`, `execution-agent`, or
+  from `templates/enums/agent_type.yaml`: `pm`, `execution-agent`, or
   `verification-agent`.
 - `owned_by` — which agent owns updates to the artifact (often equals
   `produced_by`). Same enum as `produced_by`.

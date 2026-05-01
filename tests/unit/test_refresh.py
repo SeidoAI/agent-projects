@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from tripwire.core.graph_cache import ensure_fresh, load_index
+from tripwire.core.graph.cache import ensure_fresh, load_index
 
 
 def write_project_yaml(project_dir: Path) -> None:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tripwire.core.reference_parser import extract_references, replace_references
+from tripwire.core.graph.refs import extract_references, replace_references
 
 
 class TestExtractReferences:

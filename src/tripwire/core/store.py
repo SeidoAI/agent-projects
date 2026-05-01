@@ -121,7 +121,7 @@ def save_issue(project_dir: Path, issue: Issue, *, update_cache: bool = True) ->
     path.write_text(text, encoding="utf-8")
 
     if update_cache:
-        from tripwire.core.graph_cache import update_cache_for_file
+        from tripwire.core.graph.cache import update_cache_for_file
 
         update_cache_for_file(project_dir, str(path.relative_to(project_dir)))
 

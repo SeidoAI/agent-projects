@@ -697,7 +697,7 @@ def _apply_fixes_locked(ctx: ValidationContext) -> list[CheckResult]:
     # read inside the same process sees the new state. Comments and
     # sessions are no-ops (graph_cache._classify ignores them).
     if dirty:
-        from tripwire.core.graph_cache import update_cache_for_file
+        from tripwire.core.graph.cache import update_cache_for_file
 
         for rel in dirty:
             update_cache_for_file(ctx.project_dir, rel)
@@ -907,7 +907,7 @@ def validate_project(
     behaviour. See `docs/specs/2026-04-26-v08-handoff.md` §1.2, §2.2.
     """
     # Import lazily to avoid a circular import at module load time.
-    from tripwire.core import graph_cache
+    from tripwire.core.graph import cache as graph_cache
 
     if emitter is None:
         emitter = NullEmitter()

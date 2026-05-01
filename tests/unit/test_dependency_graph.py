@@ -1,4 +1,4 @@
-"""Unit tests for `core/dependency_graph.py`.
+"""Unit tests for `core/graph/dependency.py`.
 
 Covers:
 - Graph construction from a list of Issues
@@ -9,7 +9,7 @@ Covers:
 
 from __future__ import annotations
 
-from tripwire.core.dependency_graph import (
+from tripwire.core.graph.dependency import (
     build_dependency_graph,
     to_dot,
     to_mermaid,

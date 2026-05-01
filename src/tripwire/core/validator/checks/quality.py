@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from tripwire.core import paths
+from tripwire.core.graph.refs import extract_references
 from tripwire.core.id_generator import parse_key
-from tripwire.core.reference_parser import extract_references
 from tripwire.core.validator._types import CheckResult, LoadedEntity, ValidationContext
 from tripwire.core.workflow.registry import registers_at
 from tripwire.models.issue import Issue

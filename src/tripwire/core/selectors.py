@@ -22,7 +22,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from tripwire.core.concept_graph import build_full_graph
+from tripwire.core.graph.concept import build_full_graph
 from tripwire.models.graph import FullGraphResult
 
 

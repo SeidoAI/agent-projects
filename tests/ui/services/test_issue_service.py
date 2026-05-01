@@ -170,7 +170,7 @@ class TestGetIssue:
         save_test_issue(tmp_path_project, "TST-1", body=_BODY_WITH_REFS)
 
         # Prime the graph cache so stale_nodes contains user-model.
-        from tripwire.core import graph_cache
+        from tripwire.core.graph import cache as graph_cache
 
         graph_cache.full_rebuild(tmp_path_project)
         cache = graph_cache.load_index(tmp_path_project)

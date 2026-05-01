@@ -186,7 +186,7 @@ class TestCurrentCacheVersion:
         self, tmp_path_project: Path, save_test_node
     ):
         save_test_node(tmp_path_project, "user-model")
-        from tripwire.core import graph_cache
+        from tripwire.core.graph import cache as graph_cache
 
         graph_cache.full_rebuild(tmp_path_project)
         v = current_cache_version(tmp_path_project)

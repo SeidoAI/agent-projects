@@ -16,9 +16,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from tripwire.core.graph.refs import extract_references
 from tripwire.core.node_store import node_exists, node_path
 from tripwire.core.paths import session_plan_path
-from tripwire.core.reference_parser import extract_references
 
 
 @dataclass(frozen=True)

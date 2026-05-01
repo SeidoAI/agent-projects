@@ -22,7 +22,7 @@ Schema::
     }
 
 Atomic writes use the same tmp-file + rename + `flock` pattern as
-`core/graph_cache.py` so concurrent merges don't corrupt the file.
+`core/graph/cache.py` so concurrent merges don't corrupt the file.
 """
 
 from __future__ import annotations

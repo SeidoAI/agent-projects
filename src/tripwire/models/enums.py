@@ -47,6 +47,13 @@ class Executor(StrEnum):
     MIXED = "mixed"
 
 
+class AgentType(StrEnum):
+    PM = "pm"
+    EXECUTION_AGENT = "execution-agent"
+    VERIFICATION_AGENT = "verification-agent"
+    HUMAN = "human"
+
+
 class Verifier(StrEnum):
     REQUIRED = "required"
     OPTIONAL = "optional"
@@ -153,6 +160,7 @@ class CommentType(StrEnum):
 # Used by the enum loader to fall back to packaged defaults when no
 # project-level enum file exists.
 DEFAULT_ENUMS: dict[str, type[StrEnum]] = {
+    "agent_type": AgentType,
     "issue_status": IssueStatus,
     "priority": Priority,
     "executor": Executor,

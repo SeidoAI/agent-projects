@@ -21,8 +21,8 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from tripwire.core import graph_cache
-from tripwire.core.dependency_graph import build_dependency_graph
+from tripwire.core.graph import cache as graph_cache
+from tripwire.core.graph.dependency import build_dependency_graph
 from tripwire.core.store import (
     ProjectNotFoundError,
     list_issues,

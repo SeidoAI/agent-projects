@@ -23,9 +23,9 @@ from rich.console import Console
 from rich.table import Table
 
 from tripwire.cli._utils import require_project as _require_project
-from tripwire.core import graph_cache
+from tripwire.core.graph import cache as graph_cache
+from tripwire.core.graph.refs import extract_references
 from tripwire.core.node_store import list_nodes, node_exists
-from tripwire.core.reference_parser import extract_references
 from tripwire.core.store import (
     issue_exists,
     list_issues,
@@ -222,10 +222,10 @@ def refs_check(project_dir: Path, output_format: str) -> None:
 
 
 def _collect_refs_check(project_dir: Path) -> RefsCheckReport:
-    from tripwire.core.concept_graph import (
+    from tripwire.core.graph.concept import (
         orphan_issues as concept_orphan_issues,
     )
-    from tripwire.core.concept_graph import (
+    from tripwire.core.graph.concept import (
         orphan_nodes as concept_orphan_nodes,
     )
 

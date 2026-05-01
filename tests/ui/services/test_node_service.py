@@ -57,7 +57,7 @@ class TestListNodes:
         save_test_issue(tmp_path_project, "TST-1")
         save_test_issue(tmp_path_project, "TST-2")
 
-        from tripwire.core import graph_cache
+        from tripwire.core.graph import cache as graph_cache
 
         graph_cache.full_rebuild(tmp_path_project)
 
@@ -73,7 +73,7 @@ class TestListNodes:
         save_test_node(tmp_path_project, "alpha")
         save_test_node(tmp_path_project, "beta")
 
-        from tripwire.core import graph_cache
+        from tripwire.core.graph import cache as graph_cache
 
         graph_cache.full_rebuild(tmp_path_project)
         cache = graph_cache.load_index(tmp_path_project)
@@ -90,7 +90,7 @@ class TestListNodes:
         save_test_node(tmp_path_project, "alpha")
         save_test_node(tmp_path_project, "beta")
 
-        from tripwire.core import graph_cache
+        from tripwire.core.graph import cache as graph_cache
 
         graph_cache.full_rebuild(tmp_path_project)
         cache = graph_cache.load_index(tmp_path_project)
@@ -147,7 +147,7 @@ class TestGetNode:
     def test_is_stale_from_cache(self, tmp_path_project: Path, save_test_node):
         save_test_node(tmp_path_project, "alpha")
 
-        from tripwire.core import graph_cache
+        from tripwire.core.graph import cache as graph_cache
 
         graph_cache.full_rebuild(tmp_path_project)
         cache = graph_cache.load_index(tmp_path_project)
@@ -271,7 +271,7 @@ class TestReverseRefs:
         save_test_node(tmp_path_project, "user-model")
         save_test_issue(tmp_path_project, "TST-1")
 
-        from tripwire.core import graph_cache
+        from tripwire.core.graph import cache as graph_cache
 
         graph_cache.full_rebuild(tmp_path_project)
 
@@ -313,7 +313,7 @@ class TestReverseRefs:
         # that fails (lock timeout, disk IO error, etc). The service
         # should log and fall back to a filesystem scan.
         import tripwire.ui.services.node_service as svc
-        from tripwire.core import graph_cache as gc
+        from tripwire.core.graph import cache as gc
 
         def _boom(*a, **kw):
             raise OSError("simulated lock failure")

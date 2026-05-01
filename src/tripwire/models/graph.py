@@ -161,7 +161,7 @@ class GraphIndex(BaseModel):
 
 
 class FullGraphResult(BaseModel):
-    """A complete computed graph, returned by `core.concept_graph.build_full_graph`.
+    """A complete computed graph, returned by `core.graph.concept.build_full_graph`.
 
     Distinct from `GraphIndex` in that this is the in-memory result for one
     query, not the persisted cache.
@@ -175,7 +175,7 @@ class FullGraphResult(BaseModel):
 
 
 class DependencyGraphResult(BaseModel):
-    """Result of `core.dependency_graph.build_dependency_graph`."""
+    """Result of `core.graph.dependency.build_dependency_graph`."""
 
     model_config = ConfigDict(extra="forbid")
 

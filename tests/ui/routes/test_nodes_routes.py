@@ -84,7 +84,7 @@ class TestListNodes:
         tests already cover the filter semantics; this one pins the
         route so we notice if the query param gets dropped during a
         refactor."""
-        from tripwire.core import graph_cache
+        from tripwire.core.graph import cache as graph_cache
         from tripwire.models.graph import GraphIndex
 
         # Seed a cache that marks `api-contract` as stale. Service's
@@ -108,7 +108,7 @@ class TestListNodes:
     ):
         """Companion to the stale=true case — ?stale=false excludes
         the stale node, leaving the fresh one."""
-        from tripwire.core import graph_cache
+        from tripwire.core.graph import cache as graph_cache
         from tripwire.models.graph import GraphIndex
 
         graph_cache.save_index(

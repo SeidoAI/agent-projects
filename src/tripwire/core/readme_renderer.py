@@ -20,7 +20,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from tripwire import __version__ as _tripwire_version
-from tripwire.core.dependency_graph import build_dependency_graph
+from tripwire.core.graph.dependency import build_dependency_graph
 from tripwire.core.session_agenda import build_agenda
 from tripwire.core.session_mermaid import render_session_mermaid
 from tripwire.core.session_store import list_sessions

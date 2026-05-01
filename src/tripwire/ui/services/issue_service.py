@@ -14,9 +14,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from tripwire.core import graph_cache
+from tripwire.core.graph import cache as graph_cache
+from tripwire.core.graph.refs import extract_references
 from tripwire.core.node_store import node_exists
-from tripwire.core.reference_parser import extract_references
 from tripwire.core.store import issue_exists, load_issue
 from tripwire.core.store import list_issues as _core_list_issues
 from tripwire.core.validator import ValidationReport, validate_project

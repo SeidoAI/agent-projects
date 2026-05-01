@@ -100,16 +100,16 @@ src/tripwire/core/graph/
 └── version_pin.py      pin-syntax helpers
 ```
 
-The flat modules `core/graph_cache.py`, `core/concept_graph.py`,
-`core/dependency_graph.py`, `core/reference_parser.py` are retained
-as backward-compat shims that re-export from the new package paths.
+The old flat modules `core/graph/cache.py`, `core/graph/concept.py`,
+`core/graph/dependency.py`, `core/graph/refs.py` have been removed.
+Code imports the package paths directly.
 
 ## Backward compatibility
 
 - Existing `graph/index.yaml` files load cleanly (no new required
   fields; `via_artifact` and `line` default to None).
-- Existing imports (`from tripwire.core.graph_cache import …`)
-  keep working via shim modules at the old paths.
+- Package-path imports (`from tripwire.core.graph.cache import …`) are the
+  supported graph API.
 - `GraphNode.kind` accepts both legacy strings (`"issue"`,
   `"node"`) and the canonical `NodeKind` values.
 - Legacy edge type strings (`"references"`, `"blocked_by"`, etc.)

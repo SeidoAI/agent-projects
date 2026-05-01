@@ -1,4 +1,4 @@
-"""Unit tests for `core/graph_cache.py`.
+"""Unit tests for `core/graph/cache.py`.
 
 Covers:
 - load_index / save_index round-trip
@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from tripwire.core.graph_cache import (
+from tripwire.core.graph.cache import (
     CACHE_VERSION,
     INDEX_REL_PATH,
     ensure_fresh,

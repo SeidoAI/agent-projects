@@ -5,8 +5,8 @@ from __future__ import annotations
 from pydantic import ValidationError
 
 from tripwire.core import paths
+from tripwire.core.graph.refs import extract_references
 from tripwire.core.parser import ParseError, parse_frontmatter_body
-from tripwire.core.reference_parser import extract_references
 from tripwire.core.status import is_status_reachable
 from tripwire.core.validator._types import CheckResult, ValidationContext
 from tripwire.core.workflow.registry import registers_at

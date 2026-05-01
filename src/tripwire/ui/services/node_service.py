@@ -1,7 +1,7 @@
 """Concept-node read service — list, detail, freshness, reverse refs.
 
 Wraps :mod:`tripwire.core.node_store`, :mod:`tripwire.core.freshness`, and
-:mod:`tripwire.core.graph_cache` to produce API-shaped models for the
+:mod:`tripwire.core.graph.cache` to produce API-shaped models for the
 ``/api/projects/{pid}/nodes`` routes.
 """
 
@@ -14,8 +14,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from tripwire.core import graph_cache
 from tripwire.core.freshness import check_node_freshness
+from tripwire.core.graph import cache as graph_cache
 from tripwire.core.node_store import list_nodes as _core_list_nodes
 from tripwire.core.node_store import load_node
 from tripwire.core.store import ProjectNotFoundError, load_project
@@ -153,7 +153,7 @@ def _scan_reverse_refs(project_dir: Path, node_id: str) -> list[str]:
     attempt also failed. Reads every issue and every node body and
     greps for the reference id.
     """
-    from tripwire.core.reference_parser import extract_references
+    from tripwire.core.graph.refs import extract_references
     from tripwire.core.store import list_issues
 
     referrers: list[str] = []
@@ -174,7 +174,7 @@ def _load_cache_ensuring_fresh(project_dir: Path):  # type: ignore[no-untyped-de
     """Load the graph cache, building it once if absent.
 
     Per the KUI-16 execution constraint: *"If ``graph/index.yaml`` is
-    missing, call ``tripwire.core.graph_cache.ensure_fresh(project_dir)``
+    missing, call ``tripwire.core.graph.cache.ensure_fresh(project_dir)``
     once per request — avoid infinite rebuild loops."*
 
     We call ``ensure_fresh`` at most once per call. If the rebuild fails

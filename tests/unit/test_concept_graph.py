@@ -1,15 +1,15 @@
-"""Unit tests for `core/concept_graph.py`."""
+"""Unit tests for `core/graph/concept.py`."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from tripwire.core.concept_graph import (
+from tripwire.core.graph.cache import full_rebuild
+from tripwire.core.graph.concept import (
     build_full_graph,
     orphan_issues,
     orphan_nodes,
 )
-from tripwire.core.graph_cache import full_rebuild
 from tripwire.core.node_store import save_node
 from tripwire.core.store import save_issue, save_project
 from tripwire.models import (

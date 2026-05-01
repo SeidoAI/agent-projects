@@ -1,7 +1,7 @@
 """Graph read service — React Flow-shaped dependency + concept graphs.
 
-Wraps :mod:`tripwire.core.dependency_graph` and
-:mod:`tripwire.core.concept_graph` to produce JSON payloads matching the
+Wraps :mod:`tripwire.core.graph.dependency` and
+:mod:`tripwire.core.graph.concept` to produce JSON payloads matching the
 React Flow node+edge schema. Positions are computed server-side with a
 deterministic layered layout so the frontend doesn't need a layout
 engine.
@@ -23,9 +23,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from tripwire.core import graph_cache
-from tripwire.core.concept_graph import build_full_graph
-from tripwire.core.dependency_graph import build_dependency_graph as _core_dep_graph
+from tripwire.core.graph import cache as graph_cache
+from tripwire.core.graph.concept import build_full_graph
+from tripwire.core.graph.dependency import build_dependency_graph as _core_dep_graph
 from tripwire.core.selectors import resolve_selector
 from tripwire.core.store import list_issues
 from tripwire.models.graph import (

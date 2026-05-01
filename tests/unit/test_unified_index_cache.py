@@ -252,7 +252,7 @@ def test_save_session_invalidates_cache(tmp_path: Path) -> None:
     save path didn't invalidate the cache, so reads via direct
     `load_index` (without a freshness pass) saw stale data.
     """
-    from tripwire.core.graph_cache import load_index, save_index
+    from tripwire.core.graph.cache import load_index, save_index
     from tripwire.core.session_store import save_session
     from tripwire.models import AgentSession
 

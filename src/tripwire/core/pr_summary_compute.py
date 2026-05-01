@@ -142,7 +142,7 @@ def _read_state(project_dir: Path) -> _StateSnapshot:
     project), return an empty snapshot rather than raising — the base
     side of a brand-new project should compare against "nothing".
     """
-    from tripwire.core.dependency_graph import build_dependency_graph
+    from tripwire.core.graph.dependency import build_dependency_graph
     from tripwire.core.linter import Linter
     from tripwire.core.node_store import list_nodes
     from tripwire.core.session_store import list_sessions
@@ -189,7 +189,7 @@ def _read_state(project_dir: Path) -> _StateSnapshot:
     # Stale-node count comes from the graph cache when present; if the
     # cache hasn't been built at this SHA, fall back to 0 — validate
     # rebuilds the cache, so by this point it should exist.
-    from tripwire.core import graph_cache
+    from tripwire.core.graph import cache as graph_cache
 
     cache = graph_cache.load_index(project_dir)
     state.stale_node_count = len(cache.stale_nodes) if cache is not None else 0

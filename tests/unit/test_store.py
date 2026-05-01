@@ -236,7 +236,7 @@ class TestCacheInvalidationOnSave:
     the graph cache consistent with what's on disk."""
 
     def test_save_issue_updates_graph_cache(self, project_dir: Path) -> None:
-        from tripwire.core.graph_cache import load_index
+        from tripwire.core.graph.cache import load_index
 
         issue = Issue(
             id="TST-42",
@@ -256,7 +256,7 @@ class TestCacheInvalidationOnSave:
     def test_save_issue_with_update_cache_false_does_not_touch_cache(
         self, project_dir: Path
     ) -> None:
-        from tripwire.core.graph_cache import load_index
+        from tripwire.core.graph.cache import load_index
 
         issue = Issue(
             id="TST-99",
