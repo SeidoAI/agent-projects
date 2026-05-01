@@ -114,9 +114,7 @@ def test_in_review_session_admits_in_review_verified_deferred_abandoned() -> Non
     # is a documented lifecycle path; the rolled-back session retains
     # already-verified issues. Plus abandoned (always-allowed escape).
     allowed = ALLOWED_ISSUE_STATES_BY_SESSION_STATE["in_review"]
-    assert allowed == frozenset(
-        {"in_review", "verified", "deferred", "abandoned"}
-    )
+    assert allowed == frozenset({"in_review", "verified", "deferred", "abandoned"})
 
 
 def test_verified_session_pins_to_verified() -> None:
