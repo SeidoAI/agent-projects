@@ -109,7 +109,9 @@ def test_string_threshold_falls_back_to_default(
     assert any(r.code == "mega_issue/too_many_children" for r in results)
 
 
-def test_string_node_ratio_threshold_falls_back(tmp_path_project: Path, save_test_issue):
+def test_string_node_ratio_threshold_falls_back(
+    tmp_path_project: Path, save_test_issue
+):
     """codex P1: float-valued thresholds also reject string overrides."""
     from tripwire.core.validator.lint import node_ratio
 
