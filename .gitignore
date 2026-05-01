@@ -47,6 +47,7 @@ tmp/
 # src/tripwire/ui/static/ on release (hatch_build.py hook) and is not
 # checked in. The server tolerates a missing static/ dir at runtime.
 src/tripwire/ui/static/
+web/node_modules
 web/node_modules/
 web/dist/
 web/coverage/

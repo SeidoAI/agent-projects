@@ -75,9 +75,11 @@ class TestProdModeWithBundle:
 
 
 class TestProdModeWithoutBundle:
-    def test_warning_logged(self, caplog):
+    def test_warning_logged(self, tmp_path: Path, caplog):
         with caplog.at_level(logging.WARNING, logger="tripwire.ui.server"):
-            create_app(dev_mode=False)
+            with patch("tripwire.ui.server.importlib.resources.files") as mock_files:
+                mock_files.return_value = tmp_path
+                create_app(dev_mode=False)
         assert any("Frontend statics not found" in m for m in caplog.messages)
 
     def test_api_still_works(self):

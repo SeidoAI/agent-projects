@@ -51,14 +51,18 @@ export function SessionList() {
   const grouped = useMemo(() => {
     const buckets = new Map<string, SessionSummary[]>();
     for (const s of filtered) {
-      if (!buckets.has(s.status)) buckets.set(s.status, []);
-      buckets.get(s.status)!.push(s);
+      let bucket = buckets.get(s.status);
+      if (!bucket) {
+        bucket = [];
+        buckets.set(s.status, bucket);
+      }
+      bucket.push(s);
     }
     const sortedKeys = Array.from(buckets.keys()).sort(
       (a, b) => statusOrder(a) - statusOrder(b) || a.localeCompare(b),
     );
     return sortedKeys.map((status) => {
-      const list = buckets.get(status)!;
+      const list = buckets.get(status) ?? [];
       list.sort((a, b) => {
         // Within "planned": actionable first.
         if (status === "planned") {
@@ -201,10 +205,7 @@ export function SessionList() {
                 <span className="font-mono text-[11px] text-(--color-ink-3) tabular-nums">
                   {sessions.length}
                 </span>
-                <span
-                  aria-hidden
-                  className="ml-1 h-px flex-1 bg-(--color-edge)"
-                />
+                <span aria-hidden className="ml-1 h-px flex-1 bg-(--color-edge)" />
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {sessions.map((session) => (
