@@ -276,9 +276,7 @@ def check_issue_session_status_compatibility(
             if not is_issue_state_compatible_with_session_state(
                 str(session.status), str(issue.status)
             ):
-                allowed = sorted(
-                    ALLOWED_ISSUE_STATES_BY_SESSION_STATE[s_state]
-                )
+                allowed = sorted(ALLOWED_ISSUE_STATES_BY_SESSION_STATE[s_state])
                 results.append(
                     CheckResult(
                         code="contract/issue_session_state_incompatible",

@@ -106,7 +106,9 @@ def _validate_transition(
 
     # Try canonical first, then the legacy alias for the same concept.
     allowed_raw: list[str] = list(
-        transitions.get(cur_canon, transitions.get(_CANONICAL_TO_LEGACY.get(cur_canon, ""), []))
+        transitions.get(
+            cur_canon, transitions.get(_CANONICAL_TO_LEGACY.get(cur_canon, ""), [])
+        )
     )
     # Normalise allowed values too — so a row with `["todo", "canceled"]`
     # resolves the same as `["queued", "abandoned"]`.

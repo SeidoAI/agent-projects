@@ -4,13 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 import yaml
 
 from tripwire.core.status_contract import (
     ALLOWED_ISSUE_STATES_BY_SESSION_STATE,
     ISSUE_ALIASES,
-    SESSION_ALIASES,
     SWEEP_TARGETS,
     is_issue_state_compatible_with_session_state,
     normalize_issue_status,
@@ -18,7 +16,6 @@ from tripwire.core.status_contract import (
     sweep_issues,
     sweep_target_for,
 )
-
 
 # --- Alias maps --------------------------------------------------------------
 
@@ -139,31 +136,29 @@ def test_paused_failed_abandoned_are_permissive() -> None:
 
 def test_compatibility_uses_canonical_via_aliases() -> None:
     # Old name on the issue side, canonical on the session side.
-    assert is_issue_state_compatible_with_session_state("executing", "in_progress") is True
+    assert (
+        is_issue_state_compatible_with_session_state("executing", "in_progress") is True
+    )
     assert is_issue_state_compatible_with_session_state("completed", "done") is True
     assert is_issue_state_compatible_with_session_state("planned", "backlog") is True
 
 
 def test_floor_violation_rejected() -> None:
     # An issue at "planned" is below the floor of an executing session.
-    assert (
-        is_issue_state_compatible_with_session_state("executing", "planned") is False
-    )
+    assert is_issue_state_compatible_with_session_state("executing", "planned") is False
 
 
 def test_ceiling_violation_rejected() -> None:
     # Issue at completed inside a still-executing session — ceiling
     # violation.
     assert (
-        is_issue_state_compatible_with_session_state("executing", "completed")
-        is False
+        is_issue_state_compatible_with_session_state("executing", "completed") is False
     )
 
 
 def test_completed_session_rejects_in_progress_issue() -> None:
     assert (
-        is_issue_state_compatible_with_session_state("completed", "executing")
-        is False
+        is_issue_state_compatible_with_session_state("completed", "executing") is False
     )
 
 
@@ -306,7 +301,9 @@ def test_sweep_issues_advances_only_forward(tmp_path: Path) -> None:
     assert load_issue(tmp_path, "T-104").status == "completed"
 
 
-def test_sweep_issues_to_completed_promotes_verified_and_earlier(tmp_path: Path) -> None:
+def test_sweep_issues_to_completed_promotes_verified_and_earlier(
+    tmp_path: Path,
+) -> None:
     _write_minimal_project(tmp_path)
     _make_issue(tmp_path, "T-100", "verified")
     _make_issue(tmp_path, "T-101", "executing")
@@ -331,6 +328,7 @@ def test_sweep_issues_no_target_for_paused(tmp_path: Path) -> None:
     changed = sweep_issues(tmp_path, session, "paused")
     assert changed == []
     from tripwire.core.store import load_issue
+
     assert load_issue(tmp_path, "T-100").status == "queued"
 
 
@@ -342,7 +340,9 @@ def test_sweep_issues_tolerates_missing_issue_files(tmp_path: Path) -> None:
     assert changed == ["T-100"]
 
 
-def test_sweep_issues_with_legacy_status_normalizes_then_advances(tmp_path: Path) -> None:
+def test_sweep_issues_with_legacy_status_normalizes_then_advances(
+    tmp_path: Path,
+) -> None:
     _write_minimal_project(tmp_path)
     # Issue saved with the v0.9.3-and-earlier name. The IssueStatus enum's
     # _missing_ alias handler should normalize it on load to "queued".
@@ -352,6 +352,7 @@ def test_sweep_issues_with_legacy_status_normalizes_then_advances(tmp_path: Path
     changed = sweep_issues(tmp_path, session, "in_review")
     assert changed == ["T-100"]
     from tripwire.core.store import load_issue
+
     assert load_issue(tmp_path, "T-100").status == "in_review"
 
 

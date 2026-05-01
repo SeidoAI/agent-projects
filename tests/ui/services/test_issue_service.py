@@ -104,10 +104,14 @@ class TestListIssues:
     def test_is_blocked_by_upstream_status(self, tmp_path_project, save_test_issue):
         # TST-1 is in progress → TST-2 blocked_by=[TST-1] is blocked
         save_test_issue(tmp_path_project, "TST-1", status="queued")
-        save_test_issue(tmp_path_project, "TST-2", status="queued", blocked_by=["TST-1"])
+        save_test_issue(
+            tmp_path_project, "TST-2", status="queued", blocked_by=["TST-1"]
+        )
         # TST-3 is blocked_by a done issue → not blocked
         save_test_issue(tmp_path_project, "TST-4", status="completed")
-        save_test_issue(tmp_path_project, "TST-3", status="queued", blocked_by=["TST-4"])
+        save_test_issue(
+            tmp_path_project, "TST-3", status="queued", blocked_by=["TST-4"]
+        )
 
         by_id = {s.id: s for s in list_issues(tmp_path_project)}
         assert by_id["TST-2"].is_blocked is True
@@ -115,7 +119,9 @@ class TestListIssues:
         assert by_id["TST-1"].is_blocked is False  # no blockers at all
 
     def test_is_blocked_when_blocker_missing(self, tmp_path_project, save_test_issue):
-        save_test_issue(tmp_path_project, "TST-1", status="queued", blocked_by=["TST-99"])
+        save_test_issue(
+            tmp_path_project, "TST-1", status="queued", blocked_by=["TST-99"]
+        )
         by_id = {s.id: s for s in list_issues(tmp_path_project)}
         assert by_id["TST-1"].is_blocked is True
 

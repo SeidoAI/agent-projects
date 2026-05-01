@@ -28,7 +28,7 @@ from tripwire.core.issue_artifact_store import (
     status_at_or_past,
 )
 from tripwire.core.session_store import load_session, save_session
-from tripwire.core.store import load_issue, save_issue
+from tripwire.core.store import load_issue
 from tripwire.models.enums import SessionStatus
 
 

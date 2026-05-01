@@ -92,7 +92,10 @@ def _blocked_issues(issues: list[Issue]) -> list[str]:
     for issue in issues:
         for blocker in issue.blocked_by:
             # v0.9.4: canonical "completed" + legacy "done" alias.
-            if id_to_status.get(blocker) and id_to_status[blocker] not in ("completed", "done"):
+            if id_to_status.get(blocker) and id_to_status[blocker] not in (
+                "completed",
+                "done",
+            ):
                 blocked.append(issue.id)
                 break
     return sorted(blocked)

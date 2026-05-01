@@ -97,9 +97,7 @@ def normalize_session_status(value: str) -> str:
 ALLOWED_ISSUE_STATES_BY_SESSION_STATE: dict[str, frozenset[str]] = {
     "planned": frozenset({"planned", "deferred"}),
     "queued": frozenset({"planned", "queued", "deferred"}),
-    "executing": frozenset(
-        {"queued", "executing", "in_review", "deferred"}
-    ),
+    "executing": frozenset({"queued", "executing", "in_review", "deferred"}),
     "in_review": frozenset({"in_review", "deferred"}),
     "verified": frozenset({"verified", "deferred"}),
     "completed": frozenset({"completed", "abandoned", "deferred"}),
@@ -217,7 +215,7 @@ def _lifecycle_index(state: str) -> int | None:
 
 def sweep_issues(
     project_dir: Path,
-    session: "AgentSession",
+    session: AgentSession,
     target_session_state: str,
 ) -> list[str]:
     """Advance member issues to the sweep target implied by
@@ -265,13 +263,13 @@ def sweep_issues(
 
 
 __all__ = [
+    "ALLOWED_ISSUE_STATES_BY_SESSION_STATE",
     "ISSUE_ALIASES",
     "SESSION_ALIASES",
-    "normalize_issue_status",
-    "normalize_session_status",
-    "ALLOWED_ISSUE_STATES_BY_SESSION_STATE",
     "SWEEP_TARGETS",
     "is_issue_state_compatible_with_session_state",
-    "sweep_target_for",
+    "normalize_issue_status",
+    "normalize_session_status",
     "sweep_issues",
+    "sweep_target_for",
 ]

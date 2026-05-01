@@ -201,7 +201,9 @@ def test_cli_json_format_returns_parseable_json(two_state_repo):
     assert data["base_sha"] == base_sha
     assert data["head_sha"] == head_sha
     assert any(
-        c["id"] == "CLI-1" and c["from_status"] == "queued" and c["to_status"] == "completed"
+        c["id"] == "CLI-1"
+        and c["from_status"] == "queued"
+        and c["to_status"] == "completed"
         for c in data["issues"]["changes"]
     )
 

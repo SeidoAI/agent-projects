@@ -938,11 +938,6 @@ def session_transition_cmd(
             f"allowed targets from {session.status!r}: {sorted(allowed) or '<none>'}"
         )
 
-    session.status = SessionStatus(target_status)
-    session.updated_at = datetime.now(tz=timezone.utc)
-    save_session(resolved, session)
-    click.echo(f"Session '{session_id}' → {target_status}")
-
     # Decide whether to sweep. Explicit user choice wins; fall back to the
     # default-on set if not specified.
     do_sweep = (
@@ -950,12 +945,32 @@ def session_transition_cmd(
         if sweep_issues is not None
         else target_status in _DEFAULT_SWEEP_ON_TRANSITION
     )
+
+    # v0.9.4 (codex P2): sweep BEFORE saving the session. If the sweep
+    # raises, the session status stays at its old value so the operator
+    # can fix the underlying issue and retry — as opposed to leaving the
+    # session at the new status with member issues stranded behind.
+    new_status = SessionStatus(target_status)
+    pending_session_status = session.status
+    session.status = new_status  # local-only mutation for sweep_issues to read
+
+    swept: list[str] = []
     if do_sweep:
-        changed = _sweep_issues_fn(resolved, session, target_status)
-        if changed:
-            click.echo(f"  swept {len(changed)} issue(s) → matching state:")
-            for k in changed:
-                click.echo(f"    {k}")
+        try:
+            swept = _sweep_issues_fn(resolved, session, target_status)
+        except Exception:
+            # Roll back the local mutation so caller sees consistent state
+            # if they catch this exception in a higher harness.
+            session.status = pending_session_status
+            raise
+
+    session.updated_at = datetime.now(tz=timezone.utc)
+    save_session(resolved, session)
+    click.echo(f"Session '{session_id}' → {target_status}")
+    if swept:
+        click.echo(f"  swept {len(swept)} issue(s) → matching state:")
+        for k in swept:
+            click.echo(f"    {k}")
 
 
 @session_cmd.command("abandon")
