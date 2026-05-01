@@ -155,6 +155,30 @@ class TestFinalizeSession:
         assert body["status"] == "completed"
         assert "changed_at" in body
 
+    def test_accepts_uppercase_sequential_session_key(
+        self,
+        action_client,
+        action_project,
+        action_project_id,
+        save_test_session,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        save_test_session(action_project, "TST-S1", status="planned")
+        monkeypatch.setattr(
+            "tripwire.ui.services.action_service.complete_session", _complete_ok
+        )
+
+        r = action_client.post(
+            "/api/actions/finalize-session",
+            json={
+                "project_id": action_project_id,
+                "session_id": "TST-S1",
+            },
+        )
+
+        assert r.status_code == 200
+        assert r.json()["session_id"] == "TST-S1"
+
     def test_gate_failure_returns_409(self, action_client, action_project_id):
         r = action_client.post(
             "/api/actions/finalize-session",

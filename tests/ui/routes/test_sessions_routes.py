@@ -104,21 +104,26 @@ class TestGetSession:
         assert body["code"] == "session/not_found"
         assert "does-not-exist" in body["detail"]
 
-    def test_malformed_sid_uppercase_returns_400(
+    def test_uppercase_sequential_session_key_returns_detail(
         self,
         session_client,
         sess_project_id,
+        sess_project,
+        save_test_session,
     ):
-        r = session_client.get(f"/api/projects/{sess_project_id}/sessions/UpperCase")
-        assert r.status_code == 400
-        assert r.json()["code"] == "session/bad_slug"
+        save_test_session(sess_project, "TST-S1", plan=True, status="planned")
 
-    def test_malformed_sid_leading_digit_returns_400(
+        r = session_client.get(f"/api/projects/{sess_project_id}/sessions/TST-S1")
+
+        assert r.status_code == 200
+        assert r.json()["id"] == "TST-S1"
+
+    def test_malformed_sid_returns_400(
         self,
         session_client,
         sess_project_id,
     ):
-        r = session_client.get(f"/api/projects/{sess_project_id}/sessions/1bad")
+        r = session_client.get(f"/api/projects/{sess_project_id}/sessions/bad.value")
         assert r.status_code == 400
 
 
@@ -166,6 +171,22 @@ class TestPauseSession:
         sess = load_session(sess_project, "live-session")
         assert sess.status == "paused"
 
+    def test_uppercase_sequential_session_key_pauses(
+        self,
+        executing_session_client,
+        sess_project_id,
+        sess_project,
+        save_test_session,
+    ):
+        save_test_session(sess_project, "TST-S1", plan=True, status="executing")
+
+        r = executing_session_client.post(
+            f"/api/projects/{sess_project_id}/sessions/TST-S1/pause"
+        )
+
+        assert r.status_code == 200, r.text
+        assert r.json()["session_id"] == "TST-S1"
+
     def test_non_executing_session_returns_409(self, session_client, sess_project_id):
         # session-a is `planned` per the session_client fixture.
         r = session_client.post(
@@ -187,7 +208,7 @@ class TestPauseSession:
 
     def test_bad_slug_returns_400(self, executing_session_client, sess_project_id):
         r = executing_session_client.post(
-            f"/api/projects/{sess_project_id}/sessions/UpperCase/pause"
+            f"/api/projects/{sess_project_id}/sessions/bad.value/pause"
         )
         assert r.status_code == 400
         assert r.json()["code"] == "session/bad_slug"
