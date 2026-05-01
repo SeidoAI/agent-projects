@@ -88,18 +88,35 @@ def normalize_session_status(value: str) -> str:
 # --- The contract: issue states ⊆ allowed-by-session-state -------------------
 
 # Each session state pins a range of allowed issue states for member
-# issues. ``deferred`` is always allowed (consciously-skipped issues
-# carry forward unchanged through every session phase).
+# issues. ``deferred`` and ``abandoned`` are always allowed:
+#  * ``deferred`` — consciously-skipped issues carry forward unchanged
+#    through every session phase (e.g. punted within a session).
+#  * ``abandoned`` — the project.yaml transition table allows
+#    `* → abandoned` from any active state, mirroring the user-facing
+#    ability to drop an issue at any time. The contract must agree, or
+#    `check_issue_session_status_compatibility` would falsely error
+#    every time a session-member issue is abandoned mid-flight.
+#
+# v0.9.4 (codex round-4 P1 #2): ``verified`` session rollback to
+# ``in_review`` is a documented session lifecycle path. The
+# rolled-back session keeps its already-verified issues; sweep is
+# forward-only so they stay at ``verified``. The contract for the
+# ``in_review`` session state therefore admits ``verified`` issues
+# (the rollback case) in addition to ``in_review`` ones.
 #
 # An issue's status must be in the set keyed by its session's status.
 # Validators enforce this on write; ``sweep_issues`` advances issues to
 # the floor when a session transitions forward.
 ALLOWED_ISSUE_STATES_BY_SESSION_STATE: dict[str, frozenset[str]] = {
-    "planned": frozenset({"planned", "deferred"}),
-    "queued": frozenset({"planned", "queued", "deferred"}),
-    "executing": frozenset({"queued", "executing", "in_review", "deferred"}),
-    "in_review": frozenset({"in_review", "deferred"}),
-    "verified": frozenset({"verified", "deferred"}),
+    "planned": frozenset({"planned", "deferred", "abandoned"}),
+    "queued": frozenset({"planned", "queued", "deferred", "abandoned"}),
+    "executing": frozenset(
+        {"queued", "executing", "in_review", "deferred", "abandoned"}
+    ),
+    # in_review accepts verified for the verified→in_review session-
+    # rollback case (see comment above).
+    "in_review": frozenset({"in_review", "verified", "deferred", "abandoned"}),
+    "verified": frozenset({"verified", "deferred", "abandoned"}),
     "completed": frozenset({"completed", "abandoned", "deferred"}),
     # Frozen: paused/failed don't constrain — issues stay where they were
     # when the session hit pause/fail. We accept any canonical issue

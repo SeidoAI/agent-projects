@@ -82,7 +82,10 @@ def test_normalize_session_status_passes_canonical_through() -> None:
 
 def test_planned_session_only_accepts_planned_or_deferred_issues() -> None:
     allowed = ALLOWED_ISSUE_STATES_BY_SESSION_STATE["planned"]
-    assert allowed == frozenset({"planned", "deferred"})
+    # v0.9.4 (codex P1 round-4): abandoned is always allowed too —
+    # mirrors the project.yaml transition table that lets users drop an
+    # issue at any time.
+    assert allowed == frozenset({"planned", "deferred", "abandoned"})
 
 
 def test_queued_session_accepts_planned_through_queued() -> None:
@@ -106,14 +109,19 @@ def test_executing_session_accepts_through_in_review() -> None:
     assert "completed" not in allowed
 
 
-def test_in_review_session_pins_to_in_review() -> None:
+def test_in_review_session_admits_in_review_verified_deferred_abandoned() -> None:
+    # v0.9.4 (codex P1 round-4): verified→in_review session rollback
+    # is a documented lifecycle path; the rolled-back session retains
+    # already-verified issues. Plus abandoned (always-allowed escape).
     allowed = ALLOWED_ISSUE_STATES_BY_SESSION_STATE["in_review"]
-    assert allowed == frozenset({"in_review", "deferred"})
+    assert allowed == frozenset(
+        {"in_review", "verified", "deferred", "abandoned"}
+    )
 
 
 def test_verified_session_pins_to_verified() -> None:
     allowed = ALLOWED_ISSUE_STATES_BY_SESSION_STATE["verified"]
-    assert allowed == frozenset({"verified", "deferred"})
+    assert allowed == frozenset({"verified", "deferred", "abandoned"})
 
 
 def test_completed_session_accepts_completed_abandoned_deferred() -> None:
