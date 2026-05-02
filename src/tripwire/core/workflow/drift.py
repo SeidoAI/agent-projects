@@ -198,7 +198,9 @@ def _scan_unexpected_transitions(
         last_status = workflow.statuses_by_id.get(last_to)
         if last_status is None:
             continue
-        if _is_reachable(workflow, last_status.next, from_status=last_to, target=actual):
+        if _is_reachable(
+            workflow, last_status.next, from_status=last_to, target=actual
+        ):
             continue  # legitimate single-step move; the gate just hasn't
             # logged a `transition.completed` for it yet.
         out.append(

@@ -534,7 +534,11 @@ def _check_route_refs(
                         ),
                     )
                 )
-        if known_commands is not None and route.command and route.command not in known_commands:
+        if (
+            known_commands is not None
+            and route.command
+            and route.command not in known_commands
+        ):
             out.append(
                 WorkflowFinding(
                     code="workflow/unknown_command",

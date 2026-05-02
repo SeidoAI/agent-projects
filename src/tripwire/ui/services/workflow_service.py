@@ -277,7 +277,9 @@ def _build_command_registry(project_dir: Path) -> list[dict[str, Any]]:
         )
     # Keep this defensive: if future command discovery differs from
     # prompt-check discovery, route validation can still resolve the id.
-    for command_id in sorted(known_command_ids(project_dir) - {entry["id"] for entry in out}):
+    for command_id in sorted(
+        known_command_ids(project_dir) - {entry["id"] for entry in out}
+    ):
         out.append(
             {
                 "id": command_id,
