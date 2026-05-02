@@ -1,0 +1,45 @@
+---
+uuid: e113fa20-84d0-4b0f-8d23-afeac472b3c8
+id: ap-mixed-alerts-and-status
+type: anti_pattern
+name: Mixed alerts and status
+description: Combining interruptive alerts and digest status updates in a single feed dilutes both — alerts get ignored, status updates steal attention they didn't need to.
+related: []
+tags: [ux, anti-pattern]
+status: active
+created_at: "2026-03-15T14:00:00"
+updated_at: "2026-03-15T14:00:00"
+created_by: maia
+---
+## The anti-pattern
+
+Combining items that demand **different cognitive treatments** into a
+single visual feed.
+
+## Why it's bad
+
+- **Interruptive items** (something is blocked, a decision is needed,
+  a tripwire fired hard) require *stop, look, decide* attention.
+- **Digest items** (a session completed, a status changed, a metric
+  ticked) require *skim when convenient* attention.
+
+When mixed:
+
+- Urgent items get lost in the digest noise
+- Digest items steal attention they didn't need
+- The user develops "ignore the feed" reflex — both classes degrade
+
+## What to do instead
+
+Two visual surfaces, two cognitive modes. In tripwire's case:
+
+- `bucket: blocked` — alert chrome, always visible
+- `bucket: fyi` — muted chrome, collapsible
+
+The visual encoding tells the user *which mode to engage* before
+they read any item title.
+
+## Related
+
+- [[principle-two-bucket-attention]] — the principle this avoids violating
+- [[ap-unified-now-feed]] — same family of mistake at a larger scale

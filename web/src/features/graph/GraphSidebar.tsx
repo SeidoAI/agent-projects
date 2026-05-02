@@ -45,6 +45,13 @@ const KIND_COLOR: Record<string, string> = {
   decision: "var(--color-tripwire)",
   requirement: "var(--color-rule)",
   model: "var(--color-ink)",
+  principle: "var(--color-rule)",
+  practice: "var(--color-gate)",
+  glossary: "var(--color-ink-2)",
+  metric: "var(--color-info)",
+  persona: "var(--color-ink-3)",
+  invariant: "var(--color-rule)",
+  anti_pattern: "var(--color-tripwire)",
   custom: "var(--color-ink-2)",
 };
 

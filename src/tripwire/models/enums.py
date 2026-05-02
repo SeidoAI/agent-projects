@@ -115,6 +115,13 @@ class NodeType(StrEnum):
     REQUIREMENT = "requirement"
     SERVICE = "service"
     SCHEMA = "schema"
+    PRINCIPLE = "principle"
+    PRACTICE = "practice"
+    GLOSSARY = "glossary"
+    METRIC = "metric"
+    PERSONA = "persona"
+    INVARIANT = "invariant"
+    ANTI_PATTERN = "anti_pattern"
     CUSTOM = "custom"
 
 

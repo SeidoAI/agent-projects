@@ -53,10 +53,14 @@ def test_pm_skill_total_size_under_budget() -> None:
     v0.8x bumps to 153KB for the new SCHEMA_INBOX.md reference doc + the
     "Inbox — escalating to the human" section in SKILL.md (PM-as-curator
     of the dashboard's left-column attention queue).
+    v0.9.7 bumps to 165KB for the node-type expansion (7 new types:
+    principle, practice, glossary, metric, persona, invariant,
+    anti_pattern) — adds 7 example node files + the Naming the node
+    section + adjacent-types decision table in SCHEMA_NODES.md.
     """
     pm_dir = TEMPLATES_DIR / "skills" / "project-manager"
     total = _total_chars(pm_dir)
-    assert total < 153_000, (
+    assert total < 167_000, (
         f"PM skill is {total:,} chars ({total / 1024:.0f} KB). "
         f"Budget is 153KB. Consolidate or trim reference docs."
     )
@@ -94,9 +98,11 @@ def test_total_templates_under_budget() -> None:
     the codex-review workflow + codex-reviewer agent + protocol doc.
     v0.8x bumps to 332KB for the inbox primitive (SCHEMA_INBOX.md
     reference doc + the SKILL.md inbox-authoring section).
+    v0.9.7 bumps to 350KB for the node-type expansion (PM skill +12KB
+    via 7 new example files + SCHEMA_NODES expansion).
     """
     total = _total_chars(TEMPLATES_DIR)
-    assert total < 332_000, (
+    assert total < 350_000, (
         f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 332KB."
     )
 

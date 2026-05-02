@@ -1,0 +1,43 @@
+---
+uuid: 3f857aa0-f59b-4452-819d-cf74f34cf7f4
+id: invariant-uuid-immutable
+type: invariant
+name: UUIDs are immutable
+description: Once an entity is assigned a UUID, that UUID is never changed or reassigned for the life of the project.
+related: []
+tags: [identity, schema]
+status: active
+created_at: "2026-03-15T14:00:00"
+updated_at: "2026-03-15T14:00:00"
+created_by: maia
+---
+## The invariant
+
+Every entity (issue, session, node, comment) gets a UUID4 at creation.
+**That UUID is permanent.** It must never change. It must never be
+reassigned to a different entity. It survives renames, status flips,
+human-key reassignments, and project moves.
+
+## Why this is an invariant, not a practice
+
+Practices have edge cases ("usually X, but sometimes Y"). Invariants
+have none — a violation is a bug, not a preference.
+
+External systems (events log, graph cache, downstream agents,
+historical PRs) anchor on UUIDs precisely because they can trust
+the value never moves. Any code path that mutates a UUID breaks
+every reference.
+
+## How it's enforced
+
+- `tripwire validate` rejects entities whose `uuid` field changed
+  between commits
+- `tripwire next-key` allocates human keys; UUIDs are minted at
+  entity creation and never re-minted
+- Schema doesn't expose a "rename UUID" surface
+
+## Related
+
+- The human key (`KUI-42`) CAN be reassigned in narrow scenarios
+  (typo correction at creation, never after first commit). The UUID
+  cannot.

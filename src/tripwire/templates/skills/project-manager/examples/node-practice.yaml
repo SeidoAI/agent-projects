@@ -1,0 +1,35 @@
+---
+uuid: da2d07a1-6c5a-4808-95bc-eff26b08021b
+id: practice-empty-states-as-features
+type: practice
+name: Empty states are features
+description: When the absence of items is informative, render the empty state as active reassurance, not as a missing-content placeholder.
+related: []
+tags: [ux, dashboard]
+status: active
+created_at: "2026-03-15T14:00:00"
+updated_at: "2026-03-15T14:00:00"
+created_by: maia
+---
+## The practice
+
+When a list/queue/panel is empty, render the empty state as **active
+reassurance** — "nothing blocking you right now" — not as a sad-face
+"no items found" placeholder.
+
+## When it applies
+
+- The inbox blocked-bucket: empty = "you have no decisions pending"
+- The critical-path spine: empty = "all in-flight work is independent"
+- Tripwire-fires panel on S6: empty = "no agent drift this period"
+
+## When it does NOT apply
+
+- Lists where empty just means "you haven't created any yet" (issues,
+  sessions, nodes for a new project). Treat those with onboarding
+  guidance, not reassurance.
+
+## How to tell which case you're in
+
+Ask: "is the absence itself informative to the user?" If yes →
+reassurance. If no → onboarding nudge.
