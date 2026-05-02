@@ -68,45 +68,54 @@ export function buildWorkflowTerritory(
   graph: WorkflowGraph,
   workflowId?: string,
 ): WorkflowTerritory | null {
+  const workflows = graph.workflows ?? [];
   const workflow =
-    (workflowId ? graph.workflows.find((wf) => wf.id === workflowId) : graph.workflows[0]) ?? null;
+    (workflowId ? workflows.find((wf) => wf.id === workflowId) : workflows[0]) ?? null;
   if (!workflow) return null;
 
-  const validatorsById = byId(graph.registry.validators);
-  const promptsById = byId(graph.registry.jit_prompts);
-  const promptChecksById = byId(graph.registry.prompt_checks);
-  const statusIndex = new Map(workflow.statuses.map((status, index) => [status.id, index]));
+  const registry = graph.registry ?? { validators: [], jit_prompts: [], prompt_checks: [] };
+  const driftFindings = graph.drift?.findings ?? [];
+  const statuses = workflow.statuses ?? [];
+  const validatorsById = byId(registry.validators ?? []);
+  const promptsById = byId(registry.jit_prompts ?? []);
+  const promptChecksById = byId(registry.prompt_checks ?? []);
+  const statusIndex = new Map(statuses.map((status, index) => [status.id, index]));
   const transitions = buildTransitions(workflow, statusIndex);
   const incoming = countBy(transitions.map((route) => route.to).filter(Boolean) as string[]);
   const outgoing = countBy(transitions.map((route) => route.from));
-  const driftByStatus = groupDrift(graph.drift.findings, workflow.id);
+  const driftByStatus = groupDrift(driftFindings, workflow.id);
 
-  const statuses = workflow.statuses.map((status, index) => {
+  const territoryStatuses = statuses.map((status, index) => {
+    const next = status.next ?? ({ kind: "terminal" } as const);
+    const validatorIds = status.validators ?? [];
+    const promptCheckIds = status.prompt_checks ?? [];
+    const jitPromptIds = status.jit_prompts ?? [];
+    const artifactRefs = status.artifacts ?? { produces: [], consumes: [] };
     const gate = buildGateCluster(status, validatorsById, promptChecksById);
-    const jitPrompts = status.jit_prompts.map((id) => ({
+    const jitPrompts = jitPromptIds.map((id) => ({
       id: `${status.id}:jit:${id}`,
       statusId: status.id,
       prompt: promptsById.get(id) ?? fallbackEntry(id),
     }));
     const artifacts = [
-      ...status.artifacts.produces.map((artifact) => ({
+      ...(artifactRefs.produces ?? []).map((artifact) => ({
         id: `${status.id}:produces:${artifact.id}`,
         statusId: status.id,
         direction: "produces" as const,
         artifact,
       })),
-      ...status.artifacts.consumes.map((artifact) => ({
+      ...(artifactRefs.consumes ?? []).map((artifact) => ({
         id: `${status.id}:consumes:${artifact.id}`,
         statusId: status.id,
         direction: "consumes" as const,
         artifact,
       })),
     ];
-    const branchPressure = status.next.kind === "conditional" ? status.next.branches.length : 0;
+    const branchPressure = next.kind === "conditional" ? next.branches.length : 0;
     const complexity =
-      status.validators.length +
-      status.prompt_checks.length +
-      status.jit_prompts.length +
+      validatorIds.length +
+      promptCheckIds.length +
+      jitPromptIds.length +
       artifacts.length +
       branchPressure +
       (incoming.get(status.id) ?? 0) +
@@ -130,7 +139,7 @@ export function buildWorkflowTerritory(
     };
   });
 
-  return { workflow, statuses, transitions, drift: graph.drift.findings };
+  return { workflow, statuses: territoryStatuses, transitions, drift: driftFindings };
 }
 
 function buildGateCluster(
@@ -138,8 +147,10 @@ function buildGateCluster(
   validatorsById: Map<string, WorkflowRegistryEntry>,
   promptChecksById: Map<string, WorkflowRegistryEntry>,
 ): GateCluster | null {
-  const validators = status.validators.map((id) => validatorsById.get(id) ?? fallbackEntry(id));
-  const promptChecks = status.prompt_checks.map(
+  const validators = (status.validators ?? []).map(
+    (id) => validatorsById.get(id) ?? fallbackEntry(id),
+  );
+  const promptChecks = (status.prompt_checks ?? []).map(
     (id) => promptChecksById.get(id) ?? fallbackEntry(id),
   );
   if (validators.length === 0 && promptChecks.length === 0) return null;
@@ -157,8 +168,9 @@ function buildTransitions(
   statusIndex: Map<string, number>,
 ): TransitionRoute[] {
   const routes: TransitionRoute[] = [];
-  for (const status of workflow.statuses) {
-    if (status.next.kind === "terminal") {
+  for (const status of workflow.statuses ?? []) {
+    const next = status.next ?? ({ kind: "terminal" } as const);
+    if (next.kind === "terminal") {
       routes.push({
         id: `${status.id}:terminal`,
         from: status.id,
@@ -168,17 +180,17 @@ function buildTransitions(
       });
       continue;
     }
-    if (status.next.kind === "single") {
+    if (next.kind === "single") {
       routes.push({
-        id: `${status.id}:to:${status.next.single}`,
+        id: `${status.id}:to:${next.single}`,
         from: status.id,
-        to: status.next.single,
-        kind: classifyRoute(status.id, status.next.single, statusIndex),
-        label: status.next.single,
+        to: next.single,
+        kind: classifyRoute(status.id, next.single, statusIndex),
+        label: next.single,
       });
       continue;
     }
-    for (const branch of status.next.branches) {
+    for (const branch of next.branches) {
       const target = "else" in branch ? branch.else : branch.then;
       const condition = "else" in branch ? "else" : branch.if;
       routes.push({

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildWorkflowTerritory } from "@/features/workflow/useWorkflowLayout";
-import type { WorkflowGraph } from "@/lib/api/endpoints/workflow";
+import type { WorkflowGraph, WorkflowStatus } from "@/lib/api/endpoints/workflow";
 
 function buildGraph(overrides: Partial<WorkflowGraph> = {}): WorkflowGraph {
   return {
@@ -137,5 +137,34 @@ describe("buildWorkflowTerritory", () => {
 
     expect(executing?.drift).toHaveLength(1);
     expect(executing?.drift[0]?.code).toBe("workflow/unknown_next_status");
+  });
+
+  it("does not crash when a runtime payload is missing registry or drift", () => {
+    const { registry: _registry, drift: _drift, ...graph } = buildGraph();
+
+    const territory = buildWorkflowTerritory(graph as WorkflowGraph);
+    const executing = territory?.statuses.find((region) => region.status.id === "executing");
+
+    expect(executing?.gate?.validators.map((entry) => entry.id)).toEqual(["v_check", "v_check"]);
+    expect(executing?.jitPrompts[0]?.prompt.id).toBe("self-review");
+    expect(territory?.drift).toEqual([]);
+  });
+
+  it("does not crash when a status omits optional collection fields", () => {
+    const graph = buildGraph();
+    const workflow = graph.workflows[0];
+    if (!workflow) throw new Error("missing workflow fixture");
+    const executing = workflow.statuses[1] as Partial<WorkflowStatus>;
+    delete executing.validators;
+    delete executing.prompt_checks;
+    delete executing.jit_prompts;
+    delete executing.artifacts;
+
+    const territory = buildWorkflowTerritory(graph);
+    const region = territory?.statuses.find((item) => item.status.id === "executing");
+
+    expect(region?.gate).toBeNull();
+    expect(region?.jitPrompts).toEqual([]);
+    expect(region?.artifacts).toEqual([]);
   });
 });
