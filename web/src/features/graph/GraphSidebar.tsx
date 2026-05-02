@@ -1,8 +1,7 @@
 import { ChevronDown, ChevronRight, PanelLeftClose } from "lucide-react";
 import { useMemo, useState } from "react";
-
-import type { ReactFlowGraph, ReactFlowNode } from "@/lib/api/endpoints/graph";
 import { Button } from "@/components/ui/button";
+import type { ReactFlowGraph, ReactFlowNode } from "@/lib/api/endpoints/graph";
 import { cn } from "@/lib/utils";
 
 /**

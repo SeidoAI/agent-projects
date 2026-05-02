@@ -64,9 +64,7 @@ function LegendDot({
           // as `fillOpacity={0.5}` on unfocused circles in ConceptGraph),
           // border at full opacity. `color-mix` keeps the var() reference
           // so theme changes still propagate.
-          backgroundColor: filled
-            ? `color-mix(in srgb, ${color} 50%, transparent)`
-            : undefined,
+          backgroundColor: filled ? `color-mix(in srgb, ${color} 50%, transparent)` : undefined,
         }}
       />
       <span className="font-serif text-[15px] italic text-(--color-ink-3) leading-snug">

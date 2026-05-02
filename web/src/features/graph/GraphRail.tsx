@@ -59,9 +59,7 @@ export function GraphRail({
         className="flex w-80 shrink-0 flex-col items-start gap-2 border-(--color-edge) border-l bg-(--color-paper) px-5 py-4"
       >
         <div className="flex w-full items-center justify-between">
-          <p className="font-serif text-[14px] italic text-(--color-ink-3)">
-            No concept selected.
-          </p>
+          <p className="font-serif text-[14px] italic text-(--color-ink-3)">No concept selected.</p>
           <Button variant="ghost" size="icon" onClick={onCollapse} aria-label="Collapse panel">
             <PanelRightClose className="h-4 w-4" />
           </Button>
