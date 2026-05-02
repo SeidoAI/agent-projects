@@ -38,10 +38,14 @@ test("workflow page renders against real API payload without console regressions
   await page.goto(`/p/${projectId}/workflow`);
 
   await expect(page.getByRole("heading", { name: /^Workflow$/i })).toBeVisible();
-  await expect(page.getByRole("region", { name: /Workflow map canvas/i })).toBeVisible();
-  await expect(page.getByLabel(/Validator uuid present/i)).toBeVisible();
-  await expect(page.getByLabel(/Validator stale concept/i)).toBeVisible();
-  await expect(page.getByLabel(/JIT prompt self-review/i)).toBeVisible();
+  await expect(page.getByRole("region", { name: /Workflow territory map/i })).toBeVisible();
+  await expect(page.getByRole("region", { name: /Status executing/i })).toBeVisible();
+  await expect(page.getByRole("region", { name: /Status in_review/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Gate into executing/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /JIT prompt self review/i })).toBeVisible();
+
+  await page.getByRole("button", { name: /Gate into executing/i }).click();
+  await expect(page.getByRole("dialog")).toContainText("v_uuid_present");
   await guard.assertClean();
 });
 
