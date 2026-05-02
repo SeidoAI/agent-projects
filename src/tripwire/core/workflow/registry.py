@@ -112,7 +112,9 @@ def known_jit_prompt_ids(project_dir: Path | None = None) -> set[str]:
     return ids
 
 
-def jit_prompt_status_refs(project_dir: Path, jit_prompt_id: str) -> list[tuple[str, str]]:
+def jit_prompt_status_refs(
+    project_dir: Path, jit_prompt_id: str
+) -> list[tuple[str, str]]:
     """Return workflow.yaml statuses that reference *jit_prompt_id*."""
     refs: list[tuple[str, str]] = []
     spec = load_workflows(project_dir)

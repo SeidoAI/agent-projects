@@ -95,9 +95,7 @@ def fire_jit_prompt_event(
     if not registry:
         return JitPromptFireResult()
 
-    jit_prompts = _workflow_declared_prompts(
-        project_dir, registry.get(event, [])
-    )
+    jit_prompts = _workflow_declared_prompts(project_dir, registry.get(event, []))
     if not jit_prompts:
         return JitPromptFireResult()
 
