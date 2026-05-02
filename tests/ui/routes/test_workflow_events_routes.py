@@ -63,7 +63,8 @@ def test_workflow_events_lists_chronologically(seeded_client, project_dir, proje
         assert "ts" in row
         assert "workflow" in row
         assert "instance" in row
-        assert "station" in row
+        assert "status" in row
+        assert "station" not in row
         assert "event" in row
         assert "details" in row
 
