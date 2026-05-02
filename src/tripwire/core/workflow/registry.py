@@ -99,9 +99,7 @@ _jit_prompt_statuses: dict[str, tuple[str, str]] = {}
 _status_jit_prompts: dict[tuple[str, str], list[str]] = defaultdict(list)
 
 
-def register_jit_prompt_status(
-    jit_prompt_id: str, workflow: str, status: str
-) -> None:
+def register_jit_prompt_status(jit_prompt_id: str, workflow: str, status: str) -> None:
     """Record that ``jit_prompt_id`` is registered at ``(workflow, status)``.
 
     Called by the JIT prompt loader when it instantiates a JitPrompt whose

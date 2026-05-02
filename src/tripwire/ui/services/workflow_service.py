@@ -78,12 +78,10 @@ def _workflow_to_dict(workflow: Workflow) -> dict[str, Any]:
                 "prompt_checks": list(status.prompt_checks),
                 "artifacts": {
                     "produces": [
-                        _artifact_ref_to_dict(ref)
-                        for ref in status.artifacts.produces
+                        _artifact_ref_to_dict(ref) for ref in status.artifacts.produces
                     ],
                     "consumes": [
-                        _artifact_ref_to_dict(ref)
-                        for ref in status.artifacts.consumes
+                        _artifact_ref_to_dict(ref) for ref in status.artifacts.consumes
                     ],
                 },
             }
@@ -224,7 +222,9 @@ def _build_prompt_check_registry(project_dir: Path) -> list[dict[str, Any]]:
     return out
 
 
-def _workflow_findings_to_dicts(findings: list[WorkflowFinding]) -> list[dict[str, Any]]:
+def _workflow_findings_to_dicts(
+    findings: list[WorkflowFinding],
+) -> list[dict[str, Any]]:
     return [
         {
             "source": "definition",

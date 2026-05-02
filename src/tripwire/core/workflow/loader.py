@@ -92,8 +92,7 @@ def _parse_workflow(wf_id: str, raw: dict) -> tuple[Workflow, list[WorkflowFindi
                 workflow=wf_id,
                 status=None,
                 message=(
-                    "workflow.yaml uses stale `stations:`; use `statuses:` "
-                    "instead"
+                    "workflow.yaml uses stale `stations:`; use `statuses:` instead"
                 ),
             )
         )
@@ -111,7 +110,9 @@ def _parse_workflow(wf_id: str, raw: dict) -> tuple[Workflow, list[WorkflowFindi
     return Workflow(id=wf_id, actor=actor, trigger=trigger, statuses=statuses), findings
 
 
-def _parse_status(wf_id: str, raw: dict) -> tuple[WorkflowStatus, list[WorkflowFinding]]:
+def _parse_status(
+    wf_id: str, raw: dict
+) -> tuple[WorkflowStatus, list[WorkflowFinding]]:
     sid = str(raw.get("id", "")) or "<unknown>"
     findings: list[WorkflowFinding] = []
     has_terminal = bool(raw.get("terminal"))
@@ -169,7 +170,9 @@ def _parse_status(wf_id: str, raw: dict) -> tuple[WorkflowStatus, list[WorkflowF
     )
 
 
-def _parse_next(wf_id: str, status_id: str, raw: Any) -> tuple[NextSpec, list[WorkflowFinding]]:
+def _parse_next(
+    wf_id: str, status_id: str, raw: Any
+) -> tuple[NextSpec, list[WorkflowFinding]]:
     findings: list[WorkflowFinding] = []
     if isinstance(raw, str):
         return NextSpec(kind="single", single=raw), findings
