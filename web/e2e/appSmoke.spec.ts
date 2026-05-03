@@ -37,20 +37,18 @@ test("workflow page renders against real API payload without console regressions
 
   await page.goto(`/p/${projectId}/workflow`);
 
-  await expect(page.getByRole("heading", { name: /^Workflow$/i })).toBeVisible();
-  await expect(page.getByRole("region", { name: /Workflow process map/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Status executing/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Status in_review/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Route in_review", exact: true })).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Gate on route executing:to:in_review", exact: true }),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: /JIT prompt self review/i })).toBeVisible();
+  await expect(page.getByTestId("workflow-navigator")).toBeVisible();
+  await expect(page.getByTestId("workflow-flowchart")).toBeVisible();
+  await expect(page.getByTestId("workflow-nav-tile-coding-session")).toBeVisible();
+  await expect(page.getByTestId("workflow-region-executing")).toBeVisible();
+  await expect(page.getByTestId("workflow-jit-completed-self-review")).toBeVisible();
 
-  await page
-    .getByRole("button", { name: "Gate on route executing:to:in_review", exact: true })
-    .click();
-  await expect(page.getByRole("dialog")).toContainText("v_uuid_present");
+  const gateBadge = page.getByTestId("workflow-gate-badge-queued-to-executing");
+  await expect(gateBadge).toBeVisible();
+  await gateBadge.click();
+  await expect(
+    page.getByTestId("workflow-gate-panel-queued-to-executing"),
+  ).toContainText("uuid_present");
   await guard.assertClean();
 });
 

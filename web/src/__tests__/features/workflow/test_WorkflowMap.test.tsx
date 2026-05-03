@@ -1,18 +1,52 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import type { ReactNode } from "react";
+import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 import { WorkflowMap } from "@/features/workflow/WorkflowMap";
-import type { WorkflowGraph } from "@/lib/api/endpoints/workflow";
-import { queryKeys } from "@/lib/api/queryKeys";
+import type {
+  WorkflowGraph,
+  WorkflowRoute,
+  WorkflowStatus,
+} from "@/lib/api/endpoints/workflow";
 import { server } from "../../mocks/server";
 
 vi.mock("@/app/ProjectShell", () => ({
   useProjectShell: () => ({ projectId: "p1", wsStatus: "open" }),
 }));
+
+function status(
+  id: string,
+  overrides: Partial<WorkflowStatus> = {},
+): WorkflowStatus {
+  return {
+    id,
+    next: { kind: "single", single: "next" },
+    validators: [],
+    jit_prompts: [],
+    prompt_checks: [],
+    artifacts: { produces: [], consumes: [] },
+    ...overrides,
+  };
+}
+
+function route(overrides: Partial<WorkflowRoute>): WorkflowRoute {
+  return {
+    id: "r-x",
+    workflow_id: "coding-session",
+    actor: "pm-agent",
+    from: "planned",
+    to: "queued",
+    kind: "forward",
+    label: "go",
+    controls: { validators: [], jit_prompts: [], prompt_checks: [] },
+    skills: [],
+    emits: { artifacts: [], events: [], comments: [], status_changes: [] },
+    ...overrides,
+  };
+}
 
 function makeGraph(overrides: Partial<WorkflowGraph> = {}): WorkflowGraph {
   return {
@@ -22,78 +56,70 @@ function makeGraph(overrides: Partial<WorkflowGraph> = {}): WorkflowGraph {
         id: "coding-session",
         actor: "coding-agent",
         trigger: "session.spawn",
+        brief_description: "one session: plan, execute, review, ship.",
         statuses: [
-          status("planned", { produces: [], consumes: [{ id: "issue", label: "issue brief" }] }),
-          status("queued", {
-            produces: [{ id: "plan", label: "plan.md", path: "sessions/{session_id}/plan.md" }],
-          }),
+          status("planned", { next: { kind: "single", single: "queued" } }),
+          status("queued", { next: { kind: "single", single: "executing" } }),
           status("executing", {
-            produces: [{ id: "diff", label: "implementation diff" }],
+            next: { kind: "single", single: "in_review" },
+            jit_prompts: ["self-review"],
           }),
-          status("in_review", { produces: [{ id: "review", label: "review notes" }] }),
-          status("verified"),
-          status("completed", { produces: [{ id: "sig", label: "session signature" }] }),
+          status("in_review", { next: { kind: "single", single: "verified" } }),
+          status("verified", { next: { kind: "terminal" } }),
         ],
         routes: [
           route({
-            id: "planned-to-queued",
-            actor: "pm-agent",
-            from: "planned",
-            to: "queued",
-            label: "queue",
-            command: "pm-session-queue",
-            validators: ["v_check"],
-            skills: ["project-manager"],
-          }),
-          route({
             id: "queued-to-executing",
-            actor: "pm-agent",
+            command: "pm-session-spawn",
             from: "queued",
             to: "executing",
-            label: "spawn",
-            command: "pm-session-spawn",
-            validators: ["v_check"],
-            skills: ["project-manager", "backend-development"],
+            label: "spawn coding agent",
+            controls: {
+              validators: ["v_uuid_present"],
+              jit_prompts: [],
+              prompt_checks: ["pm-session-spawn"],
+            },
+            skills: ["project-manager"],
           }),
           route({
             id: "executing-to-review",
             actor: "coding-agent",
             from: "executing",
             to: "in_review",
-            label: "submit",
-            trigger: "session.complete",
-            jit_prompts: ["self-review"],
-            emits: [{ id: "diff", label: "implementation diff" }],
-            skills: ["backend-development"],
+            label: "submit for review",
           }),
           route({
             id: "review-approved",
-            actor: "pm-agent",
+            command: "pm-session-review",
             from: "in_review",
             to: "verified",
             label: "approve",
-            command: "pm-session-review",
-            prompt_checks: ["pm-session-review"],
-            validators: ["v_artifact_presence"],
-            skills: ["project-manager", "verification"],
           }),
           route({
-            id: "review-return",
-            actor: "pm-agent",
+            id: "review-changes-requested",
+            command: "pm-session-review",
             from: "in_review",
             to: "executing",
             kind: "return",
             label: "request changes",
-            command: "pm-session-review",
-            skills: ["verification"],
           }),
+        ],
+      },
+      {
+        id: "pm-scoping",
+        actor: "pm-agent",
+        trigger: "command.pm-scope",
+        brief_description: "turn intent into scoped work.",
+        statuses: [
+          status("intake", { next: { kind: "single", single: "draft" } }),
+          status("draft", { next: { kind: "terminal" } }),
+        ],
+        routes: [
           route({
-            id: "verified-to-completed",
-            actor: "pm-agent",
-            from: "verified",
-            to: "completed",
-            label: "complete",
-            command: "pm-session-complete",
+            id: "scope-intake",
+            from: "intake",
+            to: "draft",
+            label: "draft",
           }),
         ],
       },
@@ -101,379 +127,165 @@ function makeGraph(overrides: Partial<WorkflowGraph> = {}): WorkflowGraph {
     registry: {
       validators: [
         {
-          id: "v_check",
-          label: "generic check",
-          description: "duplicate validator id used in multiple routes",
-          blocking: true,
+          id: "v_uuid_present",
+          label: "v_uuid_present",
+          description: "all entities have UUIDs",
         },
+      ],
+      prompt_checks: [
         {
-          id: "v_artifact_presence",
-          label: "artifact presence",
-          description: "required artifacts exist",
-          blocking: true,
+          id: "pm-session-spawn",
+          label: "pm-session-spawn",
+          description: "PM spawning: agent has all it needs?",
         },
       ],
       jit_prompts: [
         {
           id: "self-review",
-          label: "self review",
+          label: "self-review",
+          description: "remind agent to review own diff",
           fires_on_event: "session.complete",
-          blocking: true,
-          prompt_revealed: null,
-          prompt_redacted: "<<JIT prompt registered>>",
+          prompt_redacted: "<<self-review>>",
         },
       ],
-      prompt_checks: [
-        {
-          id: "pm-session-review",
-          label: "session review",
-          blocking: true,
-        },
-      ],
-      commands: [
-        { id: "pm-session-queue", label: "session queue", source: "commands/pm-session-queue.md" },
-        { id: "pm-session-spawn", label: "session spawn", source: "commands/pm-session-spawn.md" },
-        {
-          id: "pm-session-review",
-          label: "session review",
-          source: "commands/pm-session-review.md",
-        },
-        {
-          id: "pm-session-complete",
-          label: "session complete",
-          source: "commands/pm-session-complete.md",
-        },
-      ],
-      skills: [
-        {
-          id: "project-manager",
-          label: "project manager",
-          source: "skills/project-manager/SKILL.md",
-        },
-        {
-          id: "backend-development",
-          label: "backend development",
-          source: "skills/backend-development/SKILL.md",
-        },
-        { id: "verification", label: "verification", source: "skills/verification/SKILL.md" },
-      ],
+      commands: [],
+      skills: [],
     },
-    drift: {
-      count: 1,
-      findings: [
-        {
-          source: "definition",
-          code: "workflow/unknown_route_status",
-          workflow: "coding-session",
-          status: "in_review",
-          severity: "error",
-          message: "in_review references a missing status",
-        },
-      ],
-    },
+    drift: { count: 0, findings: [] },
     ...overrides,
   };
 }
 
-function status(
-  id: string,
-  artifacts: {
-    produces?: { id: string; label: string; path?: string }[];
-    consumes?: { id: string; label: string; path?: string }[];
-  } = {},
+function mountAt(
+  initialEntry: string,
+  body: () => ReactElement = () => <WorkflowMap />,
 ) {
-  return {
-    id,
-    label: id.replace("_", " "),
-    next:
-      id === "completed"
-        ? ({ kind: "terminal" } as const)
-        : ({ kind: "single", single: id } as const),
-    validators: [],
-    jit_prompts: [],
-    prompt_checks: [],
-    artifacts: {
-      consumes: artifacts.consumes ?? [],
-      produces: artifacts.produces ?? [],
-    },
-  };
-}
-
-function route({
-  id,
-  actor,
-  from,
-  to,
-  kind = "forward",
-  label,
-  trigger = null,
-  command = null,
-  validators = [],
-  jit_prompts = [],
-  prompt_checks = [],
-  skills = [],
-  emits = [],
-}: {
-  id: string;
-  actor: string;
-  from: string;
-  to: string;
-  kind?: string;
-  label: string;
-  trigger?: string | null;
-  command?: string | null;
-  validators?: string[];
-  jit_prompts?: string[];
-  prompt_checks?: string[];
-  skills?: string[];
-  emits?: { id: string; label: string }[];
-}) {
-  return {
-    id,
-    workflow_id: "coding-session",
-    actor,
-    from,
-    to,
-    kind,
-    label,
-    trigger,
-    command,
-    controls: { validators, jit_prompts, prompt_checks },
-    skills,
-    emits: { artifacts: emits, events: [], comments: [], status_changes: [] },
-  };
-}
-
-function withProviders(graph: WorkflowGraph | null, opts?: { pmMode?: boolean }) {
-  const pmMode = Boolean(opts?.pmMode);
-  const qc = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
-  });
-  if (graph) qc.setQueryData([...queryKeys.workflow("p1"), { pmMode }] as const, graph);
-  const initialEntry = pmMode ? "/p/p1/workflow?role=pm" : "/p/p1/workflow";
-  return ({ children }: { children: ReactNode }) => (
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
-          <Route path="/p/:projectId/workflow" element={children} />
+          <Route path="/p/:projectId/workflow" element={body()} />
         </Routes>
       </MemoryRouter>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 
-describe("WorkflowMap", () => {
-  it("renders one process map from workflow statuses and routes", () => {
-    const Wrapper = withProviders(makeGraph());
-    render(
-      <Wrapper>
-        <WorkflowMap />
-      </Wrapper>,
+describe("WorkflowMap (V1 territory map)", () => {
+  it("renders the navigator grouped by actor and the active workflow", async () => {
+    server.use(
+      http.get("/api/projects/:pid/workflow", () => HttpResponse.json(makeGraph())),
     );
+    mountAt("/p/p1/workflow");
 
-    expect(screen.getByTestId("workflow-territory")).toBeInTheDocument();
-    expect(screen.queryByTestId("workflow-yaml-panel")).not.toBeInTheDocument();
-    for (const id of ["planned", "queued", "executing", "in_review", "verified", "completed"]) {
-      expect(screen.getByTestId(`status-region-${id}`)).toBeInTheDocument();
-    }
-    expect(screen.getByRole("button", { name: /Route request changes/i })).toBeInTheDocument();
+    const nav = await screen.findByTestId("workflow-navigator");
+    expect(nav).toHaveTextContent(/ACTOR · CODING-AGENT/i);
+    expect(nav).toHaveTextContent(/ACTOR · PM-AGENT/i);
+    expect(screen.getByTestId("workflow-nav-tile-coding-session")).toBeInTheDocument();
+    expect(screen.getByTestId("workflow-nav-tile-pm-scoping")).toBeInTheDocument();
+    expect(screen.getByTestId("workflow-flowchart")).toHaveAttribute(
+      "data-workflow",
+      "coding-session",
+    );
   });
 
-  it("renders process-map grammar in the legend", () => {
-    const Wrapper = withProviders(makeGraph());
-    render(
-      <Wrapper>
-        <WorkflowMap />
-      </Wrapper>,
+  it("renders the brief-description below the navigator", async () => {
+    server.use(
+      http.get("/api/projects/:pid/workflow", () => HttpResponse.json(makeGraph())),
     );
-    const legend = screen.getByLabelText(/legend/i);
-    for (const label of [
-      "STATUS TERRITORY",
-      "ACTOR ROUTE",
-      "COMMAND",
-      "GATE",
-      "JIT PROMPT",
-      "SKILL",
-      "ARTIFACT",
-    ]) {
-      expect(within(legend).getByText(label)).toBeInTheDocument();
-    }
-  });
-
-  it("opens route, command, skill, gate, JIT prompt, artifact, status, and drift drawers", () => {
-    const Wrapper = withProviders(makeGraph());
-    render(
-      <Wrapper>
-        <WorkflowMap />
-      </Wrapper>,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /Route request changes/i }));
-    expect(within(screen.getByRole("dialog")).getByText("ROUTE")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /close/i }));
-
-    const commandButtons = screen.getAllByRole("button", {
-      name: /Command session review/i,
-    });
-    expect(commandButtons.length).toBeGreaterThan(0);
-    const commandButton = commandButtons[0];
-    if (!commandButton) throw new Error("missing command marker");
-    fireEvent.click(commandButton);
-    expect(within(screen.getByRole("dialog")).getByText("COMMAND")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /close/i }));
-
-    const skillButtons = screen.getAllByRole("button", { name: /Skill verification/i });
-    expect(skillButtons.length).toBeGreaterThan(0);
-    const skillButton = skillButtons[0];
-    if (!skillButton) throw new Error("missing skill marker");
-    fireEvent.click(skillButton);
-    expect(within(screen.getByRole("dialog")).getByText("SKILL")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /close/i }));
-
-    fireEvent.click(screen.getByRole("button", { name: /Gate on route review-approved/i }));
-    expect(within(screen.getByRole("dialog")).getByText("GATE")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /close/i }));
-
-    fireEvent.click(screen.getByRole("button", { name: /JIT prompt self review/i }));
+    mountAt("/p/p1/workflow");
     expect(
-      within(screen.getByRole("dialog")).getByText("<<JIT prompt registered>>"),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /close/i }));
-
-    fireEvent.click(screen.getByRole("button", { name: /Artifact plan.md/i }));
-    expect(within(screen.getByRole("dialog")).getByText("ARTIFACT")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /close/i }));
-
-    fireEvent.click(screen.getByRole("button", { name: /^Status executing$/i }));
-    expect(within(screen.getByRole("dialog")).getByText("STATUS")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /close/i }));
-
-    fireEvent.click(screen.getByRole("button", { name: /^Drift$/i }));
-    expect(
-      within(screen.getByRole("dialog")).getByText("workflow/unknown_route_status"),
+      await screen.findByText("one session: plan, execute, review, ship."),
     ).toBeInTheDocument();
   });
 
-  it("reveals JIT prompt body for PM-mode payloads", () => {
-    const graph = makeGraph({
-      registry: {
-        ...makeGraph().registry,
-        jit_prompts: [
-          {
-            id: "self-review",
-            label: "self review",
-            fires_on_event: "session.complete",
-            blocking: true,
-            prompt_revealed: "secret-prompt-body for the agent",
-            prompt_redacted: "<<JIT prompt registered>>",
-          },
-        ],
-      },
-    });
-    const Wrapper = withProviders(graph, { pmMode: true });
-    render(
-      <Wrapper>
-        <WorkflowMap />
-      </Wrapper>,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /JIT prompt self review/i }));
-    expect(within(screen.getByRole("dialog")).getByText(/secret-prompt-body/i)).toBeInTheDocument();
-  });
-
-  it("does not emit React duplicate-key warnings when one validator id appears in multiple routes", () => {
-    const Wrapper = withProviders(makeGraph());
-    render(
-      <Wrapper>
-        <WorkflowMap />
-      </Wrapper>,
-    );
-
-    expect(screen.getAllByRole("button", { name: /gate on route/i })).toHaveLength(3);
-  });
-
-  it("shows a loading surface while the workflow query is pending", () => {
+  it("opens the inline gate panel when the gate badge is clicked", async () => {
     server.use(
-      http.get("/api/projects/:pid/workflow", async () => {
-        await new Promise(() => {});
-        return HttpResponse.json({});
-      }),
+      http.get("/api/projects/:pid/workflow", () => HttpResponse.json(makeGraph())),
     );
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const Wrapper = ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={qc}>
-        <MemoryRouter initialEntries={["/p/p1/workflow"]}>
-          <Routes>
-            <Route path="/p/:projectId/workflow" element={children} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
-    render(
-      <Wrapper>
-        <WorkflowMap />
-      </Wrapper>,
-    );
+    mountAt("/p/p1/workflow");
 
-    expect(screen.getByText(/loading workflow/i)).toBeInTheDocument();
+    const badge = await screen.findByTestId("workflow-gate-badge-queued-to-executing");
+    fireEvent.click(badge);
+
+    const panel = await screen.findByTestId(
+      "workflow-gate-panel-queued-to-executing",
+    );
+    expect(panel).toHaveTextContent("GATE · 2 CHECKS");
+    expect(panel).toHaveTextContent("uuid_present");
+    expect(panel).toHaveTextContent("pm-session-spawn");
   });
 
-  it("shows an error surface with retry when the request fails", async () => {
+  it("does not render a gate badge when the route has no controls", async () => {
     server.use(
-      http.get("/api/projects/:pid/workflow", () =>
-        HttpResponse.json({ detail: "boom" }, { status: 500 }),
-      ),
+      http.get("/api/projects/:pid/workflow", () => HttpResponse.json(makeGraph())),
     );
-    const qc = new QueryClient({
-      defaultOptions: { queries: { retry: false, retryDelay: 0 } },
-    });
-    const Wrapper = ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={qc}>
-        <MemoryRouter initialEntries={["/p/p1/workflow"]}>
-          <Routes>
-            <Route path="/p/:projectId/workflow" element={children} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    mountAt("/p/p1/workflow");
 
-    render(
-      <Wrapper>
-        <WorkflowMap />
-      </Wrapper>,
+    await screen.findByTestId("workflow-flowchart");
+    expect(
+      screen.queryByTestId("workflow-gate-badge-executing-to-review"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("switches the active workflow when a navigator tile is clicked", async () => {
+    server.use(
+      http.get("/api/projects/:pid/workflow", () => HttpResponse.json(makeGraph())),
     );
+    mountAt("/p/p1/workflow");
+
+    fireEvent.click(await screen.findByTestId("workflow-nav-tile-pm-scoping"));
 
     await waitFor(() =>
-      expect(screen.getByText(/couldn't load the workflow map/i)).toBeInTheDocument(),
-    );
-    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
-  });
-
-  it("shows the empty state on 404", async () => {
-    server.use(
-      http.get("/api/projects/:pid/workflow", () =>
-        HttpResponse.json({ detail: "not found" }, { status: 404 }),
+      expect(screen.getByTestId("workflow-flowchart")).toHaveAttribute(
+        "data-workflow",
+        "pm-scoping",
       ),
     );
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const Wrapper = ({ children }: { children: ReactNode }) => (
-      <QueryClientProvider client={qc}>
-        <MemoryRouter initialEntries={["/p/p1/workflow"]}>
-          <Routes>
-            <Route path="/p/:projectId/workflow" element={children} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
-    render(
-      <Wrapper>
-        <WorkflowMap />
-      </Wrapper>,
-    );
+  });
 
-    await waitFor(() =>
-      expect(screen.getByText(/workflow not yet available/i)).toBeInTheDocument(),
+  it("respects ?wf=<id> in the URL on initial render", async () => {
+    server.use(
+      http.get("/api/projects/:pid/workflow", () => HttpResponse.json(makeGraph())),
     );
+    mountAt("/p/p1/workflow?wf=pm-scoping");
+    const chart = await screen.findByTestId("workflow-flowchart");
+    expect(chart).toHaveAttribute("data-workflow", "pm-scoping");
+  });
+
+  it("shows the loading state while pending", async () => {
+    server.use(
+      http.get(
+        "/api/projects/:pid/workflow",
+        async () =>
+          new Promise<Response>(() => {
+            /* never resolves */
+          }),
+      ),
+    );
+    mountAt("/p/p1/workflow");
+    expect(await screen.findByText(/loading workflow/i)).toBeInTheDocument();
+  });
+
+  it("shows the empty state when no workflows are returned", async () => {
+    server.use(
+      http.get("/api/projects/:pid/workflow", () =>
+        HttpResponse.json(makeGraph({ workflows: [] })),
+      ),
+    );
+    mountAt("/p/p1/workflow");
+    expect(await screen.findByText(/not yet available/i)).toBeInTheDocument();
+  });
+
+  it("opens the drawer when a status region is clicked", async () => {
+    server.use(
+      http.get("/api/projects/:pid/workflow", () => HttpResponse.json(makeGraph())),
+    );
+    mountAt("/p/p1/workflow");
+
+    const region = await screen.findByTestId("workflow-region-executing");
+    fireEvent.click(region);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 });
