@@ -80,6 +80,7 @@ def _workflow_to_dict(workflow: Workflow) -> dict[str, Any]:
         "id": workflow.id,
         "actor": workflow.actor,
         "trigger": workflow.trigger,
+        "brief_description": workflow.brief_description,
         "statuses": [
             {
                 "id": status.id,

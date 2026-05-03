@@ -242,6 +242,7 @@ class Workflow:
     trigger: str
     statuses: list[WorkflowStatus]
     routes: list[WorkflowRoute] = field(default_factory=list)
+    brief_description: str | None = None
 
     @property
     def statuses_by_id(self) -> dict[str, WorkflowStatus]:

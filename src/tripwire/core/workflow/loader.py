@@ -87,6 +87,10 @@ def parse_workflow_spec(raw: Any) -> WorkflowSpec:
 def _parse_workflow(wf_id: str, raw: dict) -> tuple[Workflow, list[WorkflowFinding]]:
     actor = str(raw.get("actor", "")) or ""
     trigger = str(raw.get("trigger", "")) or ""
+    brief_raw = raw.get("brief-description", raw.get("brief_description"))
+    brief_description = (
+        str(brief_raw).strip() if isinstance(brief_raw, str) and brief_raw.strip() else None
+    )
     findings: list[WorkflowFinding] = []
     if "stations" in raw:
         findings.append(
@@ -102,7 +106,16 @@ def _parse_workflow(wf_id: str, raw: dict) -> tuple[Workflow, list[WorkflowFindi
     statuses_raw = raw.get("statuses") or []
     statuses: list[WorkflowStatus] = []
     if not isinstance(statuses_raw, list):
-        return Workflow(id=wf_id, actor=actor, trigger=trigger, statuses=[]), findings
+        return (
+            Workflow(
+                id=wf_id,
+                actor=actor,
+                trigger=trigger,
+                statuses=[],
+                brief_description=brief_description,
+            ),
+            findings,
+        )
 
     for entry in statuses_raw:
         if not isinstance(entry, dict):
@@ -118,6 +131,7 @@ def _parse_workflow(wf_id: str, raw: dict) -> tuple[Workflow, list[WorkflowFindi
             trigger=trigger,
             statuses=statuses,
             routes=routes,
+            brief_description=brief_description,
         ),
         findings,
     )

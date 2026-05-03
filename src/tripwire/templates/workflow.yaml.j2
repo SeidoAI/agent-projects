@@ -11,6 +11,7 @@ workflows:
   coding-session:
     actor: coding-agent
     trigger: session.spawn
+    brief-description: "one session: plan, execute, review, ship."
     statuses:
       - id: planned
         next: queued
@@ -216,6 +217,7 @@ workflows:
   pm-session-management:
     actor: pm-agent
     trigger: command.pm-session-create
+    brief-description: "PM's lifecycle for handling sessions."
     statuses:
       - id: inspect
         next: create
@@ -311,6 +313,7 @@ workflows:
   pm-scoping:
     actor: pm-agent
     trigger: command.pm-scope
+    brief-description: "turn intent into scoped work."
     statuses:
       - id: intake
         next: draft
@@ -376,6 +379,7 @@ workflows:
   pm-triage:
     actor: pm-agent
     trigger: command.pm-triage
+    brief-description: "inbox in, action out."
     statuses:
       - id: intake
         next: classify
@@ -425,6 +429,7 @@ workflows:
   pm-incremental-update:
     actor: pm-agent
     trigger: command.pm-edit
+    brief-description: "small edits, validated, then published."
     statuses:
       - id: inspect
         next: edit
@@ -486,6 +491,7 @@ workflows:
   project-maintenance:
     actor: pm-agent
     trigger: command.pm-status
+    brief-description: "periodic project sweep."
     statuses:
       - id: inspect
         next: report

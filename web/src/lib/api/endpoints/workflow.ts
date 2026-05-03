@@ -65,6 +65,7 @@ export interface WorkflowDefinition {
   id: string;
   actor: string;
   trigger: string;
+  brief_description?: string | null;
   statuses: WorkflowStatus[];
   routes: WorkflowRoute[];
 }
