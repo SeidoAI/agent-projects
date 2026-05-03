@@ -109,8 +109,14 @@ export function ConceptGraph() {
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState(DEFAULT_CANVAS);
   // Bumped by the Auto-arrange button to force `useGraphLayout` to
-  // re-seed unsaved nodes (smart placement + a fresh d3-force pass).
+  // re-seed (smart placement + a fresh d3-force pass).
   const [reseedNonce, setReseedNonce] = useState(0);
+  // "unsaved" — only re-place nodes without a saved layout.
+  // "all" — un-pin every node and re-distribute. Used when the user
+  // clicks Auto-arrange with zero unsaved nodes (the saved positions
+  // came from automatic seeding, not user drags, so re-arranging is
+  // the user's intent).
+  const [reseedMode, setReseedMode] = useState<"unsaved" | "all">("unsaved");
 
   // Track canvas size so the d3-force seeding centres in the
   // visible area instead of the default 1000×600 viewBox.
@@ -152,6 +158,7 @@ export function ConceptGraph() {
     width: size.width,
     height: size.height,
     reseedNonce,
+    reseedMode,
   });
 
   const unsavedCount = useMemo(
@@ -222,18 +229,27 @@ export function ConceptGraph() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setReseedNonce((n) => n + 1)}
-            disabled={unsavedCount === 0}
+            onClick={() => {
+              // When there are unsaved nodes, just place those.
+              // When everything is saved, the user is asking for a
+              // full re-layout — un-pin all nodes for this pass.
+              setReseedMode(unsavedCount === 0 ? "all" : "unsaved");
+              setReseedNonce((n) => n + 1);
+            }}
             title={
               unsavedCount === 0
-                ? "All nodes have a saved position"
+                ? "Re-distribute every node — saved positions become starting points"
                 : "Re-place unsaved nodes near related neighbours"
             }
-            aria-label="Auto-arrange unsaved nodes"
+            aria-label={
+              unsavedCount === 0
+                ? "Re-layout every concept node"
+                : "Auto-arrange unsaved nodes"
+            }
           >
             <LayoutGrid className="mr-1.5 h-3.5 w-3.5" />
             {unsavedCount === 0
-              ? "All nodes positioned"
+              ? "Re-layout all"
               : `Auto-arrange (${unsavedCount} unsaved)`}
           </Button>
         </div>

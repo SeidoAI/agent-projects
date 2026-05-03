@@ -1,12 +1,4 @@
-import {
-  forceCenter,
-  forceCollide,
-  forceLink,
-  forceManyBody,
-  forceSimulation,
-  forceX,
-  forceY,
-} from "d3-force";
+import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation } from "d3-force";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ReactFlowEdge, ReactFlowNode } from "@/lib/api/endpoints/graph";
@@ -27,6 +19,17 @@ export interface UseGraphLayoutInput {
    * invalidates the cached `seedKey` and re-runs the simulation.
    */
   reseedNonce?: number;
+  /**
+   * "unsaved" (default) — pin every saved-position node and only
+   * seed/refine the unsaved ones. Normal load behaviour.
+   *
+   * "all" — un-pin every node, seed from current positions, and
+   * let the simulation re-distribute everything. The caller
+   * persists ALL post-simulation positions, not just unsaved ones.
+   * Used by the "Re-layout all" mode of the Auto-arrange button
+   * when there are no unsaved nodes.
+   */
+  reseedMode?: "unsaved" | "all";
 }
 
 export interface UseGraphLayoutResult {
@@ -51,9 +54,23 @@ interface SimLink {
   target: string;
 }
 
-const SIM_ITERATIONS = 400;
+const SIM_ITERATIONS = 600;
 const NODE_R = 22;
 const MIN_PAD = 12;
+
+// d3-force tuning. PM #25 round 5: the original config (centre 0.05
+// + forceX 0.04 + forceY 0.04 = 0.13 of centripetal pull, link
+// distance 120, repulsion -280) bunched ~30 of 153 nodes inside a
+// 200×200 px square at the centre and pushed weakly-connected
+// outliers to >2.5σ distances. Removing forceX/Y (forceCenter
+// already does what they did, twice over), raising repulsion to -500,
+// and pushing link distance to 180 gives connected clusters room to
+// breathe without drifting orphans further. SIM_ITERATIONS bumped
+// 400 → 600 to absorb the larger search space.
+const FORCE_CENTER_STRENGTH = 0.08;
+const FORCE_LINK_DISTANCE = 180;
+const FORCE_LINK_STRENGTH = 0.4;
+const FORCE_CHARGE_STRENGTH = -500;
 
 /**
  * Hand-rolled SVG canvas position seeding for the Concept Graph (KUI-104).
@@ -74,6 +91,7 @@ export function useGraphLayout({
   width,
   height,
   reseedNonce = 0,
+  reseedMode = "unsaved",
 }: UseGraphLayoutInput): UseGraphLayoutResult {
   const [positions, setPositions] = useState<Record<string, Vec2>>(() => initialPositions(nodes));
   const [didSeed, setDidSeed] = useState<boolean>(false);
@@ -114,8 +132,10 @@ export function useGraphLayout({
     lastSeedRef.current = seedKey;
 
     const unsaved = nodes.filter((n) => !n.data?.has_saved_layout);
-    if (unsaved.length === 0) {
-      // Every node already has a saved layout; nothing to seed.
+    // In "unsaved" mode (default) we have nothing to do when every
+    // node is already pinned. In "all" mode the user has explicitly
+    // asked for a re-layout, so we run regardless.
+    if (unsaved.length === 0 && reseedMode !== "all") {
       setPositions(initialPositions(nodes));
       setNewLayouts({});
       setDidSeed(false);
@@ -124,7 +144,7 @@ export function useGraphLayout({
 
     const cx = width / 2;
     const cy = height / 2;
-    const simNodes: SimNode[] = seedSimNodes(nodes, edges, cx, cy, width, height);
+    const simNodes: SimNode[] = seedSimNodes(nodes, edges, cx, cy, width, height, reseedMode);
     const simLinks: SimLink[] = edges.map((e) => ({ source: e.source, target: e.target }));
 
     const sim = forceSimulation<SimNode>(simNodes)
@@ -132,13 +152,11 @@ export function useGraphLayout({
         "link",
         forceLink<SimNode, SimLink>(simLinks)
           .id((n) => n.id)
-          .distance(120)
-          .strength(0.4),
+          .distance(FORCE_LINK_DISTANCE)
+          .strength(FORCE_LINK_STRENGTH),
       )
-      .force("charge", forceManyBody().strength(-280))
-      .force("center", forceCenter(cx, cy).strength(0.05))
-      .force("x", forceX(cx).strength(0.04))
-      .force("y", forceY(cy).strength(0.04))
+      .force("charge", forceManyBody().strength(FORCE_CHARGE_STRENGTH))
+      .force("center", forceCenter(cx, cy).strength(FORCE_CENTER_STRENGTH))
       .force(
         "collide",
         forceCollide<SimNode>(NODE_R + MIN_PAD)
@@ -156,14 +174,18 @@ export function useGraphLayout({
       const y = Number.isFinite(n.y) ? n.y : cy;
       next[n.id] = { x, y };
       const original = nodes.find((node) => node.id === n.id);
-      if (!original?.data?.has_saved_layout) {
+      // In "all" mode the caller wants every post-simulation position
+      // persisted (the user explicitly re-layouted, so we treat all
+      // nodes as freshly seeded). Otherwise only nodes that lacked a
+      // saved layout count as seeded.
+      if (reseedMode === "all" || !original?.data?.has_saved_layout) {
         seeded[n.id] = { x, y };
       }
     }
     setPositions(next);
     setNewLayouts(seeded);
     setDidSeed(true);
-  }, [nodes, edges, width, height, seedKey]);
+  }, [nodes, edges, width, height, seedKey, reseedMode]);
 
   return { positions, newLayouts, didSeed };
 }
@@ -172,8 +194,13 @@ export function useGraphLayout({
 // part of layout. The d3-force pass after it is refinement; the
 // quality of the seed is what we verify.
 export const __test__ = {
-  seedSimNodes: (nodes: ReactFlowNode[], edges: ReactFlowEdge[], width: number, height: number) =>
-    seedSimNodes(nodes, edges, width / 2, height / 2, width, height),
+  seedSimNodes: (
+    nodes: ReactFlowNode[],
+    edges: ReactFlowEdge[],
+    width: number,
+    height: number,
+    mode: "unsaved" | "all" = "unsaved",
+  ) => seedSimNodes(nodes, edges, width / 2, height / 2, width, height, mode),
 };
 
 function initialPositions(nodes: ReactFlowNode[]): Record<string, Vec2> {
@@ -203,14 +230,17 @@ const NEIGHBOUR_RING_STEP = NODE_R * 3; // expand by ~66px per ring on collision
 /**
  * Seed positions for d3-force.
  *
- * Saved nodes get pinned (`fx`, `fy`) to their server position.
+ * Default mode (`"unsaved"`): saved nodes get pinned (`fx`, `fy`) to
+ * their server position; unsaved nodes are placed near a connected
+ * neighbour whose position is already known (saved or already-placed),
+ * falling back to an outer ring for orphans whose neighbours aren't
+ * placed.
  *
- * Unsaved nodes are placed near a connected neighbour whose position
- * is already known (saved or already-placed). The spiral pattern in
- * {@link OFFSET_DIRS} keeps siblings of one neighbour from
- * overlapping. Falls back to the outer ring for nodes whose
- * neighbours aren't yet placed — gives the simulation room to spread
- * orphans without piling them at the centre.
+ * "all" mode: nothing is pinned. Saved positions are still used as
+ * starting positions (so the simulation moves smoothly from the
+ * current state) but every node is free to move. The caller persists
+ * every post-simulation position. Used by the "Re-layout all" mode of
+ * the Auto-arrange button.
  */
 function seedSimNodes(
   nodes: ReactFlowNode[],
@@ -219,6 +249,7 @@ function seedSimNodes(
   cy: number,
   width: number,
   height: number,
+  mode: "unsaved" | "all" = "unsaved",
 ): SimNode[] {
   const adjacency = new Map<string, string[]>();
   for (const e of edges) {
@@ -231,12 +262,19 @@ function seedSimNodes(
   const placed = new Map<string, Vec2>();
   const out: SimNode[] = [];
 
-  // Pass 1 — pin every saved node and record its position.
+  // Pass 1 — record every saved node's position. In "unsaved" mode
+  // we also pin (`fx`, `fy`); in "all" mode we just seed from the
+  // current position so the simulation can move it.
   for (const n of nodes) {
     if (n.data?.has_saved_layout) {
       const pos = { x: n.position.x, y: n.position.y };
       placed.set(n.id, pos);
-      out.push({ id: n.id, x: pos.x, y: pos.y, fx: pos.x, fy: pos.y });
+      const sim: SimNode = { id: n.id, x: pos.x, y: pos.y };
+      if (mode === "unsaved") {
+        sim.fx = pos.x;
+        sim.fy = pos.y;
+      }
+      out.push(sim);
     }
   }
 

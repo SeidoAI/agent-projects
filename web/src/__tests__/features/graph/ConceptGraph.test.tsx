@@ -515,12 +515,16 @@ describe("ConceptGraph auto-arrange button", () => {
     vi.restoreAllMocks();
   });
 
-  it("disables the button when every node has a saved layout", () => {
+  it("flips to 'Re-layout all' (enabled) when every node has a saved layout", () => {
+    // PM #25 round 5: a disabled "All nodes positioned" state
+    // stranded users whose positions all came from automatic
+    // seeding (not user drags). The button now flips to a
+    // "Re-layout all" mode that un-pins everything for one pass.
     const wrapper = withSeed(makeGraph()); // every node in makeGraph has has_saved_layout: true
     render(<ConceptGraph />, { wrapper });
-    const btn = screen.getByRole("button", { name: /auto-arrange unsaved nodes/i });
-    expect(btn).toBeDisabled();
-    expect(btn.textContent ?? "").toMatch(/all nodes positioned/i);
+    const btn = screen.getByRole("button", { name: /re-layout every concept node/i });
+    expect(btn).not.toBeDisabled();
+    expect(btn.textContent ?? "").toMatch(/re-layout all/i);
   });
 
   it("shows the unsaved count and is enabled when unsaved nodes exist", () => {
