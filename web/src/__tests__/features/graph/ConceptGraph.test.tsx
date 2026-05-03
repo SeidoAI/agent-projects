@@ -508,3 +508,97 @@ describe("ConceptGraph rail", () => {
     expect(screen.getByText(/version · vabc1234/i)).toBeInTheDocument();
   });
 });
+
+describe("ConceptGraph auto-arrange button", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("disables the button when every node has a saved layout", () => {
+    const wrapper = withSeed(makeGraph()); // every node in makeGraph has has_saved_layout: true
+    render(<ConceptGraph />, { wrapper });
+    const btn = screen.getByRole("button", { name: /auto-arrange unsaved nodes/i });
+    expect(btn).toBeDisabled();
+    expect(btn.textContent ?? "").toMatch(/all nodes positioned/i);
+  });
+
+  it("shows the unsaved count and is enabled when unsaved nodes exist", () => {
+    const wrapper = withSeed({
+      nodes: [
+        {
+          id: "saved-1",
+          type: "concept",
+          position: { x: 100, y: 100 },
+          data: { label: "Saved", type: "model", has_saved_layout: true },
+        },
+        {
+          id: "unsaved-1",
+          type: "concept",
+          position: { x: 0, y: 0 },
+          data: { label: "Unsaved A", type: "principle" },
+        },
+        {
+          id: "unsaved-2",
+          type: "concept",
+          position: { x: 0, y: 0 },
+          data: { label: "Unsaved B", type: "principle" },
+        },
+      ],
+      edges: [{ id: "e1", source: "saved-1", target: "unsaved-1", relation: "related", data: {} }],
+      meta: {
+        kind: "concept",
+        focus: null,
+        upstream: false,
+        downstream: false,
+        depth: null,
+        node_count: 3,
+        edge_count: 1,
+        orphans: [],
+      },
+    });
+    render(<ConceptGraph />, { wrapper });
+    const btn = screen.getByRole("button", { name: /auto-arrange unsaved nodes/i });
+    expect(btn).not.toBeDisabled();
+    expect(btn.textContent ?? "").toMatch(/auto-arrange \(2 unsaved\)/i);
+  });
+
+  it("clicking the button does not throw and the button stays present", () => {
+    // Smoke test for the click path: bumps reseedNonce → useGraphLayout
+    // re-runs → useLayoutPersistence buffers a PATCH on debounce.
+    // The persistence layer is debounced and tested separately; here
+    // we verify the click is safe and the UI stays responsive.
+    const wrapper = withSeed({
+      nodes: [
+        {
+          id: "anchor",
+          type: "concept",
+          position: { x: 200, y: 200 },
+          data: { label: "Anchor", type: "model", has_saved_layout: true },
+        },
+        {
+          id: "drifter",
+          type: "concept",
+          position: { x: 0, y: 0 },
+          data: { label: "Drifter", type: "principle" },
+        },
+      ],
+      edges: [{ id: "e1", source: "anchor", target: "drifter", relation: "related", data: {} }],
+      meta: {
+        kind: "concept",
+        focus: null,
+        upstream: false,
+        downstream: false,
+        depth: null,
+        node_count: 2,
+        edge_count: 1,
+        orphans: [],
+      },
+    });
+    render(<ConceptGraph />, { wrapper });
+    const btn = screen.getByRole("button", { name: /auto-arrange unsaved nodes/i });
+    expect(() => fireEvent.click(btn)).not.toThrow();
+    // Button still visible after the click; not in an error state.
+    expect(screen.getByRole("button", { name: /auto-arrange unsaved nodes/i })).toBeInTheDocument();
+  });
+});

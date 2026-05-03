@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from pathlib import Path
 from typing import Literal
 
@@ -177,20 +178,41 @@ def _load_cache_ensuring_fresh(project_dir: Path):  # type: ignore[no-untyped-de
     missing, call ``tripwire.core.graph.cache.ensure_fresh(project_dir)``
     once per request — avoid infinite rebuild loops."*
 
-    We call ``ensure_fresh`` at most once per call. If the rebuild fails
-    (OSError, TimeoutError, or any other IO hazard during lock acquire)
-    we log a warning and return ``None``; callers then fall back to a
-    scan or empty result rather than 500-ing the route.
+    On a TimeoutError (another caller is mid-rebuild) we retry once
+    after a short sleep — bulk rebuilds finish in ~1.5s after the
+    ``_INCREMENTAL_BAILOUT`` perf fix, so the retry usually succeeds
+    quickly. On persistent OSError/TimeoutError we log at ERROR (not
+    warning — silent warnings are how we lost half-an-hour of dogfood
+    debug time once already) and return ``None``; callers degrade
+    gracefully rather than 5xx-ing the route.
     """
     cache = graph_cache.load_index(project_dir)
     if cache is not None:
         return cache
     try:
         graph_cache.ensure_fresh(project_dir)
-    except (OSError, TimeoutError) as exc:
-        logger.warning(
-            "node_service: graph cache rebuild failed for %s: %s",
+    except TimeoutError:
+        time.sleep(0.25)
+        try:
+            graph_cache.ensure_fresh(project_dir)
+        except (OSError, TimeoutError) as exc:
+            logger.error(
+                "node_service: graph cache rebuild failed for %s after retry "
+                "(%s: %s). This usually means a concurrent ensure_fresh held "
+                "the index lock past the 10s timeout — check for runaway "
+                "incremental updates and tune _INCREMENTAL_BAILOUT in "
+                "core/graph/cache.py if needed. Falling back to no-cache.",
+                project_dir,
+                type(exc).__name__,
+                exc,
+            )
+            return None
+    except OSError as exc:
+        logger.error(
+            "node_service: graph cache rebuild failed for %s "
+            "(%s: %s). Falling back to no-cache.",
             project_dir,
+            type(exc).__name__,
             exc,
         )
         return None

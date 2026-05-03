@@ -21,6 +21,12 @@ export interface UseGraphLayoutInput {
   edges: ReactFlowEdge[];
   width: number;
   height: number;
+  /**
+   * Bump to force a re-seed of unsaved nodes (used by the
+   * "Auto-arrange" toolbar action). Any change in this number
+   * invalidates the cached `seedKey` and re-runs the simulation.
+   */
+  reseedNonce?: number;
 }
 
 export interface UseGraphLayoutResult {
@@ -67,6 +73,7 @@ export function useGraphLayout({
   edges,
   width,
   height,
+  reseedNonce = 0,
 }: UseGraphLayoutInput): UseGraphLayoutResult {
   const [positions, setPositions] = useState<Record<string, Vec2>>(() => initialPositions(nodes));
   const [didSeed, setDidSeed] = useState<boolean>(false);
@@ -97,8 +104,8 @@ export function useGraphLayout({
       .map((e) => `${e.source}>${e.target}`)
       .sort()
       .join(",");
-    return `${allIds}|${topology}|${width}|${height}`;
-  }, [nodes, edges, width, height]);
+    return `${allIds}|${topology}|${width}|${height}|${reseedNonce}`;
+  }, [nodes, edges, width, height, reseedNonce]);
 
   const lastSeedRef = useRef<string | null>(null);
 
@@ -117,21 +124,7 @@ export function useGraphLayout({
 
     const cx = width / 2;
     const cy = height / 2;
-    const r = Math.min(width, height) / 3;
-    const simNodes: SimNode[] = nodes.map((n, i) => {
-      const saved = Boolean(n.data?.has_saved_layout);
-      if (saved) {
-        return { id: n.id, x: n.position.x, y: n.position.y, fx: n.position.x, fy: n.position.y };
-      }
-      // Seed unsaved nodes on a deterministic ring around the centre
-      // so the simulation has something to spread out.
-      const a = (i / nodes.length) * Math.PI * 2;
-      return {
-        id: n.id,
-        x: cx + Math.cos(a) * r,
-        y: cy + Math.sin(a) * r,
-      };
-    });
+    const simNodes: SimNode[] = seedSimNodes(nodes, edges, cx, cy, width, height);
     const simLinks: SimLink[] = edges.map((e) => ({ source: e.source, target: e.target }));
 
     const sim = forceSimulation<SimNode>(simNodes)
@@ -175,10 +168,140 @@ export function useGraphLayout({
   return { positions, newLayouts, didSeed };
 }
 
+// Exported for unit testing — the seed step is the deterministic
+// part of layout. The d3-force pass after it is refinement; the
+// quality of the seed is what we verify.
+export const __test__ = {
+  seedSimNodes: (nodes: ReactFlowNode[], edges: ReactFlowEdge[], width: number, height: number) =>
+    seedSimNodes(nodes, edges, width / 2, height / 2, width, height),
+};
+
 function initialPositions(nodes: ReactFlowNode[]): Record<string, Vec2> {
   const out: Record<string, Vec2> = {};
   for (const n of nodes) {
     out[n.id] = { x: n.position.x, y: n.position.y };
   }
   return out;
+}
+
+// Eight unit vectors for the spiral-search offset pattern, ordered to
+// reduce visual clustering when many siblings share one neighbour.
+const OFFSET_DIRS: ReadonlyArray<readonly [number, number]> = [
+  [1, 0],
+  [0, 1],
+  [-1, 0],
+  [0, -1],
+  [0.7071, 0.7071],
+  [-0.7071, 0.7071],
+  [-0.7071, -0.7071],
+  [0.7071, -0.7071],
+];
+
+const NEIGHBOUR_BASE_OFFSET = NODE_R * 5; // ~110px from neighbour centre
+const NEIGHBOUR_RING_STEP = NODE_R * 3; // expand by ~66px per ring on collision
+
+/**
+ * Seed positions for d3-force.
+ *
+ * Saved nodes get pinned (`fx`, `fy`) to their server position.
+ *
+ * Unsaved nodes are placed near a connected neighbour whose position
+ * is already known (saved or already-placed). The spiral pattern in
+ * {@link OFFSET_DIRS} keeps siblings of one neighbour from
+ * overlapping. Falls back to the outer ring for nodes whose
+ * neighbours aren't yet placed — gives the simulation room to spread
+ * orphans without piling them at the centre.
+ */
+function seedSimNodes(
+  nodes: ReactFlowNode[],
+  edges: ReactFlowEdge[],
+  cx: number,
+  cy: number,
+  width: number,
+  height: number,
+): SimNode[] {
+  const adjacency = new Map<string, string[]>();
+  for (const e of edges) {
+    if (!adjacency.has(e.source)) adjacency.set(e.source, []);
+    if (!adjacency.has(e.target)) adjacency.set(e.target, []);
+    adjacency.get(e.source)!.push(e.target);
+    adjacency.get(e.target)!.push(e.source);
+  }
+
+  const placed = new Map<string, Vec2>();
+  const out: SimNode[] = [];
+
+  // Pass 1 — pin every saved node and record its position.
+  for (const n of nodes) {
+    if (n.data?.has_saved_layout) {
+      const pos = { x: n.position.x, y: n.position.y };
+      placed.set(n.id, pos);
+      out.push({ id: n.id, x: pos.x, y: pos.y, fx: pos.x, fy: pos.y });
+    }
+  }
+
+  // Pass 2 — place unsaved nodes near a placed neighbour where possible.
+  // Multiple passes converge unsaved → unsaved chains (a node's
+  // neighbour might itself be unsaved-but-just-placed in this run).
+  const unsaved = nodes.filter((n) => !n.data?.has_saved_layout);
+  const unplacedFallback: ReactFlowNode[] = [];
+  let madeProgress = true;
+  let remaining = unsaved.slice();
+  while (madeProgress && remaining.length > 0) {
+    madeProgress = false;
+    const next: ReactFlowNode[] = [];
+    for (const n of remaining) {
+      const neighbours = adjacency.get(n.id) ?? [];
+      const anchor = neighbours
+        .map((id) => placed.get(id))
+        .find((p): p is Vec2 => p !== undefined);
+      if (!anchor) {
+        next.push(n);
+        continue;
+      }
+      const pos = pickNeighbourOffset(anchor, placed);
+      placed.set(n.id, pos);
+      out.push({ id: n.id, x: pos.x, y: pos.y });
+      madeProgress = true;
+    }
+    remaining = next;
+  }
+
+  // Pass 3 — orphans (no path to any placed node). Spread on an outer
+  // ring so the simulation can fan them out without bunching at the
+  // centre. Skip every other slot for breathing room.
+  unplacedFallback.push(...remaining);
+  const orphanRadius = Math.min(width, height) / 2;
+  const slots = Math.max(unplacedFallback.length * 2, 8);
+  unplacedFallback.forEach((n, i) => {
+    const a = ((i * 2) / slots) * Math.PI * 2;
+    const x = cx + Math.cos(a) * orphanRadius;
+    const y = cy + Math.sin(a) * orphanRadius;
+    placed.set(n.id, { x, y });
+    out.push({ id: n.id, x, y });
+  });
+
+  return out;
+}
+
+function pickNeighbourOffset(anchor: Vec2, placed: Map<string, Vec2>): Vec2 {
+  const minDist = NODE_R + MIN_PAD;
+  for (let ring = 0; ring < 6; ring += 1) {
+    const radius = NEIGHBOUR_BASE_OFFSET + ring * NEIGHBOUR_RING_STEP;
+    for (const [dx, dy] of OFFSET_DIRS) {
+      const candidate = { x: anchor.x + dx * radius, y: anchor.y + dy * radius };
+      let collides = false;
+      for (const p of placed.values()) {
+        const ddx = candidate.x - p.x;
+        const ddy = candidate.y - p.y;
+        if (ddx * ddx + ddy * ddy < minDist * minDist) {
+          collides = true;
+          break;
+        }
+      }
+      if (!collides) return candidate;
+    }
+  }
+  // Last-resort fallback: stack along +x; d3-force will untangle.
+  return { x: anchor.x + NEIGHBOUR_BASE_OFFSET * 6, y: anchor.y };
 }

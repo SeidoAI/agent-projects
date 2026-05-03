@@ -1,4 +1,4 @@
-import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
+import { LayoutGrid, PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { useProjectShell } from "@/app/ProjectShell";
@@ -108,6 +108,9 @@ export function ConceptGraph() {
   const [railOpen, setRailOpen] = useState(true);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState(DEFAULT_CANVAS);
+  // Bumped by the Auto-arrange button to force `useGraphLayout` to
+  // re-seed unsaved nodes (smart placement + a fresh d3-force pass).
+  const [reseedNonce, setReseedNonce] = useState(0);
 
   // Track canvas size so the d3-force seeding centres in the
   // visible area instead of the default 1000×600 viewBox.
@@ -148,7 +151,13 @@ export function ConceptGraph() {
     edges: conceptEdges,
     width: size.width,
     height: size.height,
+    reseedNonce,
   });
+
+  const unsavedCount = useMemo(
+    () => concepts.filter((n) => !n.data?.has_saved_layout).length,
+    [concepts],
+  );
 
   // Persist any newly-seeded positions back to YAML so the next
   // reload reads them and skips d3-force entirely.
@@ -198,15 +207,36 @@ export function ConceptGraph() {
   return (
     <div className="flex min-h-full flex-col bg-(--color-paper) text-(--color-ink)">
       <header className="border-(--color-edge) border-b px-7 py-4">
-        <div className="font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
-          chapter 05 · concept graph
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
+              chapter 05 · concept graph
+            </div>
+            <h1 className="mt-1 font-sans font-semibold text-[30px] text-(--color-ink) leading-[1.1] tracking-[-0.02em]">
+              What this project is made of.
+            </h1>
+            <p className="mt-1 font-serif text-[14.5px] italic text-(--color-ink-2)">
+              Every concept the team has named, who cites it, and how fresh it is.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setReseedNonce((n) => n + 1)}
+            disabled={unsavedCount === 0}
+            title={
+              unsavedCount === 0
+                ? "All nodes have a saved position"
+                : "Re-place unsaved nodes near related neighbours"
+            }
+            aria-label="Auto-arrange unsaved nodes"
+          >
+            <LayoutGrid className="mr-1.5 h-3.5 w-3.5" />
+            {unsavedCount === 0
+              ? "All nodes positioned"
+              : `Auto-arrange (${unsavedCount} unsaved)`}
+          </Button>
         </div>
-        <h1 className="mt-1 font-sans font-semibold text-[30px] text-(--color-ink) leading-[1.1] tracking-[-0.02em]">
-          What this project is made of.
-        </h1>
-        <p className="mt-1 font-serif text-[14.5px] italic text-(--color-ink-2)">
-          Every concept the team has named, who cites it, and how fresh it is.
-        </p>
       </header>
       <div className="border-(--color-edge) border-b px-7 py-3">
         <GraphLegend />
