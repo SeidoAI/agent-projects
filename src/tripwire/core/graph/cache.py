@@ -69,6 +69,13 @@ COMMENTS_SUBDIR = paths.COMMENTS_SUBDIR
 DEFAULT_LOCK_TIMEOUT_S = 10.0
 LOCK_POLL_INTERVAL_S = 0.05
 
+# In ensure_fresh, switch from per-file incremental updates to a single
+# full rebuild once the change set crosses this many files. The
+# incremental path is O(N²) because update_cache_for_file rebuilds the
+# derived tables on every call; full_rebuild does it once. Below the
+# threshold the incremental path is still cheaper (no whole-tree scan).
+_INCREMENTAL_BAILOUT = 5
+
 
 @contextmanager
 def _index_lock(
@@ -878,39 +885,66 @@ def ensure_fresh(project_dir: Path) -> bool:
             for abs_path in comments_root.glob("*.yaml"):
                 current_files.add(str(abs_path.relative_to(project_dir)))
 
+    # Decide incremental-vs-full upfront. update_cache_for_file rebuilds
+    # the derived tables (by_name, by_type, referenced_by) on EVERY call,
+    # which walks the whole cache and re-reads every node file from disk.
+    # That's O(N) per file → O(N²) total for a bulk update. full_rebuild
+    # does the same work once. For changes ≥ INCREMENTAL_BAILOUT we bail
+    # out to a full rebuild, which is dramatically faster for bulk
+    # additions/renames/imports and avoids long lock-holds that race with
+    # other ensure_fresh callers (file watcher, validate-on-edit hook).
+
+    new_or_changed: list[str] = []
+    for rel in current_files:
+        fp = existing.files.get(rel)
+        if fp is None:
+            new_or_changed.append(rel)
+            continue
+        try:
+            disk_mtime = (project_dir / rel).stat().st_mtime
+        except OSError:
+            continue
+        if disk_mtime > fp.mtime + 1e-6:
+            new_or_changed.append(rel)
+
+    deleted = set(existing.files.keys()) - current_files
+    change_count = len(new_or_changed) + len(deleted)
+
+    if change_count >= _INCREMENTAL_BAILOUT:
+        logger.info(
+            "graph_cache: %d changes detected (>= %d), running full rebuild",
+            change_count,
+            _INCREMENTAL_BAILOUT,
+        )
+        full_rebuild(project_dir)
+        return True
+
     rebuilt = False
 
-    # New or modified files
-    for rel in current_files:
+    # New or modified files (small-batch incremental path)
+    for rel in new_or_changed:
         abs_path = project_dir / rel
         fp = existing.files.get(rel)
         if fp is None:
             update_cache_for_file(project_dir, rel)
             rebuilt = True
             continue
-        try:
-            disk_mtime = abs_path.stat().st_mtime
-        except OSError:
-            continue
-        if disk_mtime > fp.mtime + 1e-6:
-            # Double-check with sha — mtime can change without content
-            # changing (e.g. `touch`). If sha matches, update mtime only.
-            disk_sha = _compute_file_sha(abs_path)
-            if disk_sha != fp.sha:
-                update_cache_for_file(project_dir, rel)
-                rebuilt = True
-            else:
-                # Just refresh the mtime in place to avoid re-hashing next time.
-                with _index_lock(project_dir):
-                    cache = load_index(project_dir) or _empty_cache()
-                    if rel in cache.files:
-                        cache.files[rel].mtime = disk_mtime
-                        cache.last_incremental_update = datetime.now()
-                        save_index(project_dir, cache)
+        # Re-check sha (mtime can change without content changing)
+        disk_sha = _compute_file_sha(abs_path)
+        if disk_sha != fp.sha:
+            update_cache_for_file(project_dir, rel)
+            rebuilt = True
+        else:
+            # Just refresh the mtime in place to avoid re-hashing next time.
+            with _index_lock(project_dir):
+                cache = load_index(project_dir) or _empty_cache()
+                if rel in cache.files:
+                    cache.files[rel].mtime = abs_path.stat().st_mtime
+                    cache.last_incremental_update = datetime.now()
+                    save_index(project_dir, cache)
 
     # Deleted files
-    stale = set(existing.files.keys()) - current_files
-    for rel in stale:
+    for rel in deleted:
         update_cache_for_file(project_dir, rel)
         rebuilt = True
 
