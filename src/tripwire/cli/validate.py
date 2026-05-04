@@ -44,11 +44,6 @@ console = Console()
     help="Path to the project root (contains project.yaml).",
 )
 @click.option(
-    "--strict",
-    is_flag=True,
-    help="Treat warnings as errors (the agent's normal mode).",
-)
-@click.option(
     "--format",
     "output_format",
     type=click.Choice(["text", "json", "summary", "compact"]),
@@ -76,7 +71,6 @@ console = Console()
 @profileable
 def validate_cmd(
     project_dir: Path,
-    strict: bool,
     output_format: str,
     count_only: bool,
     fix: bool,
@@ -85,11 +79,14 @@ def validate_cmd(
     """Run the validation gate.
 
     The gate the agent runs after every batch of file writes. Always
-    rebuilds `graph/index.yaml` as a side effect. Run with `--fix` to
-    auto-repair trivial issues, `--strict` to treat warnings as errors.
+    rebuilds `graph/index.yaml` as a side effect. Strict-by-default:
+    warnings are errors. Run with ``--fix`` to auto-repair trivial
+    issues. (``--strict`` was hard-removed in stage 1 of the workflow
+    codification — heuristic-as-tripwire promotion ships in stage 2 as
+    ``--heuristics-as-tripwires``.)
     """
     resolved = project_dir.expanduser().resolve()
-    report = validate_project(resolved, strict=strict, fix=fix)
+    report = validate_project(resolved, strict=True, fix=fix)
 
     if select_expr:
         _filter_report_by_selector(report, resolved, select_expr)

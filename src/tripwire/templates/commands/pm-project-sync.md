@@ -43,7 +43,7 @@ Workflow:
    a. Run `tripwire workspace push [--nodes=...]`.
    b. Exit 0 — done.
    c. Exit 11 — upstream diverged again (rare). Go back to step 3.
-6. Run `tripwire validate --strict`; commit: `sync: <N> nodes with workspace`.
+6. Run `tripwire validate`; commit: `sync: <N> nodes with workspace`.
 7. Report:
    - Number of nodes pulled + merges mediated + nodes pushed
    - New workspace_sha

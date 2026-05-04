@@ -193,7 +193,13 @@ class TestValidate:
         assert "errors" in payload
         assert payload["summary"]["cache_rebuilt"] is True
 
-    def test_strict_promotes_warnings(self, runner: CliRunner, tmp_path: Path) -> None:
+    def test_validate_promotes_warnings_strict_by_default(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        """``--strict`` was hard-removed in stage 1 of the workflow
+        codification. ``tripwire validate`` is now strict-by-default —
+        warnings count as errors, exit code 2."""
+
         target = tmp_path / "p"
         init_project(runner, target)
         # Issue with no references → body/no_references warning
@@ -214,12 +220,16 @@ class TestValidate:
             ),
         )
 
-        normal = runner.invoke(cli, ["validate", "--project-dir", str(target)])
-        strict = runner.invoke(
+        result = runner.invoke(cli, ["validate", "--project-dir", str(target)])
+        # Strict-by-default: warnings promoted to errors.
+        assert result.exit_code == 2
+
+        # Confirm the flag was hard-removed (passing it errors out).
+        with_flag = runner.invoke(
             cli, ["validate", "--project-dir", str(target), "--strict"]
         )
-        assert normal.exit_code == 1  # warnings only
-        assert strict.exit_code == 2  # warnings promoted
+        assert with_flag.exit_code != 0
+        assert "no such option" in with_flag.output.lower() or "--strict" in with_flag.output
 
     def test_fix_repairs_sequence_drift(
         self, runner: CliRunner, tmp_path: Path
@@ -945,9 +955,13 @@ class TestEndToEnd:
         target = tmp_path / "p"
         populate_project(runner, target)
 
-        # 1. validate
+        # 1. validate — strict-by-default in stage 1 of the workflow
+        # codification: heuristic warnings on a freshly populated
+        # fixture project surface as exit 2. The end-to-end smoke test
+        # only asserts the CLI works (doesn't crash), so accept any
+        # of the documented exit codes.
         v = runner.invoke(cli, ["validate", "--project-dir", str(target)])
-        assert v.exit_code in (0, 1)  # warnings ok; no errors
+        assert v.exit_code in (0, 1, 2)
         assert (
             not any(
                 "error" in line.lower() and "s:" in line.lower()

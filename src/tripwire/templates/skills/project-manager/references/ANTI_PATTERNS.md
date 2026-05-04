@@ -14,7 +14,7 @@ bad/good examples and the reasoning behind each rule.
    `issue/schema_invalid`. Stick to what's in the example file.
 
 2. **Forgetting to run `validate`** before declaring done. Every batch
-   of writes must be followed by `tripwire validate --strict`.
+   of writes must be followed by `tripwire validate`.
    No exceptions. It catches 95% of errors before a human or PM
    reviewer has to.
 
@@ -132,12 +132,12 @@ tripwire session create --name ...
 All mutation happens via direct file writes. If you try these, the
 CLI will say "no such command" and you'll waste a tool call.
 
-### Running `validate` without `--strict`
+### Skipping the validation gate
 
-Without `--strict`, warnings don't block commit. For an agent loop,
-always use `--strict` so warnings and errors are treated the same.
-The only exception is when you've already fixed all errors and want
-to see warnings as warnings (rare).
+`tripwire validate` is the gate. Run it after every batch of file
+writes. Warnings (heuristics) surface in validate output by default.
+(Stage 2 will introduce `--heuristics-as-tripwires` to fail the run
+on heuristic hits — currently a no-op slot.)
 
 ### Parsing validate output with inline scripts
 

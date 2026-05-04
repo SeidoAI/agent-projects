@@ -6,7 +6,7 @@ Exercises the new primitives end-to-end through the CLI:
 - tripwire session check surfaces the missing handoff.yaml
 - add handoff.yaml (simulating /pm-session-create stamp)
 - tripwire session check passes
-- tripwire validate --strict passes (handoff required at queued, so we
+- tripwire validate passes (handoff required at queued, so we
   keep status=planned — launching would be a write operation the CLI
   doesn't do yet in v0.6a; /pm-session-queue's work lives in the
   slash-command body)
@@ -123,7 +123,7 @@ last_verification_passed_at: null
 
     # tripwire validate should pass (session is in planned status, handoff
     # isn't required yet, but schema is valid).
-    validate = _run_tripwire(tmp_path_project, "validate", "--strict")
+    validate = _run_tripwire(tmp_path_project, "validate")
     # We don't insist on exit 0 because the freshly-scaffolded project
     # may have phase/heuristic findings unrelated to our session work.
     # What we do insist on: no handoff_schema/* findings in the output.

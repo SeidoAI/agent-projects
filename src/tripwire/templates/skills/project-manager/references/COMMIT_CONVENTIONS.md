@@ -77,7 +77,7 @@ Use a section-heavy structure so reviewers can skim:
 - sessions/api-endpoints-core/artifacts/plan.md (new)
 
 ## Validator
-`tripwire validate --strict` exits 0.
+`tripwire validate` exits 0.
 
 ## Concept graph
 - Created [[auth-token-endpoint]] pointing at src/api/auth.py:45-82

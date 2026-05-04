@@ -95,7 +95,7 @@ disagrees with the example, trust the example.
 After every batch of file writes, run:
 
 ```bash
-tripwire validate --strict
+tripwire validate
 ```
 
 Default output is human-readable text. Available formats:
@@ -110,10 +110,10 @@ Fix every error. Re-run. Repeat until exit code 0.
 When validating after a targeted edit, use selectors:
 
 ```bash
-tripwire validate --strict --select SEI-42+   # downstream
-tripwire validate --strict --select +SEI-42   # upstream
-tripwire validate --strict --select SEI-42+2  # 2 hops
-tripwire validate --strict --select SEI-42    # just this entity
+tripwire validate --select SEI-42+   # downstream
+tripwire validate --select +SEI-42   # upstream
+tripwire validate --select SEI-42+2  # 2 hops
+tripwire validate --select SEI-42    # just this entity
 ```
 
 **What validate checks:** structural integrity — schemas, references,
@@ -139,7 +139,7 @@ enforces different requirements per phase:
 - **`executing`** / **`reviewing`** — same as `scoped`.
 
 To advance from `scoping` to `scoped`, edit `project.yaml` and set
-`phase: scoped`, then run `tripwire validate --strict`. If the artifacts
+`phase: scoped`, then run `tripwire validate`. If the artifacts
 are missing, validation will fail — you MUST complete the gap analysis
 and compliance checklist before advancing.
 
@@ -327,7 +327,7 @@ already shows.
 
 Write to `<project>/inbox/<id>.md` (markdown body + YAML
 frontmatter). See `references/SCHEMA_INBOX.md` for the full schema
-+ a worked example. Run `tripwire validate --strict` after writing.
++ a worked example. Run `tripwire validate` after writing.
 
 **Do not resolve your own entries.** Leave `resolved: false`; the
 human clicks ✓ in the dashboard.
@@ -374,7 +374,7 @@ or a separate Claude Code session; in the future, a container).
 The execution agent receives the plan and runs it.
 
 After the execution agent completes:
-1. Run `tripwire validate --strict`
+1. Run `tripwire validate`
 2. Review the validation report
 3. If errors: create fix issues or re-delegate
 4. If clean: update issue statuses, close the session
@@ -387,10 +387,10 @@ artifacts (issues, nodes, sessions, plans).
 
 | Agent thought | Reality |
 |---|---|
-| "The validate errors are just warnings, I'll fix them later" | The gate is non-negotiable. Warnings are errors when `--strict` is set. Fix them now. |
+| "The validate errors are just warnings, I'll fix them later" | The gate is non-negotiable. Warnings (heuristics) surface in validate output by default. (Stage 2 will introduce `--heuristics-as-tripwires` to fail the run on heuristic hits — currently a no-op slot.) Fix them now. |
 | "The ref is broken but the target node will exist soon" | Create the target node first, then the referrer. The graph only has one state at a time. |
 | "I'll skip `tripwire refs reverse` — I know nothing references this" | You don't know. You're forgetful. Run the command. |
-| "This issue is basically done, I'll mark it done" | Run `tripwire validate --strict` first. If it fails, the issue is not done. |
+| "This issue is basically done, I'll mark it done" | Run `tripwire validate` first. If it fails, the issue is not done. |
 | "I don't need a plan for this small change" | You do. The plan template exists for a reason. Fill it out, even if it's 3 steps. |
 | "I'll execute this plan myself — it's simpler than delegating" | You are a project manager. You scope, plan, validate, and review. You do not execute. Delegate to an execution agent. |
 | "I'll do the gap analysis later" | Deferral is cancellation. You will not come back. Do it now. |

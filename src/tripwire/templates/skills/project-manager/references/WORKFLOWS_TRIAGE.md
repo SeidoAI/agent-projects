@@ -60,7 +60,7 @@ Add a comment to the existing issue. Mark the inbound item as processed
 
 ### 6. Validate and commit
 ```bash
-tripwire validate --strict
+tripwire validate
 ```
 Every new issue, every new comment, every new node must pass the gate.
 

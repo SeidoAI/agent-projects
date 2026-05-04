@@ -32,7 +32,7 @@ Workflow:
    `comment_templates/status_change.yaml.j2`. Body: one paragraph
    summarising the handoff — reference `handoff.yaml.branch`, the
    agent type, and any open questions.
-9. Run `tripwire validate --strict`. Fix any errors.
+9. Run `tripwire validate`. Fix any errors.
 10. Commit: `queue: $ARGUMENTS → <agent-type>`.
 11. Report the branch name (from `handoff.yaml.branch`) so the user
     can dispatch the execution agent or run `/pm-session-spawn`.

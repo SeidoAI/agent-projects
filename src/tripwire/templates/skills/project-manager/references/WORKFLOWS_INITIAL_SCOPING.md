@@ -184,7 +184,7 @@ After every 20 concrete issues written, pause and calibrate:
    quality standard. Do not rationalise the difference ("these are
    simpler issues") — check the planning docs to verify.
 
-4. **Run `tripwire validate --strict`** after rewriting to confirm the
+4. **Run `tripwire validate`** after rewriting to confirm the
    rewrites are clean.
 
 5. **Record the calibration** in `plans/artifacts/compliance.md`
@@ -202,7 +202,7 @@ validator also detects this pattern (`quality/body_degradation`,
 
 After every 3-5 files:
 ```bash
-tripwire validate --strict
+tripwire validate
 ```
 
 Default output is human-readable text. Use `--format summary` for
@@ -305,7 +305,7 @@ Write three artifacts in `plans/artifacts/`:
 
 ### 11. Final validation + confirm shape
 ```bash
-tripwire validate --strict
+tripwire validate
 tripwire status
 tripwire agenda --by status
 tripwire graph --type concept
@@ -329,7 +329,7 @@ Advance the project phase:
 phase: scoped
 ```
 
-Then run `tripwire validate --strict`. If the gap analysis or compliance
+Then run `tripwire validate`. If the gap analysis or compliance
 artifacts are missing or incomplete, validation will fail. Fix before
 committing.
 

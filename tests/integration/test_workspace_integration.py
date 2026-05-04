@@ -272,11 +272,13 @@ class TestStandaloneProjectUnchanged:
         )
         assert r.returncode == 0
 
-        r = _run_tripwire(proj, "validate", "--strict")
-        # validate may emit quality-consistency warnings etc. — we only
-        # care that it doesn't emit workspace/handoff-related errors.
-        # exit 0 (clean) or 1 (warnings) both acceptable; exit 2 is not.
-        assert r.returncode in (0, 1), r.stdout + r.stderr
+        r = _run_tripwire(proj, "validate")
+        # validate is strict-by-default in stage 1. Quality-consistency
+        # warnings (now heuristics) still surface. We only care that
+        # workspace/handoff-related errors don't appear; non-zero exit
+        # from heuristic warnings is acceptable here.
+        assert "workspace/" not in r.stdout, r.stdout + r.stderr
+        assert "handoff/" not in r.stdout, r.stdout + r.stderr
         assert "handoff_schema" not in r.stdout
         assert "workspace_schema" not in r.stdout
 

@@ -48,7 +48,7 @@ Before committing ANY changes to the project repo (artifacts,
 comments, nodes), run:
 
 ```bash
-tripwire validate --strict
+tripwire validate
 ```
 
 Parse the JSON. Fix every error. Re-run until exit 0. This is
@@ -141,7 +141,7 @@ separate from the target code repo's test suite — both must pass.
     checkable (✓ or ✗). If anything fails, fix it and re-run.
 20. **Run the project-level validate**:
     ```bash
-    tripwire validate --strict
+    tripwire validate
     ```
     Must exit 0. Parse errors, fix, re-run.
 21. **Run the target repo's checks**:

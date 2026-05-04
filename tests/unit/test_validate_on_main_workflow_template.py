@@ -1,6 +1,8 @@
 """Verify the v0.7.9 §A10 ``validate-on-main.yml.j2`` workflow template
 renders to valid YAML, pins actions to point releases, and runs
-``tripwire validate --strict`` on push and PR.
+``tripwire validate`` on push and PR. (``--strict`` was hard-removed
+in stage 1 of the workflow codification — strict-by-default is the
+new behaviour.)
 """
 
 from __future__ import annotations
@@ -31,9 +33,13 @@ def test_template_renders_to_valid_yaml():
     assert data["jobs"]["validate"]["runs-on"] == "ubuntu-latest"
 
 
-def test_template_runs_tripwire_validate_strict():
+def test_template_runs_tripwire_validate():
     rendered = _render_template()
-    assert "tripwire validate --strict" in rendered
+    assert "tripwire validate" in rendered
+    assert "--strict" not in rendered, (
+        "--strict has been hard-removed in stage 1; the template should"
+        " call `tripwire validate` (strict-by-default)"
+    )
 
 
 def test_template_pins_third_party_actions_to_point_releases():

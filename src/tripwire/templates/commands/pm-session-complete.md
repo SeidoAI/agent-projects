@@ -26,7 +26,7 @@ Workflow:
 5. Record the workflow prompt-check:
    `tripwire prompt-check invoke pm-session-complete <session-id> --status completed`.
 6. Run `tripwire session complete <session-id>` (real — drops `--dry-run`).
-7. Run `tripwire validate --strict` — the Layer 3 coherence check should
+7. Run `tripwire validate` — the Layer 3 coherence check should
    pass now that issues and session both read `done`.
 8. Commit: `complete: <session-id> (<comma-separated issue keys>)`.
 9. Report back:

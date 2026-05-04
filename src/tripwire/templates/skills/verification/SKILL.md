@@ -146,7 +146,7 @@ incomplete implementation.
     Definition of Done says they should be.
 15. **Run the project-level validator**:
     ```bash
-    tripwire validate --strict
+    tripwire validate
     ```
     Any errors must be fixed before approval.
 
@@ -175,7 +175,7 @@ incomplete implementation.
 
     ### Evidence
     - `make test` → 42 passed in 3.2s
-    - `tripwire validate --strict` → exit 0
+    - `tripwire validate` → exit 0
     - `tripwire node check` → all fresh
 
     Approved.
@@ -204,7 +204,7 @@ incomplete implementation.
     2. Rewrite `test_expired_token` to use real timestamps
     3. Rehash [[user-model]] and update `updated_at`
 
-    After fixing, re-run `tripwire validate --strict` and
+    After fixing, re-run `tripwire validate` and
     push again. I will re-verify.
     EOF
     )"
@@ -228,7 +228,7 @@ incomplete implementation.
     write access to the project repo, just not the target repo).
     Branch: `verifier/<KEY>-verified`.
 
-21. **Run `tripwire validate --strict`** on the project repo
+21. **Run `tripwire validate`** on the project repo
     before pushing your commit. Your own changes must pass the gate.
 
 ## Operating rules

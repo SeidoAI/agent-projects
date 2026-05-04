@@ -27,5 +27,5 @@ Workflow:
      - The issue body (acceptance criteria, requirements)
      - The PR diff (for verified.md, check each criterion)
      - Your review judgment
-5. Run `tripwire validate --strict`. Fix any errors.
+5. Run `tripwire validate`. Fix any errors.
 6. Commit: `artifact: <artifact-name> for <issue-key>`.

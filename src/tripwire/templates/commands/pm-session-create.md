@@ -38,7 +38,7 @@ Workflow:
    - `branch` = output of step 6
    - `open_questions` = anything you couldn't answer during scoping
    - `context_to_preserve` = decisions made during scoping
-8. Run `tripwire validate --strict`. Fix any errors.
+8. Run `tripwire validate`. Fix any errors.
 9. Record the workflow prompt-check:
    `tripwire prompt-check invoke pm-session-create <session-key> --status planned`.
 10. Commit: `session: create <session-key> for <issue-key>`.

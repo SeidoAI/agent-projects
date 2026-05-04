@@ -45,7 +45,7 @@ freshness drifts silently.
 
 ### 3. Run the validation gate
 ```bash
-tripwire validate --strict
+tripwire validate
 ```
 If this exits non-zero, the PR fails review. Comment on the PR with
 the specific errors from the JSON output (one line per error, with
@@ -145,7 +145,7 @@ For each surfaced divergence:
 5. **`source.content_hash`** only needs bumping if the underlying
    `source` file (the one the node points at) actually changed.
    Body-only edits do not require a content_hash bump.
-6. Validate (`tripwire validate --strict`) and commit. Convention:
+6. Validate (`tripwire validate`) and commit. Convention:
    `reconcile: <node-list> after <pr-id>` — e.g.
    `reconcile: [[file-watcher]], [[websocket-hub]] after #10`.
 
@@ -166,7 +166,7 @@ own canonical shape (v0.7.5 §2.C3):
    a. Read the agent's self-review (the four-lens block from the
       spawn template).
    b. Walk the verification-checklist independently.
-   c. Run `tripwire validate --strict` against the project repo.
+   c. Run `tripwire validate` against the project repo.
    d. Optionally dispatch sub-agents for independent bug scans
       and cross-cutting pattern analysis.
 3. PM writes the structured PR-review artifact (v0.7.5 item D, ships
@@ -197,7 +197,7 @@ is queryable.
 | Agent thought | Reality |
 |---|---|
 | "The PR passes validate so it must be correct" | Validate is necessary but not sufficient. Check that the changes match the issue scope and the concept graph is coherent. |
-| "I'll approve this with a note to fix the warnings later" | Do not approve with warnings. Request changes. Warnings in `--strict` mode are errors. |
+| "I'll approve this with a note to fix the warnings later" | Do not approve with warnings. Request changes. Warnings (heuristics) surface in validate output by default and must be resolved before approval. (Stage 2 will introduce `--heuristics-as-tripwires` to fail the run on heuristic hits — currently a no-op slot.) |
 | "I'll skip `--write-verified` and reconcile straight from the diff post-merge" | Step 8 has no per-issue evidence to reconcile against once the branch is gone; node freshness drifts silently. Run step 2.5 every review. |
 
 ## See also

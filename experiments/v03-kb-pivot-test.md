@@ -50,7 +50,7 @@ meta-artifacts. The phase-aware validator enforced the transition gate.
 | 23:23-23:30 | 3 new issues created (KBP-74, 75, 76) — gaps found during review. |
 | 23:30-23:35 | Gap analysis written (147 lines). Scoping verification written (76 lines). Task checklist written (41 lines). |
 | 23:35-23:38 | Compliance checklist filled in (23 lines). All 5 artifacts marked `<!-- status: complete -->`. |
-| 23:38 | Phase set to `scoped`. `keel validate --strict` passed. |
+| 23:38 | Phase set to `scoped`. `keel validate` passed. |
 | ~23:40 | Agent running final status/agenda/refs commands. Commit pending. |
 
 ## What worked

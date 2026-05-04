@@ -81,7 +81,7 @@ Scoping, plan writing, session layout, acceptance criteria, dependency DAGs — 
 
 **The graph is coherence.** Issues reference `[[auth-token-endpoint]]`, not prose. Move the code, update the node, every reference catches up. Drift is a validator error.
 
-**Validation is the gate.** Every loop ends with `tw validate --strict`. Write → validate → fix → validate → commit.
+**Validation is the gate.** Every loop ends with `tw validate`. Write → validate → fix → validate → commit.
 
 **Sessions are knowledge-producing events.** A session ends at `tw session complete`, which gates on PR merged, artifacts present, and review exit-code ≤ 1. Proposed graph updates get PM-reviewed before close-out.
 
@@ -229,7 +229,7 @@ my-project/
 <summary><b>Demo</b> — CLI samples</summary>
 
 ```text
-$ tw validate --strict --format=json
+$ tw validate --format=json
 {
   "version": 1,
   "exit_code": 0,
@@ -310,7 +310,7 @@ source:
 2. `/pm-scope Build a knowledge base. Planning docs in ./plans/.`
 3. The PM skill calls `tw brief`, then reads `plans/*.md`.
 4. The agent writes 20 issues, 15 nodes, 3 sessions.
-5. `tw validate --strict` — fix errors, re-run, clean.
+5. `tw validate` — fix errors, re-run, clean.
 6. Commit. `tw status` shows a connected graph with a critical path.
 
 Everything resolves. One clone carries the whole project.

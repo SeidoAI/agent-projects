@@ -51,7 +51,7 @@ Each subagent MUST receive:
 
 After each subagent returns, the PM agent MUST:
 - Read at least 3 random files from the batch
-- Run `tripwire validate --strict --select <batch-range>+` on the batch
+- Run `tripwire validate --select <batch-range>+` on the batch
 - Verify that `[[node-id]]` references are semantically correct (not
   just syntactically present)
 - Be able to describe any file's contents from memory

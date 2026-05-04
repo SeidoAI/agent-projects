@@ -49,7 +49,7 @@ supposed to back them.
 5. **Independent validation gate.** From the project tracking repo
    (not the code repo):
    ```bash
-   tripwire validate --strict
+   tripwire validate
    ```
    Don't trust the executor's claim that this passed — run it
    yourself. If it fails, the PR fails review.

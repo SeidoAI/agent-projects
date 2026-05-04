@@ -287,7 +287,7 @@ def collect_scaffold(project_dir: Path) -> ScaffoldData:
         phase=project.phase.value,
         node_ids=node_ids,
         validation_gate={
-            "command": "tripwire validate --strict",
+            "command": "tripwire validate",
             "exit_codes": {
                 "0": "clean",
                 "1": "warnings only",

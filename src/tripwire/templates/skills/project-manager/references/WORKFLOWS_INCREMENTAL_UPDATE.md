@@ -52,7 +52,7 @@ cannot rehash, but it can at least flag and report).
 
 ### 5. Validate
 ```bash
-tripwire validate --strict
+tripwire validate
 ```
 Fix every error. Re-run until clean.
 

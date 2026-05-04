@@ -31,7 +31,7 @@ content:
 5. Do NOT delete or renumber existing items without explicit user
    permission. Incremental growth only.
 6. Write the new files and update the existing ones.
-7. Run `tripwire validate --strict`. Fix errors.
+7. Run `tripwire validate`. Fix errors.
 8. Commit with a message describing the rescope (e.g.
    `rescope: add billing initiative with 8 new issues`).
 

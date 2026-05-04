@@ -51,10 +51,12 @@ declaring any work done.
 ## The one command
 
 ```bash
-tripwire validate --strict
+tripwire validate
 ```
 
-- `--strict` promotes warnings to errors (your normal mode)
+- Warnings (heuristics) surface in validate output by default. (Stage 2
+  will introduce `--heuristics-as-tripwires` to fail the run on
+  heuristic hits — currently a no-op slot.)
 - `--format=json` gives you a structured report you can parse
 
 It always rebuilds `graph/index.yaml` as a side effect. No separate
@@ -63,7 +65,7 @@ It always rebuilds `graph/index.yaml` as a side effect. No separate
 ## Exit codes
 
 - **0** — clean
-- **1** — warnings only (only possible without `--strict`)
+- **1** — warnings only (reserved; the future `--heuristics-as-tripwires` flag will not produce this exit code in stage 2)
 - **2** — one or more errors
 
 Your loop is: write files → validate → fix errors → validate → fix
@@ -189,7 +191,7 @@ Fix the file, re-run, continue.
 ## Auto-fix (`--fix`)
 
 ```bash
-tripwire validate --strict --fix
+tripwire validate --fix
 ```
 
 Safely repairs:

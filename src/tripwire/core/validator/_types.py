@@ -20,8 +20,9 @@ if TYPE_CHECKING:
 class CheckResult:
     """One finding from one check.
 
-    Severity is `error` (blocks exit 0), `warning` (exit 1 unless --strict),
-    or `fixed` (something the auto-fixer changed).
+    Severity is `error` (blocks exit 0), `warning` (also blocks exit 0
+    by default since `tripwire validate` is strict-by-default — `--strict`
+    was hard-removed in stage 1), or `fixed` (auto-fixer changed it).
     """
 
     code: str
