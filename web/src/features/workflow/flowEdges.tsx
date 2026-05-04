@@ -2,7 +2,6 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getSmoothStepPath,
-  getStraightPath,
   type EdgeProps,
 } from "@xyflow/react";
 
@@ -40,24 +39,15 @@ export function ActorEdge(props: EdgeProps) {
   const stroke = actorStroke(d.actor);
   const dash = DASH_BY_KIND[d.kind];
 
-  // Use a straight path when source and target are on the same row
-  // (common case: work_step ↔ gate ↔ work_step along Y_WORK).
-  // getSmoothStepPath adds sub-pixel corner arcs even when the ideal
-  // path is a straight line, which renders as a faint kink at each
-  // handle. getStraightPath produces a single L command so the line is
-  // pixel-perfect horizontal.
-  const sameRow = Math.abs(sourceY - targetY) < 0.5;
-  const [path, labelX, labelY] = sameRow
-    ? getStraightPath({ sourceX, sourceY, targetX, targetY })
-    : getSmoothStepPath({
-        sourceX,
-        sourceY,
-        sourcePosition,
-        targetX,
-        targetY,
-        targetPosition,
-        borderRadius: 12,
-      });
+  const [path, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    borderRadius: 12,
+  });
 
   return (
     <>
