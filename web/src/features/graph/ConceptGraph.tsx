@@ -18,6 +18,41 @@ const DEFAULT_CANVAS = { width: 1000, height: 600 };
 const NODE_RADIUS = 22;
 const NODE_RADIUS_SMALL = 16;
 
+/**
+ * Type-driven size multipliers. Encodes the architectural hierarchy
+ * subtly (1.4× / 1.0× / 0.85×) — load-bearing types whisper
+ * "important" without claiming a ranking *within* type. PM #25
+ * round 5: ref-count sizing was considered and rejected — it would
+ * inflate well-cited terms (glossary-tripwire) over architecturally
+ * important principles (principle-comparative-advantage) that are
+ * usually invoked, not cited.
+ */
+const TYPE_SIZE_SCALE: Record<string, number> = {
+  principle: 1.4,
+  invariant: 1.4,
+  decision: 1.0,
+  contract: 1.0,
+  requirement: 1.0,
+  endpoint: 1.0,
+  service: 1.0,
+  schema: 1.0,
+  config: 1.0,
+  model: 1.0,
+  glossary: 0.85,
+  practice: 0.85,
+  persona: 0.85,
+  metric: 0.85,
+  anti_pattern: 0.85,
+  skill: 0.85,
+  tf_output: 0.85,
+  custom: 0.85,
+};
+
+function radiusForType(nodeType: string): number {
+  const scale = TYPE_SIZE_SCALE[nodeType] ?? 1.0;
+  return Math.round(NODE_RADIUS * scale);
+}
+
 /** Cap on canvas-rendered node labels — the rail shows the full
  *  string. PM #25 round 2 P1: at ~200 nodes, untruncated titles
  *  collide so heavily the screen is unreadable. */
@@ -355,7 +390,7 @@ export function ConceptGraph() {
               const stale = node.data?.status === "stale";
               const nodeType = String(node.data?.type ?? "concept");
               const typeColor = colorForKind(nodeType);
-              const r = NODE_RADIUS;
+              const r = radiusForType(nodeType);
               const inboxCount = inboxByNode.get(node.id)?.length ?? 0;
               return (
                 // biome-ignore lint/a11y/useSemanticElements: HTML <button> isn't a valid SVG child; role="button" on a <g> is the standard pattern for interactive SVG groups

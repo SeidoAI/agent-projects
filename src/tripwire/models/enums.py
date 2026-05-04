@@ -122,6 +122,7 @@ class NodeType(StrEnum):
     PERSONA = "persona"
     INVARIANT = "invariant"
     ANTI_PATTERN = "anti_pattern"
+    SKILL = "skill"
     CUSTOM = "custom"
 
 

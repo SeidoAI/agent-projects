@@ -90,6 +90,8 @@ source:
 - `persona` — an actor (agent or human) with a role
 - `invariant` — a rule that must always hold; violations are bugs
 - `anti_pattern` — a pattern explicitly ruled out, with rationale
+- `skill` — a packaged set of agent instructions (a SKILL.md plus
+  references/examples) that one or more personas load
 
 **Escape hatch:**
 
@@ -107,6 +109,7 @@ source:
 | "A rule that *must* hold; violation = bug" | `invariant` |
 | "A measurable signal" | `metric` |
 | "An actor / role" | `persona` |
+| "A skill (SKILL.md package) an agent loads" | `skill` |
 
 ## When to create a node
 
@@ -167,5 +170,6 @@ agent can rehash it later.
 - `examples/node-persona.yaml` — actor / role
 - `examples/node-invariant.yaml` — must-always-hold rule
 - `examples/node-anti-pattern.yaml` — explicitly ruled-out pattern
+- `examples/node-skill.yaml` — packaged skill (SKILL.md + refs)
 - `CONCEPT_GRAPH.md` — the when-to-create-a-node rule
 - `REFERENCES.md` — `[[node-id]]` syntax and bi-directional rules

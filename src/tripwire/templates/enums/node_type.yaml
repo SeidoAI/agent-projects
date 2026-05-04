@@ -49,6 +49,9 @@ values:
   - id: anti_pattern
     label: Anti-pattern
     color: crimson
+  - id: skill
+    label: Skill
+    color: violet
   - id: custom
     label: Custom
     color: gray

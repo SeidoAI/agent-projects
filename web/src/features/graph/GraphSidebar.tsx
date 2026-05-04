@@ -52,6 +52,7 @@ const KIND_COLOR: Record<string, string> = {
   persona: "var(--color-ink-3)",
   invariant: "var(--color-rule)",
   anti_pattern: "var(--color-tripwire)",
+  skill: "var(--color-ink)",
   custom: "var(--color-ink-2)",
 };
 

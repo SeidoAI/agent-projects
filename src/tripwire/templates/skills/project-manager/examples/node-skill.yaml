@@ -1,0 +1,48 @@
+---
+uuid: 8b374583-03ad-4f92-aaf2-f848450b6175
+id: skill-project-manager
+type: skill
+name: project-manager skill
+description: The PM skill — SKILL.md plus references/examples that the PM agent loads on every project session.
+source:
+  repo: SeidoAI/tripwire
+  path: src/tripwire/templates/skills/project-manager/SKILL.md
+  branch: main
+  content_hash: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+related: []
+tags: [skill, pm-agent]
+status: active
+created_at: "2026-05-04T08:00:00"
+updated_at: "2026-05-04T08:00:00"
+created_by: maia
+---
+## What this skill is
+
+The packaged set of instructions the PM agent loads on every
+session. Comprises:
+
+- `SKILL.md` — the entry-point document (~18KB)
+- `references/` — 20 reference docs (schemas, workflows, policies)
+- `examples/` — 14 canonical examples of issues, sessions, nodes,
+  comments
+
+## Who loads it
+
+The `persona-pm-agent` (always). Other agents may load specific
+references when they need PM-shaped context.
+
+## Why a node, not just a directory
+
+The skill is a definitional artifact that many other entities
+reference: personas load it, principles cite it, every PM-facing
+issue assumes it. Promoting it to a node means freshness checks
+fire when SKILL.md changes, and "what does the PM agent know?"
+becomes a graph query instead of a directory walk.
+
+## Granularity rule
+
+One node per skill *package* (project-manager, verification,
+agent-messaging, backend-development). Individual reference docs
+or commands inside a skill don't earn their own nodes unless
+they're explicitly cited from issues or other nodes — at which
+point promote them.

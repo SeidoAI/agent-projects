@@ -57,10 +57,13 @@ def test_pm_skill_total_size_under_budget() -> None:
     principle, practice, glossary, metric, persona, invariant,
     anti_pattern) — adds 7 example node files + the Naming the node
     section + adjacent-types decision table in SCHEMA_NODES.md.
+    v0.9.7 round 2 bumps to 168KB for the `skill` node type (8th
+    new type) — adds node-skill.yaml example + skill rows in the
+    type list and adjacent-types table.
     """
     pm_dir = TEMPLATES_DIR / "skills" / "project-manager"
     total = _total_chars(pm_dir)
-    assert total < 167_000, (
+    assert total < 168_000, (
         f"PM skill is {total:,} chars ({total / 1024:.0f} KB). "
         f"Budget is 153KB. Consolidate or trim reference docs."
     )
