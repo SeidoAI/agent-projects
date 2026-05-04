@@ -34,7 +34,7 @@ export function WorkflowLegend() {
       <Eyebrow>route</Eyebrow>
       <RouteSwatch dash={null} label="forward" />
       <RouteSwatch dash="7 5" label="return" />
-      <RouteSwatch dash="10 4 2 4" label="side" />
+      <CrossLinkSwatch />
       <Eyebrow>markers</Eyebrow>
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
         <svg width={14} height={14} aria-hidden>
@@ -113,6 +113,34 @@ function RouteSwatch({ dash, label }: { dash: string | null; label: string }) {
         />
       </svg>
       {label}
+    </span>
+  );
+}
+
+const CROSSLINK_SWATCH_HEX = "#0e7c8a";
+function CrossLinkSwatch() {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <svg width={42} height={12} aria-hidden>
+        {/* small teal dot at the start (matches the on-canvas endpoint
+            circle), then a dashed teal line to indicate the cross-link
+            edge connecting two workflows. */}
+        <circle
+          cx={4}
+          cy={6}
+          r={3.5}
+          fill={CROSSLINK_SWATCH_HEX}
+          stroke={CROSSLINK_SWATCH_HEX}
+          strokeWidth={1}
+        />
+        <path
+          d="M9 6 L40 6"
+          stroke={CROSSLINK_SWATCH_HEX}
+          strokeWidth={1.5}
+          strokeDasharray="4 4"
+        />
+      </svg>
+      cross-workflow
     </span>
   );
 }

@@ -66,24 +66,6 @@ const STATUS_HEX: Record<string, string> = {
 export const statusHex = (statusId: string): string =>
   STATUS_HEX[statusId] ?? "#b8b0a0";
 
-// Cross-link palette — colour-coded by SOURCE workflow so a glance at
-// any cross-link line/dot identifies where it originated. All hues are
-// chosen to stand apart from every actor colour (PM ochre, coding green,
-// code indigo) and from the status palette — they read as "metadata,
-// not a route."
-const CROSSLINK_BY_WORKFLOW: Record<string, string> = {
-  "pm-triage": "#0e7c8a", // teal
-  "pm-scoping": "#7a3f9c", // violet
-  "pm-incremental-update": "#1f5fa6", // saturated cobalt
-  "project-maintenance": "#b85a7a", // mauve / muted rose
-  // coding-session is the most common TARGET, rarely a source — keep
-  // teal as a fallback.
-  "coding-session": "#0e7c8a",
-};
-
-export const crossLinkHex = (sourceWorkflowId: string): string =>
-  CROSSLINK_BY_WORKFLOW[sourceWorkflowId] ?? "#0e7c8a";
-
 /** Convert #rrggbb → rgba(r,g,b,a). Used for low-opacity region tints. */
 export const statusTint = (statusId: string, alpha: number): string => {
   const hex = statusHex(statusId);

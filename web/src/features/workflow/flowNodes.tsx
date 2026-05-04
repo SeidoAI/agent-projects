@@ -449,7 +449,7 @@ function TransitionBox({ d, flavor, selected }: TransitionBoxProps) {
         style={{
           position: "absolute",
           inset: 0,
-          background: "var(--color-paper)",
+          background: "var(--color-paper-2)",
           border: `${flavor === "boundary" ? 2 : 1.4}px solid ${c}`,
           borderRadius: 4,
           boxSizing: "border-box",
@@ -563,39 +563,39 @@ export function BranchDiamondNode({ data }: NodeProps) {
   return (
     <div
       data-testid={`workflow-branch-${d.command}`}
-      style={{ width: 120, height: 64, position: "relative" }}
+      style={{ width: 180, height: 86, position: "relative" }}
     >
-      <svg width={120} height={64} viewBox="0 0 120 64">
+      <svg width={180} height={86} viewBox="0 0 180 86">
         <polygon
-          points="60,2 118,32 60,62 2,32"
-          fill="var(--color-paper)"
+          points="90,2 178,43 90,84 2,43"
+          fill="var(--color-paper-2)"
           stroke={c}
           strokeWidth={1.8}
         />
         <text
-          x={60}
-          y={28}
+          x={90}
+          y={38}
           textAnchor="middle"
           fontFamily="var(--font-mono)"
-          fontSize={10}
+          fontSize={10.5}
           fill="var(--color-ink-3)"
         >
           ▷ {d.command}
         </text>
         <text
-          x={60}
-          y={44}
+          x={90}
+          y={58}
           textAnchor="middle"
           fontFamily="var(--font-sans)"
           fontWeight={600}
-          fontSize={12}
+          fontSize={13}
           fill="var(--color-ink)"
         >
           decision
         </text>
       </svg>
-      <Handle id="left" type="target" position={Position.Left} style={sideHandle(32)} />
-      <Handle id="right" type="source" position={Position.Right} style={sideHandle(32)} />
+      <Handle id="left" type="target" position={Position.Left} style={sideHandle(43)} />
+      <Handle id="right" type="source" position={Position.Right} style={sideHandle(43)} />
       {/* bottom handle for return outcomes (south-routed) */}
       <Handle id="bottom" type="source" position={Position.Bottom} style={hiddenHandle} />
       <Handle id="top" type="source" position={Position.Top} style={hiddenHandle} />
@@ -784,14 +784,12 @@ export interface CrossLinkEndpointData {
   otherWorkflowId: string;
   otherStatusId: string;
   label: string | null;
-  /** Source-workflow's cross-link colour (see crossLinkHex in tokens). */
-  color: string;
 }
+const CROSSLINK_HEX = "#0e7c8a";
 export function CrossLinkEndpointNode({ data }: NodeProps) {
   const d = data as unknown as CrossLinkEndpointData;
   const [hovered, setHovered] = useState(false);
   const arrow = d.role === "source" ? "→" : "←";
-  const color = d.color ?? "#0e7c8a";
   return (
     <div
       data-testid={`workflow-crosslink-endpoint-${d.role}-${d.otherWorkflowId}-${d.otherStatusId}`}
@@ -800,13 +798,17 @@ export function CrossLinkEndpointNode({ data }: NodeProps) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        width: 14,
-        height: 14,
+        width: 18,
+        height: 18,
         borderRadius: "50%",
-        background: color,
+        background: CROSSLINK_HEX,
         border: "2px solid var(--color-paper)",
-        boxShadow: "0 0 0 1px " + color,
+        boxShadow: "0 0 0 1px " + CROSSLINK_HEX,
         cursor: "pointer",
+        // Force pointer-events on this exact element so hover always
+        // fires on the visible circle, regardless of any ancestor
+        // pointer-events: none cascade.
+        pointerEvents: "auto",
         position: "relative",
       }}
     >
@@ -821,8 +823,8 @@ export function CrossLinkEndpointNode({ data }: NodeProps) {
         <div
           style={{
             background: "var(--color-paper)",
-            border: `1px solid ${color}`,
-            color: color,
+            border: `1px solid ${CROSSLINK_HEX}`,
+            color: CROSSLINK_HEX,
             fontFamily: "var(--font-mono)",
             fontSize: 10,
             padding: "4px 8px",

@@ -6,7 +6,7 @@ import {
 } from "@xyflow/react";
 
 import { CROSSLINK_BUS_X, Y_DEEP_RETURN, Y_WORK } from "./flowGraph";
-import { ACTOR_COLOR, crossLinkHex, isKnownActor } from "./tokens";
+import { ACTOR_COLOR, isKnownActor } from "./tokens";
 
 export interface ActorEdgeData extends Record<string, unknown> {
   actor: string;
@@ -73,13 +73,12 @@ export function ActorEdge(props: EdgeProps) {
               border: `1px solid ${stroke}`,
               borderRadius: 2,
               fontFamily: "var(--font-mono)",
-              fontSize: 10,
+              fontSize: 10.5,
               color: "var(--color-ink)",
               letterSpacing: "0.04em",
               pointerEvents: "all",
               whiteSpace: "nowrap",
-              zIndex: 50,
-              boxShadow: "0 0 0 3px var(--color-paper)",
+              zIndex: 1000,
             }}
           >
             {d.label}
@@ -109,11 +108,18 @@ export interface CrossLinkEdgeData extends Record<string, unknown> {
   targetLaneY?: number | null;
 }
 
+// Cross-link colour — picked to stand apart from every actor hue:
+//   pm-agent (var(--color-tripwire) #b8741a ochre)
+//   coding-agent (var(--color-gate) #2d5a3d green)
+//   code (var(--color-info) #2d3a7c indigo)
+// Teal sits diagonally opposite all three on the wheel and reads as
+// "this is metadata, not a route."
+const CROSSLINK_HEX = "#0e7c8a";
+
 export function CrossLinkEdge(props: EdgeProps) {
   const { id, sourceX, sourceY, targetX, targetY, markerEnd, data } = props;
   const d = (data ?? {}) as CrossLinkEdgeData;
-  // Colour-coded by the source workflow — see crossLinkHex in tokens.ts.
-  const stroke = crossLinkHex(d.sourceWorkflow);
+  const stroke = CROSSLINK_HEX;
   const dash = "4 4";
   const r = 12;
 
@@ -291,13 +297,16 @@ export function ReturnEdge(props: EdgeProps) {
               border: `1.2px solid ${stroke}`,
               borderRadius: 2,
               fontFamily: "var(--font-mono)",
-              fontSize: 10,
+              fontSize: 10.5,
               color: "var(--color-ink)",
               letterSpacing: "0.04em",
               pointerEvents: "all",
               whiteSpace: "nowrap",
-              zIndex: 60,
-              boxShadow: "0 0 0 4px var(--color-paper)",
+              // High zIndex so the label sits OVER the dashed return
+              // line — same readability rule as cross-link labels. No
+              // halo/box-shadow; the solid paper background masks the
+              // line directly behind the label.
+              zIndex: 1000,
             }}
           >
             {d.label}

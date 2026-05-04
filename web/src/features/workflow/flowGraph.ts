@@ -9,7 +9,7 @@ import type {
   WorkflowWorkStep,
 } from "@/lib/api/endpoints/workflow";
 import { BRANCHES, type BranchOutcome } from "./decorations";
-import { ACTOR_COLOR, crossLinkHex, isKnownActor } from "./tokens";
+import { ACTOR_COLOR, isKnownActor } from "./tokens";
 
 const actorStrokeColor = (actor: string): string =>
   isKnownActor(actor) ? ACTOR_COLOR[actor] : "var(--color-ink)";
@@ -479,10 +479,12 @@ export function buildFlow(
       nodes.push({
         id: `branch:${command}`,
         type: "branch",
-        position: { x: cx - 60, y: Y_WORK - 32 },
+        // Wider/taller (180x86) so long command labels fit comfortably
+        // inside the diamond's narrow text rows. Recentred on the wall.
+        position: { x: cx - 90, y: Y_WORK - 43 },
         draggable: false,
         selectable: true,
-        style: { width: 120, height: 64, zIndex: 8 },
+        style: { width: 180, height: 86, zIndex: 8 },
         data: {
           command,
           actor: first.route.actor,
@@ -784,9 +786,16 @@ export const Y_CROSSLINK_LANE_SOUTH = Y_OUTPUTS_TOP - 80;
  *  doesn't push the bands themselves rightwards. */
 export const CROSSLINK_BUS_X = -120;
 
-/** Pixel size of the small endpoint circle rendered on a status's
- *  south/north edge where a cross-link starts/ends. */
-export const CROSSLINK_DOT_SIZE = 14;
+/** Pixel size of the endpoint circle rendered on a work_step's
+ *  south/north edge where a cross-link starts/ends. Sized large enough
+ *  to be a comfortable click target. */
+export const CROSSLINK_DOT_SIZE = 18;
+/** Gap between the dot's nearest edge and the work_step's edge — keeps
+ *  the dot's clickable area clear of the work_step's own south/north
+ *  handle (whose default ReactFlow ::before clickable region extends
+ *  ~12px around the handle position) and clear of where the cross-link
+ *  edge stroke begins, so hover events never get intercepted. */
+export const CROSSLINK_DOT_GAP = 6;
 
 export interface BandInfo {
   workflowId: string;
@@ -951,20 +960,21 @@ export function buildUnifiedFlow(
           ?.height ?? WORK_H;
         const tgtW = (tgtParent?.style as { width?: number } | undefined)
           ?.width ?? WORK_W;
-        // Source dot sits on the work_step's SOUTH edge — semantic
-        // "outgoing" anchor. Target dot sits on the work_step's NORTH
-        // edge — semantic "incoming" anchor. Each direction routes
-        // through its OWN in-band lane (between work and outputs for
-        // south-side outgoing; between inputs and work for north-side
-        // incoming) — both lanes are empty stripes, so the line never
-        // crosses any chrome.
+        // Source dot sits BELOW the work_step's south edge with a
+        // small gap (CROSSLINK_DOT_GAP) — keeps the dot fully outside
+        // the work_step's own south handle's clickable region (which
+        // would otherwise intercept hover events). Target dot mirrors
+        // ABOVE the target work_step. Each direction routes through
+        // its OWN in-band lane (between work and outputs for outgoing;
+        // between inputs and work for incoming) — both lanes are empty
+        // stripes, so the line never crosses any chrome.
         allNodes.push({
           id: srcDotId,
           type: "crosslinkEndpoint",
           parentId: sourceParentId,
           position: {
             x: srcW / 2 - CROSSLINK_DOT_SIZE / 2,
-            y: srcH - CROSSLINK_DOT_SIZE / 2,
+            y: srcH + CROSSLINK_DOT_GAP,
           },
           draggable: false,
           selectable: false,
@@ -980,9 +990,6 @@ export function buildUnifiedFlow(
             otherWorkflowId: link.workflow,
             otherStatusId: link.status,
             label: link.label ?? null,
-            // Both dots wear the SOURCE workflow's colour so the line
-            // and its two endpoints match.
-            color: crossLinkHex(wf.id),
           },
         });
         allNodes.push({
@@ -991,7 +998,7 @@ export function buildUnifiedFlow(
           parentId: targetParentId,
           position: {
             x: tgtW / 2 - CROSSLINK_DOT_SIZE / 2,
-            y: -CROSSLINK_DOT_SIZE / 2,
+            y: -(CROSSLINK_DOT_SIZE + CROSSLINK_DOT_GAP),
           },
           draggable: false,
           selectable: false,
@@ -1007,7 +1014,6 @@ export function buildUnifiedFlow(
             otherWorkflowId: wf.id,
             otherStatusId: status.id,
             label: link.label ?? null,
-            color: crossLinkHex(wf.id),
           },
         });
 
@@ -1030,7 +1036,7 @@ export function buildUnifiedFlow(
           targetHandle: "north",
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: crossLinkHex(wf.id),
+            color: "#0e7c8a",
             width: 14,
             height: 14,
           },
