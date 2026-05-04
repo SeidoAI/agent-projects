@@ -208,6 +208,22 @@ class WorkflowWorkStep:
 
 
 @dataclass(frozen=True)
+class WorkflowCrossLink:
+    """A link from this status to a status in another workflow.
+
+    ``kind`` is ``"triggers"`` when this status hands off to the target
+    workflow (the canonical write side), or ``"triggered_by"`` for the
+    inverse documentation. The renderer always draws the edge using the
+    ``triggers`` side; ``triggered_by`` entries are advisory.
+    """
+
+    workflow: str
+    status: str
+    label: str | None = None
+    kind: Literal["triggers", "triggered_by"] = "triggers"
+
+
+@dataclass(frozen=True)
 class WorkflowStatus:
     id: str
     next: NextSpec
@@ -216,6 +232,7 @@ class WorkflowStatus:
     jit_prompts: list[str] = field(default_factory=list)
     artifacts: WorkflowStatusArtifacts = field(default_factory=WorkflowStatusArtifacts)
     work_steps: list[WorkflowWorkStep] = field(default_factory=list)
+    cross_links: list[WorkflowCrossLink] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -354,7 +371,54 @@ def validate_workflow_spec(
                 known_skills=known_skills,
             )
         )
+    findings.extend(_check_cross_links(spec))
     return findings
+
+
+def _check_cross_links(spec: WorkflowSpec) -> list[WorkflowFinding]:
+    """Warn when a status's `cross_links:` points at a workflow or status
+    that doesn't exist. Cross-links are pure documentation (no runtime
+    side-effect), so the finding is a warning rather than a hard error —
+    the workflow still loads.
+    """
+    out: list[WorkflowFinding] = []
+    statuses_by_wf: dict[str, set[str]] = {
+        wf_id: {s.id for s in wf.statuses} for wf_id, wf in spec.workflows.items()
+    }
+    for wf_id, wf in spec.workflows.items():
+        for status in wf.statuses:
+            for link in status.cross_links:
+                if link.workflow not in statuses_by_wf:
+                    out.append(
+                        WorkflowFinding(
+                            code="workflow/cross_link_unknown_workflow",
+                            workflow=wf_id,
+                            status=status.id,
+                            severity="warning",
+                            message=(
+                                f"status {status.id!r} cross_link points at "
+                                f"workflow {link.workflow!r} which is not "
+                                f"declared"
+                            ),
+                        )
+                    )
+                    continue
+                if link.status not in statuses_by_wf[link.workflow]:
+                    out.append(
+                        WorkflowFinding(
+                            code="workflow/cross_link_unknown_status",
+                            workflow=wf_id,
+                            status=status.id,
+                            severity="warning",
+                            message=(
+                                f"status {status.id!r} cross_link points at "
+                                f"{link.workflow}.{link.status!r} but that "
+                                f"status is not declared in workflow "
+                                f"{link.workflow!r}"
+                            ),
+                        )
+                    )
+    return out
 
 
 def _check_workflow(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:

@@ -106,6 +106,15 @@ def _workflow_to_dict(workflow: Workflow) -> dict[str, Any]:
                     }
                     for ws in status.work_steps
                 ],
+                "cross_links": [
+                    {
+                        "workflow": link.workflow,
+                        "status": link.status,
+                        "label": link.label,
+                        "kind": link.kind,
+                    }
+                    for link in status.cross_links
+                ],
             }
             for status in workflow.statuses
         ],

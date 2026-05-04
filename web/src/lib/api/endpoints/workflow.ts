@@ -29,6 +29,13 @@ export interface WorkflowWorkStep {
   skills: string[];
 }
 
+export interface WorkflowCrossLink {
+  workflow: string;
+  status: string;
+  label?: string | null;
+  kind: "triggers" | "triggered_by";
+}
+
 export interface WorkflowStatus {
   id: string;
   label?: string;
@@ -39,6 +46,7 @@ export interface WorkflowStatus {
   prompt_checks: string[];
   artifacts: WorkflowStatusArtifacts;
   work_steps: WorkflowWorkStep[];
+  cross_links?: WorkflowCrossLink[];
 }
 
 export interface WorkflowRouteControls {

@@ -634,6 +634,118 @@ def test_validator_clean_on_well_formed(tmp_path: Path) -> None:
 
 
 # ----------------------------------------------------------------------
+# Cross-links
+# ----------------------------------------------------------------------
+
+
+def test_loader_parses_cross_links(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              triage:
+                actor: pm-agent
+                trigger: t
+                statuses:
+                  - id: act
+                    next: done
+                    cross_links:
+                      - workflow: coding-session
+                        status: planned
+                        label: spawn coding session
+                  - id: done
+                    terminal: true
+              coding-session:
+                actor: coding-agent
+                trigger: t
+                statuses:
+                  - id: planned
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    spec = load_workflows(tmp_path)
+    act = spec.workflows["triage"].statuses_by_id["act"]
+    assert len(act.cross_links) == 1
+    link = act.cross_links[0]
+    assert link.workflow == "coding-session"
+    assert link.status == "planned"
+    assert link.label == "spawn coding session"
+    assert link.kind == "triggers"
+
+
+def test_validator_warns_on_unknown_cross_link_workflow(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: s1
+                    terminal: true
+                    cross_links:
+                      - workflow: nonexistent-workflow
+                        status: somewhere
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_validators=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    codes = [f.code for f in findings]
+    assert "workflow/cross_link_unknown_workflow" in codes
+
+
+def test_validator_warns_on_unknown_cross_link_status(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              triage:
+                actor: pm-agent
+                trigger: t
+                statuses:
+                  - id: act
+                    terminal: true
+                    cross_links:
+                      - workflow: coding-session
+                        status: nonexistent-status
+              coding-session:
+                actor: coding-agent
+                trigger: t
+                statuses:
+                  - id: planned
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_validators=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    codes = [f.code for f in findings]
+    assert "workflow/cross_link_unknown_status" in codes
+
+
+# ----------------------------------------------------------------------
 # Predicate parsing
 # ----------------------------------------------------------------------
 

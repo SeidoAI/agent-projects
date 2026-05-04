@@ -32,6 +32,7 @@ from tripwire.core.workflow.schema import (
     WorkflowRouteControls,
     WorkflowRouteEmits,
     WorkflowSpec,
+    WorkflowCrossLink,
     WorkflowStatus,
     WorkflowStatusArtifacts,
     WorkflowWorkStep,
@@ -194,9 +195,29 @@ def _parse_status(
             jit_prompts=_str_list(raw.get("jit_prompts")),
             artifacts=_parse_artifacts(raw.get("artifacts")),
             work_steps=_parse_work_steps(raw.get("work_steps")),
+            cross_links=_parse_cross_links(raw.get("cross_links")),
         ),
         findings,
     )
+
+
+def _parse_cross_links(value: Any) -> list[WorkflowCrossLink]:
+    if not isinstance(value, list):
+        return []
+    out: list[WorkflowCrossLink] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            continue
+        wf = str(entry.get("workflow", "")).strip()
+        st = str(entry.get("status", "")).strip()
+        if not wf or not st:
+            continue
+        kind_raw = str(entry.get("kind") or "triggers").strip()
+        kind = kind_raw if kind_raw in ("triggers", "triggered_by") else "triggers"
+        label_raw = entry.get("label")
+        label = str(label_raw).strip() if label_raw is not None else None
+        out.append(WorkflowCrossLink(workflow=wf, status=st, label=label, kind=kind))  # type: ignore[arg-type]
+    return out
 
 
 def _parse_work_steps(value: Any) -> list[WorkflowWorkStep]:
