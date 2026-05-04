@@ -1,7 +1,7 @@
 """Workflow drift detection (KUI-124).
 
 Drift is the gap between the workflow.yaml-declared lifecycle and what
-the events log records actually happened. Three classes of drift:
+the events log records actually happened. Four classes of drift:
 
 - ``drift/prompt_check_missing`` — a target status declared
   ``prompt_checks: [...]`` but the session entered that status without a
@@ -10,6 +10,11 @@ the events log records actually happened. Three classes of drift:
   ``jit_prompts: [...]`` but the session entered it without a
   ``jit_prompt.fired`` event for one of them. Either the JIT prompt is
   miswired or the gate runner skipped it.
+- ``drift/heuristic_should_have_fired`` — a target status declared
+  ``heuristics: [...]`` but the session entered it without any
+  ``heuristic.fired`` event for those ids in the stay window. Severity
+  is ``warning`` (not ``error``) — heuristics are advisory by design,
+  so the absence is a softer signal than a missed jit_prompt.
 - ``drift/unexpected_transition`` — session.yaml currently sits at a
   status that's NOT reachable from the last
   ``transition.completed.to_status``. Means somebody (or some tool)
@@ -103,6 +108,7 @@ def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]
             stay_rows = inst_rows[stay_start:idx]
             invoked_pcs = _ids_for_event(stay_rows, "prompt_check.invoked")
             fired_prompts = _ids_for_event(stay_rows, "jit_prompt.fired")
+            fired_heuristics = _ids_for_event(stay_rows, "heuristic.fired")
             for pc in controls.prompt_checks:
                 if pc not in invoked_pcs:
                     out.append(
@@ -131,6 +137,25 @@ def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]
                                 f"{to_status!r} without firing declared "
                                 f"JIT prompt {prompt_id!r}"
                             ),
+                        )
+                    )
+            # Heuristics are advisory — a missed one is a warning, not
+            # an error. The detection layer is forward-compat; the
+            # `heuristic.fired` event emission is wired in stage 2.
+            for heuristic_id in controls.heuristics:
+                if heuristic_id not in fired_heuristics:
+                    out.append(
+                        DriftFinding(
+                            code="drift/heuristic_should_have_fired",
+                            workflow=workflow.id,
+                            instance=inst,
+                            status=to_status,
+                            message=(
+                                f"session {inst!r} entered status "
+                                f"{to_status!r} without firing declared "
+                                f"heuristic {heuristic_id!r}"
+                            ),
+                            severity="warning",
                         )
                     )
             stay_start = idx + 1
