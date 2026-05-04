@@ -759,14 +759,23 @@ export function buildFlow(
  *  this gutter (and in the cross-link lane just above each band). */
 export const BAND_GUTTER = 140;
 
-/** Cross-link lane Y inside a band — between the inputs band and the
- *  work-step row. Routing horizontals here avoids crossing any chrome
- *  (inputs above, work-steps below) and keeps the line entirely inside
- *  the band's vertical span (so it never overshoots above the topmost
- *  band or below the bottommost). Band-relative; absolute Y =
- *  bandTop + Y_CROSSLINK_LANE.
+/** Cross-link lane Y for INCOMING (target-side) lines — between the
+ *  inputs band and the work-step row. Empty stripe inside every region.
+ *  Target dots sit on work_step.NORTH; the line drops from this lane
+ *  down to the dot, never crossing inputs (above) or work-steps (below).
+ *  Band-relative; absolute Y = bandTop + Y_CROSSLINK_LANE_NORTH.
  */
-export const Y_CROSSLINK_LANE = Y_INPUTS_BOTTOM + 32;
+export const Y_CROSSLINK_LANE_NORTH = Y_INPUTS_BOTTOM + 32;
+
+/** Cross-link lane Y for OUTGOING (source-side) lines — between the
+ *  work-step row and the outputs band. Empty stripe inside every
+ *  region. Source dots sit on work_step.SOUTH (semantic: outgoing); the
+ *  line drops from the dot into this lane, never crossing the outputs
+ *  band (below) or work-steps (above). Sits below the backflow lane
+ *  (Y_DEEP_RETURN ≈ 526) so cross-link and backflow never share a row.
+ *  Band-relative; absolute Y = bandTop + Y_CROSSLINK_LANE_SOUTH.
+ */
+export const Y_CROSSLINK_LANE_SOUTH = Y_OUTPUTS_TOP - 80;
 
 /** Distance from the canvas's left edge to the cross-link "bus" — a
  *  vertical lane shared by every cross-workflow link. Routing every
@@ -942,22 +951,20 @@ export function buildUnifiedFlow(
           ?.height ?? WORK_H;
         const tgtW = (tgtParent?.style as { width?: number } | undefined)
           ?.width ?? WORK_W;
-        // BOTH dots sit on the work_step's NORTH edge. Routing then
-        // travels up into the in-band cross-link lane (between inputs
-        // and the work line) — which is empty space, so the line never
-        // crosses any chrome (inputs are above the lane, work-steps
-        // below). Suppresses the previous bugs of crossing outputs on
-        // exit and overshooting above the topmost band on entry.
-        // (`srcH` is consumed only for the fallback case — kept for
-        // symmetry but no longer used in the dot position.)
-        void srcH;
+        // Source dot sits on the work_step's SOUTH edge — semantic
+        // "outgoing" anchor. Target dot sits on the work_step's NORTH
+        // edge — semantic "incoming" anchor. Each direction routes
+        // through its OWN in-band lane (between work and outputs for
+        // south-side outgoing; between inputs and work for north-side
+        // incoming) — both lanes are empty stripes, so the line never
+        // crosses any chrome.
         allNodes.push({
           id: srcDotId,
           type: "crosslinkEndpoint",
           parentId: sourceParentId,
           position: {
             x: srcW / 2 - CROSSLINK_DOT_SIZE / 2,
-            y: -CROSSLINK_DOT_SIZE / 2,
+            y: srcH - CROSSLINK_DOT_SIZE / 2,
           },
           draggable: false,
           selectable: false,
@@ -1026,13 +1033,19 @@ export function buildUnifiedFlow(
           data: {
             sourceWorkflow: wf.id,
             label: link.label ?? null,
-            // Absolute Y of each band's IN-BAND cross-link lane. The
-            // lane lives between the inputs band and the work line —
-            // empty horizontal space inside every region — so the line
-            // never crosses inputs/outputs/work-steps and never
-            // overshoots the canvas's top/bottom bands.
-            sourceLaneY: srcBand ? srcBand.bandTop + Y_CROSSLINK_LANE : null,
-            targetLaneY: tgtBand ? tgtBand.bandTop + Y_CROSSLINK_LANE : null,
+            // Absolute Y of each band's directional cross-link lane.
+            //   sourceLaneY: SOUTH lane (work_step.south → south lane,
+            //                  west to bus)
+            //   targetLaneY: NORTH lane (bus → east in north lane,
+            //                  down into work_step.north)
+            // Both lanes live in empty in-band stripes so the line
+            // never crosses inputs/outputs/work-steps.
+            sourceLaneY: srcBand
+              ? srcBand.bandTop + Y_CROSSLINK_LANE_SOUTH
+              : null,
+            targetLaneY: tgtBand
+              ? tgtBand.bandTop + Y_CROSSLINK_LANE_NORTH
+              : null,
           },
           zIndex: 1,
         });

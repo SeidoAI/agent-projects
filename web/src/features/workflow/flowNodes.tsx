@@ -843,15 +843,15 @@ export function CrossLinkEndpointNode({ data }: NodeProps) {
           </span>
         </div>
       </NodeToolbar>
-      {/* Both dots sit on the work_step's NORTH edge — source dots
-          *exit* upward into the in-band cross-link lane, target dots
-          *receive* from that lane. So both handles use Position.Top
-          (default left:50% + translate(-50%,-50%) centres them on the
-          dot's geometric midpoint). */}
+      {/* Source dot sits on work_step.SOUTH (outgoing — line exits
+          downward into the south cross-link lane). Target dot sits on
+          work_step.NORTH (incoming — line drops in from the north
+          cross-link lane above). Default left:50% + translate(-50%,-50%)
+          centres each handle on the dot's geometric midpoint. */}
       <Handle
         id={d.role === "source" ? "south" : "north"}
         type={d.role === "source" ? "source" : "target"}
-        position={Position.Top}
+        position={d.role === "source" ? Position.Bottom : Position.Top}
         style={hiddenHandle}
       />
     </div>
