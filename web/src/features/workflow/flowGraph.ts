@@ -3,6 +3,7 @@ import { MarkerType, type Edge, type Node } from "@xyflow/react";
 import type {
   WorkflowArtifactRef,
   WorkflowDefinition,
+  WorkflowGraph,
   WorkflowRoute,
   WorkflowStatus,
   WorkflowWorkStep,
@@ -743,7 +744,162 @@ export function buildFlow(
     });
   });
 
-  return { nodes, edges, width: totalWidth, height: REGION_H };
+  return { nodes, edges, width: totalWidth, height: dynRegionH };
+}
+
+// ── unified flow: stack all workflows vertically into one canvas ─────
+
+/** Vertical gap between adjacent bands. Cross-workflow edges route in
+ *  this gutter (and in the cross-link lane just above each band). */
+export const BAND_GUTTER = 140;
+
+/** Cross-link lane sits this far above each band's top, so cross-edges
+ *  dock at the band's north *outside* the inputs band (which lives
+ *  below the region's top stripe). */
+export const CROSSLINK_LANE_OFFSET = 36;
+
+export interface BandInfo {
+  workflowId: string;
+  bandTop: number;
+  width: number;
+  height: number;
+  parentNodeId: string;
+  briefDescription: string;
+}
+
+export interface UnifiedFlowGraph {
+  nodes: Node[];
+  edges: Edge[];
+  width: number;
+  height: number;
+  bands: BandInfo[];
+}
+
+export interface BandNodeData extends Record<string, unknown> {
+  workflowId: string;
+  brief: string;
+  width: number;
+  height: number;
+}
+
+/** Build a unified ReactFlow graph stacking every workflow in `graph`
+ *  as a horizontal band. Each band reuses `buildFlow()` for its own
+ *  layout; this function namespaces ids and wraps each band in a
+ *  parent group so the navigator can `fitView({ nodes: [{ id: 'band:<wf>' }] })`.
+ *
+ *  Cross-workflow edges declared via `status.cross_links` are emitted
+ *  here (one edge per link) — they require knowledge of multiple bands
+ *  so they can't be produced inside a per-band buildFlow.
+ */
+export function buildUnifiedFlow(
+  graph: WorkflowGraph,
+  opts: BuildOptions = {},
+): UnifiedFlowGraph {
+  const allNodes: Node[] = [];
+  const allEdges: Edge[] = [];
+  const bands: BandInfo[] = [];
+  let cursorY = 0;
+  let maxWidth = 0;
+
+  // Map (workflowId, statusId) → namespaced status node id, so cross-link
+  // edges can find the correct target across bands.
+  const statusNodeIdByLink = new Map<string, string>();
+
+  for (const wf of graph.workflows) {
+    const sub = buildFlow(wf, opts);
+    const ns = `band:${wf.id}:`;
+    const bandParentId = `band:${wf.id}`;
+
+    // Band parent group — invisible holder used for navigator fitView
+    // and for the band header ribbon. Children inherit position.
+    allNodes.push({
+      id: bandParentId,
+      type: "band",
+      position: { x: 0, y: cursorY },
+      draggable: false,
+      selectable: false,
+      focusable: false,
+      style: { width: sub.width, height: sub.height, pointerEvents: "none" },
+      data: {
+        workflowId: wf.id,
+        brief: wf.brief_description ?? "",
+        width: sub.width,
+        height: sub.height,
+      } satisfies BandNodeData,
+      zIndex: -100,
+    });
+
+    for (const n of sub.nodes) {
+      const newId = `${ns}${n.id}`;
+      const isTopLevel = !n.parentId;
+      const newParentId = n.parentId ? `${ns}${n.parentId}` : bandParentId;
+      allNodes.push({
+        ...n,
+        id: newId,
+        parentId: newParentId,
+        extent: isTopLevel ? "parent" : n.extent,
+      });
+      if (n.id.startsWith("status:")) {
+        const statusId = n.id.slice("status:".length);
+        statusNodeIdByLink.set(`${wf.id}|${statusId}`, newId);
+      }
+    }
+    for (const e of sub.edges) {
+      allEdges.push({
+        ...e,
+        id: `${ns}${e.id}`,
+        source: `${ns}${e.source}`,
+        target: `${ns}${e.target}`,
+      });
+    }
+
+    bands.push({
+      workflowId: wf.id,
+      bandTop: cursorY,
+      width: sub.width,
+      height: sub.height,
+      parentNodeId: bandParentId,
+      briefDescription: wf.brief_description ?? "",
+    });
+    maxWidth = Math.max(maxWidth, sub.width);
+    cursorY += sub.height + BAND_GUTTER;
+  }
+
+  // Cross-workflow edges. Read from each status's `cross_links` (always
+  // canonical on the source side per the schema convention).
+  for (const wf of graph.workflows) {
+    for (const status of wf.statuses) {
+      const links = status.cross_links ?? [];
+      for (let i = 0; i < links.length; i += 1) {
+        const link = links[i];
+        if (!link || link.kind === "triggered_by") continue;
+        const sourceId = statusNodeIdByLink.get(`${wf.id}|${status.id}`);
+        const targetId = statusNodeIdByLink.get(`${link.workflow}|${link.status}`);
+        if (!sourceId || !targetId) continue;
+        allEdges.push({
+          id: `xlink:${wf.id}:${status.id}:${i}`,
+          type: "crosslink",
+          source: sourceId,
+          target: targetId,
+          sourceHandle: "south",
+          targetHandle: "north",
+          data: {
+            sourceWorkflow: wf.id,
+            label: link.label ?? null,
+          },
+          zIndex: 1,
+        });
+      }
+    }
+  }
+
+  return {
+    nodes: allNodes,
+    edges: allEdges,
+    width: maxWidth,
+    height: cursorY > 0 ? cursorY - BAND_GUTTER : 0,
+    bands,
+  };
 }
 
 function flowEdge(

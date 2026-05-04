@@ -44,6 +44,7 @@ import {
   ChipNode,
   DetourTransitionNode,
   JitPromptNode,
+  BandHeaderNode,
   PortNode,
   StatusDividerNode,
   StatusRegionNode,
@@ -65,6 +66,7 @@ const NODE_TYPES = {
   port: PortNode,
   anchor: AnchorNode,
   divider: StatusDividerNode,
+  band: BandHeaderNode,
 };
 
 const EDGE_TYPES = {

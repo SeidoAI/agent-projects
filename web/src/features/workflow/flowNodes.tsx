@@ -755,6 +755,65 @@ function ToolbarButton({
   );
 }
 
+// ── band parent group (one per workflow in the unified canvas) ────
+// Renders the band header ribbon (workflow id + brief description)
+// floating above the band's top edge. The group itself is invisible —
+// it just provides a parent container that fitView can target.
+export interface BandNodeData {
+  workflowId: string;
+  brief: string;
+  width: number;
+  height: number;
+}
+export function BandHeaderNode({ data }: NodeProps) {
+  const d = data as unknown as BandNodeData;
+  return (
+    <div
+      data-testid={`workflow-band-${d.workflowId}`}
+      data-workflow={d.workflowId}
+      style={{
+        width: d.width,
+        height: d.height,
+        position: "relative",
+        pointerEvents: "none",
+      }}
+    >
+      {/* Header ribbon — anchored above the band so it doesn't collide
+          with the per-status header row inside. */}
+      <div
+        style={{
+          position: "absolute",
+          top: -64,
+          left: 24,
+          fontFamily: "var(--font-mono)",
+          fontSize: 11,
+          letterSpacing: "0.18em",
+          color: "var(--color-ink-2)",
+          textTransform: "uppercase",
+        }}
+      >
+        workflow · {d.workflowId}
+      </div>
+      {d.brief && (
+        <div
+          style={{
+            position: "absolute",
+            top: -42,
+            left: 24,
+            fontFamily: "var(--font-serif)",
+            fontStyle: "italic",
+            fontSize: 14,
+            color: "var(--color-ink-3)",
+            maxWidth: Math.min(d.width - 48, 720),
+          }}
+        >
+          {d.brief}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── dotted vertical divider between adjacent status regions ──────
 // Sits exactly on the seam between two touching regions. Z-index is set
 // in the graph builder so it renders below gates/boundary nodes but above

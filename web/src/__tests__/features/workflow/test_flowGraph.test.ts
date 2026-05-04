@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { Y_WORK, buildFlow } from "@/features/workflow/flowGraph";
-import type { WorkflowDefinition } from "@/lib/api/endpoints/workflow";
+import {
+  BAND_GUTTER,
+  Y_WORK,
+  buildFlow,
+  buildUnifiedFlow,
+} from "@/features/workflow/flowGraph";
+import type {
+  WorkflowDefinition,
+  WorkflowGraph,
+} from "@/lib/api/endpoints/workflow";
 
 const fixture: WorkflowDefinition = {
   id: "coding-session",
@@ -203,5 +211,122 @@ describe("buildFlow", () => {
     const flares = flow.nodes.filter((n) => n.type === "jit");
     expect(flares).toHaveLength(2);
     expect(flares.every((n) => n.parentId === "status:executing")).toBe(true);
+  });
+});
+
+// ── unified flow ────────────────────────────────────────────────────
+
+const triageFixture: WorkflowDefinition = {
+  id: "pm-triage",
+  actor: "pm-agent",
+  trigger: "command.pm-triage",
+  brief_description: "inbox in, action out.",
+  statuses: [
+    {
+      id: "intake",
+      next: { kind: "single", single: "act" },
+      validators: [],
+      jit_prompts: [],
+      prompt_checks: [],
+      artifacts: { produces: [], consumes: [] },
+      work_steps: [],
+    },
+    {
+      id: "act",
+      next: { kind: "terminal" },
+      validators: [],
+      jit_prompts: [],
+      prompt_checks: [],
+      artifacts: { produces: [], consumes: [] },
+      work_steps: [],
+      cross_links: [
+        {
+          workflow: "coding-session",
+          status: "planned",
+          label: "triages into session",
+          kind: "triggers",
+        },
+      ],
+    },
+  ],
+  routes: [],
+};
+
+const unifiedFixture: WorkflowGraph = {
+  project_id: "test",
+  workflows: [fixture, triageFixture],
+  registry: {
+    validators: [],
+    jit_prompts: [],
+    prompt_checks: [],
+    commands: [],
+    skills: [],
+  },
+  drift: { count: 0, findings: [] },
+};
+
+describe("buildUnifiedFlow", () => {
+  it("emits a band parent group node per workflow", () => {
+    const flow = buildUnifiedFlow(unifiedFixture);
+    const bands = flow.nodes.filter((n) => n.type === "band");
+    expect(bands.map((n) => n.id)).toEqual([
+      "band:coding-session",
+      "band:pm-triage",
+    ]);
+  });
+
+  it("stacks bands vertically with BAND_GUTTER between them", () => {
+    const flow = buildUnifiedFlow(unifiedFixture);
+    const codingBand = flow.nodes.find((n) => n.id === "band:coding-session");
+    const triageBand = flow.nodes.find((n) => n.id === "band:pm-triage");
+    expect(codingBand?.position.y).toBe(0);
+    const codingHeight = (codingBand?.style as { height?: number } | undefined)
+      ?.height;
+    expect(triageBand?.position.y).toBe((codingHeight ?? 0) + BAND_GUTTER);
+  });
+
+  it("namespaces status node ids by workflow", () => {
+    const flow = buildUnifiedFlow(unifiedFixture);
+    const statusIds = flow.nodes
+      .filter((n) => n.type === "status")
+      .map((n) => n.id);
+    expect(statusIds).toContain("band:coding-session:status:planned");
+    expect(statusIds).toContain("band:pm-triage:status:act");
+  });
+
+  it("regions are children of their band parent", () => {
+    const flow = buildUnifiedFlow(unifiedFixture);
+    const codingPlanned = flow.nodes.find(
+      (n) => n.id === "band:coding-session:status:planned",
+    );
+    expect(codingPlanned?.parentId).toBe("band:coding-session");
+    expect(codingPlanned?.extent).toBe("parent");
+  });
+
+  it("namespaces edges so they do not collide across bands", () => {
+    const flow = buildUnifiedFlow(unifiedFixture);
+    const ids = flow.edges.map((e) => e.id);
+    // Every per-band edge should be prefixed.
+    expect(
+      ids.filter((id) => id.startsWith("band:coding-session:")).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("emits a crosslink edge for each `triggers` cross_link", () => {
+    const flow = buildUnifiedFlow(unifiedFixture);
+    const xlinks = flow.edges.filter((e) => e.type === "crosslink");
+    expect(xlinks).toHaveLength(1);
+    expect(xlinks[0]?.source).toBe("band:pm-triage:status:act");
+    expect(xlinks[0]?.target).toBe("band:coding-session:status:planned");
+  });
+
+  it("returns a bands array with positions for navigator fitView", () => {
+    const flow = buildUnifiedFlow(unifiedFixture);
+    expect(flow.bands.map((b) => b.workflowId)).toEqual([
+      "coding-session",
+      "pm-triage",
+    ]);
+    expect(flow.bands[0]?.bandTop).toBe(0);
+    expect(flow.bands[1]?.bandTop).toBeGreaterThan(0);
   });
 });
