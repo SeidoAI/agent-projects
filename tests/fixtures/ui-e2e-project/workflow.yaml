@@ -17,7 +17,8 @@ workflows:
             label: implement
             skills: [backend-development]
       - id: in_review
-        tripwires: [v_reference_integrity, v_stale_concept]
+        tripwires: [v_reference_integrity]
+        heuristics: [v_stale_concept]
         next: verified
         work_steps:
           - id: review

@@ -162,8 +162,9 @@ workflows:
             - v_id_format
             - v_enum_values
             - v_id_collisions
-            - v_sequence_drift
             - v_timestamps
+          heuristics:
+            - v_sequence_drift
         skills: [project-manager]
         emits:
           artifacts:
@@ -209,12 +210,13 @@ workflows:
             - v_handoff_artifact
             - v_worktree_paths_unique
             - v_no_orphan_proj_branches
+            - v_done_implies_session_completed
+          heuristics:
             - v_stale_concept
             - v_concept_name_prose
             - v_semantic_coverage
             - v_mega_issue
             - v_node_ratio
-            - v_done_implies_session_completed
         skills: [project-manager, backend-development, agent-messaging]
         emits:
           events: [session.spawn]
@@ -230,10 +232,11 @@ workflows:
             - v_manifest_schema
             - v_manifest_phase_ownership_consistent
             - v_artifact_presence
-            - v_coverage_heuristics
             - v_phase_requirements
-            - v_quality_consistency
             - v_issue_artifact_presence
+          heuristics:
+            - v_coverage_heuristics
+            - v_quality_consistency
         skills: [backend-development, agent-messaging]
         emits:
           artifacts:
@@ -287,6 +290,10 @@ workflows:
             - stopped-to-ask
             - write-count
             - cost-ceiling
+            # NOTE: cost-ceiling is conceptually a hard-cap tripwire
+            # (pass/fail rather than a prompt) but classified here because
+            # the runtime impl is registered as a JIT prompt today. Stage
+            # 2 of the workflow codification reclassifies it.
         skills: [project-manager, verification]
         emits:
           artifacts:

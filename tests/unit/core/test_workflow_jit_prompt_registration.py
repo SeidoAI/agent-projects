@@ -95,6 +95,17 @@ def test_no_jit_prompt_at_metadata_remains() -> None:
 
 
 def test_default_workflow_declares_all_builtin_jit_prompts() -> None:
+    """Every implemented JIT prompt class must be referenced in
+    ``workflow.yaml.j2``. Some are referenced under ``tripwires:`` rather
+    than ``jit_prompts:`` — the four-primitive split classifies an impl
+    by the kind of *control* it represents (hard pass/fail vs hidden +
+    ack), not by the Python directory it ships in. ``cost-ceiling`` is
+    the canonical example: lives under ``_internal/jit_prompts/`` for
+    historical reasons but is referenced as a tripwire because it's a
+    hard cap. Until the stage-2 module rename relocates it, the test
+    accepts a reference under any control slot.
+    """
+
     import yaml
 
     from tripwire.core.workflow.registry import known_jit_prompt_ids
@@ -106,7 +117,10 @@ def test_default_workflow_declares_all_builtin_jit_prompts() -> None:
     declared = set()
     for workflow in parsed["workflows"].values():
         for status in workflow["statuses"]:
-            declared.update(status.get("jit_prompts", []))
+            for slot in ("jit_prompts", "tripwires", "heuristics", "prompt_checks"):
+                declared.update(status.get(slot, []))
         for route in workflow.get("routes", []):
-            declared.update((route.get("controls") or {}).get("jit_prompts", []))
+            controls = route.get("controls") or {}
+            for slot in ("jit_prompts", "tripwires", "heuristics", "prompt_checks"):
+                declared.update(controls.get(slot, []))
     assert known_jit_prompt_ids() - declared == set()
