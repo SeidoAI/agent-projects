@@ -691,3 +691,162 @@ workflows:
         to: report
         kind: side
         label: sync
+
+  # pm-monitor — overseer loop. Scans project state, classifies signals,
+  # and dispatches actions or subagents per the cross_link contract. The
+  # signal vocabulary, thresholds, and dispatch targets are codified in
+  # `references/MONITOR_CRITERIA.md`. Threshold values live in
+  # `project.yaml.monitor:` so iteration doesn't require code edits.
+  pm-monitor:
+    actor: pm-agent
+    trigger: command.pm-monitor
+    brief-description: "ongoing overseer: scan, classify, dispatch."
+    statuses:
+      - id: scan
+        next: classify
+        # Hard-stop the scan if the on-disk state can't be read at all
+        # — there's no useful classification path if the inputs are
+        # corrupt.
+        tripwires:
+          - v_workflow_well_formed
+        work_steps:
+          - id: gather-session-state
+            actor: pm-agent
+            label: gather session state
+            skills: [project-manager]
+          - id: gather-pr-state
+            actor: pm-agent
+            label: gather PR state
+            skills: [project-manager]
+          - id: gather-inbox-state
+            actor: pm-agent
+            label: gather inbox state
+            skills: [project-manager, agent-messaging]
+          - id: gather-message-queue
+            actor: pm-agent
+            label: gather message queue
+            skills: [project-manager, agent-messaging]
+      - id: classify
+        next: dispatch
+        # Stale-concept count is itself a signal source — re-using the
+        # heuristic suppresses repeat warnings unless the count moves.
+        heuristics:
+          - v_stale_concept
+        work_steps:
+          - id: classify-each-signal
+            actor: pm-agent
+            label: classify signals
+            skills: [project-manager]
+      - id: dispatch
+        next: idle
+        cross_links:
+          - workflow: coding-session
+            status: queued
+            label: launch session
+            kind: triggers
+            pm_subagent_dispatch: true
+          - workflow: coding-session
+            status: executing
+            label: relaunch crashed session
+            kind: triggers
+            pm_subagent_dispatch: true
+          - workflow: pm-triage
+            status: intake
+            label: triage new inbound
+            kind: triggers
+            pm_subagent_dispatch: true
+          - workflow: pm-incremental-update
+            status: inspect
+            label: handle agent question
+            kind: triggers
+            pm_subagent_dispatch: true
+        work_steps:
+          - id: spawn-action
+            actor: pm-agent
+            label: dispatch matched signals
+            skills: [project-manager]
+      - id: idle
+        next: scan
+        work_steps:
+          - id: wait-or-tick
+            actor: pm-agent
+            label: wait for next tick
+            skills: [project-manager]
+    routes:
+      - id: monitor-tick
+        actor: pm-agent
+        command: pm-monitor
+        trigger: command.pm-monitor
+        from: idle
+        to: scan
+        kind: forward
+        label: tick
+        skills: [project-manager]
+      - id: scan-to-classify
+        actor: pm-agent
+        trigger: scan.complete
+        from: scan
+        to: classify
+        kind: forward
+        label: classify signals
+        skills: [project-manager]
+      # Each dispatch route names the signals that drive it. The
+      # `signals:` field is consumed by the spec validator and the UI
+      # legend; the runtime evaluates them in `classify`.
+      - id: dispatch-launch-session
+        actor: pm-agent
+        from: classify
+        to: dispatch
+        trigger: signal.session_unblocked == true
+        signals: [signal.session_unblocked]
+        kind: forward
+        label: launch unblocked session
+        skills: [project-manager]
+      - id: dispatch-relaunch
+        actor: pm-agent
+        from: classify
+        to: dispatch
+        trigger: signal.session_crashed == true
+        signals:
+          - signal.session_crashed
+          - signal.session_paused_question
+        kind: forward
+        label: relaunch crashed or stuck
+        skills: [project-manager]
+      - id: dispatch-review
+        actor: pm-agent
+        from: classify
+        to: dispatch
+        trigger: signal.session_pr_pair_open == true
+        signals: [signal.session_pr_pair_open]
+        kind: forward
+        label: launch code-review
+        skills: [project-manager]
+      - id: dispatch-triage
+        actor: pm-agent
+        from: classify
+        to: dispatch
+        trigger: signal.inbox_inbound_new == true
+        signals:
+          - signal.inbox_inbound_new
+          - signal.comment_question
+        kind: forward
+        label: dispatch triage
+        skills: [project-manager]
+      - id: dispatch-idle
+        actor: pm-agent
+        from: classify
+        to: idle
+        trigger: signal.nothing_to_do == true
+        signals: [signal.nothing_to_do]
+        kind: side
+        label: nothing to do
+        skills: [project-manager]
+      - id: dispatch-to-idle
+        actor: pm-agent
+        trigger: dispatch.complete
+        from: dispatch
+        to: idle
+        kind: forward
+        label: return to idle
+        skills: [project-manager]
