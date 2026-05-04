@@ -45,7 +45,8 @@ def check_workflow_well_formed(ctx: ValidationContext) -> list[CheckResult]:
 
     findings = validate_workflow_spec(
         spec,
-        known_validators=_known_validators(),
+        known_tripwires=_known_tripwires(),
+        known_heuristics=_known_heuristics(),
         known_jit_prompts=_known_jit_prompts(ctx.project_dir),
         known_prompt_checks=_known_prompt_checks(ctx.project_dir),
         known_commands=_known_commands(ctx.project_dir),
@@ -68,11 +69,22 @@ def check_workflow_well_formed(ctx: ValidationContext) -> list[CheckResult]:
     return out
 
 
-def _known_validators() -> set[str]:
-    """Return implemented validator ids."""
+def _known_tripwires() -> set[str]:
+    """Return implemented tripwire ids (hard-gate primitives)."""
     from tripwire.core.workflow.registry import known_validator_ids
 
     return known_validator_ids()
+
+
+def _known_heuristics() -> set[str]:
+    """Return implemented heuristic ids (soft warn-once primitives).
+
+    Stage 1 ships an empty registry; the heuristics module lands in a
+    follow-up commit. Returning an empty set means the spec validator
+    skips the unknown-id check (matching the existing pattern for the
+    other primitive sets).
+    """
+    return set()
 
 
 def _known_jit_prompts(project_dir) -> set[str]:  # type: ignore[no-untyped-def]

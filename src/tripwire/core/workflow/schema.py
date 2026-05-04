@@ -19,8 +19,9 @@ The shape:
             # or
             terminal: true               # terminal status
             prompt_checks: [<id>, ...]
-            validators: [<id>, ...]
-            jit_prompts: [<id>, ...]
+            tripwires: [<id>, ...]       # hard pass/fail gates
+            heuristics: [<id>, ...]      # soft warn-once checks
+            jit_prompts: [<id>, ...]     # hidden + ack
             artifacts:
               produces:
                 - id: <artifact-id>
@@ -37,8 +38,10 @@ The shape:
             kind: forward | return | loop | side | terminal
             command: <optional-command-id>
             trigger: <optional-event-or-condition>
+            signals: [signal.<name>, ...]   # pm-monitor signal vocabulary
             controls:
-              validators: [<id>, ...]
+              tripwires: [<id>, ...]
+              heuristics: [<id>, ...]
               prompt_checks: [<id>, ...]
               jit_prompts: [<id>, ...]
             skills: [<skill-id>, ...]
@@ -46,6 +49,13 @@ The shape:
               artifacts:
                 - id: <artifact-id>
                   label: <display-label>
+
+Four-primitive control model (locked):
+
+- ``tripwire`` — hard pass/fail gate; blocks until file/state passes
+- ``heuristic`` — soft warn-once detector; does not block
+- ``jit_prompt`` — hidden ack-required prompt
+- ``prompt_check`` — required slash-command invocation
 
 Conditional predicates are equality-only for v0.9 (locked decision in
 ``backlog-architecture.md``): ``<dot-path> (==|!=) <bare-value>``.
@@ -215,12 +225,18 @@ class WorkflowCrossLink:
     workflow (the canonical write side), or ``"triggered_by"`` for the
     inverse documentation. The renderer always draws the edge using the
     ``triggers`` side; ``triggered_by`` entries are advisory.
+
+    ``pm_subagent_dispatch`` flags that the dispatched workflow should
+    run inside a Claude Code subagent (Task-style spawn) rather than
+    the parent PM agent's session — used by the pm-monitor overseer
+    loop when fanning out work.
     """
 
     workflow: str
     status: str
     label: str | None = None
     kind: Literal["triggers", "triggered_by"] = "triggers"
+    pm_subagent_dispatch: bool = False
 
 
 @dataclass(frozen=True)
@@ -228,7 +244,8 @@ class WorkflowStatus:
     id: str
     next: NextSpec
     prompt_checks: list[str] = field(default_factory=list)
-    validators: list[str] = field(default_factory=list)
+    tripwires: list[str] = field(default_factory=list)
+    heuristics: list[str] = field(default_factory=list)
     jit_prompts: list[str] = field(default_factory=list)
     artifacts: WorkflowStatusArtifacts = field(default_factory=WorkflowStatusArtifacts)
     work_steps: list[WorkflowWorkStep] = field(default_factory=list)
@@ -237,7 +254,8 @@ class WorkflowStatus:
 
 @dataclass(frozen=True)
 class WorkflowRouteControls:
-    validators: list[str] = field(default_factory=list)
+    tripwires: list[str] = field(default_factory=list)
+    heuristics: list[str] = field(default_factory=list)
     jit_prompts: list[str] = field(default_factory=list)
     prompt_checks: list[str] = field(default_factory=list)
 
@@ -257,6 +275,10 @@ class WorkflowRoute:
     ``from_ref`` and ``to_ref`` are status ids or boundary ports such as
     ``source:issue`` and ``sink:merged``. The API serializes them back to
     ``from`` and ``to`` so ``workflow.yaml`` remains readable.
+
+    ``signals`` lists the pm-monitor signal predicates that fire this
+    route (e.g. ``signal.session_unblocked``). Used by the overseer
+    loop to wire dispatch routes back to their source signals.
     """
 
     id: str
@@ -268,6 +290,7 @@ class WorkflowRoute:
     trigger: str | None = None
     command: str | None = None
     controls: WorkflowRouteControls = field(default_factory=WorkflowRouteControls)
+    signals: list[str] = field(default_factory=list)
     skills: list[str] = field(default_factory=list)
     emits: WorkflowRouteEmits = field(default_factory=WorkflowRouteEmits)
 
@@ -333,7 +356,8 @@ class WorkflowSpec:
 def validate_workflow_spec(
     spec: WorkflowSpec,
     *,
-    known_validators: set[str],
+    known_tripwires: set[str],
+    known_heuristics: set[str],
     known_jit_prompts: set[str],
     known_prompt_checks: set[str],
     known_commands: set[str] | None = None,
@@ -352,10 +376,9 @@ def validate_workflow_spec(
       AND declares ``next``
     - ``workflow/no_terminal_status`` — the workflow has no terminal
       status (every workflow must converge)
-    - ``workflow/unknown_validator`` / ``workflow/unknown_jit_prompt`` /
-      ``workflow/unknown_prompt_check`` — a status references a
-      validator / JIT prompt / prompt-check implementation that does
-      not exist
+    - ``workflow/unknown_tripwire`` / ``workflow/unknown_heuristic`` /
+      ``workflow/unknown_jit_prompt`` / ``workflow/unknown_prompt_check``
+      — a status or route references a primitive id that does not exist
     """
     findings: list[WorkflowFinding] = list(spec.load_findings)
     for wf_id, wf in spec.workflows.items():
@@ -364,7 +387,8 @@ def validate_workflow_spec(
             _check_refs(
                 wf_id,
                 wf,
-                known_validators=known_validators,
+                known_tripwires=known_tripwires,
+                known_heuristics=known_heuristics,
                 known_jit_prompts=known_jit_prompts,
                 known_prompt_checks=known_prompt_checks,
                 known_commands=known_commands,
@@ -524,7 +548,8 @@ def _check_refs(
     wf_id: str,
     wf: Workflow,
     *,
-    known_validators: set[str],
+    known_tripwires: set[str],
+    known_heuristics: set[str],
     known_jit_prompts: set[str],
     known_prompt_checks: set[str],
     known_commands: set[str] | None,
@@ -532,15 +557,28 @@ def _check_refs(
 ) -> list[WorkflowFinding]:
     out: list[WorkflowFinding] = []
     for status in wf.statuses:
-        for ref in status.validators:
-            if known_validators and ref not in known_validators:
+        for ref in status.tripwires:
+            if known_tripwires and ref not in known_tripwires:
                 out.append(
                     WorkflowFinding(
-                        code="workflow/unknown_validator",
+                        code="workflow/unknown_tripwire",
                         workflow=wf_id,
                         status=status.id,
                         message=(
-                            f"status {status.id!r} references validator "
+                            f"status {status.id!r} references tripwire "
+                            f"{ref!r} which is not implemented"
+                        ),
+                    )
+                )
+        for ref in status.heuristics:
+            if known_heuristics and ref not in known_heuristics:
+                out.append(
+                    WorkflowFinding(
+                        code="workflow/unknown_heuristic",
+                        workflow=wf_id,
+                        status=status.id,
+                        message=(
+                            f"status {status.id!r} references heuristic "
                             f"{ref!r} which is not implemented"
                         ),
                     )
@@ -575,7 +613,8 @@ def _check_refs(
         _check_route_refs(
             wf_id,
             wf,
-            known_validators=known_validators,
+            known_tripwires=known_tripwires,
+            known_heuristics=known_heuristics,
             known_jit_prompts=known_jit_prompts,
             known_prompt_checks=known_prompt_checks,
             known_commands=known_commands,
@@ -589,7 +628,8 @@ def _check_route_refs(
     wf_id: str,
     wf: Workflow,
     *,
-    known_validators: set[str],
+    known_tripwires: set[str],
+    known_heuristics: set[str],
     known_jit_prompts: set[str],
     known_prompt_checks: set[str],
     known_commands: set[str] | None,
@@ -673,15 +713,28 @@ def _check_route_refs(
                         ),
                     )
                 )
-        for ref in route.controls.validators:
-            if known_validators and ref not in known_validators:
+        for ref in route.controls.tripwires:
+            if known_tripwires and ref not in known_tripwires:
                 out.append(
                     WorkflowFinding(
-                        code="workflow/unknown_validator",
+                        code="workflow/unknown_tripwire",
                         workflow=wf_id,
                         status=status,
                         message=(
-                            f"route {route.id!r} references validator {ref!r} "
+                            f"route {route.id!r} references tripwire {ref!r} "
+                            f"which is not implemented"
+                        ),
+                    )
+                )
+        for ref in route.controls.heuristics:
+            if known_heuristics and ref not in known_heuristics:
+                out.append(
+                    WorkflowFinding(
+                        code="workflow/unknown_heuristic",
+                        workflow=wf_id,
+                        status=status,
+                        message=(
+                            f"route {route.id!r} references heuristic {ref!r} "
                             f"which is not implemented"
                         ),
                     )

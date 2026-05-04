@@ -156,7 +156,7 @@ workflows:
         label: create session
         controls:
           prompt_checks: [pm-session-create]
-          validators:
+          tripwires:
             - v_workflow_well_formed
             - v_uuid_present
             - v_id_format
@@ -179,7 +179,7 @@ workflows:
         label: queue session
         controls:
           prompt_checks: [pm-session-queue]
-          validators:
+          tripwires:
             - v_session_issue_coherence
             - v_issue_session_status_compatibility
             - v_reference_integrity
@@ -201,7 +201,7 @@ workflows:
         label: spawn coding agent
         controls:
           prompt_checks: [pm-session-spawn]
-          validators:
+          tripwires:
             - v_issue_body_structure
             - v_project_standards
             - v_freshness
@@ -226,7 +226,7 @@ workflows:
         kind: forward
         label: submit for review
         controls:
-          validators:
+          tripwires:
             - v_manifest_schema
             - v_manifest_phase_ownership_consistent
             - v_artifact_presence
@@ -275,7 +275,7 @@ workflows:
         label: complete session
         controls:
           prompt_checks: [pm-session-complete]
-          validators:
+          tripwires:
             - v_pm_response_covers_self_review
             - v_pm_response_followups_resolve
             - v_done_implies_issue_artifacts_on_main

@@ -55,10 +55,10 @@ def test_declared_validator_ids_come_from_workflow_yaml(tmp_path: Path) -> None:
                 statuses:
                   - id: queued
                     next: executing
-                    validators: [v_uuid_present]
+                    tripwires: [v_uuid_present]
                   - id: executing
                     terminal: true
-                    validators: [v_reference_integrity, v_uuid_present]
+                    tripwires: [v_reference_integrity, v_uuid_present]
             """
         ),
         encoding="utf-8",
@@ -84,7 +84,7 @@ def test_declared_validator_ids_prefer_route_controls(tmp_path: Path) -> None:
                 statuses:
                   - id: queued
                     next: executing
-                    validators: [v_status_only]
+                    tripwires: [v_status_only]
                   - id: executing
                     terminal: true
                 routes:
@@ -93,7 +93,7 @@ def test_declared_validator_ids_prefer_route_controls(tmp_path: Path) -> None:
                     from: queued
                     to: executing
                     controls:
-                      validators: [v_route_only, v_status_only]
+                      tripwires: [v_route_only, v_status_only]
             """
         ),
         encoding="utf-8",
@@ -135,7 +135,7 @@ def test_all_declared_validators_resolve_to_implementations(tmp_path: Path) -> N
                 statuses:
                   - id: completed
                     terminal: true
-                    validators: [v_uuid_present, v_enum_values]
+                    tripwires: [v_uuid_present, v_enum_values]
             """
         ),
         encoding="utf-8",
@@ -169,7 +169,7 @@ def test_validate_project_runs_only_workflow_declared_validators(
                 statuses:
                   - id: completed
                     terminal: true
-                    validators: [v_selected]
+                    tripwires: [v_selected]
             """
         ),
         encoding="utf-8",

@@ -248,7 +248,7 @@ def _run_gate(
     target = statuses_by_id[target_status]
     controls = _controls_for_transition(route, target)
 
-    # 2. Validators — target-status entry gate from workflow.yaml.
+    # 2. Tripwires — target-status entry gate from workflow.yaml.
     from tripwire.cli.transition import validate_project
 
     report = validate_project(
@@ -256,7 +256,7 @@ def _run_gate(
         strict=True,
         fix=False,
         session_id=session_id,
-        validator_ids=controls.validators,
+        validator_ids=controls.tripwires,
         workflow=WORKFLOW_ID,
         status=target_status,
     )
@@ -266,7 +266,7 @@ def _run_gate(
             project_dir,
             session_id,
             target_status,
-            reason=f"validators_failed: {first.code}: {first.message}",
+            reason=f"tripwires_failed: {first.code}: {first.message}",
         )
 
     # 3. JIT prompts — target-status entry gate from workflow.yaml.
@@ -379,7 +379,8 @@ def _controls_for_transition(
 ) -> WorkflowRouteControls:
     if route is None:
         return WorkflowRouteControls(
-            validators=list(target.validators),
+            tripwires=list(target.tripwires),
+            heuristics=list(target.heuristics),
             jit_prompts=list(target.jit_prompts),
             prompt_checks=list(target.prompt_checks),
         )

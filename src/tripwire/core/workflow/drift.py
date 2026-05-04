@@ -145,7 +145,8 @@ def _controls_for_observed_transition(
             if route.from_ref == from_status and route.to_ref == to_status:
                 return route.controls
     return WorkflowRouteControls(
-        validators=list(status.validators),
+        tripwires=list(status.tripwires),
+        heuristics=list(status.heuristics),
         jit_prompts=list(status.jit_prompts),
         prompt_checks=list(status.prompt_checks),
     )

@@ -160,10 +160,10 @@ def test_transition_uses_target_status_validators(
                 statuses:
                   - id: planned
                     next: queued
-                    validators: [v_id_format]
+                    tripwires: [v_id_format]
                   - id: queued
                     next: executing
-                    validators: [v_uuid_present]
+                    tripwires: [v_uuid_present]
                   - id: executing
                     terminal: true
             """
@@ -201,14 +201,14 @@ def test_transition_uses_route_controls_when_routes_declared(
                     next: queued
                   - id: queued
                     terminal: true
-                    validators: [v_status_only]
+                    tripwires: [v_status_only]
                 routes:
                   - id: planned-to-queued
                     actor: pm-agent
                     from: planned
                     to: queued
                     controls:
-                      validators: [v_route_only]
+                      tripwires: [v_route_only]
             """
         ),
         encoding="utf-8",
@@ -389,9 +389,9 @@ def test_transition_completed_event_carries_status_instance(
     )
 
 
-def test_transition_rejected_when_validators_fail(tmp_path: Path) -> None:
-    """If `tripwire validate --strict` reports errors at the destination
-    status, the gate rejects with reason=validators_failed."""
+def test_transition_rejected_when_tripwires_fail(tmp_path: Path) -> None:
+    """If `tripwire validate` reports errors at the destination status,
+    the gate rejects with reason=tripwires_failed."""
     from tripwire.cli.transition import transition_cmd
     from tripwire.core.events.log import read_events
 
@@ -410,7 +410,7 @@ def test_transition_rejected_when_validators_fail(tmp_path: Path) -> None:
     assert result.exit_code != 0
     rows = list(read_events(pd, instance="test-session", event="transition.rejected"))
     assert any(
-        r["details"].get("reason", "").startswith("validators_failed") for r in rows
+        r["details"].get("reason", "").startswith("tripwires_failed") for r in rows
     )
     # Session did NOT advance.
     session_yaml = (pd / "sessions" / "test-session" / "session.yaml").read_text()

@@ -51,7 +51,8 @@ def build_workflow(
     )
     definition_findings = validate_workflow_spec(
         spec,
-        known_validators={entry["id"] for entry in registry["validators"]},
+        known_tripwires={entry["id"] for entry in registry["tripwires"]},
+        known_heuristics={entry["id"] for entry in registry["heuristics"]},
         known_jit_prompts={entry["id"] for entry in registry["jit_prompts"]},
         known_prompt_checks={entry["id"] for entry in registry["prompt_checks"]},
         known_commands={entry["id"] for entry in registry["commands"]},
@@ -86,7 +87,8 @@ def _workflow_to_dict(workflow: Workflow) -> dict[str, Any]:
                 "id": status.id,
                 "label": status.id.replace("_", " "),
                 "next": _next_spec_to_dict(status.next),
-                "validators": list(status.validators),
+                "tripwires": list(status.tripwires),
+                "heuristics": list(status.heuristics),
                 "jit_prompts": list(status.jit_prompts),
                 "prompt_checks": list(status.prompt_checks),
                 "artifacts": {
@@ -112,6 +114,7 @@ def _workflow_to_dict(workflow: Workflow) -> dict[str, Any]:
                         "status": link.status,
                         "label": link.label,
                         "kind": link.kind,
+                        "pm_subagent_dispatch": link.pm_subagent_dispatch,
                     }
                     for link in status.cross_links
                 ],
@@ -141,10 +144,12 @@ def _route_to_dict(workflow_id: str, route: WorkflowRoute) -> dict[str, Any]:
         "trigger": route.trigger,
         "command": route.command,
         "controls": {
-            "validators": list(route.controls.validators),
+            "tripwires": list(route.controls.tripwires),
+            "heuristics": list(route.controls.heuristics),
             "jit_prompts": list(route.controls.jit_prompts),
             "prompt_checks": list(route.controls.prompt_checks),
         },
+        "signals": list(route.signals),
         "skills": list(route.skills),
         "emits": {
             "artifacts": [_artifact_ref_to_dict(ref) for ref in route.emits.artifacts],
@@ -180,7 +185,8 @@ def _build_registry(
     is_pm_role: bool,
 ) -> dict[str, list[dict[str, Any]]]:
     return {
-        "validators": _build_validator_registry(),
+        "tripwires": _build_tripwire_registry(),
+        "heuristics": _build_heuristic_registry(),
         "jit_prompts": _build_jit_prompt_registry(
             project_dir,
             project_id=project_id,
@@ -192,19 +198,26 @@ def _build_registry(
     }
 
 
-def _build_validator_registry() -> list[dict[str, Any]]:
+def _build_tripwire_registry() -> list[dict[str, Any]]:
+    """Hard-gate primitives — pass/fail checks that block transitions.
+
+    The Python implementations still live under ``core/validator/``
+    (rename deferred to stage 2); the public-facing label is
+    ``tripwire``.
+    """
+
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for validator_id, fn in validator_catalog().items():
-        if validator_id in seen:
+    for tripwire_id, fn in validator_catalog().items():
+        if tripwire_id in seen:
             continue
-        seen.add(validator_id)
+        seen.add(tripwire_id)
         try:
             src = inspect.getfile(fn)
         except (TypeError, OSError):
             src = ""
         entry: dict[str, Any] = {
-            "id": validator_id,
+            "id": tripwire_id,
             "label": validator_label_for(fn),
             "description": validator_description_for(fn),
             "source": src,
@@ -212,6 +225,20 @@ def _build_validator_registry() -> list[dict[str, Any]]:
         }
         out.append(entry)
     return out
+
+
+def _build_heuristic_registry() -> list[dict[str, Any]]:
+    """Soft warn-once primitives.
+
+    Stage 1 ships the empty registry — heuristics module
+    (``src/tripwire/_internal/heuristics/``) lands in a follow-up
+    commit. Returning an empty list here is intentional: the workflow
+    spec validator simply skips the unknown-id check when the registry
+    is empty (existing behaviour for ``known_*`` sets), so the new
+    field is forward-compatible.
+    """
+
+    return []
 
 
 def _build_jit_prompt_registry(

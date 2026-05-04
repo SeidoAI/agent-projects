@@ -27,12 +27,12 @@ from tripwire.core.workflow.schema import (
     Predicate,
     Workflow,
     WorkflowArtifactRef,
+    WorkflowCrossLink,
     WorkflowFinding,
     WorkflowRoute,
     WorkflowRouteControls,
     WorkflowRouteEmits,
     WorkflowSpec,
-    WorkflowCrossLink,
     WorkflowStatus,
     WorkflowStatusArtifacts,
     WorkflowWorkStep,
@@ -91,7 +91,9 @@ def _parse_workflow(wf_id: str, raw: dict) -> tuple[Workflow, list[WorkflowFindi
     trigger = str(raw.get("trigger", "")) or ""
     brief_raw = raw.get("brief-description", raw.get("brief_description"))
     brief_description = (
-        str(brief_raw).strip() if isinstance(brief_raw, str) and brief_raw.strip() else None
+        str(brief_raw).strip()
+        if isinstance(brief_raw, str) and brief_raw.strip()
+        else None
     )
     findings: list[WorkflowFinding] = []
     if "stations" in raw:
@@ -191,7 +193,8 @@ def _parse_status(
             id=sid,
             next=nxt,
             prompt_checks=_str_list(raw.get("prompt_checks")),
-            validators=_str_list(raw.get("validators")),
+            tripwires=_str_list(raw.get("tripwires")),
+            heuristics=_str_list(raw.get("heuristics")),
             jit_prompts=_str_list(raw.get("jit_prompts")),
             artifacts=_parse_artifacts(raw.get("artifacts")),
             work_steps=_parse_work_steps(raw.get("work_steps")),
@@ -216,7 +219,16 @@ def _parse_cross_links(value: Any) -> list[WorkflowCrossLink]:
         kind = kind_raw if kind_raw in ("triggers", "triggered_by") else "triggers"
         label_raw = entry.get("label")
         label = str(label_raw).strip() if label_raw is not None else None
-        out.append(WorkflowCrossLink(workflow=wf, status=st, label=label, kind=kind))  # type: ignore[arg-type]
+        sub = bool(entry.get("pm_subagent_dispatch", False))
+        out.append(
+            WorkflowCrossLink(
+                workflow=wf,
+                status=st,
+                label=label,
+                kind=kind,  # type: ignore[arg-type]
+                pm_subagent_dispatch=sub,
+            )
+        )
     return out
 
 
@@ -364,6 +376,7 @@ def _parse_routes(
                 trigger=str(trigger).strip() if trigger else None,
                 command=str(command).strip() if command else None,
                 controls=_parse_route_controls(entry.get("controls")),
+                signals=_str_list(entry.get("signals")),
                 skills=_str_list(entry.get("skills")),
                 emits=_parse_route_emits(entry.get("emits")),
             )
@@ -393,7 +406,8 @@ def _parse_route_controls(value: Any) -> WorkflowRouteControls:
     if not isinstance(value, dict):
         return WorkflowRouteControls()
     return WorkflowRouteControls(
-        validators=_str_list(value.get("validators")),
+        tripwires=_str_list(value.get("tripwires")),
+        heuristics=_str_list(value.get("heuristics")),
         jit_prompts=_str_list(value.get("jit_prompts")),
         prompt_checks=_str_list(value.get("prompt_checks")),
     )

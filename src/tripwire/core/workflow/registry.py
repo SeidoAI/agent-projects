@@ -76,11 +76,11 @@ def declared_validator_ids(project_dir: Path) -> list[str]:
         return list(validator_catalog())
     for workflow in spec.workflows.values():
         for route in workflow.routes:
-            for validator_id in route.controls.validators:
+            for validator_id in route.controls.tripwires:
                 if validator_id not in ids:
                     ids.append(validator_id)
         for status in workflow.statuses:
-            for validator_id in status.validators:
+            for validator_id in status.tripwires:
                 if validator_id not in ids:
                     ids.append(validator_id)
     return ids
@@ -180,11 +180,11 @@ def workflow_catalog_drift(project_dir: Path) -> list[dict[str, Any]]:
     used_prompt_checks: set[str] = set()
     for workflow in spec.workflows.values():
         for route in workflow.routes:
-            used_validators.update(route.controls.validators)
+            used_validators.update(route.controls.tripwires)
             used_jit_prompts.update(route.controls.jit_prompts)
             used_prompt_checks.update(route.controls.prompt_checks)
         for status in workflow.statuses:
-            used_validators.update(status.validators)
+            used_validators.update(status.tripwires)
             used_jit_prompts.update(status.jit_prompts)
             used_prompt_checks.update(status.prompt_checks)
 
@@ -193,11 +193,11 @@ def workflow_catalog_drift(project_dir: Path) -> list[dict[str, Any]]:
         findings.append(
             {
                 "source": "catalog",
-                "code": "workflow/unreferenced_validator",
+                "code": "workflow/unreferenced_tripwire",
                 "workflow": None,
                 "status": None,
                 "message": (
-                    f"validator {ident!r} is implemented but not referenced in workflow.yaml"
+                    f"tripwire {ident!r} is implemented but not referenced in workflow.yaml"
                 ),
                 "severity": "warning",
             }

@@ -9,7 +9,7 @@ workflows:
       - id: queued
         next: executing
       - id: executing
-        validators: [v_uuid_present]
+        tripwires: [v_uuid_present]
         next: in_review
         work_steps:
           - id: implement
@@ -17,7 +17,7 @@ workflows:
             label: implement
             skills: [backend-development]
       - id: in_review
-        validators: [v_reference_integrity, v_stale_concept]
+        tripwires: [v_reference_integrity, v_stale_concept]
         next: verified
         work_steps:
           - id: review
@@ -44,7 +44,7 @@ workflows:
         kind: forward
         label: spawn coding agent
         controls:
-          validators: [v_uuid_present]
+          tripwires: [v_uuid_present]
       - id: executing-to-review
         actor: coding-agent
         from: executing

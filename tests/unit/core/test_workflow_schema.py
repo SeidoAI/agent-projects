@@ -116,7 +116,7 @@ def test_loader_parses_inequality_predicate(tmp_path: Path) -> None:
     assert nxt.conditional[0].predicate.op == "!="
 
 
-def test_loader_parses_prompt_checks_validators_jit_prompts(tmp_path: Path) -> None:
+def test_loader_parses_prompt_checks_tripwires_jit_prompts(tmp_path: Path) -> None:
     from tripwire.core.workflow.loader import load_workflows
 
     (tmp_path / "workflow.yaml").write_text(
@@ -130,7 +130,8 @@ def test_loader_parses_prompt_checks_validators_jit_prompts(tmp_path: Path) -> N
                   - id: s1
                     next: s2
                     prompt_checks: [pm-session-launch]
-                    validators: [schema-valid, refs-resolved]
+                    tripwires: [schema-valid, refs-resolved]
+                    heuristics: [quality-drift, mega-issue]
                     jit_prompts: [cost-ceiling]
                   - id: s2
                     terminal: true
@@ -140,8 +141,83 @@ def test_loader_parses_prompt_checks_validators_jit_prompts(tmp_path: Path) -> N
     )
     s1 = load_workflows(tmp_path).workflows["w"].statuses[0]
     assert s1.prompt_checks == ["pm-session-launch"]
-    assert s1.validators == ["schema-valid", "refs-resolved"]
+    assert s1.tripwires == ["schema-valid", "refs-resolved"]
+    assert s1.heuristics == ["quality-drift", "mega-issue"]
     assert s1.jit_prompts == ["cost-ceiling"]
+
+
+def test_loader_parses_route_signals_and_heuristics(tmp_path: Path) -> None:
+    """Routes carry pm-monitor signal vocabulary + heuristic controls."""
+
+    from tripwire.core.workflow.loader import load_workflows
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              pm-monitor:
+                actor: pm-agent
+                trigger: command.pm-monitor
+                statuses:
+                  - id: scan
+                    next: dispatch
+                  - id: dispatch
+                    terminal: true
+                routes:
+                  - id: dispatch-launch
+                    actor: pm-agent
+                    from: scan
+                    to: dispatch
+                    kind: forward
+                    signals: [signal.session_unblocked, signal.inbox_inbound_new]
+                    controls:
+                      tripwires: [v_session_state_readable]
+                      heuristics: [stale-node-count-high]
+            """
+        ),
+        encoding="utf-8",
+    )
+    route = load_workflows(tmp_path).workflows["pm-monitor"].routes[0]
+    assert route.signals == [
+        "signal.session_unblocked",
+        "signal.inbox_inbound_new",
+    ]
+    assert route.controls.tripwires == ["v_session_state_readable"]
+    assert route.controls.heuristics == ["stale-node-count-high"]
+
+
+def test_loader_parses_cross_link_pm_subagent_dispatch(tmp_path: Path) -> None:
+    """Cross-links carry the pm_subagent_dispatch flag for pm-monitor."""
+
+    from tripwire.core.workflow.loader import load_workflows
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              pm-monitor:
+                actor: pm-agent
+                trigger: command.pm-monitor
+                statuses:
+                  - id: dispatch
+                    terminal: true
+                    cross_links:
+                      - workflow: code-review
+                        status: received
+                        label: launch review
+                        kind: triggers
+                        pm_subagent_dispatch: true
+                      - workflow: inbox-handling
+                        status: pending
+                        label: escalate to user
+                        kind: triggers
+            """
+        ),
+        encoding="utf-8",
+    )
+    links = load_workflows(tmp_path).workflows["pm-monitor"].statuses[0].cross_links
+    assert links[0].pm_subagent_dispatch is True
+    assert links[1].pm_subagent_dispatch is False
 
 
 def test_loader_parses_status_artifacts(tmp_path: Path) -> None:
@@ -200,7 +276,7 @@ def test_loader_parses_explicit_routes(tmp_path: Path) -> None:
                     to: executing
                     label: spawn
                     controls:
-                      validators: [v_uuid_present]
+                      tripwires: [v_uuid_present]
                       jit_prompts: [self-review]
                       prompt_checks: [pm-session-spawn]
                     skills: [project-manager, backend-development]
@@ -226,7 +302,7 @@ def test_loader_parses_explicit_routes(tmp_path: Path) -> None:
     assert route.from_ref == "planned"
     assert route.to_ref == "executing"
     assert route.kind == "forward"
-    assert route.controls.validators == ["v_uuid_present"]
+    assert route.controls.tripwires == ["v_uuid_present"]
     assert route.controls.jit_prompts == ["self-review"]
     assert route.controls.prompt_checks == ["pm-session-spawn"]
     assert route.skills == ["project-manager", "backend-development"]
@@ -258,7 +334,8 @@ def test_loader_reports_stale_stations_key(tmp_path: Path) -> None:
     assert spec.workflows["w"].statuses == []
     findings = validate_workflow_spec(
         spec,
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
@@ -345,7 +422,8 @@ def test_validator_rejects_unreferenced_station_in_next(tmp_path: Path) -> None:
     spec = load_workflows(tmp_path)
     findings = validate_workflow_spec(
         spec,
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
@@ -366,7 +444,7 @@ def test_validator_rejects_undeclared_validator_ref(tmp_path: Path) -> None:
                 trigger: t
                 statuses:
                   - id: s1
-                    validators: [does-not-exist]
+                    tripwires: [does-not-exist]
                     terminal: true
             """
         ),
@@ -374,12 +452,13 @@ def test_validator_rejects_undeclared_validator_ref(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators={"schema-valid"},
+        known_tripwires={"schema-valid"},
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
     codes = [f.code for f in findings]
-    assert "workflow/unknown_validator" in codes
+    assert "workflow/unknown_tripwire" in codes
 
 
 def test_validator_rejects_undeclared_tripwire_ref(tmp_path: Path) -> None:
@@ -403,7 +482,8 @@ def test_validator_rejects_undeclared_tripwire_ref(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts={"self-review"},
         known_prompt_checks=set(),
     )
@@ -432,7 +512,8 @@ def test_validator_rejects_undeclared_prompt_check_ref(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks={"pm-session-launch"},
     )
@@ -463,7 +544,7 @@ def test_validator_rejects_bad_route_refs(tmp_path: Path) -> None:
                     from: planned
                     to: missing
                     controls:
-                      validators: [v_missing]
+                      tripwires: [v_missing]
                       jit_prompts: [missing-prompt]
                       prompt_checks: [pm-missing-check]
                     skills: [missing-skill]
@@ -478,7 +559,8 @@ def test_validator_rejects_bad_route_refs(tmp_path: Path) -> None:
 
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators={"v_uuid_present"},
+        known_tripwires={"v_uuid_present"},
+        known_heuristics=set(),
         known_jit_prompts={"self-review"},
         known_prompt_checks={"pm-session-spawn"},
         known_commands={"pm-session-spawn"},
@@ -492,7 +574,7 @@ def test_validator_rejects_bad_route_refs(tmp_path: Path) -> None:
     assert "workflow/unknown_route_status" in codes
     assert "workflow/unknown_command" in codes
     assert "workflow/unknown_skill" in codes
-    assert "workflow/unknown_validator" in codes
+    assert "workflow/unknown_tripwire" in codes
     assert "workflow/unknown_jit_prompt" in codes
     assert "workflow/unknown_prompt_check" in codes
 
@@ -523,7 +605,8 @@ def test_validator_rejects_terminal_with_next(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
@@ -553,7 +636,8 @@ def test_validator_rejects_duplicate_status_ids(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
@@ -584,7 +668,8 @@ def test_validator_rejects_no_terminal_status(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
@@ -608,7 +693,7 @@ def test_validator_clean_on_well_formed(tmp_path: Path) -> None:
                     next: executing
                     prompt_checks: [pm-session-launch]
                   - id: executing
-                    validators: [schema-valid]
+                    tripwires: [schema-valid]
                     jit_prompts: [cost-ceiling]
                     next:
                       - if: agent.role == frontend
@@ -626,7 +711,8 @@ def test_validator_clean_on_well_formed(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators={"schema-valid"},
+        known_tripwires={"schema-valid"},
+        known_heuristics=set(),
         known_jit_prompts={"cost-ceiling"},
         known_prompt_checks={"pm-session-launch"},
     )
@@ -700,7 +786,8 @@ def test_validator_warns_on_unknown_cross_link_workflow(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
@@ -737,7 +824,8 @@ def test_validator_warns_on_unknown_cross_link_status(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks=set(),
     )

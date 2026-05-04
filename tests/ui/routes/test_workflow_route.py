@@ -21,7 +21,7 @@ def _write_workflow(project_dir: Path) -> None:
                     next: queued
                   - id: queued
                     next: in_review
-                    validators: [v_uuid_present]
+                    tripwires: [v_uuid_present]
                     jit_prompts: [self-review]
                     artifacts:
                       produces:

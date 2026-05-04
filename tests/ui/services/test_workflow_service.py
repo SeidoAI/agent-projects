@@ -52,7 +52,7 @@ def _write_workflow(project_dir: Path) -> None:
                           path: sessions/{session_id}/plan.md
                   - id: executing
                     next: in_review
-                    validators: [v_uuid_present, v_reference_integrity]
+                    tripwires: [v_uuid_present, v_reference_integrity]
                     prompt_checks: [pm-session-queue]
                   - id: in_review
                     next:
@@ -76,7 +76,7 @@ def _write_workflow(project_dir: Path) -> None:
                     from: planned
                     to: queued
                     controls:
-                      validators: [v_reference_integrity]
+                      tripwires: [v_reference_integrity]
                       prompt_checks: [pm-session-queue]
                     skills: [project-manager]
                     emits:
@@ -109,7 +109,7 @@ def test_build_workflow_returns_workflow_first_shape(tmp_path: Path) -> None:
     assert set(payload) == {"project_id", "workflows", "registry", "drift"}
     assert payload["project_id"] == "abc"
     assert "lifecycle" not in payload
-    assert "validators" not in payload
+    assert "tripwires" not in payload
     assert "jit_prompts" not in payload
     assert "connectors" not in payload
     assert "artifacts" not in payload
@@ -134,7 +134,7 @@ def test_build_workflow_surfaces_statuses_from_workflow_yaml(tmp_path: Path) -> 
         "completed",
     ]
     executing = workflow["statuses"][2]
-    assert executing["validators"] == ["v_uuid_present", "v_reference_integrity"]
+    assert executing["tripwires"] == ["v_uuid_present", "v_reference_integrity"]
     assert executing["prompt_checks"] == ["pm-session-queue"]
     in_review = workflow["statuses"][3]
     assert in_review["next"]["kind"] == "conditional"
@@ -156,7 +156,7 @@ def test_build_workflow_surfaces_routes_from_workflow_yaml(tmp_path: Path) -> No
     assert route["from"] == "planned"
     assert route["to"] == "queued"
     assert route["kind"] == "forward"
-    assert route["controls"]["validators"] == ["v_reference_integrity"]
+    assert route["controls"]["tripwires"] == ["v_reference_integrity"]
     assert route["controls"]["prompt_checks"] == ["pm-session-queue"]
     assert route["skills"] == ["project-manager"]
     assert route["emits"]["artifacts"] == [
@@ -197,10 +197,10 @@ def test_build_workflow_joins_registry_metadata(tmp_path: Path) -> None:
     payload = build_workflow(project_dir, project_id="abc", is_pm_role=False)
     registry = payload["registry"]
 
-    validators = {entry["id"]: entry for entry in registry["validators"]}
-    assert "v_uuid_present" in validators
-    assert validators["v_uuid_present"]["blocking"] is True
-    assert validators["v_uuid_present"]["label"] == "uuid present"
+    tripwires = {entry["id"]: entry for entry in registry["tripwires"]}
+    assert "v_uuid_present" in tripwires
+    assert tripwires["v_uuid_present"]["blocking"] is True
+    assert tripwires["v_uuid_present"]["label"] == "uuid present"
 
     prompts = {entry["id"]: entry for entry in registry["jit_prompts"]}
     assert "self-review" in prompts
