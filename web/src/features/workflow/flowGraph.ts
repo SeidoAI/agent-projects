@@ -819,6 +819,11 @@ export function buildUnifiedFlow(
   // Map (workflowId, statusId) → namespaced status node id, so cross-link
   // edges can find the correct target across bands.
   const statusNodeIdByLink = new Map<string, string>();
+  // Map (workflowId, statusId) → ordered list of namespaced work_step
+  // ids (in declared order). Used to anchor cross-link dots to the
+  // *specific* work_step that triggers / receives the handoff (default:
+  // last work_step on source side, first on target side).
+  const workStepIdsByStatus = new Map<string, string[]>();
 
   for (const wf of graph.workflows) {
     const sub = buildFlow(wf, opts);
@@ -857,6 +862,17 @@ export function buildUnifiedFlow(
       if (n.id.startsWith("status:")) {
         const statusId = n.id.slice("status:".length);
         statusNodeIdByLink.set(`${wf.id}|${statusId}`, newId);
+      } else if (n.id.startsWith("work:")) {
+        // n.id format: `work:<statusId>:<workStepId>`
+        const rest = n.id.slice("work:".length);
+        const colon = rest.indexOf(":");
+        if (colon !== -1) {
+          const statusId = rest.slice(0, colon);
+          const key = `${wf.id}|${statusId}`;
+          const list = workStepIdsByStatus.get(key) ?? [];
+          list.push(newId);
+          workStepIdsByStatus.set(key, list);
+        }
       }
     }
     for (const e of sub.edges) {
@@ -889,33 +905,44 @@ export function buildUnifiedFlow(
       for (let i = 0; i < links.length; i += 1) {
         const link = links[i];
         if (!link || link.kind === "triggered_by") continue;
-        const sourceId = statusNodeIdByLink.get(`${wf.id}|${status.id}`);
-        const targetId = statusNodeIdByLink.get(
-          `${link.workflow}|${link.status}`,
-        );
-        if (!sourceId || !targetId) continue;
+        // Anchor parents: prefer the SPECIFIC work_step that triggers /
+        // receives the handoff. Default — source side: the LAST work_step
+        // of the source status (the work the actor finishes before
+        // triggering); target side: the FIRST work_step of the target
+        // status (the entry-point work for the incoming handoff). Fall
+        // back to the status region if a side has no work_steps.
+        const srcWorkSteps = workStepIdsByStatus.get(`${wf.id}|${status.id}`) ?? [];
+        const tgtWorkSteps =
+          workStepIdsByStatus.get(`${link.workflow}|${link.status}`) ?? [];
+        const sourceParentId =
+          srcWorkSteps[srcWorkSteps.length - 1] ??
+          statusNodeIdByLink.get(`${wf.id}|${status.id}`);
+        const targetParentId =
+          tgtWorkSteps[0] ??
+          statusNodeIdByLink.get(`${link.workflow}|${link.status}`);
+        if (!sourceParentId || !targetParentId) continue;
 
-        // Emit source + target endpoint dots, parented to their
-        // respective status regions. Click handler on each dot jumps
-        // to the OTHER endpoint's band (wired in WorkflowFlowchart).
+        // Emit source + target endpoint dots, parented to the specific
+        // work_step (or fallback region) on each side. Click handler on
+        // each dot jumps to the OTHER endpoint's band (wired in
+        // WorkflowFlowchart).
         const srcDotId = `xdot:src:${wf.id}:${status.id}:${i}`;
         const tgtDotId = `xdot:tgt:${wf.id}:${status.id}:${i}`;
-        const srcRegion = allNodes.find((n) => n.id === sourceId);
-        const tgtRegion = allNodes.find((n) => n.id === targetId);
-        const srcW = (srcRegion?.style as { width?: number } | undefined)
-          ?.width ?? MIN_REGION_W;
-        const srcH = (srcRegion?.style as { height?: number } | undefined)
-          ?.height ?? REGION_H;
-        const tgtW = (tgtRegion?.style as { width?: number } | undefined)
-          ?.width ?? MIN_REGION_W;
-        // South dot on source region: bottom-centre, half outside.
-        // Explicit width/height so ReactFlow can position before measure;
-        // pointerEvents: auto overrides the band parent's "none" so the
-        // dot stays clickable.
+        const srcParent = allNodes.find((n) => n.id === sourceParentId);
+        const tgtParent = allNodes.find((n) => n.id === targetParentId);
+        const srcW = (srcParent?.style as { width?: number } | undefined)
+          ?.width ?? WORK_W;
+        const srcH = (srcParent?.style as { height?: number } | undefined)
+          ?.height ?? WORK_H;
+        const tgtW = (tgtParent?.style as { width?: number } | undefined)
+          ?.width ?? WORK_W;
+        // South dot at the bottom-centre of the source work_step (or
+        // region fallback). Explicit width/height so ReactFlow can
+        // measure; pointerEvents:auto overrides the band's "none".
         allNodes.push({
           id: srcDotId,
           type: "crosslinkEndpoint",
-          parentId: sourceId,
+          parentId: sourceParentId,
           position: {
             x: srcW / 2 - CROSSLINK_DOT_SIZE / 2,
             y: srcH - CROSSLINK_DOT_SIZE / 2,
@@ -936,11 +963,12 @@ export function buildUnifiedFlow(
             label: link.label ?? null,
           },
         });
-        // North dot on target region: top-centre, half outside.
+        // North dot at the top-centre of the target work_step (or
+        // region fallback).
         allNodes.push({
           id: tgtDotId,
           type: "crosslinkEndpoint",
-          parentId: targetId,
+          parentId: targetParentId,
           position: {
             x: tgtW / 2 - CROSSLINK_DOT_SIZE / 2,
             y: -CROSSLINK_DOT_SIZE / 2,

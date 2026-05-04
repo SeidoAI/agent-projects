@@ -238,7 +238,9 @@ const triageFixture: WorkflowDefinition = {
       jit_prompts: [],
       prompt_checks: [],
       artifacts: { produces: [], consumes: [] },
-      work_steps: [],
+      work_steps: [
+        { id: "act", actor: "pm-agent", label: "act", skills: [] },
+      ],
       cross_links: [
         {
           workflow: "coding-session",
@@ -325,7 +327,12 @@ describe("buildUnifiedFlow", () => {
     expect(dots).toHaveLength(2);
     const src = dots.find((n) => n.id === "xdot:src:pm-triage:act:0");
     const tgt = dots.find((n) => n.id === "xdot:tgt:pm-triage:act:0");
-    expect(src?.parentId).toBe("band:pm-triage:status:act");
+    // Dots anchor to the SPECIFIC work_step that triggers / receives the
+    // cross-link (default: source = last work_step of source status,
+    // target = first work_step of target status), not the status region.
+    expect(src?.parentId).toBe("band:pm-triage:work:act:act");
+    // coding-session.planned has no work_steps in this fixture, so the
+    // target dot falls back to the status region.
     expect(tgt?.parentId).toBe("band:coding-session:status:planned");
   });
 
