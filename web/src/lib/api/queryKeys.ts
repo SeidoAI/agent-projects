@@ -55,9 +55,6 @@ export const queryKeys = {
   workflowStats: (pid: string, params: object) =>
     ["projects", pid, "workflow-stats", params] as const,
 
-  // Drift report (KUI-157 / I4).
-  drift: (pid: string) => ["projects", pid, "drift"] as const,
-
   // v2 (declared but unused in v1 — placeholder to avoid churn later)
   containers: () => ["containers"] as const,
   messages: (sid: string) => ["messages", sid] as const,

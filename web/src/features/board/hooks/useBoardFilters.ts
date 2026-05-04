@@ -17,9 +17,14 @@ import { useSearchParams } from "react-router-dom";
  *  §3.3 it must preserve filter state across switches — keeping it
  *  in the same URL achieves that for free. */
 export type BoardView = "sessions" | "issues";
+export type BoardMode = "board" | "graph";
 
 export interface BoardFilters {
   view: BoardView;
+  /** Board renders the kanban columns; graph renders a layered DAG.
+   *  The two are independent of `view`, so the four-cell matrix
+   *  (sessions/issues × board/graph) is fully URL-addressable. */
+  mode: BoardMode;
   agents: Set<string>;
   owners: Set<string>;
   ages: Set<string>;
@@ -30,6 +35,7 @@ export interface BoardFilters {
 export interface BoardFilterControls {
   filters: BoardFilters;
   setView: (view: BoardView) => void;
+  setMode: (mode: BoardMode) => void;
   toggleAgent: (agent: string) => void;
   toggleOwner: (owner: string) => void;
   toggleAge: (age: string) => void;
@@ -39,6 +45,7 @@ export interface BoardFilterControls {
 }
 
 const PARAM_VIEW = "view";
+const PARAM_MODE = "mode";
 const PARAM_AGENT = "agent";
 const PARAM_OWNER = "owner";
 const PARAM_AGE = "age";
@@ -64,12 +71,18 @@ function readView(params: URLSearchParams): BoardView {
   return raw === "issues" ? "issues" : "sessions";
 }
 
+function readMode(params: URLSearchParams): BoardMode {
+  const raw = params.get(PARAM_MODE);
+  return raw === "graph" ? "graph" : "board";
+}
+
 export function useBoardFilters(): BoardFilterControls {
   const [params, setParams] = useSearchParams();
 
   const filters = useMemo<BoardFilters>(
     () => ({
       view: readView(params),
+      mode: readMode(params),
       agents: readSet(params, PARAM_AGENT),
       owners: readSet(params, PARAM_OWNER),
       ages: readSet(params, PARAM_AGE),
@@ -98,6 +111,16 @@ export function useBoardFilters(): BoardFilterControls {
       update((next) => {
         if (view === "sessions") next.delete(PARAM_VIEW);
         else next.set(PARAM_VIEW, view);
+      });
+    },
+    [update],
+  );
+
+  const setMode = useCallback(
+    (mode: BoardMode) => {
+      update((next) => {
+        if (mode === "board") next.delete(PARAM_MODE);
+        else next.set(PARAM_MODE, mode);
       });
     },
     [update],
@@ -145,6 +168,7 @@ export function useBoardFilters(): BoardFilterControls {
   return {
     filters,
     setView,
+    setMode,
     toggleAgent,
     toggleOwner,
     toggleAge,

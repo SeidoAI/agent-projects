@@ -12,7 +12,9 @@ import { cn } from "@/lib/utils";
 import { FilterPills } from "./FilterPills";
 import { useBlockedInbox } from "./hooks/useBlockedInbox";
 import { ageBucket, useBoardFilters } from "./hooks/useBoardFilters";
+import { IssuesGraphView } from "./IssuesGraphView";
 import { IssuesView } from "./IssuesView";
+import { SessionsGraphView } from "./SessionsGraphView";
 import { SessionsView } from "./SessionsView";
 
 /**
@@ -73,15 +75,18 @@ export function Board() {
             Board
           </h1>
           <p className="mt-0.5 font-serif text-[14px] text-(--color-ink-2) italic">
-            everything in flight, by station
+            everything in flight — by station, or as a dependency graph
           </p>
         </div>
-        <ViewToggle
-          value={filters.view}
-          onChange={boardFilters.setView}
-          sessionsCount={filteredSessions.length}
-          issuesCount={filteredIssues.length}
-        />
+        <div className="flex items-center gap-2">
+          <ViewToggle
+            value={filters.view}
+            onChange={boardFilters.setView}
+            sessionsCount={filteredSessions.length}
+            issuesCount={filteredIssues.length}
+          />
+          <ModeToggle value={filters.mode} onChange={boardFilters.setMode} />
+        </div>
       </header>
 
       <FilterPills
@@ -101,8 +106,8 @@ export function Board() {
         onClearAll={boardFilters.clearAll}
       />
 
-      {filters.view === "sessions" ? (
-        <div className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1">
+        {filters.view === "sessions" && filters.mode === "board" && (
           <SessionsView
             sessions={filteredSessions}
             blockedInbox={blockedInbox}
@@ -110,9 +115,14 @@ export function Board() {
             onCardClick={(s) => setDrawer({ kind: "session", session: s })}
             onCrossLinkClick={(s) => openInbox(s.id, blockedInbox.bySession.get(s.id), setDrawer)}
           />
-        </div>
-      ) : (
-        <div className="min-h-0 flex-1">
+        )}
+        {filters.view === "sessions" && filters.mode === "graph" && (
+          <SessionsGraphView
+            sessions={filteredSessions}
+            onNodeClick={(s) => setDrawer({ kind: "session", session: s })}
+          />
+        )}
+        {filters.view === "issues" && filters.mode === "board" && (
           <IssuesView
             projectId={projectId}
             issues={filteredIssues}
@@ -121,8 +131,15 @@ export function Board() {
             onCardClick={(i) => setDrawer({ kind: "issue", issue: i })}
             onCrossLinkClick={(i) => openInbox(i.id, blockedInbox.byIssue.get(i.id), setDrawer)}
           />
-        </div>
-      )}
+        )}
+        {filters.view === "issues" && filters.mode === "graph" && (
+          <IssuesGraphView
+            issues={filteredIssues}
+            statusValues={statusEnumQuery.data?.values ?? []}
+            onNodeClick={(i) => setDrawer({ kind: "issue", issue: i })}
+          />
+        )}
+      </div>
 
       <BoardDrawer projectId={projectId} target={drawer} onClose={() => setDrawer(null)} />
     </div>
@@ -175,20 +192,53 @@ function ViewToggle({
   );
 }
 
+function ModeToggle({
+  value,
+  onChange,
+}: {
+  value: "board" | "graph";
+  onChange: (v: "board" | "graph") => void;
+}) {
+  return (
+    <fieldset
+      aria-label="Board mode"
+      className="m-0 inline-flex items-center gap-0 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) p-0.5"
+    >
+      <ToggleButton
+        active={value === "board"}
+        onClick={() => onChange("board")}
+        testId="board-mode-board"
+      >
+        board
+      </ToggleButton>
+      <ToggleButton
+        active={value === "graph"}
+        onClick={() => onChange("graph")}
+        testId="board-mode-graph"
+      >
+        graph
+      </ToggleButton>
+    </fieldset>
+  );
+}
+
 function ToggleButton({
   active,
   onClick,
   children,
+  testId,
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
+  testId?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
+      data-testid={testId}
       className={cn(
         "rounded-(--radius-stamp) px-3 py-1 font-mono text-[11px] tracking-[0.06em] transition-colors",
         active

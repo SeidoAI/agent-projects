@@ -152,4 +152,98 @@ describe("Board", () => {
     const openFull = screen.getByRole("link", { name: /open full/i });
     expect(openFull).toHaveAttribute("href", "/p/p1/sessions/abc");
   });
+
+  // ===========================================================================
+  // 2x2 matrix: view ∈ {sessions, issues} × mode ∈ {board, graph}
+  // ===========================================================================
+  describe("mode toggle", () => {
+    it("renders both ModeToggle buttons defaulting to board", async () => {
+      const qc = makeQc();
+      qc.setQueryData(queryKeys.sessions("p1"), []);
+      qc.setQueryData(queryKeys.issues("p1"), []);
+      qc.setQueryData(queryKeys.enum("p1", "issue_status"), { name: "x", values: [] });
+      qc.setQueryData(queryKeys.inboxFiltered("p1", { bucket: "blocked" }), []);
+
+      renderBoard({ qc });
+
+      expect(screen.getByTestId("board-mode-board")).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByTestId("board-mode-graph")).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("renders SessionsGraphView when (view=sessions, mode=graph)", async () => {
+      const qc = makeQc();
+      qc.setQueryData(queryKeys.sessions("p1"), [
+        makeSession({ id: "alpha", name: "Alpha", status: "executing" }),
+      ]);
+      qc.setQueryData(queryKeys.issues("p1"), []);
+      qc.setQueryData(queryKeys.enum("p1", "issue_status"), { name: "x", values: [] });
+      qc.setQueryData(queryKeys.inboxFiltered("p1", { bucket: "blocked" }), []);
+
+      renderBoard({ qc, initialPath: "/p/p1/board?mode=graph" });
+
+      expect(screen.getByTestId("sessions-graph-view")).toBeInTheDocument();
+      // SessionFlow renders an SVG <g> per session with this testid.
+      expect(screen.getByTestId("session-flow-node-alpha")).toBeInTheDocument();
+    });
+
+    it("renders IssuesGraphView when (view=issues, mode=graph)", async () => {
+      const qc = makeQc();
+      qc.setQueryData(queryKeys.sessions("p1"), []);
+      qc.setQueryData(queryKeys.issues("p1"), [
+        makeIssue({ id: "K-1", title: "Root issue" }),
+        makeIssue({ id: "K-2", title: "Blocked by K-1", blocked_by: ["K-1"] }),
+      ]);
+      qc.setQueryData(queryKeys.enum("p1", "issue_status"), {
+        name: "issue_status",
+        values: [
+          { value: "backlog", label: "Backlog", color: "#888", description: null },
+          { value: "done", label: "Done", color: "#0a0", description: null },
+        ],
+      });
+      qc.setQueryData(queryKeys.inboxFiltered("p1", { bucket: "blocked" }), []);
+
+      renderBoard({ qc, initialPath: "/p/p1/board?view=issues&mode=graph" });
+
+      expect(screen.getByTestId("issues-graph-view")).toBeInTheDocument();
+      expect(screen.getByTestId("issues-graph-node-K-1")).toBeInTheDocument();
+      expect(screen.getByTestId("issues-graph-node-K-2")).toBeInTheDocument();
+    });
+
+    it("clicking the graph button while on issues view persists mode=graph in the URL", async () => {
+      const qc = makeQc();
+      qc.setQueryData(queryKeys.sessions("p1"), []);
+      qc.setQueryData(queryKeys.issues("p1"), []);
+      qc.setQueryData(queryKeys.enum("p1", "issue_status"), { name: "x", values: [] });
+      qc.setQueryData(queryKeys.inboxFiltered("p1", { bucket: "blocked" }), []);
+
+      renderBoard({ qc, initialPath: "/p/p1/board?view=issues" });
+
+      // Default mode is board on landing
+      expect(screen.getByTestId("board-mode-board")).toHaveAttribute("aria-pressed", "true");
+      fireEvent.click(screen.getByTestId("board-mode-graph"));
+      expect(screen.getByTestId("board-mode-graph")).toHaveAttribute("aria-pressed", "true");
+      // The graph quadrant for issues took over.
+      expect(screen.getByTestId("issues-graph-empty")).toBeInTheDocument();
+    });
+
+    it("clicking an issue node in graph mode opens the entity drawer", async () => {
+      const qc = makeQc();
+      qc.setQueryData(queryKeys.sessions("p1"), []);
+      qc.setQueryData(queryKeys.issues("p1"), [
+        makeIssue({ id: "K-9", title: "Drawer me" }),
+      ]);
+      qc.setQueryData(queryKeys.enum("p1", "issue_status"), {
+        name: "issue_status",
+        values: [{ value: "backlog", label: "Backlog", color: null, description: null }],
+      });
+      qc.setQueryData(queryKeys.inboxFiltered("p1", { bucket: "blocked" }), []);
+
+      renderBoard({ qc, initialPath: "/p/p1/board?view=issues&mode=graph" });
+
+      fireEvent.click(screen.getByTestId("issues-graph-node-K-9"));
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "Drawer me" })).toBeInTheDocument();
+      });
+    });
+  });
 });

@@ -32,7 +32,6 @@ function renderRoute(path: string) {
         { index: true, element: <Navigate to="board" replace /> },
         { path: "board", element: <Stub name="Board" /> },
         { path: "graph", element: <Stub name="ConceptGraph" /> },
-        { path: "sessions", element: <Stub name="SessionList" /> },
         { path: "workflow", element: <Stub name="WorkflowMap" /> },
       ],
     },
@@ -63,7 +62,11 @@ describe("Router", () => {
     expect(screen.getByRole("link", { name: /board/ })).toBeDefined();
     expect(screen.getByRole("link", { name: /workflow/ })).toBeDefined();
     expect(screen.getByRole("link", { name: /concepts/ })).toBeDefined();
-    expect(screen.getByRole("link", { name: /sessions/ })).toBeDefined();
+    expect(screen.getByRole("link", { name: /quality/ })).toBeDefined();
+    // /sessions removed in the v0.9.7 board 2x2 refactor: sessions now
+    // live on the Board (sessions × board, sessions × graph quadrants);
+    // SessionDetail still routes at /sessions/:sid but no top nav item.
+    expect(screen.queryByRole("link", { name: /^sessions$/i })).toBeNull();
   });
 
   it("renders the workflow stub at /workflow", () => {
