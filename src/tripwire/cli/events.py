@@ -3,7 +3,7 @@
 Subcommands:
 
 - ``tail`` — show the most recent N events (default 20).
-- ``filter`` — narrow by workflow, instance, station, and/or event kind.
+- ``filter`` — narrow by workflow, instance, status, and/or event kind.
 
 Both emit one JSON object per line (matches the on-disk format), so
 output pipes cleanly into ``jq`` and other line-oriented tooling.
@@ -62,7 +62,7 @@ def events_tail_cmd(project_dir: Path, limit: int) -> None:
 )
 @click.option("--workflow", "workflow", default=None)
 @click.option("--instance", "instance", default=None)
-@click.option("--station", "station", default=None)
+@click.option("--status", "status", default=None)
 @click.option("--event", "event", default=None)
 @click.option(
     "--limit",
@@ -75,11 +75,11 @@ def events_filter_cmd(
     project_dir: Path,
     workflow: str | None,
     instance: str | None,
-    station: str | None,
+    status: str | None,
     event: str | None,
     limit: int,
 ) -> None:
-    """Filter events by workflow / instance / station / event kind.
+    """Filter events by workflow / instance / status / event kind.
 
     Each filter narrows the result set; omitted filters are wildcards.
     """
@@ -91,7 +91,7 @@ def events_filter_cmd(
             resolved,
             workflow=workflow,
             instance=instance,
-            station=station,
+            status=status,
             event=event,
         )
     )

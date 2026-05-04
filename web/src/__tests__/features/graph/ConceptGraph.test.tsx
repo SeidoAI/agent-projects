@@ -211,6 +211,114 @@ describe("ConceptGraph layout (PM #25 round 2)", () => {
     expect(canvas?.contains(sidebar as Node)).toBe(false);
   });
 
+  it("clicking the drift header's stale-only toggle dims non-stale nodes", () => {
+    // Drift restored as a header card on the Concepts page (the
+    // /drift route was retired in v0.9.7). The "show stale only"
+    // toggle is the in-page drift filter — non-stale nodes get
+    // data-dim="true" so the user can scan only the drift surface.
+    const wrapper = withSeed({
+      nodes: [
+        {
+          id: "fresh-1",
+          type: "concept",
+          position: { x: 100, y: 100 },
+          data: { label: "Fresh", type: "model", status: "active", has_saved_layout: true },
+        },
+        {
+          id: "stale-1",
+          type: "concept",
+          position: { x: 300, y: 100 },
+          data: { label: "Stale", type: "model", status: "stale", has_saved_layout: true },
+        },
+      ],
+      edges: [],
+      meta: {
+        kind: "concept",
+        focus: null,
+        upstream: false,
+        downstream: false,
+        depth: null,
+        node_count: 2,
+        edge_count: 0,
+        orphans: [],
+      },
+    });
+    const { container } = render(<ConceptGraph />, { wrapper });
+    const fresh = () => container.querySelector("[data-testid='node-group-fresh-1']");
+    const stale = () => container.querySelector("[data-testid='node-group-stale-1']");
+
+    // Initially: stale-only is off, neither node is dim.
+    expect(fresh()?.getAttribute("data-dim")).toBe("false");
+    expect(stale()?.getAttribute("data-dim")).toBe("false");
+
+    // Click the toggle in the drift header.
+    const toggle = screen.getByTestId("drift-stale-only-toggle");
+    expect(toggle).toHaveTextContent(/show stale only · 1/i);
+    fireEvent.click(toggle);
+
+    // Stale node still reads clearly; the fresh node dims.
+    expect(stale()?.getAttribute("data-dim")).toBe("false");
+    expect(fresh()?.getAttribute("data-dim")).toBe("true");
+  });
+
+  it("encodes type-driven node sizing — principles render larger than glossary nodes", () => {
+    // P2 from PR review: the TYPE_SIZE_SCALE table at the top of
+    // ConceptGraph.tsx had no behavioural test. A row deletion
+    // (or accidental flattening of all scales to 1.0) would silently
+    // regress the visual hierarchy. We pin only the ORDERING — exact
+    // pixel radii are calibration knobs that should stay free to
+    // tune. Today: principle/invariant 1.4× > model/decision 1.0× >
+    // glossary/practice 0.85×.
+    const wrapper = withSeed({
+      nodes: [
+        {
+          id: "principle-x",
+          type: "concept",
+          position: { x: 100, y: 100 },
+          data: { label: "P", type: "principle", has_saved_layout: true },
+        },
+        {
+          id: "model-x",
+          type: "concept",
+          position: { x: 300, y: 100 },
+          data: { label: "M", type: "model", has_saved_layout: true },
+        },
+        {
+          id: "glossary-x",
+          type: "concept",
+          position: { x: 500, y: 100 },
+          data: { label: "G", type: "glossary", has_saved_layout: true },
+        },
+      ],
+      edges: [],
+      meta: {
+        kind: "concept",
+        focus: null,
+        upstream: false,
+        downstream: false,
+        depth: null,
+        node_count: 3,
+        edge_count: 0,
+        orphans: [],
+      },
+    });
+    const { container } = render(<ConceptGraph />, { wrapper });
+    const r = (id: string) =>
+      Number(
+        container
+          .querySelector(`[data-testid='node-circle-${id}']`)
+          ?.getAttribute("r"),
+      );
+    const rPrinciple = r("principle-x");
+    const rModel = r("model-x");
+    const rGlossary = r("glossary-x");
+    // Strict ordering — the table being adjusted up or down is
+    // fine; flattening to a single radius is the regression we
+    // want to catch.
+    expect(rPrinciple).toBeGreaterThan(rModel);
+    expect(rModel).toBeGreaterThan(rGlossary);
+  });
+
   it("truncates long node labels on the canvas to keep dense layouts readable (P1)", () => {
     const longLabel = "this is an extremely long concept node label";
     const wrapper = withSeed({
@@ -421,9 +529,7 @@ describe("ConceptGraph", () => {
     });
     const { container } = render(<ConceptGraph />, { wrapper });
     const get = (rel: string) =>
-      container.querySelector(
-        `[data-edge-relation='${rel}']`,
-      ) as SVGLineElement | null;
+      container.querySelector(`[data-edge-relation='${rel}']`) as SVGLineElement | null;
     expect(get("cites")?.getAttribute("stroke-dasharray")).toBe("0");
     expect(get("references")?.getAttribute("stroke-dasharray")).toBe("0");
     expect(get("related")?.getAttribute("stroke-dasharray")).toBe("3 3");
@@ -508,5 +614,103 @@ describe("ConceptGraph rail", () => {
     // alongside the sidebar entry — assert the rail-specific shape.
     expect(screen.getByText(/\[\[User model\]\]/)).toBeInTheDocument();
     expect(screen.getByText(/version · vabc1234/i)).toBeInTheDocument();
+  });
+});
+
+describe("ConceptGraph auto-arrange button", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("flips to 'Re-layout all' (enabled) when every node has a saved layout", () => {
+    // PM #25 round 5: a disabled "All nodes positioned" state
+    // stranded users whose positions all came from automatic
+    // seeding (not user drags). The button now flips to a
+    // "Re-layout all" mode that un-pins everything for one pass.
+    const wrapper = withSeed(makeGraph()); // every node in makeGraph has has_saved_layout: true
+    render(<ConceptGraph />, { wrapper });
+    const btn = screen.getByRole("button", { name: /re-layout every concept node/i });
+    expect(btn).not.toBeDisabled();
+    expect(btn.textContent ?? "").toMatch(/re-layout all/i);
+  });
+
+  it("shows the unsaved count and is enabled when unsaved nodes exist", () => {
+    const wrapper = withSeed({
+      nodes: [
+        {
+          id: "saved-1",
+          type: "concept",
+          position: { x: 100, y: 100 },
+          data: { label: "Saved", type: "model", has_saved_layout: true },
+        },
+        {
+          id: "unsaved-1",
+          type: "concept",
+          position: { x: 0, y: 0 },
+          data: { label: "Unsaved A", type: "principle" },
+        },
+        {
+          id: "unsaved-2",
+          type: "concept",
+          position: { x: 0, y: 0 },
+          data: { label: "Unsaved B", type: "principle" },
+        },
+      ],
+      edges: [{ id: "e1", source: "saved-1", target: "unsaved-1", relation: "related", data: {} }],
+      meta: {
+        kind: "concept",
+        focus: null,
+        upstream: false,
+        downstream: false,
+        depth: null,
+        node_count: 3,
+        edge_count: 1,
+        orphans: [],
+      },
+    });
+    render(<ConceptGraph />, { wrapper });
+    const btn = screen.getByRole("button", { name: /auto-arrange unsaved nodes/i });
+    expect(btn).not.toBeDisabled();
+    expect(btn.textContent ?? "").toMatch(/auto-arrange \(2 unsaved\)/i);
+  });
+
+  it("clicking the button does not throw and the button stays present", () => {
+    // Smoke test for the click path: bumps reseedNonce → useGraphLayout
+    // re-runs → useLayoutPersistence buffers a PATCH on debounce.
+    // The persistence layer is debounced and tested separately; here
+    // we verify the click is safe and the UI stays responsive.
+    const wrapper = withSeed({
+      nodes: [
+        {
+          id: "anchor",
+          type: "concept",
+          position: { x: 200, y: 200 },
+          data: { label: "Anchor", type: "model", has_saved_layout: true },
+        },
+        {
+          id: "drifter",
+          type: "concept",
+          position: { x: 0, y: 0 },
+          data: { label: "Drifter", type: "principle" },
+        },
+      ],
+      edges: [{ id: "e1", source: "anchor", target: "drifter", relation: "related", data: {} }],
+      meta: {
+        kind: "concept",
+        focus: null,
+        upstream: false,
+        downstream: false,
+        depth: null,
+        node_count: 2,
+        edge_count: 1,
+        orphans: [],
+      },
+    });
+    render(<ConceptGraph />, { wrapper });
+    const btn = screen.getByRole("button", { name: /auto-arrange unsaved nodes/i });
+    expect(() => fireEvent.click(btn)).not.toThrow();
+    // Button still visible after the click; not in an error state.
+    expect(screen.getByRole("button", { name: /auto-arrange unsaved nodes/i })).toBeInTheDocument();
   });
 });

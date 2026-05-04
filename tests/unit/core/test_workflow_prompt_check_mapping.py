@@ -1,11 +1,4 @@
-"""Prompt-check station mapping (KUI-122).
-
-Each PM-skill slash command file declares ``fires_at: <station-id>``
-in its YAML frontmatter. The workflow registry indexes commands by
-station so the gate runner (KUI-159) can ask "what prompt-checks fire
-at station X?" and the well-formedness validator can resolve
-workflow.yaml's ``prompt_checks: [...]`` refs against the registry.
-"""
+"""Prompt-check implementation catalog for workflow.yaml references."""
 
 from __future__ import annotations
 
@@ -13,67 +6,24 @@ from pathlib import Path
 from textwrap import dedent
 
 
-def test_collect_prompt_checks_returns_packaged_session_commands(
-    tmp_path: Path,
-) -> None:
-    """The packaged ``templates/commands/`` directory ships PM session
-    commands with ``fires_at:`` declared. The collector must surface
-    every one."""
+def test_collect_prompt_checks_returns_packaged_commands(tmp_path: Path) -> None:
     from tripwire.core.workflow.prompt_checks import collect_prompt_checks
 
-    pcs = collect_prompt_checks(tmp_path)
-    ids = {pc.id for pc in pcs}
-    expected = {
-        "pm-session-create",
-        "pm-session-queue",
-        "pm-session-spawn",
-        "pm-session-review",
-        "pm-session-complete",
-    }
-    missing = expected - ids
-    assert not missing, (
-        f"PM session commands missing `fires_at:` frontmatter: {missing}"
-    )
-
-
-def test_collect_prompt_checks_filters_non_workflow_commands(
-    tmp_path: Path,
-) -> None:
-    """Slash commands without ``fires_at:`` (general PM tools like
-    pm-validate, pm-status) are not surfaced through the
-    workflow-station registry."""
-    from tripwire.core.workflow.prompt_checks import collect_prompt_checks
-
-    pcs = collect_prompt_checks(tmp_path)
-    ids = {pc.id for pc in pcs}
-    # These are PM tools, not workflow-station prompt-checks.
-    assert "pm-validate" not in ids
-    assert "pm-status" not in ids
-    assert "pm-edit" not in ids
+    ids = {pc.id for pc in collect_prompt_checks(tmp_path)}
+    assert "pm-session-queue" in ids
+    assert "pm-session-review" in ids
+    assert "pm-validate" in ids
 
 
 def test_known_prompt_check_ids_returns_packaged_set(tmp_path: Path) -> None:
     from tripwire.core.workflow.registry import known_prompt_check_ids
 
     ids = known_prompt_check_ids(tmp_path)
-    # Sanity check on the workflow.yaml.j2 references.
     assert "pm-session-queue" in ids
-    assert "pm-session-spawn" in ids
     assert "pm-session-review" in ids
 
 
-def test_prompt_checks_for_station_groups_by_fires_at(tmp_path: Path) -> None:
-    from tripwire.core.workflow.registry import prompt_checks_for_station
-
-    queued = prompt_checks_for_station(tmp_path, "queued")
-    assert "pm-session-queue" in queued
-    in_review = prompt_checks_for_station(tmp_path, "in_review")
-    assert "pm-session-review" in in_review
-
-
 def test_project_local_override_wins_over_packaged(tmp_path: Path) -> None:
-    """Project-local ``.tripwire/commands/<name>.md`` shadows the
-    packaged default — the override wins for that command id."""
     from tripwire.core.workflow.prompt_checks import collect_prompt_checks
 
     overrides = tmp_path / ".tripwire" / "commands"
@@ -83,7 +33,6 @@ def test_project_local_override_wins_over_packaged(tmp_path: Path) -> None:
             """\
             ---
             name: pm-session-spawn
-            fires_at: planned
             description: project-local override
             ---
 
@@ -92,14 +41,13 @@ def test_project_local_override_wins_over_packaged(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
+
     pcs = {pc.id: pc for pc in collect_prompt_checks(tmp_path)}
-    assert pcs["pm-session-spawn"].fires_at == "planned"
+    assert pcs["pm-session-spawn"].description == "project-local override"
+    assert pcs["pm-session-spawn"].source == overrides / "pm-session-spawn.md"
 
 
 def test_workflow_well_formed_resolves_prompt_check_refs(tmp_path: Path) -> None:
-    """workflow.yaml's ``prompt_checks: [...]`` refs against ids that
-    are not declared via ``fires_at:`` produce a
-    ``workflow/unknown_prompt_check`` finding."""
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
@@ -107,7 +55,7 @@ def test_workflow_well_formed_resolves_prompt_check_refs(tmp_path: Path) -> None
               w:
                 actor: a
                 trigger: t
-                stations:
+                statuses:
                   - id: s1
                     next: s2
                     prompt_checks: [pm-session-queue, does-not-exist]
@@ -117,8 +65,6 @@ def test_workflow_well_formed_resolves_prompt_check_refs(tmp_path: Path) -> None
         ),
         encoding="utf-8",
     )
-    # Need a project.yaml so the validator's project loader doesn't
-    # complain — this test is about workflow refs only.
     (tmp_path / "project.yaml").write_text(
         "name: test\nkey_prefix: TST\nbase_branch: main\nstatuses: [planned]\n"
         "status_transitions:\n  planned: []\nrepos: {}\nnext_issue_number: 1\n"
@@ -132,7 +78,16 @@ def test_workflow_well_formed_resolves_prompt_check_refs(tmp_path: Path) -> None
     findings = check_workflow_well_formed(ctx)
     codes = [f.code for f in findings]
     assert "workflow/unknown_prompt_check" in codes
-    # The known one (pm-session-queue) does NOT fire a finding.
     msgs = [f.message for f in findings if f.code == "workflow/unknown_prompt_check"]
     assert any("does-not-exist" in m for m in msgs)
     assert not any("pm-session-queue" in m for m in msgs)
+
+
+def test_no_prompt_check_fires_at_frontmatter_remains() -> None:
+    root = Path("src/tripwire/templates/commands")
+    offenders = [
+        str(path)
+        for path in root.glob("*.md")
+        if "fires_at:" in path.read_text(encoding="utf-8")
+    ]
+    assert offenders == []

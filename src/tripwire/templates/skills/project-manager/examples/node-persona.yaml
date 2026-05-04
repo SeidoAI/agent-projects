@@ -1,0 +1,41 @@
+---
+uuid: f9410f4c-408c-4027-be78-83eb04c000f5
+id: persona-pm-agent
+type: persona
+name: PM agent
+description: Project-management actor — scopes work, curates the inbox, reviews PRs, allocates IDs.
+related: []
+tags: [actor, agent]
+status: active
+created_at: "2026-03-15T14:00:00"
+updated_at: "2026-03-15T14:00:00"
+created_by: maia
+---
+## Role
+
+The PM agent is the only writer to:
+
+- `inbox/` (curated attention queue)
+- `issues/<KEY>/issue.yaml` frontmatter (status transitions)
+- Cross-cutting `project.yaml` fields (next-key, phase)
+
+It is also a reader for review purposes, but its writes are scoped
+to PM-shaped work — it never edits coding output directly.
+
+## Loaded skills
+
+- `project-manager/SKILL.md` (always)
+- `agent-messaging/SKILL.md` (when communicating cross-container)
+
+## Distinct from
+
+- **Coding agent** — writes code, opens coding PRs; never writes
+  to `inbox/` or transitions sessions through gates.
+- **Human PM** — has all PM-agent capabilities plus the ones agents
+  are bad at: taste, priority, stopping.
+
+## Where it appears in the system
+
+- `runtimes/` — spawn flow recognises the PM-agent profile
+- Session frontmatter — `agent: pm-agent` flags PM sessions
+- Workflow.yaml — many transitions list PM-agent as the actor

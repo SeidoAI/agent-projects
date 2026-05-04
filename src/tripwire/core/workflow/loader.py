@@ -3,7 +3,7 @@
 Parses the raw YAML into the :class:`WorkflowSpec` typed tree. Never
 mutates state — the file is read, normalised into dataclasses, and
 returned. Structural anomalies that can't be expressed in the typed
-tree (e.g. a station with both ``terminal: true`` and ``next:``) are
+tree (e.g. a status with both ``terminal: true`` and ``next:``) are
 recorded as :class:`WorkflowFinding` entries on
 ``WorkflowSpec.load_findings`` and surfaced through
 :func:`validate_workflow_spec`.
@@ -25,10 +25,12 @@ from tripwire.core.workflow.schema import (
     ConditionalBranch,
     NextSpec,
     Predicate,
-    Station,
     Workflow,
+    WorkflowArtifactRef,
     WorkflowFinding,
     WorkflowSpec,
+    WorkflowStatus,
+    WorkflowStatusArtifacts,
 )
 
 WORKFLOW_FILENAME = "workflow.yaml"
@@ -82,22 +84,35 @@ def parse_workflow_spec(raw: Any) -> WorkflowSpec:
 def _parse_workflow(wf_id: str, raw: dict) -> tuple[Workflow, list[WorkflowFinding]]:
     actor = str(raw.get("actor", "")) or ""
     trigger = str(raw.get("trigger", "")) or ""
-    stations_raw = raw.get("stations") or []
     findings: list[WorkflowFinding] = []
-    stations: list[Station] = []
-    if not isinstance(stations_raw, list):
-        return Workflow(id=wf_id, actor=actor, trigger=trigger, stations=[]), findings
+    if "stations" in raw:
+        findings.append(
+            WorkflowFinding(
+                code="workflow/stale_stations_key",
+                workflow=wf_id,
+                status=None,
+                message=(
+                    "workflow.yaml uses stale `stations:`; use `statuses:` instead"
+                ),
+            )
+        )
+    statuses_raw = raw.get("statuses") or []
+    statuses: list[WorkflowStatus] = []
+    if not isinstance(statuses_raw, list):
+        return Workflow(id=wf_id, actor=actor, trigger=trigger, statuses=[]), findings
 
-    for entry in stations_raw:
+    for entry in statuses_raw:
         if not isinstance(entry, dict):
             continue
-        station, sfindings = _parse_station(wf_id, entry)
-        stations.append(station)
+        status, sfindings = _parse_status(wf_id, entry)
+        statuses.append(status)
         findings.extend(sfindings)
-    return Workflow(id=wf_id, actor=actor, trigger=trigger, stations=stations), findings
+    return Workflow(id=wf_id, actor=actor, trigger=trigger, statuses=statuses), findings
 
 
-def _parse_station(wf_id: str, raw: dict) -> tuple[Station, list[WorkflowFinding]]:
+def _parse_status(
+    wf_id: str, raw: dict
+) -> tuple[WorkflowStatus, list[WorkflowFinding]]:
     sid = str(raw.get("id", "")) or "<unknown>"
     findings: list[WorkflowFinding] = []
     has_terminal = bool(raw.get("terminal"))
@@ -109,10 +124,10 @@ def _parse_station(wf_id: str, raw: dict) -> tuple[Station, list[WorkflowFinding
             WorkflowFinding(
                 code="workflow/terminal_with_next",
                 workflow=wf_id,
-                station=sid,
+                status=sid,
                 message=(
-                    f"station {sid!r} declares both `terminal: true` and "
-                    f"`next:` — a station is either terminal or transitions, "
+                    f"status {sid!r} declares both `terminal: true` and "
+                    f"`next:` — a status is either terminal or transitions, "
                     f"never both"
                 ),
             )
@@ -125,37 +140,38 @@ def _parse_station(wf_id: str, raw: dict) -> tuple[Station, list[WorkflowFinding
         findings.extend(parse_findings)
     else:
         # No terminal AND no next — treat as terminal=False but no next;
-        # the validator surfaces this through the no-terminal-station
+        # the validator surfaces this through the no-terminal-status
         # check at the workflow level. Carry the empty next as a single
-        # NextSpec pointing at the station itself sentinel… no, keep it
+        # NextSpec pointing at the status itself sentinel… no, keep it
         # honest and emit a load finding.
         findings.append(
             WorkflowFinding(
                 code="workflow/missing_next_or_terminal",
                 workflow=wf_id,
-                station=sid,
+                status=sid,
                 message=(
-                    f"station {sid!r} declares neither `next:` nor "
-                    f"`terminal: true` — every station must do exactly one"
+                    f"status {sid!r} declares neither `next:` nor "
+                    f"`terminal: true` — every status must do exactly one"
                 ),
             )
         )
         nxt = NextSpec(kind="terminal")
 
     return (
-        Station(
+        WorkflowStatus(
             id=sid,
             next=nxt,
             prompt_checks=_str_list(raw.get("prompt_checks")),
             validators=_str_list(raw.get("validators")),
             jit_prompts=_str_list(raw.get("jit_prompts")),
+            artifacts=_parse_artifacts(raw.get("artifacts")),
         ),
         findings,
     )
 
 
 def _parse_next(
-    wf_id: str, station_id: str, raw: Any
+    wf_id: str, status_id: str, raw: Any
 ) -> tuple[NextSpec, list[WorkflowFinding]]:
     findings: list[WorkflowFinding] = []
     if isinstance(raw, str):
@@ -165,9 +181,9 @@ def _parse_next(
             WorkflowFinding(
                 code="workflow/invalid_next_shape",
                 workflow=wf_id,
-                station=station_id,
+                status=status_id,
                 message=(
-                    f"station {station_id!r} `next:` must be a station id "
+                    f"status {status_id!r} `next:` must be a status id "
                     f"or a list of conditional branches; got "
                     f"{type(raw).__name__}"
                 ),
@@ -187,7 +203,7 @@ def _parse_next(
                     WorkflowFinding(
                         code="workflow/invalid_predicate",
                         workflow=wf_id,
-                        station=station_id,
+                        status=status_id,
                         message=str(exc),
                     )
                 )
@@ -200,9 +216,9 @@ def _parse_next(
                 WorkflowFinding(
                     code="workflow/invalid_branch",
                     workflow=wf_id,
-                    station=station_id,
+                    status=status_id,
                     message=(
-                        f"station {station_id!r} conditional branch must "
+                        f"status {status_id!r} conditional branch must "
                         f"declare `if:`+`then:` or `else:`; got {entry!r}"
                     ),
                 )
@@ -214,6 +230,37 @@ def _str_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(v) for v in value if isinstance(v, (str, int))]
+
+
+def _parse_artifacts(value: Any) -> WorkflowStatusArtifacts:
+    if not isinstance(value, dict):
+        return WorkflowStatusArtifacts()
+    return WorkflowStatusArtifacts(
+        produces=_parse_artifact_refs(value.get("produces")),
+        consumes=_parse_artifact_refs(value.get("consumes")),
+    )
+
+
+def _parse_artifact_refs(value: Any) -> list[WorkflowArtifactRef]:
+    if not isinstance(value, list):
+        return []
+    out: list[WorkflowArtifactRef] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            continue
+        artifact_id = str(entry.get("id", "")).strip()
+        label = str(entry.get("label", "")).strip()
+        if not artifact_id:
+            continue
+        path = entry.get("path")
+        out.append(
+            WorkflowArtifactRef(
+                id=artifact_id,
+                label=label or artifact_id,
+                path=str(path) if path else None,
+            )
+        )
+    return out
 
 
 __all__ = [

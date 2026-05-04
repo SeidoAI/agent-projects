@@ -2,7 +2,6 @@
 name: pm-session-create
 description: Create a session for an issue and scaffold its plan.
 argument-hint: "<issue-key> [agent-type]"
-fires_at: planned
 ---
 
 You are the project manager. Load the project-manager skill from

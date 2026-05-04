@@ -6,7 +6,6 @@ from typing import Any
 
 from tripwire.core.enum_loader import EnumRegistry
 from tripwire.core.validator._types import CheckResult, LoadedEntity, ValidationContext
-from tripwire.core.workflow.registry import registers_at
 from tripwire.models.comment import Comment
 from tripwire.models.issue import Issue
 from tripwire.models.node import ConceptNode
@@ -80,7 +79,6 @@ def _check_enum_field(
     )
 
 
-@registers_at("coding-session", "executing")
 def check_enum_values(ctx: ValidationContext) -> list[CheckResult]:
     """Every enum-typed field on every entity must have a value in the active enum."""
     results: list[CheckResult] = []

@@ -40,6 +40,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from collections.abc import Iterable
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -799,39 +800,38 @@ def _emit_check_result(
     check_fn: Any,
     results: list[CheckResult],
     session_id: str,
+    workflow: str | None = None,
+    status: str | None = None,
 ) -> None:
     """Emit one `validator_pass` / `validator_fail` event for *check_fn*.
 
     Aggregates the check's findings into a single event — a check that
     returns ten findings emits one `validator_fail`, not ten. The
-    validator id mirrors `workflow_service`: `v_<slug>` where `<slug>` is
-    the function name with the `check_` prefix stripped.
-
-    Reads ``check_fn.__tripwire_workflow_station__`` (set by
-    :func:`tripwire.core.workflow.registry.registers_at`) so the
-    payload carries the (workflow, station) the check is registered
-    against — the runtime gates and drift report consume this. KUI-120
-    is the registry-consume contract.
+    Validator ids mirror ``workflow.yaml`` references. Workflow/status
+    placement is supplied by the caller only when this run is executing
+    a concrete workflow status gate.
     """
     if isinstance(emitter, NullEmitter):
         return
-    slug = check_fn.__name__.removeprefix("check_")
+    from tripwire.core.workflow.registry import validator_id_for
+
+    validator_id = validator_id_for(check_fn)
+    slug = validator_id.removeprefix("v_")
     has_error = any(r.severity == "error" for r in results)
     fired_at = _isoformat_z(datetime.now(timezone.utc))
     kind = "validator_fail" if has_error else "validator_pass"
     event_id = f"evt-{fired_at}-{kind}-{slug}-{session_id}"
-    pair = getattr(check_fn, "__tripwire_workflow_station__", None)
     payload: dict[str, Any] = {
         "id": event_id,
         "kind": kind,
         "fired_at": fired_at,
         "session_id": session_id,
-        "validator_id": f"v_{slug}",
+        "validator_id": validator_id,
         "findings": [r.to_json() for r in results],
     }
-    if pair is not None:
-        payload["workflow"] = pair[0]
-        payload["station"] = pair[1]
+    if workflow is not None and status is not None:
+        payload["workflow"] = workflow
+        payload["status"] = status
     try:
         emitter.emit("validator_runs", payload)
     except Exception:
@@ -845,20 +845,21 @@ def _emit_workflow_event(
     check_fn: Any,
     results: list[CheckResult],
     session_id: str,
+    workflow: str | None,
+    status: str | None,
 ) -> None:
     """Append one ``validator.run`` row to the workflow events log
     (KUI-123) for *check_fn*.
 
-    Skipped silently if the check has no ``__tripwire_workflow_station__``
-    attribute (legacy / unregistered) — the workflow log demands
-    ``workflow`` + ``station``. Failures are logged and swallowed; the
-    log is best-effort, not load-bearing.
+    Skipped unless the caller supplies ``workflow`` + ``status``. The
+    workflow log records concrete gate execution, not implementation
+    catalog metadata.
     """
-    pair = getattr(check_fn, "__tripwire_workflow_station__", None)
-    if pair is None:
+    if workflow is None or status is None:
         return
-    workflow, station = pair
-    slug = check_fn.__name__.removeprefix("check_")
+    from tripwire.core.workflow.registry import validator_id_for
+
+    validator_id = validator_id_for(check_fn)
     has_error = any(r.severity == "error" for r in results)
     outcome = "fail" if has_error else "pass"
     try:
@@ -868,16 +869,45 @@ def _emit_workflow_event(
             project_dir,
             workflow=workflow,
             instance=session_id,
-            station=station,
+            status=status,
             event="validator.run",
             details={
-                "id": f"v_{slug}",
+                "id": validator_id,
                 "outcome": outcome,
                 "findings": len(results),
             },
         )
     except Exception:
-        logger.exception("workflow events emission failed for %s", slug)
+        logger.exception("workflow events emission failed for %s", validator_id)
+
+
+def _checks_for_validate(
+    project_dir: Path,
+    validator_ids: Iterable[str] | None,
+) -> list[Any]:
+    """Resolve the validator implementation set for one validation run."""
+    from tripwire.core.workflow.registry import (
+        declared_validator_ids,
+        validator_checks_for_ids,
+        validator_id_for,
+    )
+
+    if validator_ids is None:
+        try:
+            ids = declared_validator_ids(project_dir)
+        except yaml.YAMLError:
+            ids = ["v_workflow_well_formed"]
+    else:
+        ids = list(validator_ids)
+        if "v_workflow_well_formed" not in ids:
+            ids.insert(0, "v_workflow_well_formed")
+
+    checks = validator_checks_for_ids(ids)
+    known_ids = {validator_id_for(check) for check in checks}
+    missing = [ident for ident in ids if ident not in known_ids]
+    if missing:
+        logger.warning("workflow references unknown validator ids: %s", missing)
+    return checks
 
 
 def validate_project(
@@ -887,6 +917,9 @@ def validate_project(
     fix: bool = False,
     emitter: EventEmitter | None = None,
     session_id: str | None = None,
+    validator_ids: Iterable[str] | None = None,
+    workflow: str | None = None,
+    status: str | None = None,
 ) -> ValidationReport:
     """Run the full validation gate against a project.
 
@@ -944,7 +977,8 @@ def validate_project(
         ctx = load_context(project_dir)
         findings = list(ctx.all_load_errors())
 
-    for check in ALL_CHECKS:
+    checks = _checks_for_validate(project_dir, validator_ids)
+    for check in checks:
         check_started = time.monotonic()
         results = check(ctx)
         findings.extend(results)
@@ -959,12 +993,16 @@ def validate_project(
             check_fn=check,
             results=results,
             session_id=sid,
+            workflow=workflow,
+            status=status,
         )
         _emit_workflow_event(
             project_dir=project_dir,
             check_fn=check,
             results=results,
             session_id=sid,
+            workflow=workflow,
+            status=status,
         )
 
     # Rebuild the graph cache as a side effect. Only attempt if the project

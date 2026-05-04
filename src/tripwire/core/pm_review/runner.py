@@ -1,4 +1,4 @@
-"""``run_pm_review`` — the pm-review station's runner.
+"""``run_pm_review`` — the pm-review status's runner.
 
 The runner:
 
@@ -16,14 +16,9 @@ auto-derive — it's a PM judgment call ("this session diverged so badly
 it needs respawning"). Callers can construct a re-engage verdict
 externally; the runner's auto-derivation never picks it.
 
-The runner deliberately does not use ``@registers_at("pm-review",
-"review")`` to cross-register the validator functions. The decorator
-overwrites ``__tripwire_workflow_station__`` on the function (it tracks
-only one pair for event-emission), so a second decoration would
-reroute the events emitted during a coding-session ``validate_project``
-run from ``coding-session`` → ``pm-review`` and break the existing
-events log shape. Instead we run validators normally and partition
-their results here.
+The runner deliberately does not add workflow placement metadata to
+validator implementations. ``workflow.yaml`` owns placement, and this
+runner partitions the strict validation report by finding code.
 """
 
 from __future__ import annotations
@@ -39,7 +34,7 @@ from tripwire.core.validator import validate_project
 from tripwire.core.validator._types import CheckResult, ValidationReport
 
 PM_REVIEW_WORKFLOW = "pm-review"
-PM_REVIEW_STATION = "review"
+PM_REVIEW_STATUS = "review"
 PM_REVIEW_ARTIFACT_FILENAME = "pm-review.md"
 
 
@@ -74,7 +69,7 @@ def run_pm_review(
     session_id: str,
     now: datetime | None = None,
 ) -> PMReviewVerdict:
-    """Execute the pm-review station for *session_id*.
+    """Execute the pm-review status for *session_id*.
 
     Raises :class:`FileNotFoundError` when the session directory is
     missing — the PM is reviewing a session that doesn't exist.
@@ -113,7 +108,7 @@ def run_pm_review(
         project_dir,
         workflow=PM_REVIEW_WORKFLOW,
         instance=session_id,
-        station=PM_REVIEW_STATION,
+        status=PM_REVIEW_STATUS,
         event="pm_review.completed",
         details={
             "outcome": verdict,
@@ -232,7 +227,7 @@ def _iso_z(dt: datetime) -> str:
 
 __all__ = [
     "PM_REVIEW_ARTIFACT_FILENAME",
-    "PM_REVIEW_STATION",
+    "PM_REVIEW_STATUS",
     "PM_REVIEW_WORKFLOW",
     "PMReviewCheck",
     "PMReviewOutcome",

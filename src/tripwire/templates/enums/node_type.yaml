@@ -28,6 +28,30 @@ values:
   - id: schema
     label: Schema
     color: red
+  - id: principle
+    label: Principle
+    color: indigo
+  - id: practice
+    label: Practice
+    color: teal
+  - id: glossary
+    label: Glossary
+    color: slate
+  - id: metric
+    label: Metric
+    color: emerald
+  - id: persona
+    label: Persona
+    color: rose
+  - id: invariant
+    label: Invariant
+    color: amber
+  - id: anti_pattern
+    label: Anti-pattern
+    color: crimson
+  - id: skill
+    label: Skill
+    color: violet
   - id: custom
     label: Custom
     color: gray

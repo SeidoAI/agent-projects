@@ -1,171 +1,182 @@
-"""Station registry — what runs at each workflow station.
+"""Implementation catalogs for workflow.yaml references.
 
-Three sub-registries co-live here so the well-formedness validator can
-ask one module for the union of all known refs:
-
-- :func:`known_validator_ids` — populated by the ``@registers_at``
-  decorator on validator check functions (KUI-120).
-- :func:`known_jit_prompt_ids` — populated by the ``at = (...)`` class
-  attribute on :class:`JitPrompt` subclasses (KUI-121).
-- :func:`known_prompt_check_ids` — populated by the ``fires_at:``
-  frontmatter on PM-skill slash command files (KUI-122).
-
-The validator-id channel is module-import-time (decorator runs when
-the check module is loaded). JIT prompts are instance-time (registry
-loaded when the manifest is parsed). Prompt-checks are
-filesystem-time (the slash command directory is enumerated).
-
-Each accessor is safe to call before its source has populated — it
-returns an empty set, which the schema validator treats as "no known
-refs declared yet, skip the ref-existence check".
+``workflow.yaml`` owns placement: which validator, JIT prompt, prompt
+check, or artifact belongs to which status. This module only answers
+"which implementation ids exist?" and "which callable implements this
+id?" so schema validation, transitions, and the UI can join configured
+refs to executable code without hidden placement metadata.
 """
 
 from __future__ import annotations
 
-from collections import defaultdict
-from collections.abc import Callable
+import inspect
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import TypeVar
+from typing import Any
 
-# ----------------------------------------------------------------------
-# Validator station registry (KUI-120)
-# ----------------------------------------------------------------------
-
-_validator_stations: dict[str, list[tuple[str, str]]] = {}
-"""Maps validator id (`v_<slug>`) → list of (workflow, station) pairs."""
-
-_station_validators: dict[tuple[str, str], list[str]] = defaultdict(list)
-"""Inverse: (workflow, station) → list of validator ids registered there."""
-
-F = TypeVar("F", bound=Callable[..., object])
+from tripwire.core.workflow.loader import load_workflows
 
 
-def registers_at(workflow: str, station: str) -> Callable[[F], F]:
-    """Decorator marking a validator check function as registered at a station.
+def validator_id_for(check_fn: Callable[..., object]) -> str:
+    """Return the stable workflow id for a validator check function."""
+    name = getattr(check_fn, "__name__", "")
+    if name == "check":
+        module_name = getattr(check_fn, "__module__", "")
+        module_leaf = module_name.rsplit(".", 1)[-1]
+        if module_leaf and module_leaf != module_name:
+            return f"v_{module_leaf}"
+    return f"v_{name.removeprefix('check_')}"
 
-    Idempotent across module reloads — a re-import just refreshes the
-    registry entry. The decorator returns the function unchanged; only
-    side effect is the registry insertion.
 
-    Usage:
+def validator_label_for(check_fn: Callable[..., object]) -> str:
+    """Return the display label for a validator check function."""
+    return validator_id_for(check_fn).removeprefix("v_").replace("_", " ")
 
-    .. code-block:: python
 
-        @registers_at("coding-session", "executing")
-        def check_uuid_present(ctx): ...
-    """
+def validator_description_for(check_fn: Callable[..., object]) -> str:
+    """Return the first docstring paragraph for a validator."""
+    text = inspect.getdoc(check_fn) or ""
+    text = text.strip()
+    if not text:
+        return ""
+    return text.split("\n\n", 1)[0].strip().replace("\n", " ")
 
-    def _decorator(fn: F) -> F:
-        slug = fn.__name__.removeprefix("check_")
-        validator_id = f"v_{slug}"
-        pairs = _validator_stations.setdefault(validator_id, [])
-        pair = (workflow, station)
-        if pair not in pairs:
-            pairs.append(pair)
-        if validator_id not in _station_validators[pair]:
-            _station_validators[pair].append(validator_id)
-        # Stash the metadata on the function for introspection.
-        try:
-            fn.__tripwire_workflow_station__ = pair  # type: ignore[attr-defined]
-        except AttributeError:  # pragma: no cover — function-likes
-            pass
-        return fn
 
-    return _decorator
+def validator_catalog() -> dict[str, Callable[..., object]]:
+    """Return all validator implementations keyed by workflow id."""
+    from tripwire.core import validator
+
+    catalog: dict[str, Callable[..., object]] = {}
+    for check_fn in validator.ALL_CHECKS:
+        catalog.setdefault(validator_id_for(check_fn), check_fn)
+    return catalog
 
 
 def known_validator_ids() -> set[str]:
-    """Return the set of validator ids registered against any station.
+    """Return all implemented validator ids."""
+    return set(validator_catalog())
 
-    Empty before KUI-120 wires the decorator on existing check
-    functions. The schema validator treats an empty set as "skip the
-    ref-existence check".
+
+def validator_checks_for_ids(ids: Iterable[str]) -> list[Callable[..., object]]:
+    """Return validator callables for *ids* in canonical ALL_CHECKS order."""
+    wanted = set(ids)
+    return [fn for vid, fn in validator_catalog().items() if vid in wanted]
+
+
+def declared_validator_ids(project_dir: Path) -> list[str]:
+    """Return the workflow.yaml-declared validator ids in first-seen order.
+
+    ``v_workflow_well_formed`` is always prepended because it validates
+    the source-of-truth file itself; every other validator must be
+    listed under a workflow status to run by default.
     """
-    return set(_validator_stations.keys())
+    ids: list[str] = ["v_workflow_well_formed"]
+    spec = load_workflows(project_dir)
+    if not spec.workflows:
+        return list(validator_catalog())
+    for workflow in spec.workflows.values():
+        for status in workflow.statuses:
+            for validator_id in status.validators:
+                if validator_id not in ids:
+                    ids.append(validator_id)
+    return ids
 
 
-def validators_for_station(workflow: str, station: str) -> list[str]:
-    """Return the validator ids declared at ``(workflow, station)``."""
-    return list(_station_validators.get((workflow, station), []))
+def known_jit_prompt_ids(project_dir: Path | None = None) -> set[str]:
+    """Return implemented JIT prompt ids.
 
-
-# ----------------------------------------------------------------------
-# JIT prompt station registry (KUI-121)
-# ----------------------------------------------------------------------
-
-_jit_prompt_stations: dict[str, tuple[str, str]] = {}
-"""Maps JIT prompt id to (workflow, station) declared via class ``at`` attr."""
-
-_station_jit_prompts: dict[tuple[str, str], list[str]] = defaultdict(list)
-
-
-def register_jit_prompt_station(
-    jit_prompt_id: str, workflow: str, station: str
-) -> None:
-    """Record that ``jit_prompt_id`` is registered at ``(workflow, station)``.
-
-    Called by the JIT prompt loader when it instantiates a JitPrompt whose
-    class declares ``at = ("workflow", "station")``. Re-registration
-    overwrites the previous mapping (last loader wins) so reloads work.
+    Built-ins come from the packaged manifest. Project-local extras are
+    included when *project_dir* is supplied and can be loaded.
     """
-    _jit_prompt_stations[jit_prompt_id] = (workflow, station)
-    pair = (workflow, station)
-    if jit_prompt_id not in _station_jit_prompts[pair]:
-        _station_jit_prompts[pair].append(jit_prompt_id)
+    from tripwire._internal.jit_prompts.loader import (
+        _MANIFEST_PATH,
+        _load_manifest,
+        load_jit_prompt_registry,
+    )
+
+    ids = {
+        str(entry["id"])
+        for entries in _load_manifest(_MANIFEST_PATH).values()
+        for entry in entries
+        if isinstance(entry.get("id"), str)
+    }
+    if project_dir is None:
+        return ids
+    try:
+        registry = load_jit_prompt_registry(project_dir)
+    except Exception:
+        return ids
+    for prompts in registry.values():
+        for prompt in prompts:
+            ids.add(prompt.id)
+    return ids
 
 
-def known_jit_prompt_ids() -> set[str]:
-    """Return the set of JIT prompt ids registered against any station."""
-    return set(_jit_prompt_stations.keys())
-
-
-def jit_prompts_for_station(workflow: str, station: str) -> list[str]:
-    return list(_station_jit_prompts.get((workflow, station), []))
-
-
-# ----------------------------------------------------------------------
-# Prompt-check station registry (KUI-122)
-# ----------------------------------------------------------------------
+def jit_prompt_status_refs(
+    project_dir: Path, jit_prompt_id: str
+) -> list[tuple[str, str]]:
+    """Return workflow.yaml statuses that reference *jit_prompt_id*."""
+    refs: list[tuple[str, str]] = []
+    spec = load_workflows(project_dir)
+    for workflow in spec.workflows.values():
+        for status in workflow.statuses:
+            if jit_prompt_id in status.jit_prompts:
+                refs.append((workflow.id, status.id))
+    return refs
 
 
 def known_prompt_check_ids(project_dir: Path) -> set[str]:
-    """Return the prompt-check ids declared via slash-command frontmatter.
-
-    Walks the packaged ``templates/commands/`` directory plus the
-    project-local ``.tripwire/commands/`` override directory, parses
-    each ``*.md`` file's YAML frontmatter, and collects every command
-    name that declares a ``fires_at:`` field.
-
-    Empty before KUI-122 adds frontmatter to the existing slash
-    commands.
-    """
+    """Return all implemented prompt-check slash command ids."""
     from tripwire.core.workflow.prompt_checks import collect_prompt_checks
 
     return {pc.id for pc in collect_prompt_checks(project_dir)}
 
 
-def prompt_checks_for_station(project_dir: Path, station: str) -> list[str]:
-    """Return the prompt-check ids whose ``fires_at:`` matches ``station``.
+def workflow_catalog_drift(project_dir: Path) -> list[dict[str, Any]]:
+    """Return catalog/config mismatch findings for workflow-adjacent UIs.
 
-    Resolution mirrors :func:`known_prompt_check_ids`: project-local
-    overrides win over packaged defaults.
+    Referenced-missing controls are reported by ``validate_workflow_spec``.
+    This helper reports validator implementations that are present but
+    not referenced by any workflow status. JIT prompts and prompt checks
+    may be dormant implementation options, so they are not catalog drift
+    unless a workflow references a missing id.
     """
-    from tripwire.core.workflow.prompt_checks import collect_prompt_checks
+    spec = load_workflows(project_dir)
+    if not spec.workflows:
+        return []
 
-    out: list[str] = []
-    for pc in collect_prompt_checks(project_dir):
-        if pc.fires_at == station and pc.id not in out:
-            out.append(pc.id)
-    return out
+    used_validators: set[str] = set()
+    for workflow in spec.workflows.values():
+        for status in workflow.statuses:
+            used_validators.update(status.validators)
+
+    findings: list[dict[str, Any]] = []
+    for ident in sorted(known_validator_ids() - used_validators):
+        findings.append(
+            {
+                "source": "catalog",
+                "code": "workflow/unreferenced_validator",
+                "workflow": None,
+                "status": None,
+                "message": (
+                    f"validator {ident!r} is implemented but not referenced in workflow.yaml"
+                ),
+                "severity": "warning",
+            }
+        )
+    return findings
 
 
 __all__ = [
-    "jit_prompts_for_station",
+    "declared_validator_ids",
+    "jit_prompt_status_refs",
     "known_jit_prompt_ids",
     "known_prompt_check_ids",
     "known_validator_ids",
-    "prompt_checks_for_station",
-    "register_jit_prompt_station",
-    "registers_at",
-    "validators_for_station",
+    "validator_catalog",
+    "validator_checks_for_ids",
+    "validator_description_for",
+    "validator_id_for",
+    "validator_label_for",
+    "workflow_catalog_drift",
 ]

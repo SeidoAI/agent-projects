@@ -186,7 +186,7 @@ class AgentSession(BaseModel):
     # `tripwire transition` gate runner each time the session enters a
     # new station; absent when the session was created before the
     # workflow runtime existed (transitions back-fill it on first run).
-    current_station_instance: str | None = None
+    current_status_instance: str | None = None
 
     # Per-session orchestration override. None means use the project default.
     orchestration: SessionOrchestration | None = None

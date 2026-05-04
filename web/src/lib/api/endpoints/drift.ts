@@ -4,37 +4,37 @@ import { ApiError, apiGet } from "../client";
 import { queryKeys, staleTime } from "../queryKeys";
 
 /**
- * Typed client for `/api/projects/:pid/drift` (KUI-157 / I4).
+ * Typed client for `/api/projects/:pid/drift`.
  *
- * Returns the unified coherence score plus the per-class breakdown
- * and a chronological window of recent workflow_drift events for
- * the drill-down list. Wraps the substrate shipped in
- * `tripwire/core/drift.py`.
+ * The standalone `/drift` page was retired in v0.9.7; the same data
+ * now surfaces as a header card on the Concept Graph page (per
+ * `[[principle-concept-graph-as-definition]]` — drift as a metric,
+ * not a separate view).
  */
 export interface DriftBreakdown {
   stale_pins: number;
   unresolved_refs: number;
   stale_concepts: number;
-  workflow_drift_events: number;
+  workflow_drift_findings: number;
 }
 
-export interface WorkflowDriftEvent {
-  event: "workflow_drift";
-  at: string;
-  kind?: string;
-  // Free-form fields captured by the substrate emitter.
-  [extra: string]: unknown;
+export interface WorkflowDriftFinding {
+  code: string;
+  workflow: string;
+  instance: string;
+  status: string | null;
+  severity: "error" | "warning";
+  message: string;
 }
 
 export interface DriftReport {
   score: number;
   breakdown: DriftBreakdown;
-  workflow_drift_events: WorkflowDriftEvent[];
+  workflow_drift_findings: WorkflowDriftFinding[];
 }
 
 export const driftApi = {
-  get: (pid: string) =>
-    apiGet<DriftReport>(`/api/projects/${encodeURIComponent(pid)}/drift`),
+  get: (pid: string) => apiGet<DriftReport>(`/api/projects/${encodeURIComponent(pid)}/drift`),
 };
 
 export function useDriftReport(pid: string) {

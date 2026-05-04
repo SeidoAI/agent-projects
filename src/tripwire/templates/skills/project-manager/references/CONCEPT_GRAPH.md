@@ -47,7 +47,7 @@ should be a node. If a node covers an entire repo, it's too broad —
 break it into the concepts within the repo that other things
 actually reference.
 
-Good candidates:
+Good candidates (code-anchored):
 - API endpoints (one node per endpoint or endpoint group)
 - Data schemas (Firestore collections, config schemas, event types)
 - Contracts between systems (SSE event model, approval flow)
@@ -56,10 +56,29 @@ Good candidates:
   client class within it that others import is another)
 - Infrastructure resources consumed by application code
 
+Good candidates (conceptual):
+- Principles guiding many decisions (e.g. "agents do mechanical work,
+  humans do taste") — load-bearing lenses worth naming once and
+  citing many times
+- Practices that codify how recurring work gets done (kebab-case slugs,
+  every session writes verified.md)
+- Glossary terms with project-specific meaning (tripwire, station,
+  engagement) — first-class definitions other nodes can link to
+- Metrics that drive process review (validator pass-rate, tripwire
+  fires per session)
+- Personas (PM agent, coding agent, human reviewer) — actors with
+  defined skill profiles and write scope
+- Invariants the system must preserve (UUIDs are immutable, cache is
+  rebuildable from source) — anchor points for validator rules
+- Anti-patterns the team has explicitly ruled out — pair with the
+  principle they violate
+
 Bad candidates (keep as prose):
 - A single helper function only one issue mentions
 - Local variables or implementation details
 - Things internal to a single file that nothing else references
+- Page-specific UX details ("the side drawer is 520px wide") — those
+  go in the relevant component's body, not as their own node
 
 ## Granularity benchmarks
 

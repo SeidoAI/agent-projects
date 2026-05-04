@@ -55,7 +55,8 @@ export const queryKeys = {
   workflowStats: (pid: string, params: object) =>
     ["projects", pid, "workflow-stats", params] as const,
 
-  // Drift report (KUI-157 / I4).
+  // Drift report — surfaces on the Concept Graph header card
+  // (the standalone /drift page was retired in v0.9.7).
   drift: (pid: string) => ["projects", pid, "drift"] as const,
 
   // v2 (declared but unused in v1 — placeholder to avoid churn later)

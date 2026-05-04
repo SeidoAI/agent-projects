@@ -1,0 +1,38 @@
+---
+uuid: bc534828-a6cc-447e-ab07-2ddaaaa1df8a
+id: metric-tripwire-fires-per-session
+type: metric
+name: Tripwire fires per session
+description: Mean number of tripwire firings per coding session — process-quality signal for workflow refinement.
+related: []
+tags: [process-quality, observability]
+status: active
+created_at: "2026-03-15T14:00:00"
+updated_at: "2026-03-15T14:00:00"
+created_by: maia
+---
+## Definition
+
+For each completed session, count tripwire firings emitted by that
+session's engagements. Aggregate across a window (default 7 days)
+and report mean, p50, p95.
+
+## Source data
+
+`events/*.jsonl` records every `tripwire.fired` event with a
+`session_id` field. The metric job groups by `session_id` and
+joins against `sessions/*.yaml` for completion timestamps.
+
+## What this signal tells you
+
+- **Trending up** → workflow is increasingly out of step with how
+  agents actually work. Either the workflow needs revision, or the
+  agent's baseline prompts need correction.
+- **Trending down** → either fewer drift events (good) or fewer
+  tripwires armed (less informative). Cross-check with tripwire
+  registry counts.
+
+## Where it surfaces
+
+- Tripwire log screen (S6) — aggregate chart at the top
+- `tripwire status` — single-line summary

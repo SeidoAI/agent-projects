@@ -1,0 +1,20 @@
+workflows:
+  coding-session:
+    actor: coding-agent
+    trigger: session.spawn
+    statuses:
+      - id: planned
+        next: queued
+      - id: queued
+        next: executing
+      - id: executing
+        validators: [v_uuid_present]
+        next: in_review
+      - id: in_review
+        validators: [v_reference_integrity, v_stale_concept]
+        next: verified
+      - id: verified
+        next: completed
+      - id: completed
+        jit_prompts: [self-review]
+        terminal: true

@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 
 from tripwire.core.graph.refs import FENCE_PATTERN, extract_references
 from tripwire.core.validator.lint._thresholds import get_threshold
+from tripwire.models.enums import DEFINITIONAL_NODE_TYPES
 
 if TYPE_CHECKING:
     from tripwire.core.validator import CheckResult, ValidationContext
@@ -44,6 +45,14 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
 
     for node_entity in ctx.nodes:
         node = node_entity.model
+        # Definitional types (principle / glossary / persona / invariant /
+        # anti_pattern / practice / metric / skill) are reference
+        # surfaces rather than implementation targets — their human-
+        # readable names are MEANT to appear in issue prose. Linting
+        # those mentions creates noise without warning of real drift.
+        node_type = str(getattr(node, "type", "") or "")
+        if node_type in DEFINITIONAL_NODE_TYPES:
+            continue
         name = (getattr(node, "name", "") or "").strip()
         # Skip very-short names — too generic, false-positive risk too high.
         if len(name) < 3:

@@ -12,21 +12,30 @@ function makeWrapper(initialPath: string) {
 }
 
 describe("useBoardFilters", () => {
-  it("defaults to sessions view with empty filters", () => {
+  it("defaults to sessions view, board mode, with empty filters", () => {
     const { result } = renderHook(() => useBoardFilters(), { wrapper: makeWrapper("/p/x/board") });
     expect(result.current.filters.view).toBe("sessions");
+    expect(result.current.filters.mode).toBe("board");
     expect(result.current.filters.agents.size).toBe(0);
     expect(result.current.filters.hasBlockedInbox).toBe(false);
   });
 
   it("hydrates filters from the URL on first render", () => {
     const { result } = renderHook(() => useBoardFilters(), {
-      wrapper: makeWrapper("/p/x/board?view=issues&agent=alice,bob&inbox=1"),
+      wrapper: makeWrapper("/p/x/board?view=issues&mode=graph&agent=alice,bob&inbox=1"),
     });
     expect(result.current.filters.view).toBe("issues");
+    expect(result.current.filters.mode).toBe("graph");
     expect([...result.current.filters.agents].sort()).toEqual(["alice", "bob"]);
     expect(result.current.filters.hasBlockedInbox).toBe(true);
     expect(result.current.filters.blocked).toBe(false);
+  });
+
+  it("ignores unknown mode values and falls back to board", () => {
+    const { result } = renderHook(() => useBoardFilters(), {
+      wrapper: makeWrapper("/p/x/board?mode=spaceship"),
+    });
+    expect(result.current.filters.mode).toBe("board");
   });
 
   it("persists view + filter changes to the URL query string", () => {
@@ -48,6 +57,15 @@ describe("useBoardFilters", () => {
       result.current.setView("issues");
     });
     expect(currentLocation).toContain("view=issues");
+    act(() => {
+      result.current.setMode("graph");
+    });
+    expect(currentLocation).toContain("mode=graph");
+    act(() => {
+      result.current.setMode("board");
+    });
+    // board is the default — should be elided from the URL
+    expect(currentLocation).not.toContain("mode=");
     act(() => {
       result.current.toggleAgent("alice");
     });

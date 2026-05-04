@@ -1,4 +1,4 @@
-import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
+import { LayoutGrid, PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { useProjectShell } from "@/app/ProjectShell";
@@ -7,9 +7,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { ReactFlowNode } from "@/lib/api/endpoints/graph";
 import { type InboxItem, useInbox } from "@/lib/api/endpoints/inbox";
 import { cn } from "@/lib/utils";
+import { DriftHeader } from "./DriftHeader";
 import { GraphLegend } from "./GraphLegend";
 import { GraphRail } from "./GraphRail";
-import { GraphSidebar, colorForKind } from "./GraphSidebar";
+import { colorForKind, GraphSidebar } from "./GraphSidebar";
 import { useConceptGraph } from "./hooks/useGraph";
 import { useGraphLayout } from "./useGraphLayout";
 import { useLayoutPersistence } from "./useLayoutPersistence";
@@ -17,6 +18,41 @@ import { useLayoutPersistence } from "./useLayoutPersistence";
 const DEFAULT_CANVAS = { width: 1000, height: 600 };
 const NODE_RADIUS = 22;
 const NODE_RADIUS_SMALL = 16;
+
+/**
+ * Type-driven size multipliers. Encodes the architectural hierarchy
+ * subtly (1.4× / 1.0× / 0.85×) — load-bearing types whisper
+ * "important" without claiming a ranking *within* type. PM #25
+ * round 5: ref-count sizing was considered and rejected — it would
+ * inflate well-cited terms (glossary-tripwire) over architecturally
+ * important principles (principle-comparative-advantage) that are
+ * usually invoked, not cited.
+ */
+const TYPE_SIZE_SCALE: Record<string, number> = {
+  principle: 1.4,
+  invariant: 1.4,
+  decision: 1.0,
+  contract: 1.0,
+  requirement: 1.0,
+  endpoint: 1.0,
+  service: 1.0,
+  schema: 1.0,
+  config: 1.0,
+  model: 1.0,
+  glossary: 0.85,
+  practice: 0.85,
+  persona: 0.85,
+  metric: 0.85,
+  anti_pattern: 0.85,
+  skill: 0.85,
+  tf_output: 0.85,
+  custom: 0.85,
+};
+
+function radiusForType(nodeType: string): number {
+  const scale = TYPE_SIZE_SCALE[nodeType] ?? 1.0;
+  return Math.round(NODE_RADIUS * scale);
+}
 
 /** Cap on canvas-rendered node labels — the rail shows the full
  *  string. PM #25 round 2 P1: at ~200 nodes, untruncated titles
@@ -108,6 +144,18 @@ export function ConceptGraph() {
   const [railOpen, setRailOpen] = useState(true);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState(DEFAULT_CANVAS);
+  // Bumped by the Auto-arrange button to force `useGraphLayout` to
+  // re-seed (smart placement + a fresh d3-force pass).
+  const [reseedNonce, setReseedNonce] = useState(0);
+  // "unsaved" — only re-place nodes without a saved layout.
+  // "all" — un-pin every node and re-distribute. Used when the user
+  // clicks Auto-arrange with zero unsaved nodes (the saved positions
+  // came from automatic seeding, not user drags, so re-arranging is
+  // the user's intent).
+  const [reseedMode, setReseedMode] = useState<"unsaved" | "all">("unsaved");
+  // Drift filter — when on, non-stale nodes dim and the sidebar
+  // narrows to stale nodes only. Toggled from the DriftHeader card.
+  const [staleOnly, setStaleOnly] = useState(false);
 
   // Track canvas size so the d3-force seeding centres in the
   // visible area instead of the default 1000×600 viewBox.
@@ -130,6 +178,10 @@ export function ConceptGraph() {
     () => (data?.nodes ?? []).filter((n) => n.type === "concept"),
     [data?.nodes],
   );
+  const staleCount = useMemo(
+    () => concepts.filter((n) => n.data?.status === "stale").length,
+    [concepts],
+  );
 
   // Restrict edges to concept↔concept before handing them to
   // d3-force: the simulation only sees concept nodes, and any link
@@ -148,7 +200,20 @@ export function ConceptGraph() {
     edges: conceptEdges,
     width: size.width,
     height: size.height,
+    reseedNonce,
+    reseedMode,
+    // P0 from PR review: "all" mode is one-shot. Without this reset
+    // the next refetch (default `staleTime` 30s, WS invalidation, ...)
+    // would re-enter the seed effect with mode still "all" and
+    // re-run the simulation across the just-persisted positions,
+    // thrashing node YAMLs whenever the user lands on the page.
+    onReseedComplete: () => setReseedMode("unsaved"),
   });
+
+  const unsavedCount = useMemo(
+    () => concepts.filter((n) => !n.data?.has_saved_layout).length,
+    [concepts],
+  );
 
   // Persist any newly-seeded positions back to YAML so the next
   // reload reads them and skips d3-force entirely.
@@ -180,9 +245,23 @@ export function ConceptGraph() {
     );
   }
   if (!data || data.nodes.length === 0) {
+    // Drift header still renders on the empty page — workflow drift
+    // findings, unresolved refs, and stale pins are not gated on the
+    // existence of any concept nodes, so the operator gets the
+    // signal even on a fresh project.
     return (
-      <div className="flex h-full items-center justify-center p-6 font-serif text-[14px] italic text-(--color-ink-3)">
-        No concept nodes yet. Add one under <code className="font-mono">nodes/</code>.
+      <div className="flex min-h-full flex-col bg-(--color-paper) text-(--color-ink)">
+        <div className="border-(--color-edge) border-b px-7 py-3">
+          <DriftHeader
+            projectId={projectId}
+            staleCount={0}
+            staleOnly={false}
+            onToggleStaleOnly={() => {}}
+          />
+        </div>
+        <div className="flex flex-1 items-center justify-center p-6 font-serif text-[14px] italic text-(--color-ink-3)">
+          No concept nodes yet. Add one under <code className="font-mono">nodes/</code>.
+        </div>
       </div>
     );
   }
@@ -198,243 +277,293 @@ export function ConceptGraph() {
   return (
     <div className="flex min-h-full flex-col bg-(--color-paper) text-(--color-ink)">
       <header className="border-(--color-edge) border-b px-7 py-4">
-        <div className="font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
-          chapter 05 · concept graph
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="font-mono text-[10px] text-(--color-ink-3) uppercase tracking-[0.18em]">
+              chapter 05 · concept graph
+            </div>
+            <h1 className="mt-1 font-sans font-semibold text-[30px] text-(--color-ink) leading-[1.1] tracking-[-0.02em]">
+              What this project is made of.
+            </h1>
+            <p className="mt-1 font-serif text-[14.5px] italic text-(--color-ink-2)">
+              Every concept the team has named, who cites it, and how fresh it is.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              // When there are unsaved nodes, just place those.
+              // When everything is saved, the user is asking for a
+              // full re-layout — un-pin all nodes for this pass.
+              setReseedMode(unsavedCount === 0 ? "all" : "unsaved");
+              setReseedNonce((n) => n + 1);
+            }}
+            title={
+              unsavedCount === 0
+                ? "Re-distribute every node — saved positions become starting points"
+                : "Re-place unsaved nodes near related neighbours"
+            }
+            aria-label={
+              unsavedCount === 0
+                ? "Re-layout every concept node"
+                : "Auto-arrange unsaved nodes"
+            }
+          >
+            <LayoutGrid className="mr-1.5 h-3.5 w-3.5" />
+            {unsavedCount === 0
+              ? "Re-layout all"
+              : `Auto-arrange (${unsavedCount} unsaved)`}
+          </Button>
         </div>
-        <h1 className="mt-1 font-sans font-semibold text-[30px] text-(--color-ink) leading-[1.1] tracking-[-0.02em]">
-          What this project is made of.
-        </h1>
-        <p className="mt-1 font-serif text-[14.5px] italic text-(--color-ink-2)">
-          Every concept the team has named, who cites it, and how fresh it is.
-        </p>
       </header>
+      <div className="border-(--color-edge) border-b px-7 py-3">
+        <DriftHeader
+          projectId={projectId}
+          staleCount={staleCount}
+          staleOnly={staleOnly}
+          onToggleStaleOnly={() => setStaleOnly((on) => !on)}
+        />
+      </div>
       <div className="border-(--color-edge) border-b px-7 py-3">
         <GraphLegend />
       </div>
 
       <div className={cn("sticky top-0 flex h-[calc(100vh-3.5rem)] min-h-0", railOpen ? "" : "")}>
-      {sidebarOpen ? (
-        <GraphSidebar
-          graph={data}
-          selectedId={focus}
-          onSelect={setFocus}
-          onCollapse={() => setSidebarOpen(false)}
-        />
-      ) : (
-        <div className="flex items-start justify-start border-(--color-edge) border-r bg-(--color-paper-2) p-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Expand panel"
-          >
-            <PanelLeftOpen className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+        {sidebarOpen ? (
+          <GraphSidebar
+            graph={data}
+            selectedId={focus}
+            onSelect={setFocus}
+            onCollapse={() => setSidebarOpen(false)}
+          />
+        ) : (
+          <div className="flex items-start justify-start border-(--color-edge) border-r bg-(--color-paper-2) p-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Expand panel"
+            >
+              <PanelLeftOpen className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
 
-      <section
-        ref={canvasRef}
-        data-testid="concept-graph-canvas"
-        // Independent scroll container — must not share scroll with
-        // the sidebar (PM #25 round 2 P1). The SVG below sizes to
-        // the layout's bbox in pixels, so when the layout exceeds
-        // the visible canvas this <section> scrolls vertically.
-        className="relative min-h-0 flex-1 overflow-auto bg-(--color-paper-2)"
-      >
-        <svg
-          role="img"
-          aria-label="Concept graph canvas"
-          className="block"
-          width={bbox.width}
-          height={bbox.height}
-          viewBox={`${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`}
-          preserveAspectRatio="xMinYMin meet"
+        <section
+          ref={canvasRef}
+          data-testid="concept-graph-canvas"
+          // Independent scroll container — must not share scroll with
+          // the sidebar (PM #25 round 2 P1). The SVG below sizes to
+          // the layout's bbox in pixels, so when the layout exceeds
+          // the visible canvas this <section> scrolls vertically.
+          className="relative min-h-0 flex-1 overflow-auto bg-(--color-paper-2)"
         >
-          <title>Concept graph canvas</title>
-          <defs>
-            <pattern id="concept-graph-ledger" width={40} height={40} patternUnits="userSpaceOnUse">
-              <path
-                d="M 40 0 L 0 0 0 40"
-                fill="none"
-                stroke="var(--color-paper-3)"
-                strokeWidth={0.5}
-              />
-            </pattern>
-          </defs>
-          <rect
-            x={bbox.x}
-            y={bbox.y}
+          <svg
+            role="img"
+            aria-label="Concept graph canvas"
+            className="block"
             width={bbox.width}
             height={bbox.height}
-            fill="url(#concept-graph-ledger)"
-          />
-
-          {/* edges */}
-          {data.edges.map((edge) => {
-            const a = layout.positions[edge.source];
-            const b = layout.positions[edge.target];
-            if (!a || !b) return null;
-            const isFocused = focus !== null && (edge.source === focus || edge.target === focus);
-            const dashed = !isSolidRelation(edge.relation);
-            return (
-              <line
-                key={edge.id}
-                data-edge-relation={edge.relation}
-                data-edge-focused={isFocused ? "true" : "false"}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke={isFocused ? "var(--color-rule)" : "var(--color-edge)"}
-                strokeWidth={isFocused ? 1.4 : 0.7}
-                strokeDasharray={dashed ? "3 3" : "0"}
-                opacity={focus !== null && !isFocused ? 0.3 : 0.85}
-              />
-            );
-          })}
-
-          {/* nodes */}
-          {concepts.map((node) => {
-            const pos = layout.positions[node.id];
-            if (!pos) return null;
-            const isFocus = node.id === focus;
-            const isNeighbour = neighbours.has(node.id);
-            const dim = focus !== null && !isFocus && !isNeighbour;
-            const stale = node.data?.status === "stale";
-            const nodeType = String(node.data?.type ?? "concept");
-            const typeColor = colorForKind(nodeType);
-            const r = NODE_RADIUS;
-            const inboxCount = inboxByNode.get(node.id)?.length ?? 0;
-            return (
-              // biome-ignore lint/a11y/useSemanticElements: HTML <button> isn't a valid SVG child; role="button" on a <g> is the standard pattern for interactive SVG groups
-              <g
-                key={node.id}
-                role="button"
-                tabIndex={0}
-                aria-label={`Focus ${String(node.data?.label ?? node.id)}`}
-                data-testid={`node-group-${node.id}`}
-                data-focus={isFocus ? "true" : "false"}
-                data-dim={dim ? "true" : "false"}
-                opacity={dim ? 0.35 : 1}
-                style={{ cursor: "pointer", transition: "opacity 200ms ease", outline: "none" }}
-                onClick={() => setFocus(node.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setFocus(node.id);
-                  }
-                }}
+            viewBox={`${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`}
+            preserveAspectRatio="xMinYMin meet"
+          >
+            <title>Concept graph canvas</title>
+            <defs>
+              <pattern
+                id="concept-graph-ledger"
+                width={40}
+                height={40}
+                patternUnits="userSpaceOnUse"
               >
-                <circle
-                  data-testid={`node-circle-${node.id}`}
-                  data-stale={stale ? "true" : "false"}
-                  cx={pos.x}
-                  cy={pos.y}
-                  r={r}
-                  fill={typeColor}
-                  fillOpacity={isFocus ? 1 : 0.5}
-                  stroke={stale ? "#c8861f" : typeColor}
-                  strokeWidth={isFocus ? 2.2 : stale ? 1.6 : 1.1}
-                  strokeDasharray={stale ? "3 2" : "0"}
+                <path
+                  d="M 40 0 L 0 0 0 40"
+                  fill="none"
+                  stroke="var(--color-paper-3)"
+                  strokeWidth={0.5}
                 />
-                {isFocus ? (
+              </pattern>
+            </defs>
+            <rect
+              x={bbox.x}
+              y={bbox.y}
+              width={bbox.width}
+              height={bbox.height}
+              fill="url(#concept-graph-ledger)"
+            />
+
+            {/* edges */}
+            {data.edges.map((edge) => {
+              const a = layout.positions[edge.source];
+              const b = layout.positions[edge.target];
+              if (!a || !b) return null;
+              const isFocused = focus !== null && (edge.source === focus || edge.target === focus);
+              const dashed = !isSolidRelation(edge.relation);
+              return (
+                <line
+                  key={edge.id}
+                  data-edge-relation={edge.relation}
+                  data-edge-focused={isFocused ? "true" : "false"}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke={isFocused ? "var(--color-rule)" : "var(--color-edge)"}
+                  strokeWidth={isFocused ? 1.4 : 0.7}
+                  strokeDasharray={dashed ? "3 3" : "0"}
+                  opacity={focus !== null && !isFocused ? 0.3 : 0.85}
+                />
+              );
+            })}
+
+            {/* nodes */}
+            {concepts.map((node) => {
+              const pos = layout.positions[node.id];
+              if (!pos) return null;
+              const isFocus = node.id === focus;
+              const isNeighbour = neighbours.has(node.id);
+              const stale = node.data?.status === "stale";
+              // Two independent dim sources: focus mode (highlight a
+              // selected node + its neighbours) and stale-only mode
+              // (highlight stale nodes regardless of focus). Either
+              // engages dim; stale nodes always read clearly when
+              // stale-only is on.
+              const dimByFocus = focus !== null && !isFocus && !isNeighbour;
+              const dimByStaleOnly = staleOnly && !stale;
+              const dim = dimByFocus || dimByStaleOnly;
+              const nodeType = String(node.data?.type ?? "concept");
+              const typeColor = colorForKind(nodeType);
+              const r = radiusForType(nodeType);
+              const inboxCount = inboxByNode.get(node.id)?.length ?? 0;
+              return (
+                // biome-ignore lint/a11y/useSemanticElements: HTML <button> isn't a valid SVG child; role="button" on a <g> is the standard pattern for interactive SVG groups
+                <g
+                  key={node.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Focus ${String(node.data?.label ?? node.id)}`}
+                  data-testid={`node-group-${node.id}`}
+                  data-focus={isFocus ? "true" : "false"}
+                  data-dim={dim ? "true" : "false"}
+                  opacity={dim ? 0.35 : 1}
+                  style={{ cursor: "pointer", transition: "opacity 200ms ease", outline: "none" }}
+                  onClick={() => setFocus(node.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setFocus(node.id);
+                    }
+                  }}
+                >
                   <circle
+                    data-testid={`node-circle-${node.id}`}
+                    data-stale={stale ? "true" : "false"}
                     cx={pos.x}
                     cy={pos.y}
-                    r={r + 6}
-                    fill="none"
-                    stroke="var(--color-rule)"
-                    strokeWidth={1}
-                    strokeDasharray="3 3"
+                    r={r}
+                    fill={typeColor}
+                    fillOpacity={isFocus ? 1 : 0.5}
+                    stroke={stale ? "#c8861f" : typeColor}
+                    strokeWidth={isFocus ? 2.2 : stale ? 1.6 : 1.1}
+                    strokeDasharray={stale ? "3 2" : "0"}
                   />
-                ) : null}
-                <text
-                  data-testid={`node-label-${node.id}`}
-                  x={pos.x}
-                  y={pos.y + r + 12}
-                  textAnchor="middle"
-                  fontFamily="var(--font-sans)"
-                  fontSize={11}
-                  fontWeight={500}
-                  fill={isFocus ? "var(--color-ink)" : "var(--color-ink-2)"}
-                >
-                  {truncateLabel(String(node.data?.label ?? node.id))}
-                </text>
-                <text
-                  x={pos.x}
-                  y={pos.y + r + 24}
-                  textAnchor="middle"
-                  fontFamily="var(--font-mono)"
-                  fontSize={8.5}
-                  fill="var(--color-ink-3)"
-                  letterSpacing={0.5}
-                >
-                  {String(node.data?.type ?? "concept")}
-                </text>
-                {inboxCount > 0 ? (
-                  <g
-                    data-testid={`inbox-badge-${node.id}`}
-                    aria-label={`${inboxCount} inbox entries reference this concept`}
-                  >
+                  {isFocus ? (
                     <circle
-                      cx={pos.x + r - 4}
-                      cy={pos.y - r + 4}
-                      r={NODE_RADIUS_SMALL / 2}
-                      fill="var(--color-rule)"
-                      stroke="var(--color-paper-2)"
-                      strokeWidth={1.4}
+                      cx={pos.x}
+                      cy={pos.y}
+                      r={r + 6}
+                      fill="none"
+                      stroke="var(--color-rule)"
+                      strokeWidth={1}
+                      strokeDasharray="3 3"
                     />
-                    <text
-                      x={pos.x + r - 4}
-                      y={pos.y - r + 7}
-                      textAnchor="middle"
-                      fontFamily="var(--font-mono)"
-                      fontSize={9}
-                      fontWeight={600}
-                      fill="var(--color-paper)"
+                  ) : null}
+                  <text
+                    data-testid={`node-label-${node.id}`}
+                    x={pos.x}
+                    y={pos.y + r + 12}
+                    textAnchor="middle"
+                    fontFamily="var(--font-sans)"
+                    fontSize={11}
+                    fontWeight={500}
+                    fill={isFocus ? "var(--color-ink)" : "var(--color-ink-2)"}
+                  >
+                    {truncateLabel(String(node.data?.label ?? node.id))}
+                  </text>
+                  <text
+                    x={pos.x}
+                    y={pos.y + r + 24}
+                    textAnchor="middle"
+                    fontFamily="var(--font-mono)"
+                    fontSize={8.5}
+                    fill="var(--color-ink-3)"
+                    letterSpacing={0.5}
+                  >
+                    {String(node.data?.type ?? "concept")}
+                  </text>
+                  {inboxCount > 0 ? (
+                    <g
+                      data-testid={`inbox-badge-${node.id}`}
+                      aria-label={`${inboxCount} inbox entries reference this concept`}
                     >
-                      {inboxCount > 9 ? "9+" : String(inboxCount)}
-                    </text>
-                  </g>
-                ) : null}
-              </g>
-            );
-          })}
-        </svg>
+                      <circle
+                        cx={pos.x + r - 4}
+                        cy={pos.y - r + 4}
+                        r={NODE_RADIUS_SMALL / 2}
+                        fill="var(--color-rule)"
+                        stroke="var(--color-paper-2)"
+                        strokeWidth={1.4}
+                      />
+                      <text
+                        x={pos.x + r - 4}
+                        y={pos.y - r + 7}
+                        textAnchor="middle"
+                        fontFamily="var(--font-mono)"
+                        fontSize={9}
+                        fontWeight={600}
+                        fill="var(--color-paper)"
+                      >
+                        {inboxCount > 9 ? "9+" : String(inboxCount)}
+                      </text>
+                    </g>
+                  ) : null}
+                </g>
+              );
+            })}
+          </svg>
 
-        <div
-          className={cn(
-            "pointer-events-none absolute top-3 right-3 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) px-2 py-1",
-            "font-mono text-[10px] text-(--color-ink-3) tracking-[0.06em]",
-          )}
-        >
-          {data.meta.node_count} nodes · {data.meta.edge_count} edges
-        </div>
-      </section>
-
-      {railOpen ? (
-        <GraphRail
-          projectId={projectId}
-          node={focusedNode}
-          incident={incidentEdges}
-          allNodes={concepts}
-          referencingInbox={focus ? (inboxByNode.get(focus) ?? []) : []}
-          onSelectNeighbour={setFocus}
-          onCollapse={() => setRailOpen(false)}
-        />
-      ) : (
-        <div className="flex items-start justify-end border-(--color-edge) border-l bg-(--color-paper) p-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setRailOpen(true)}
-            aria-label="Expand panel"
+          <div
+            className={cn(
+              "pointer-events-none absolute top-3 right-3 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) px-2 py-1",
+              "font-mono text-[10px] text-(--color-ink-3) tracking-[0.06em]",
+            )}
           >
-            <PanelRightOpen className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+            {data.meta.node_count} nodes · {data.meta.edge_count} edges
+          </div>
+        </section>
+
+        {railOpen ? (
+          <GraphRail
+            projectId={projectId}
+            node={focusedNode}
+            incident={incidentEdges}
+            allNodes={concepts}
+            referencingInbox={focus ? (inboxByNode.get(focus) ?? []) : []}
+            onSelectNeighbour={setFocus}
+            onCollapse={() => setRailOpen(false)}
+          />
+        ) : (
+          <div className="flex items-start justify-end border-(--color-edge) border-l bg-(--color-paper) p-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setRailOpen(true)}
+              aria-label="Expand panel"
+            >
+              <PanelRightOpen className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

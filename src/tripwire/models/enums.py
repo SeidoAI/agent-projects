@@ -115,7 +115,40 @@ class NodeType(StrEnum):
     REQUIREMENT = "requirement"
     SERVICE = "service"
     SCHEMA = "schema"
+    PRINCIPLE = "principle"
+    PRACTICE = "practice"
+    GLOSSARY = "glossary"
+    METRIC = "metric"
+    PERSONA = "persona"
+    INVARIANT = "invariant"
+    ANTI_PATTERN = "anti_pattern"
+    SKILL = "skill"
     CUSTOM = "custom"
+
+
+# "Definitional" node types live on the concept graph as references
+# *for* engineering work rather than as units *of* engineering work.
+# They are cited from issues / PRs / agent prompts ad hoc — not via
+# the issue → node implementation pipeline that the lint rules
+# `coverage/unreferenced_node` and `concept_name_prose/found` were
+# designed to police. Counting issue references for them produces
+# noise: a `glossary-tripwire` node legitimately has zero issues
+# implementing it.
+#
+# These types are exempted from those two lints. They remain subject
+# to every other validator (ref integrity, schema, freshness, etc.).
+DEFINITIONAL_NODE_TYPES: frozenset[str] = frozenset(
+    {
+        NodeType.PRINCIPLE,
+        NodeType.PRACTICE,
+        NodeType.GLOSSARY,
+        NodeType.METRIC,
+        NodeType.PERSONA,
+        NodeType.INVARIANT,
+        NodeType.ANTI_PATTERN,
+        NodeType.SKILL,
+    }
+)
 
 
 class NodeStatus(StrEnum):

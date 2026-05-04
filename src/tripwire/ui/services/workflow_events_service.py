@@ -50,7 +50,7 @@ def list_workflow_events(
     *,
     workflow: str | None = None,
     instance: str | None = None,
-    station: str | None = None,
+    status: str | None = None,
     event: str | None = None,
     limit: int = DEFAULT_LIMIT,
 ) -> WorkflowEventsPage:
@@ -67,7 +67,7 @@ def list_workflow_events(
             project_dir,
             workflow=workflow,
             instance=instance,
-            station=station,
+            status=status,
             event=event,
         )
     )

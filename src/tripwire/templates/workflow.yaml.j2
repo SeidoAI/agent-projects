@@ -1,11 +1,8 @@
 # Per-project workflow definitions. v0.9 ships `coding-session`; later
 # versions add `inbox-handling`, `issue-lifecycle`, `concept-freshness`,
-# `pr-lifecycle`. Each workflow is a typed lifecycle graph: stations
-# with declared validators, JIT prompts, and prompt-checks; transitions
-# between stations gated by the runtime; an append-only events log
-# substrate.
-#
-# Schema reference: docs/specs/2026-04-30-v09-workflow-substrate.md
+# `pr-lifecycle`. Each workflow is a typed lifecycle graph: statuses
+# with declared validators, JIT prompts, prompt-checks, proof artifacts,
+# transitions, and append-only events.
 #
 # Conditional next: equality only (`==`, `!=`). Predicate fields are
 # dot-paths into the workflow context (e.g. `agent.role`).
@@ -14,25 +11,90 @@ workflows:
   coding-session:
     actor: coding-agent
     trigger: session.spawn
-    stations:
+    statuses:
       - id: planned
         next: queued
+        validators:
+          - v_workflow_well_formed
+          - v_uuid_present
+          - v_id_format
+          - v_enum_values
+          - v_id_collisions
+          - v_sequence_drift
+          - v_timestamps
+        artifacts:
+          consumes:
+            - id: issue-brief
+              label: issue brief
       - id: queued
         next: executing
+        validators:
+          - v_session_issue_coherence
+          - v_reference_integrity
+          - v_bidirectional_related
+          - v_no_stale_pins
+          - v_status_transitions
+        artifacts:
+          produces:
+            - id: plan
+              label: plan.md
+              path: sessions/{session_id}/plan.md
       - id: executing
         next: in_review
+        validators:
+          - v_issue_body_structure
+          - v_project_standards
+          - v_freshness
+          - v_comment_provenance
+          - v_handoff_artifact
+          - v_worktree_paths_unique
+          - v_no_orphan_proj_branches
+          - v_stale_concept
+          - v_concept_name_prose
+          - v_semantic_coverage
+          - v_mega_issue
+          - v_node_ratio
+        artifacts:
+          consumes:
+            - id: plan
+              label: plan.md
+              path: sessions/{session_id}/plan.md
+          produces:
+            - id: diff
+              label: implementation diff
       - id: in_review
         next: verified
+        validators:
+          - v_manifest_schema
+          - v_manifest_phase_ownership_consistent
+          - v_artifact_presence
+          - v_coverage_heuristics
+          - v_phase_requirements
+          - v_quality_consistency
+          - v_issue_artifact_presence
+        artifacts:
+          consumes:
+            - id: diff
+              label: implementation diff
+          produces:
+            - id: review-notes
+              label: review notes
       - id: verified
         next: completed
+        artifacts:
+          consumes:
+            - id: review-notes
+              label: review notes
       - id: completed
         terminal: true
-    # NOTE: v0.9 ships the gate runner (KUI-159) that READS
-    # `prompt_check.invoked` events, but no caller in this codebase
-    # yet EMITS them. The PM slash-commands wired with `fires_at:`
-    # (KUI-122) carry the station mapping but not the per-invocation
-    # event emit. Until the producer side lands (v0.9.x follow-up),
-    # declaring `prompt_checks: [...]` here would make every real
-    # `tripwire transition` reject with `prompt_checks_missing`.
-    # The schema still supports prompt_checks; this template will
-    # gain the declarations once the producer is wired.
+        validators:
+          - v_pm_response_covers_self_review
+          - v_pm_response_followups_resolve
+          - v_done_implies_issue_artifacts_on_main
+          - v_self_review_implies_pm_response
+        jit_prompts:
+          - self-review
+        artifacts:
+          produces:
+            - id: session-signature
+              label: session signature

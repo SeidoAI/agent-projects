@@ -8,7 +8,7 @@ from tripwire.core import paths
 from tripwire.core.graph.refs import extract_references
 from tripwire.core.id_generator import parse_key
 from tripwire.core.validator._types import CheckResult, LoadedEntity, ValidationContext
-from tripwire.core.workflow.registry import registers_at
+from tripwire.models.enums import DEFINITIONAL_NODE_TYPES
 from tripwire.models.issue import Issue
 from tripwire.models.session import AgentSession
 
@@ -18,7 +18,6 @@ def _is_epic(issue) -> bool:
     return any(label == "type/epic" for label in getattr(issue, "labels", []))
 
 
-@registers_at("coding-session", "executing")
 def check_project_standards(ctx: ValidationContext) -> list[CheckResult]:
     """V0 standards check: just confirm `<project>/standards.md` exists if any
     file references it. Future versions will read project-defined rules.
@@ -74,7 +73,6 @@ def _artifact_status(project_dir: Path, rel_path: str) -> str | None:
     return "incomplete"
 
 
-@registers_at("coding-session", "executing")
 def check_phase_requirements(ctx: ValidationContext) -> list[CheckResult]:
     """Enforce phase-specific requirements.
 
@@ -176,7 +174,6 @@ QUALITY_REF_DEGRADATION_THRESHOLD = 0.40  # 40% drop → warning
 QUALITY_MIN_ISSUES_FOR_CHECK = 9  # need 3+ per third
 
 
-@registers_at("coding-session", "in_review")
 def check_quality_consistency(ctx: ValidationContext) -> list[CheckResult]:
     """Detect quality degradation across a writing session.
 
@@ -267,7 +264,6 @@ def check_quality_consistency(ctx: ValidationContext) -> list[CheckResult]:
     return results
 
 
-@registers_at("coding-session", "executing")
 def check_coverage_heuristics(ctx: ValidationContext) -> list[CheckResult]:
     """Coverage warnings — hint at potential semantic gaps."""
     results: list[CheckResult] = []
@@ -303,6 +299,15 @@ def check_coverage_heuristics(ctx: ValidationContext) -> list[CheckResult]:
                 None,
             )
             if node_entity:
+                # Definitional types (principle / glossary / persona /
+                # invariant / anti_pattern / practice / metric / skill)
+                # are reference surfaces, not implementation targets.
+                # `coverage/unreferenced_node` was designed to warn when
+                # a code-anchored node has no implementing issue — a
+                # `principle-pm-curates-attention` legitimately has none.
+                node_type = str(node_entity.raw_frontmatter.get("type", "") or "")
+                if node_type in DEFINITIONAL_NODE_TYPES:
+                    continue
                 results.append(
                     CheckResult(
                         code="coverage/unreferenced_node",

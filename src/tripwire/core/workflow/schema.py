@@ -8,19 +8,27 @@ The shape:
       <workflow-id>:
         actor: <actor-name>
         trigger: <event-name>
-        stations:
-          - id: <station-id>
-            next: <station-id>          # single
+        statuses:
+          - id: <status-id>
+            next: <status-id>          # single
             # or
             next:                        # conditional
               - if: <predicate>
-                then: <station-id>
-              - else: <station-id>      # default branch
+                then: <status-id>
+              - else: <status-id>      # default branch
             # or
-            terminal: true               # terminal station
+            terminal: true               # terminal status
             prompt_checks: [<id>, ...]
             validators: [<id>, ...]
             jit_prompts: [<id>, ...]
+            artifacts:
+              produces:
+                - id: <artifact-id>
+                  label: <display-label>
+                  path: <optional-path-template>
+              consumes:
+                - id: <artifact-id>
+                  label: <display-label>
 
 Conditional predicates are equality-only for v0.9 (locked decision in
 ``backlog-architecture.md``): ``<dot-path> (==|!=) <bare-value>``.
@@ -127,7 +135,7 @@ class NextSpec:
 
     ``kind`` is the discriminator. ``single`` is set when ``kind ==
     "single"``; ``conditional`` is set when ``kind == "conditional"``.
-    Both stay ``None`` when the station is terminal.
+    Both stay ``None`` when the status is terminal.
     """
 
     kind: Literal["single", "conditional", "terminal"]
@@ -136,17 +144,38 @@ class NextSpec:
 
 
 # ----------------------------------------------------------------------
-# Station + workflow + spec
+# Status + workflow + spec
 # ----------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
-class Station:
+class WorkflowArtifactRef:
+    """One workflow-declared proof object.
+
+    ``path`` is optional in v0.9.6. It lets a future UI deep-link to
+    expected files without making live session files the source of truth
+    for the process definition.
+    """
+
+    id: str
+    label: str
+    path: str | None = None
+
+
+@dataclass(frozen=True)
+class WorkflowStatusArtifacts:
+    produces: list[WorkflowArtifactRef] = field(default_factory=list)
+    consumes: list[WorkflowArtifactRef] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class WorkflowStatus:
     id: str
     next: NextSpec
     prompt_checks: list[str] = field(default_factory=list)
     validators: list[str] = field(default_factory=list)
     jit_prompts: list[str] = field(default_factory=list)
+    artifacts: WorkflowStatusArtifacts = field(default_factory=WorkflowStatusArtifacts)
 
 
 @dataclass(frozen=True)
@@ -154,11 +183,11 @@ class Workflow:
     id: str
     actor: str
     trigger: str
-    stations: list[Station]
+    statuses: list[WorkflowStatus]
 
     @property
-    def stations_by_id(self) -> dict[str, Station]:
-        return {s.id: s for s in self.stations}
+    def statuses_by_id(self) -> dict[str, WorkflowStatus]:
+        return {s.id: s for s in self.statuses}
 
 
 @dataclass(frozen=True)
@@ -173,7 +202,7 @@ class WorkflowFinding:
 
     code: str
     workflow: str
-    station: str | None
+    status: str | None
     message: str
     severity: Literal["error", "warning"] = "error"
 
@@ -185,7 +214,7 @@ class WorkflowSpec:
     Empty (``workflows == {}``) when the file is missing or absent.
 
     ``load_findings`` carries any structural anomalies the loader
-    detected before constructing the typed tree (e.g. a station that
+    detected before constructing the typed tree (e.g. a status that
     had both ``terminal: true`` and a ``next:`` key — a coherent
     :class:`NextSpec` can't represent that, so the loader records it
     as a finding and discards one side). :func:`validate_workflow_spec`
@@ -214,16 +243,17 @@ def validate_workflow_spec(
     main validator report (or rejects the load entirely for fatal
     cases). Detected failure modes:
 
-    - ``workflow/duplicate_station_id`` — two stations share an id
-    - ``workflow/unknown_next_station`` — ``next:`` refers to a station
+    - ``workflow/duplicate_status_id`` — two statuses share an id
+    - ``workflow/unknown_next_status`` — ``next:`` refers to a status
       id not declared in the same workflow
-    - ``workflow/terminal_with_next`` — a station marks ``terminal: true``
+    - ``workflow/terminal_with_next`` — a status marks ``terminal: true``
       AND declares ``next``
-    - ``workflow/no_terminal_station`` — the workflow has no terminal
-      station (every workflow must converge)
+    - ``workflow/no_terminal_status`` — the workflow has no terminal
+      status (every workflow must converge)
     - ``workflow/unknown_validator`` / ``workflow/unknown_jit_prompt`` /
-      ``workflow/unknown_prompt_check`` — a station references a
-      validator / JIT prompt / prompt-check that isn't registered
+      ``workflow/unknown_prompt_check`` — a status references a
+      validator / JIT prompt / prompt-check implementation that does
+      not exist
     """
     findings: list[WorkflowFinding] = list(spec.load_findings)
     for wf_id, wf in spec.workflows.items():
@@ -244,28 +274,28 @@ def _check_workflow(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
     out: list[WorkflowFinding] = []
     seen: set[str] = set()
     has_terminal = False
-    for station in wf.stations:
-        if station.id in seen:
+    for status in wf.statuses:
+        if status.id in seen:
             out.append(
                 WorkflowFinding(
-                    code="workflow/duplicate_station_id",
+                    code="workflow/duplicate_status_id",
                     workflow=wf_id,
-                    station=station.id,
-                    message=f"station id {station.id!r} declared more than once",
+                    status=status.id,
+                    message=f"status id {status.id!r} declared more than once",
                 )
             )
-        seen.add(station.id)
-        if station.next.kind == "terminal":
+        seen.add(status.id)
+        if status.next.kind == "terminal":
             has_terminal = True
-    if not has_terminal and wf.stations:
+    if not has_terminal and wf.statuses:
         out.append(
             WorkflowFinding(
-                code="workflow/no_terminal_station",
+                code="workflow/no_terminal_status",
                 workflow=wf_id,
-                station=None,
+                status=None,
                 message=(
-                    f"workflow {wf_id!r} has no terminal station — every "
-                    f"workflow must declare at least one station with "
+                    f"workflow {wf_id!r} has no terminal status — every "
+                    f"workflow must declare at least one status with "
                     f"`terminal: true`"
                 ),
             )
@@ -278,18 +308,18 @@ def _check_next_refs(
     wf_id: str, wf: Workflow, *, declared_ids: set[str]
 ) -> list[WorkflowFinding]:
     out: list[WorkflowFinding] = []
-    for station in wf.stations:
-        nxt = station.next
+    for status in wf.statuses:
+        nxt = status.next
         if nxt.kind == "single":
             assert nxt.single is not None
             if nxt.single not in declared_ids:
                 out.append(
                     WorkflowFinding(
-                        code="workflow/unknown_next_station",
+                        code="workflow/unknown_next_status",
                         workflow=wf_id,
-                        station=station.id,
+                        status=status.id,
                         message=(
-                            f"station {station.id!r} `next:` references "
+                            f"status {status.id!r} `next:` references "
                             f"{nxt.single!r} which is not declared in "
                             f"workflow {wf_id!r}"
                         ),
@@ -301,11 +331,11 @@ def _check_next_refs(
                 if branch.then not in declared_ids:
                     out.append(
                         WorkflowFinding(
-                            code="workflow/unknown_next_station",
+                            code="workflow/unknown_next_status",
                             workflow=wf_id,
-                            station=station.id,
+                            status=status.id,
                             message=(
-                                f"station {station.id!r} conditional branch "
+                                f"status {status.id!r} conditional branch "
                                 f"`then: {branch.then!r}` is not declared "
                                 f"in workflow {wf_id!r}"
                             ),
@@ -323,43 +353,43 @@ def _check_refs(
     known_prompt_checks: set[str],
 ) -> list[WorkflowFinding]:
     out: list[WorkflowFinding] = []
-    for station in wf.stations:
-        for ref in station.validators:
+    for status in wf.statuses:
+        for ref in status.validators:
             if known_validators and ref not in known_validators:
                 out.append(
                     WorkflowFinding(
                         code="workflow/unknown_validator",
                         workflow=wf_id,
-                        station=station.id,
+                        status=status.id,
                         message=(
-                            f"station {station.id!r} references validator "
-                            f"{ref!r} which is not registered"
+                            f"status {status.id!r} references validator "
+                            f"{ref!r} which is not implemented"
                         ),
                     )
                 )
-        for ref in station.jit_prompts:
+        for ref in status.jit_prompts:
             if known_jit_prompts and ref not in known_jit_prompts:
                 out.append(
                     WorkflowFinding(
                         code="workflow/unknown_jit_prompt",
                         workflow=wf_id,
-                        station=station.id,
+                        status=status.id,
                         message=(
-                            f"station {station.id!r} references JIT prompt "
-                            f"{ref!r} which is not registered"
+                            f"status {status.id!r} references JIT prompt "
+                            f"{ref!r} which is not implemented"
                         ),
                     )
                 )
-        for ref in station.prompt_checks:
+        for ref in status.prompt_checks:
             if known_prompt_checks and ref not in known_prompt_checks:
                 out.append(
                     WorkflowFinding(
                         code="workflow/unknown_prompt_check",
                         workflow=wf_id,
-                        station=station.id,
+                        status=status.id,
                         message=(
-                            f"station {station.id!r} references prompt-check "
-                            f"{ref!r} which is not registered"
+                            f"status {status.id!r} references prompt-check "
+                            f"{ref!r} which is not implemented"
                         ),
                     )
                 )
@@ -370,9 +400,11 @@ __all__ = [
     "ConditionalBranch",
     "NextSpec",
     "Predicate",
-    "Station",
     "Workflow",
+    "WorkflowArtifactRef",
     "WorkflowFinding",
     "WorkflowSpec",
+    "WorkflowStatus",
+    "WorkflowStatusArtifacts",
     "validate_workflow_spec",
 ]

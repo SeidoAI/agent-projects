@@ -1,15 +1,15 @@
 """``tripwire transition`` — workflow gate runner CLI (KUI-159).
 
 Submits a transition request to move a session from its current
-workflow station to a target station. The gate runs validators →
+workflow status to a target status. The gate runs validators →
 tripwires → required prompt-checks (in that order); on pass the
-session advances and a station-instance id is assigned, on fail the
+session advances and a status-instance id is assigned, on fail the
 session stays put with a structured rejection reason emitted to the
 events log.
 
 Usage::
 
-    tripwire transition <session-id> <target-station>
+    tripwire transition <session-id> <target-status>
 
 Exits 0 on pass, non-zero with a printed rejection on fail.
 
@@ -36,17 +36,17 @@ from tripwire.core.workflow.transitions import (
 
 @click.command(name="transition")
 @click.argument("session_id")
-@click.argument("target_station")
+@click.argument("target_status")
 @click.option(
     "--project-dir",
     type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
     default=".",
     show_default=True,
 )
-def transition_cmd(session_id: str, target_station: str, project_dir: Path) -> None:
-    """Run the gate to move SESSION_ID to TARGET_STATION.
+def transition_cmd(session_id: str, target_status: str, project_dir: Path) -> None:
+    """Run the gate to move SESSION_ID to TARGET_STATUS.
 
-    Pass: prints the new station-instance id, exits 0.
+    Pass: prints the new status-instance id, exits 0.
     Reject: prints the reason, exits 1.
     """
     resolved = project_dir.expanduser().resolve()
@@ -56,17 +56,17 @@ def transition_cmd(session_id: str, target_station: str, project_dir: Path) -> N
         result = request_transition(
             resolved,
             session_id=session_id,
-            target_station=target_station,
+            target_status=target_status,
         )
     except TransitionError as exc:
         msg = str(exc)
-        # `not reachable` / `unknown station` / `not found` keywords are
+        # `not reachable` / `unknown status` / `not found` keywords are
         # what the test suite + agents grep for. Normalise here.
         raise click.ClickException(msg) from exc
 
     if result.ok:
         click.echo(
-            f"transition: {session_id} → {target_station} ({result.station_instance})"
+            f"transition: {session_id} → {target_status} ({result.status_instance})"
         )
     else:
         message = result.message or result.reason or "rejected"

@@ -2,7 +2,6 @@
 name: pm-session-queue
 description: Transition session to queued after readiness check.
 argument-hint: "<session-id>"
-fires_at: queued
 ---
 
 You are the project manager. Load the project-manager skill if not

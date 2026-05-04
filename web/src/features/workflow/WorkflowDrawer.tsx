@@ -1,25 +1,27 @@
 import { EntityPreviewDrawer } from "@/components/ui/entity-preview-drawer";
 import { Stamp } from "@/components/ui/stamp";
-import type { WorkflowArtifact, WorkflowValidator } from "@/lib/api/endpoints/workflow";
+import type {
+  WorkflowArtifactRef,
+  WorkflowDriftFinding,
+  WorkflowRegistryEntry,
+  WorkflowStatus,
+} from "@/lib/api/endpoints/workflow";
+import type { GateCluster } from "./useWorkflowLayout";
 
-/**
- * Tagged union of the things the workflow map opens a drawer for.
- * Stations are not included — the workflow map is the spec, and
- * stations are described by the legend strip + the canonical
- * [[session-stage-mapping]]; clicking them adds noise.
- */
 export type WorkflowSelection =
-  | { kind: "validator"; entity: WorkflowValidator }
-  | { kind: "jit_prompt"; entity: WorkflowValidator }
-  | { kind: "artifact"; entity: WorkflowArtifact };
+  | { kind: "status"; entity: WorkflowStatus; complexity: number }
+  | { kind: "gate"; entity: GateCluster }
+  | { kind: "jit_prompt"; entity: WorkflowRegistryEntry }
+  | {
+      kind: "artifact";
+      entity: WorkflowArtifactRef;
+      statusId: string;
+      direction: "produces" | "consumes";
+    }
+  | { kind: "drift"; entity: WorkflowDriftFinding };
 
 export interface WorkflowDrawerProps {
   selection: WorkflowSelection | null;
-  /** Whether the current viewer is in PM-mode. Drives whether the
-   *  JIT prompt drawer reveals `prompt_revealed` content. The server
-   *  is the source of truth (it nulls out `prompt_revealed` for
-   *  non-PM viewers) — this flag is the UI-side belt-and-braces
-   *  so we don't accidentally show a leaked value. */
   pmMode: boolean;
   onClose: () => void;
 }
@@ -36,68 +38,85 @@ function renderContents(
   selection: WorkflowSelection,
   pmMode: boolean,
 ): { title: string; header: React.ReactNode; body: React.ReactNode } {
-  if (selection.kind === "validator") {
-    const v = selection.entity;
+  if (selection.kind === "status") {
+    const status = selection.entity;
     return {
-      title: v.name,
-      header: (
-        <div className="flex items-center gap-2">
-          <Stamp tone="gate">GATE</Stamp>
-          <span className="font-mono text-[11px] text-(--color-ink-3)">
-            station · {v.fires_on_station}
-          </span>
-        </div>
-      ),
+      title: status.label ?? status.id,
+      header: <Stamp tone="rule">STATUS</Stamp>,
       body: (
         <div className="flex flex-col gap-4">
           <DefinitionBlock>
-            A <strong>validator</strong> blocks the lifecycle event until its rule passes.
-            Validators are pass/fail; agents satisfy them by changing the project state and
-            re-running the check.
+            A <strong>status</strong> is a region of the workflow. Transitions are the border
+            crossings into or out of this region.
           </DefinitionBlock>
-          <FieldBlock label="Rule it checks">
-            <span className="font-mono text-[12px] text-(--color-ink) leading-snug">
-              {v.checks ?? "—"}
+          <FieldBlock label="Static pressure">
+            <span className="font-mono text-[12px] text-(--color-ink)">
+              {selection.complexity} declared controls, artifacts, or routes
             </span>
           </FieldBlock>
-          <FieldBlock label="Recent runs">
-            <p className="font-serif text-[13px] italic text-(--color-ink-3)">
-              See the Events log for the full history of this validator.
-            </p>
+          <FieldBlock label="Next">
+            <pre className="whitespace-pre-wrap font-mono text-[12px] text-(--color-ink)">
+              {JSON.stringify(status.next, null, 2)}
+            </pre>
           </FieldBlock>
         </div>
       ),
     };
   }
-  if (selection.kind === "jit_prompt") {
-    const t = selection.entity;
-    const reveal = pmMode ? t.prompt_revealed : null;
-    const placeholder = t.prompt_redacted ?? "<<JIT prompt registered>>";
+
+  if (selection.kind === "gate") {
+    const gate = selection.entity;
     return {
-      title: t.name,
+      title: `Gate into ${gate.statusId}`,
       header: (
         <div className="flex items-center gap-2">
-          <Stamp tone="tripwire">JIT PROMPT</Stamp>
+          <Stamp tone="gate">GATE</Stamp>
           <span className="font-mono text-[11px] text-(--color-ink-3)">
-            station · {t.fires_on_station}
+            status · {gate.statusId}
           </span>
         </div>
       ),
       body: (
         <div className="flex flex-col gap-4">
           <DefinitionBlock>
-            A <strong>JIT prompt</strong> fires on a lifecycle event with agent-facing instructions.
-            The agent must <em>acknowledge</em> the prompt (act on it, then `--ack`) before the
-            event proceeds.
+            A <strong>gate cluster</strong> groups controls that evaluate the attempted status
+            change. The first read is the cluster; the drawer carries the full member list.
+          </DefinitionBlock>
+          <ControlList title="Validators" entries={gate.validators} />
+          <ControlList title="Prompt checks" entries={gate.promptChecks} />
+        </div>
+      ),
+    };
+  }
+
+  if (selection.kind === "jit_prompt") {
+    const prompt = selection.entity;
+    const reveal = pmMode ? prompt.prompt_revealed : null;
+    const placeholder = prompt.prompt_redacted ?? "<<JIT prompt registered>>";
+    return {
+      title: prompt.label,
+      header: (
+        <div className="flex items-center gap-2">
+          <Stamp tone="tripwire">JIT PROMPT</Stamp>
+          <span className="font-mono text-[11px] text-(--color-ink-3)">
+            status · {prompt.status ?? "unmapped"}
+          </span>
+        </div>
+      ),
+      body: (
+        <div className="flex flex-col gap-4">
+          <DefinitionBlock>
+            A <strong>JIT prompt</strong> is an intervention. It injects attention at the moment
+            recency matters; it is visually separate from gates.
           </DefinitionBlock>
           <FieldBlock label="Fires on">
             <span className="font-mono text-[12px] text-(--color-ink)">
-              {t.fires_on_event ?? "—"}
+              {prompt.fires_on_event ?? "-"}
             </span>
           </FieldBlock>
-          <FieldBlock label="Agent prompt">
+          <FieldBlock label="Prompt">
             {reveal ? (
-              <pre className="whitespace-pre-wrap font-mono text-[12px] text-(--color-ink) leading-snug">
+              <pre className="whitespace-pre-wrap font-mono text-[12px] text-(--color-ink)">
                 {reveal}
               </pre>
             ) : (
@@ -108,39 +127,89 @@ function renderContents(
       ),
     };
   }
-  const a = selection.entity;
+
+  if (selection.kind === "artifact") {
+    const artifact = selection.entity;
+    return {
+      title: artifact.label,
+      header: (
+        <div className="flex items-center gap-2">
+          <Stamp tone="info">ARTIFACT</Stamp>
+          <span className="font-mono text-[11px] text-(--color-ink-3)">
+            {selection.direction} · {selection.statusId}
+          </span>
+        </div>
+      ),
+      body: (
+        <div className="flex flex-col gap-4">
+          <DefinitionBlock>
+            An <strong>artifact</strong> is proof declared by the workflow definition, not a live
+            file discovered by the UI.
+          </DefinitionBlock>
+          <FieldBlock label="ID">
+            <span className="font-mono text-[12px] text-(--color-ink)">{artifact.id}</span>
+          </FieldBlock>
+          <FieldBlock label="Path">
+            <span className="font-mono text-[12px] text-(--color-ink-2)">
+              {artifact.path ?? "-"}
+            </span>
+          </FieldBlock>
+        </div>
+      ),
+    };
+  }
+
+  const finding = selection.entity;
   return {
-    title: a.label,
+    title: finding.code,
     header: (
       <div className="flex items-center gap-2">
-        <Stamp tone="info">ARTIFACT</Stamp>
+        <Stamp tone={finding.severity === "error" ? "tripwire" : "info"}>DRIFT</Stamp>
+        <span className="font-mono text-[11px] text-(--color-ink-3)">
+          {finding.workflow}:{finding.status ?? "-"}
+        </span>
       </div>
     ),
     body: (
       <div className="flex flex-col gap-4">
         <DefinitionBlock>
-          An <strong>artifact</strong> is a typed document the workflow produces and another stage
-          may consume. Authoring is the agent's job; structure is enforced by validators.
+          Drift marks a definition-integrity problem: the workflow map and the implementation
+          disagree, or runtime events bypassed the declared route.
         </DefinitionBlock>
-        <FieldBlock label="Lineage">
-          <p className="font-mono text-[12px] text-(--color-ink) leading-snug">
-            produced by <span className="font-semibold">{a.produced_by}</span>
-            {a.consumed_by ? (
-              <>
-                {" "}
-                · consumed by <span className="font-semibold">{a.consumed_by}</span>
-              </>
-            ) : null}
-          </p>
-        </FieldBlock>
-        <FieldBlock label="Most recent instance">
-          <p className="font-serif text-[13px] italic text-(--color-ink-3)">
-            Open a session that produced this artifact to view the rendered markdown.
+        <FieldBlock label="Message">
+          <p className="font-sans text-[13px] leading-snug text-(--color-ink-2)">
+            {finding.message}
           </p>
         </FieldBlock>
       </div>
     ),
   };
+}
+
+function ControlList({ title, entries }: { title: string; entries: WorkflowRegistryEntry[] }) {
+  if (entries.length === 0) {
+    return (
+      <FieldBlock label={title}>
+        <p className="font-serif text-[13px] italic text-(--color-ink-3)">none</p>
+      </FieldBlock>
+    );
+  }
+  return (
+    <FieldBlock label={title}>
+      <ul className="flex flex-col gap-2">
+        {entries.map((entry) => (
+          <li key={entry.id} className="font-mono text-[12px] text-(--color-ink)">
+            {entry.id}
+            {entry.description ? (
+              <span className="ml-2 font-serif text-[12px] italic text-(--color-ink-3)">
+                {entry.description}
+              </span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </FieldBlock>
+  );
 }
 
 function DefinitionBlock({ children }: { children: React.ReactNode }) {

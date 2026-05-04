@@ -49,7 +49,6 @@ class JitPrompt(ABC):
     id: ClassVar[str] = ""
     fires_on: ClassVar[str] = ""
     blocks: ClassVar[bool] = True
-    at: ClassVar[tuple[str, str] | tuple[()]] = ()
 
     def __init__(self) -> None:
         for attr in ("id", "fires_on"):
@@ -96,7 +95,7 @@ def fire_jit_prompt_event(
     if not registry:
         return JitPromptFireResult()
 
-    jit_prompts = registry.get(event, [])
+    jit_prompts = _workflow_declared_prompts(project_dir, registry.get(event, []))
     if not jit_prompts:
         return JitPromptFireResult()
 
@@ -168,33 +167,53 @@ def _emit_workflow_event(
     event: str,
     escalated: bool,
 ) -> None:
-    """Append a ``jit_prompt.fired`` row when a prompt declares a station."""
-    pair = getattr(jit_prompt.__class__, "at", ())
-    if not isinstance(pair, tuple) or len(pair) != 2:
-        return
-    workflow, station = pair
-    if not isinstance(workflow, str) or not isinstance(station, str):
+    """Append ``jit_prompt.fired`` rows for workflow.yaml references."""
+    from tripwire.core.workflow.registry import jit_prompt_status_refs
+
+    refs = jit_prompt_status_refs(project_dir, jit_prompt.id)
+    if not refs:
         return
     try:
         from tripwire.core.events.log import emit_event as _emit
 
-        _emit(
-            project_dir,
-            workflow=workflow,
-            instance=session_id,
-            station=station,
-            event="jit_prompt.fired",
-            details={
-                "id": jit_prompt.id,
-                "fires_on": event,
-                "blocks": bool(jit_prompt.blocks),
-                "escalated": escalated,
-            },
-        )
+        for workflow, status in refs:
+            _emit(
+                project_dir,
+                workflow=workflow,
+                instance=session_id,
+                status=status,
+                event="jit_prompt.fired",
+                details={
+                    "id": jit_prompt.id,
+                    "fires_on": event,
+                    "blocks": bool(jit_prompt.blocks),
+                    "escalated": escalated,
+                },
+            )
     except Exception:
         # Best-effort workflow log; the `.tripwire/events/jit_prompt_firings`
         # write above remains the authoritative prompt-fire record.
         pass
+
+
+def _workflow_declared_prompts(
+    project_dir: Path, prompts: list[JitPrompt]
+) -> list[JitPrompt]:
+    """Filter event prompts to ids referenced by workflow.yaml.
+
+    Projects without workflow.yaml retain the historical manifest
+    behavior; projects with workflows only run configured prompt refs.
+    """
+    from tripwire.core.workflow.loader import load_workflows
+
+    spec = load_workflows(project_dir)
+    if not spec.workflows:
+        return prompts
+    declared: set[str] = set()
+    for workflow in spec.workflows.values():
+        for status in workflow.statuses:
+            declared.update(status.jit_prompts)
+    return [prompt for prompt in prompts if prompt.id in declared]
 
 
 def _opt_out_sessions(project) -> set[str]:

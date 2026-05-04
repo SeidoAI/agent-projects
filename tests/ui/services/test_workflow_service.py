@@ -1,22 +1,16 @@
-"""Tests for `tripwire.ui.services.workflow_service`.
-
-KUI-100 — see `docs/specs/2026-04-26-v08-handoff.md` §2.1 for the
-`/api/workflow` graph shape this service builds.
-"""
+"""Tests for `tripwire.ui.services.workflow_service`."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from textwrap import dedent
 
 import yaml
 
-from tripwire.ui.services.workflow_service import (
-    DEFAULT_LIFECYCLE_STATIONS,
-    build_workflow,
-)
+from tripwire.ui.services.workflow_service import build_workflow
 
 
-def _write_project(tmp_path: Path, statuses: list[str] | None = None) -> Path:
+def _write_project(tmp_path: Path) -> Path:
     """Write a minimal `project.yaml` and return the project dir."""
     payload = {
         "name": "Fixture",
@@ -26,8 +20,6 @@ def _write_project(tmp_path: Path, statuses: list[str] | None = None) -> Path:
         "next_issue_number": 1,
         "next_session_number": 1,
     }
-    if statuses is not None:
-        payload["statuses"] = statuses
     (tmp_path / "project.yaml").write_text(
         yaml.safe_dump(payload, sort_keys=False), encoding="utf-8"
     )
@@ -36,126 +28,148 @@ def _write_project(tmp_path: Path, statuses: list[str] | None = None) -> Path:
     return tmp_path
 
 
-def test_build_workflow_returns_top_level_keys(tmp_path: Path) -> None:
-    project_dir = _write_project(tmp_path)
-    graph = build_workflow(project_dir, project_id="abc", is_pm_role=False)
-    assert set(graph.keys()) >= {
-        "project_id",
-        "lifecycle",
-        "validators",
-        "jit_prompts",
-        "connectors",
-        "artifacts",
-    }
-    assert graph["project_id"] == "abc"
-
-
-def test_build_workflow_uses_default_stations_when_project_has_none(
-    tmp_path: Path,
-) -> None:
-    project_dir = _write_project(tmp_path)
-    graph = build_workflow(project_dir, project_id="x", is_pm_role=False)
-    stations = graph["lifecycle"]["stations"]
-    assert [s["id"] for s in stations] == [s["id"] for s in DEFAULT_LIFECYCLE_STATIONS]
-    # n is 1-indexed.
-    assert stations[0]["n"] == 1
-    assert all("label" in s and "desc" in s for s in stations)
-
-
-def test_build_workflow_respects_project_statuses(tmp_path: Path) -> None:
-    project_dir = _write_project(tmp_path, statuses=["a", "b", "c"])
-    graph = build_workflow(project_dir, project_id="x", is_pm_role=False)
-    stations = graph["lifecycle"]["stations"]
-    assert [s["id"] for s in stations] == ["a", "b", "c"]
-    assert [s["n"] for s in stations] == [1, 2, 3]
-
-
-def test_build_workflow_enumerates_validators(tmp_path: Path) -> None:
-    project_dir = _write_project(tmp_path)
-    graph = build_workflow(project_dir, project_id="x", is_pm_role=False)
-    validators = graph["validators"]
-    assert isinstance(validators, list) and len(validators) > 0
-    sample = validators[0]
-    # Required fields per §2.1.
-    for k in ("id", "kind", "name", "fires_on_station"):
-        assert k in sample, f"missing {k!r} on validator: {sample}"
-    assert sample["kind"] == "gate"
-    # All known checks should surface — at minimum, the well-known ones.
-    ids = {v["id"] for v in validators}
-    assert "v_uuid_present" in ids
-    assert "v_reference_integrity" in ids
-
-
-def test_build_workflow_enumerates_jit_prompts(tmp_path: Path) -> None:
-    project_dir = _write_project(tmp_path)
-    graph = build_workflow(project_dir, project_id="x", is_pm_role=False)
-    jit_prompts = graph["jit_prompts"]
-    assert isinstance(jit_prompts, list) and len(jit_prompts) > 0
-    sample = jit_prompts[0]
-    for k in (
-        "id",
-        "kind",
-        "name",
-        "fires_on_event",
-        "blocks",
-        "fires_on_station",
-        "prompt_revealed",
-        "prompt_redacted",
-    ):
-        assert k in sample
-
-
-def test_build_workflow_redacts_jit_prompt_when_not_pm(
-    tmp_path: Path,
-) -> None:
-    project_dir = _write_project(tmp_path)
-    graph = build_workflow(project_dir, project_id="x", is_pm_role=False)
-    for prompt in graph["jit_prompts"]:
-        assert prompt["prompt_revealed"] is None
-        assert isinstance(prompt["prompt_redacted"], str)
-
-
-def test_build_workflow_reveals_jit_prompt_when_pm(tmp_path: Path) -> None:
-    project_dir = _write_project(tmp_path)
-    graph = build_workflow(project_dir, project_id="x", is_pm_role=True)
-    revealed_count = 0
-    for prompt in graph["jit_prompts"]:
-        if isinstance(prompt["prompt_revealed"], str) and prompt["prompt_revealed"]:
-            revealed_count += 1
-    assert revealed_count > 0, (
-        "expected at least one JIT prompt to expose its body in PM mode"
+def _write_workflow(project_dir: Path) -> None:
+    (project_dir / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                    next: queued
+                    artifacts:
+                      consumes:
+                        - id: issue-brief
+                          label: issue brief
+                  - id: queued
+                    next: executing
+                    artifacts:
+                      produces:
+                        - id: plan
+                          label: plan.md
+                          path: sessions/{session_id}/plan.md
+                  - id: executing
+                    next: in_review
+                    validators: [v_uuid_present, v_reference_integrity]
+                    prompt_checks: [pm-session-queue]
+                  - id: in_review
+                    next:
+                      - if: review.outcome == approved
+                        then: verified
+                      - else: executing
+                    artifacts:
+                      produces:
+                        - id: review-notes
+                          label: review notes
+                  - id: verified
+                    next: completed
+                  - id: completed
+                    jit_prompts: [self-review]
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
     )
 
 
-def test_build_workflow_includes_connectors(tmp_path: Path) -> None:
+def test_build_workflow_returns_workflow_first_shape(tmp_path: Path) -> None:
     project_dir = _write_project(tmp_path)
-    graph = build_workflow(project_dir, project_id="x", is_pm_role=False)
-    connectors = graph["connectors"]
-    assert "sources" in connectors and "sinks" in connectors
-    assert isinstance(connectors["sources"], list)
-    assert isinstance(connectors["sinks"], list)
+    _write_workflow(project_dir)
+
+    payload = build_workflow(project_dir, project_id="abc", is_pm_role=False)
+
+    assert set(payload) == {"project_id", "workflows", "registry", "drift"}
+    assert payload["project_id"] == "abc"
+    assert "lifecycle" not in payload
+    assert "validators" not in payload
+    assert "jit_prompts" not in payload
+    assert "connectors" not in payload
+    assert "artifacts" not in payload
 
 
-def test_build_workflow_includes_artifacts(tmp_path: Path) -> None:
+def test_build_workflow_surfaces_statuses_from_workflow_yaml(tmp_path: Path) -> None:
     project_dir = _write_project(tmp_path)
-    graph = build_workflow(project_dir, project_id="x", is_pm_role=False)
-    artifacts = graph["artifacts"]
-    assert isinstance(artifacts, list) and len(artifacts) > 0
-    for a in artifacts:
-        for k in ("id", "label", "produced_by"):
-            assert k in a
+    _write_workflow(project_dir)
+
+    payload = build_workflow(project_dir, project_id="abc", is_pm_role=False)
+    workflow = payload["workflows"][0]
+
+    assert workflow["id"] == "coding-session"
+    assert workflow["actor"] == "coding-agent"
+    assert workflow["trigger"] == "session.spawn"
+    assert [status["id"] for status in workflow["statuses"]] == [
+        "planned",
+        "queued",
+        "executing",
+        "in_review",
+        "verified",
+        "completed",
+    ]
+    executing = workflow["statuses"][2]
+    assert executing["validators"] == ["v_uuid_present", "v_reference_integrity"]
+    assert executing["prompt_checks"] == ["pm-session-queue"]
+    in_review = workflow["statuses"][3]
+    assert in_review["next"]["kind"] == "conditional"
+    assert {"else": "executing"} in in_review["next"]["branches"]
 
 
-# ---------------------------------------------------------------------------
-# KUI-125 — workflow.yaml-derived workflows surface on /api/workflow
-# ---------------------------------------------------------------------------
+def test_build_workflow_derives_artifacts_from_status_declarations(
+    tmp_path: Path,
+) -> None:
+    project_dir = _write_project(tmp_path)
+    _write_workflow(project_dir)
+
+    payload = build_workflow(project_dir, project_id="abc", is_pm_role=False)
+    by_status = {s["id"]: s for s in payload["workflows"][0]["statuses"]}
+
+    assert by_status["planned"]["artifacts"]["consumes"] == [
+        {"id": "issue-brief", "label": "issue brief"}
+    ]
+    assert by_status["queued"]["artifacts"]["produces"] == [
+        {
+            "id": "plan",
+            "label": "plan.md",
+            "path": "sessions/{session_id}/plan.md",
+        }
+    ]
 
 
-def test_build_workflow_surfaces_workflow_yaml_definitions(tmp_path: Path) -> None:
-    """When workflow.yaml is present the response carries a typed
-    ``workflows`` field with stations + next-spec + ref lists."""
-    from textwrap import dedent
+def test_build_workflow_joins_registry_metadata(tmp_path: Path) -> None:
+    project_dir = _write_project(tmp_path)
+    _write_workflow(project_dir)
 
+    payload = build_workflow(project_dir, project_id="abc", is_pm_role=False)
+    registry = payload["registry"]
+
+    validators = {entry["id"]: entry for entry in registry["validators"]}
+    assert "v_uuid_present" in validators
+    assert validators["v_uuid_present"]["blocking"] is True
+    assert validators["v_uuid_present"]["label"] == "uuid present"
+
+    prompts = {entry["id"]: entry for entry in registry["jit_prompts"]}
+    assert "self-review" in prompts
+    assert prompts["self-review"]["blocking"] is True
+    assert prompts["self-review"]["prompt_revealed"] is None
+    assert prompts["self-review"]["prompt_redacted"]
+
+    prompt_checks = {entry["id"]: entry for entry in registry["prompt_checks"]}
+    assert "pm-session-queue" in prompt_checks
+    assert prompt_checks["pm-session-queue"]["blocking"] is True
+
+
+def test_build_workflow_reveals_jit_prompts_when_pm(tmp_path: Path) -> None:
+    project_dir = _write_project(tmp_path)
+    _write_workflow(project_dir)
+
+    payload = build_workflow(project_dir, project_id="abc", is_pm_role=True)
+    prompts = payload["registry"]["jit_prompts"]
+
+    assert any(prompt["prompt_revealed"] for prompt in prompts)
+
+
+def test_build_workflow_reports_definition_drift(tmp_path: Path) -> None:
     project_dir = _write_project(tmp_path)
     (project_dir / "workflow.yaml").write_text(
         dedent(
@@ -164,45 +178,31 @@ def test_build_workflow_surfaces_workflow_yaml_definitions(tmp_path: Path) -> No
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: planned
-                    next: queued
-                  - id: queued
-                    terminal: true
-              pm-review:
-                actor: pm-agent
-                trigger: session.handover
-                stations:
-                  - id: review
-                    next:
-                      - if: pm_review.outcome == auto-merge
-                        then: auto_merge
-                      - else: request_changes
-                  - id: auto_merge
-                    terminal: true
-                  - id: request_changes
+                    next: missing
+                  - id: completed
                     terminal: true
             """
         ),
         encoding="utf-8",
     )
-    graph = build_workflow(project_dir, project_id="abc", is_pm_role=False)
-    workflows = graph.get("workflows")
-    assert isinstance(workflows, list)
-    by_id = {wf["id"]: wf for wf in workflows}
-    assert set(by_id) == {"coding-session", "pm-review"}
-    assert by_id["pm-review"]["actor"] == "pm-agent"
-    assert by_id["pm-review"]["trigger"] == "session.handover"
-    review = by_id["pm-review"]["stations"][0]
-    assert review["id"] == "review"
-    assert review["next"]["kind"] == "conditional"
-    branches = review["next"]["branches"]
-    assert {"else": "request_changes"} in branches
-    assert any("if" in b for b in branches)
+
+    payload = build_workflow(project_dir, project_id="abc", is_pm_role=False)
+
+    assert payload["drift"]["count"] >= 1
+    definition_findings = [
+        finding
+        for finding in payload["drift"]["findings"]
+        if finding["source"] == "definition"
+    ]
+    assert definition_findings[0]["code"] == "workflow/unknown_next_status"
 
 
 def test_build_workflow_workflows_empty_when_yaml_missing(tmp_path: Path) -> None:
-    """No workflow.yaml → workflows is an empty list, not absent."""
     project_dir = _write_project(tmp_path)
-    graph = build_workflow(project_dir, project_id="abc", is_pm_role=False)
-    assert graph["workflows"] == []
+
+    payload = build_workflow(project_dir, project_id="abc", is_pm_role=False)
+
+    assert payload["workflows"] == []
+    assert payload["drift"] == {"count": 0, "findings": []}

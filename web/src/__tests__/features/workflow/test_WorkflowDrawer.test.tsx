@@ -1,48 +1,66 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { WorkflowDrawer } from "@/features/workflow/WorkflowDrawer";
 
-afterEach(cleanup);
-
-describe("WorkflowDrawer — validator selection", () => {
-  it("renders the GATE stamp + the rule it checks", () => {
+describe("WorkflowDrawer", () => {
+  it("renders status details", () => {
     render(
       <WorkflowDrawer
         selection={{
-          kind: "validator",
+          kind: "status",
+          complexity: 4,
           entity: {
-            id: "v1",
-            kind: "gate",
-            name: "self-review",
-            fires_on_station: "in_review",
-            checks: "self-review.md exists in session bundle",
-            blocks: true,
+            id: "executing",
+            label: "executing",
+            next: { kind: "single", single: "in_review" },
+            validators: [],
+            jit_prompts: [],
+            prompt_checks: [],
+            artifacts: { produces: [], consumes: [] },
           },
         }}
         pmMode={false}
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByText("GATE")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /self-review/i })).toBeTruthy();
-    expect(screen.getByText(/self-review\.md exists in session bundle/i)).toBeTruthy();
+    expect(screen.getByText("STATUS")).toBeInTheDocument();
+    expect(screen.getByText(/4 declared controls/i)).toBeInTheDocument();
   });
-});
 
-describe("WorkflowDrawer — JIT prompt selection redaction", () => {
-  it("hides the prompt content for non-PM mode and shows the placeholder", () => {
+  it("renders gate cluster members", () => {
+    render(
+      <WorkflowDrawer
+        selection={{
+          kind: "gate",
+          entity: {
+            id: "in_review:gate",
+            statusId: "in_review",
+            blocking: true,
+            validators: [{ id: "v_artifact_presence", label: "artifact presence" }],
+            promptChecks: [{ id: "pm-session-review", label: "session review" }],
+          },
+        }}
+        pmMode={false}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("GATE")).toBeInTheDocument();
+    expect(screen.getByText("v_artifact_presence")).toBeInTheDocument();
+    expect(screen.getByText("pm-session-review")).toBeInTheDocument();
+  });
+
+  it("hides JIT prompt content for non-PM mode", () => {
     render(
       <WorkflowDrawer
         selection={{
           kind: "jit_prompt",
           entity: {
-            id: "t1",
-            kind: "jit_prompt",
-            name: "stale-context",
-            fires_on_station: "in_review",
+            id: "self-review",
+            label: "self review",
+            status: "in_review",
             fires_on_event: "session.complete",
-            prompt_revealed: null,
+            prompt_revealed: "secret-prompt-body for the agent",
             prompt_redacted: "<<JIT prompt registered>>",
           },
         }}
@@ -50,20 +68,19 @@ describe("WorkflowDrawer — JIT prompt selection redaction", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByText("<<JIT prompt registered>>")).toBeTruthy();
+    expect(screen.getByText("<<JIT prompt registered>>")).toBeInTheDocument();
     expect(screen.queryByText(/secret-prompt-body/i)).toBeNull();
   });
 
-  it("reveals the prompt content for PM-mode", () => {
+  it("reveals JIT prompt content for PM mode", () => {
     render(
       <WorkflowDrawer
         selection={{
           kind: "jit_prompt",
           entity: {
-            id: "t1",
-            kind: "jit_prompt",
-            name: "stale-context",
-            fires_on_station: "in_review",
+            id: "self-review",
+            label: "self review",
+            status: "in_review",
             fires_on_event: "session.complete",
             prompt_revealed: "secret-prompt-body for the agent",
             prompt_redacted: "<<JIT prompt registered>>",
@@ -73,36 +90,48 @@ describe("WorkflowDrawer — JIT prompt selection redaction", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByText(/secret-prompt-body for the agent/i)).toBeTruthy();
+    expect(screen.getByText(/secret-prompt-body for the agent/i)).toBeInTheDocument();
   });
-});
 
-describe("WorkflowDrawer — artifact selection", () => {
-  it("renders the artifact label + producer/consumer lineage", () => {
+  it("renders artifact details", () => {
     render(
       <WorkflowDrawer
         selection={{
           kind: "artifact",
+          statusId: "queued",
+          direction: "produces",
+          entity: { id: "plan", label: "plan.md", path: "sessions/{session_id}/plan.md" },
+        }}
+        pmMode={false}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("ARTIFACT")).toBeInTheDocument();
+    expect(screen.getByText("sessions/{session_id}/plan.md")).toBeInTheDocument();
+  });
+
+  it("renders drift details", () => {
+    render(
+      <WorkflowDrawer
+        selection={{
+          kind: "drift",
           entity: {
-            id: "a_plan",
-            label: "plan.md",
-            produced_by: "queued",
-            consumed_by: "executing",
+            source: "definition",
+            code: "workflow/unknown_next_status",
+            workflow: "coding-session",
+            status: "in_review",
+            severity: "error",
+            message: "missing target",
           },
         }}
         pmMode={false}
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByRole("heading", { name: /plan\.md/i })).toBeTruthy();
-    expect(screen.getByText(/produced by/i)).toBeTruthy();
-    expect(screen.getByText(/queued/)).toBeTruthy();
-    expect(screen.getByText(/consumed by/i)).toBeTruthy();
-    expect(screen.getByText(/executing/)).toBeTruthy();
+    expect(screen.getByText("DRIFT")).toBeInTheDocument();
+    expect(screen.getByText("missing target")).toBeInTheDocument();
   });
-});
 
-describe("WorkflowDrawer — closed", () => {
   it("renders nothing when selection is null", () => {
     const { container } = render(
       <WorkflowDrawer selection={null} pmMode={false} onClose={vi.fn()} />,

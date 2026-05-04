@@ -13,11 +13,9 @@ function mockFetch() {
     json: () =>
       Promise.resolve({
         project_id: "p1",
-        lifecycle: { stations: [] },
-        validators: [],
-        jit_prompts: [],
-        connectors: { sources: [], sinks: [] },
-        artifacts: [],
+        workflows: [],
+        registry: { validators: [], jit_prompts: [], prompt_checks: [] },
+        drift: { count: 0, findings: [] },
       }),
   } as Response;
   return vi.spyOn(globalThis, "fetch").mockResolvedValue(res);

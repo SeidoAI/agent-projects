@@ -46,9 +46,15 @@ def test_get_projects_returns_seeded_project(tripwire_ui_server: dict) -> None:
     assert r.status_code == 200
     body = r.json()
     assert isinstance(body, list)
-    # The fixture seeded exactly one project — our temp dir.
-    assert len(body) == 1
-    project = body[0]
+    project = next(
+        (
+            item
+            for item in body
+            if item["dir"] == str(tripwire_ui_server["project_dir"])
+        ),
+        None,
+    )
+    assert project is not None
     assert project["name"] == "e2e"
     assert project["key_prefix"] == "E2E"
     # ID is a 12-char hex hash of the project dir.

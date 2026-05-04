@@ -12,14 +12,12 @@ from tripwire.core.graph.refs import (
     extract_references_with_pins,
 )
 from tripwire.core.validator._types import CheckResult, ValidationContext
-from tripwire.core.workflow.registry import registers_at
 from tripwire.models.comment import Comment
 from tripwire.models.issue import Issue
 from tripwire.models.node import ConceptNode
 from tripwire.models.session import AgentSession
 
 
-@registers_at("coding-session", "executing")
 def check_reference_integrity(ctx: ValidationContext) -> list[CheckResult]:
     """All `[[node-id]]`, `blocked_by`, `parent`, `related`, `repo`, `agent` refs resolve."""
     results: list[CheckResult] = []
@@ -205,7 +203,6 @@ def _discover_agent_ids(project_dir: Path) -> set[str]:
     return ids
 
 
-@registers_at("coding-session", "executing")
 def check_no_stale_pins(ctx: ValidationContext) -> list[CheckResult]:
     """KUI-127 / A2: pinned references whose target had a contract change.
 
@@ -266,7 +263,6 @@ def check_no_stale_pins(ctx: ValidationContext) -> list[CheckResult]:
     return results
 
 
-@registers_at("coding-session", "executing")
 def check_bidirectional_related(ctx: ValidationContext) -> list[CheckResult]:
     """For every node A.related: [B], node B.related must contain A."""
     results: list[CheckResult] = []

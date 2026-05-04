@@ -1,0 +1,42 @@
+---
+uuid: 2c6b1a2a-47e3-48b1-a1d4-fea7dbb9d88f
+id: glossary-tripwire
+type: glossary
+name: Tripwire
+description: A hidden-prompt mechanism that fires at workflow checkpoints to nudge agents back on path or inject just-in-time context.
+related: []
+tags: [vocabulary, workflow]
+status: active
+created_at: "2026-03-15T14:00:00"
+updated_at: "2026-03-15T14:00:00"
+created_by: maia
+---
+## Definition
+
+A **tripwire** is a hidden-prompt mechanism that fires at a specific
+workflow checkpoint — typically a station boundary, a transition
+attempt, or a write — and either:
+
+1. **Corrects deviation:** the agent attempted something off-path
+   (e.g. trying to mark a session verified without a `verified.md`
+   artifact); the tripwire fires a corrective prompt.
+2. **Injects just-in-time context:** the agent is approaching a
+   decision point where context that was deliberately hidden from
+   the baseline prompt now matters; the tripwire surfaces it.
+
+## Distinction from related terms
+
+- **Validator** — mechanical schema/reference checks; pass/fail; no
+  prompt injection.
+- **JIT prompt** — the *content* a tripwire injects when it fires.
+  Tripwires are the firing mechanism; JIT prompts are the payload.
+- **Gate** — a validator/tripwire bundle attached to a transition
+  border. Tripwires often live inside gates but can also fire
+  independently of transitions.
+
+## Where tripwires appear in the system
+
+- `src/tripwire/core/tripwires/` — the fire mechanism
+- `workflow.yaml` — declares which tripwires attach to which stations
+- `events/*.jsonl` — every fire is an `tripwire.fired` event
+- The Tripwire log screen (S6) — for retrospective process review

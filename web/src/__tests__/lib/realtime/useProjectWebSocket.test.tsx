@@ -52,6 +52,7 @@ function wrapper({ children }: { children: ReactNode }) {
 
 describe("useProjectWebSocket", () => {
   beforeEach(async () => {
+    vi.useFakeTimers();
     clients.length = 0;
     const { __resetProjectWebSocketsForTests } = await loadHook();
     __resetProjectWebSocketsForTests();
@@ -61,6 +62,8 @@ describe("useProjectWebSocket", () => {
     cleanup();
     const { __resetProjectWebSocketsForTests } = await loadHook();
     __resetProjectWebSocketsForTests();
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
   });
 
   it("opens one socket per project id and closes it on unmount", async () => {
@@ -70,6 +73,10 @@ describe("useProjectWebSocket", () => {
     expect(clients[0]?.url).toContain("project=p1");
 
     unmount();
+    expect(clients[0]?.close).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
     expect(clients[0]?.close).toHaveBeenCalledTimes(1);
   });
 
@@ -90,6 +97,34 @@ describe("useProjectWebSocket", () => {
 
     expect(clients).toHaveLength(1);
     unmount();
+    expect(clients[0]?.close).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+    expect(clients[0]?.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the socket through a StrictMode-style immediate remount", async () => {
+    const { useProjectWebSocket } = await loadHook();
+
+    const first = renderHook(() => useProjectWebSocket("p1"), { wrapper });
+    expect(clients).toHaveLength(1);
+
+    first.unmount();
+    expect(clients[0]?.close).not.toHaveBeenCalled();
+
+    const second = renderHook(() => useProjectWebSocket("p1"), { wrapper });
+    expect(clients).toHaveLength(1);
+
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+    expect(clients[0]?.close).not.toHaveBeenCalled();
+
+    second.unmount();
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
     expect(clients[0]?.close).toHaveBeenCalledTimes(1);
   });
 

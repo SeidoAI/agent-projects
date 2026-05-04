@@ -31,7 +31,7 @@ def _scaffold(tmp_path: Path) -> Path:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: planned
                     next: queued
                   - id: queued
@@ -49,7 +49,7 @@ def _scaffold(tmp_path: Path) -> Path:
         tmp_path,
         workflow="pm-review",
         instance="demo",
-        station="review",
+        status="review",
         event="pm_review.completed",
         details={
             "outcome": "request_changes",
@@ -117,7 +117,7 @@ def test_pr_status_uses_latest_when_multiple(tmp_path):
         pd,
         workflow="pm-review",
         instance="demo",
-        station="review",
+        status="review",
         event="pm_review.completed",
         details={
             "outcome": "auto-merge",

@@ -1,106 +1,143 @@
-"""Validator station registration (KUI-120).
-
-Each existing validator check declares its workflow station via the
-``@registers_at`` decorator. The registry exposes the
-station-to-validator mapping consumed by the gate runner (KUI-159).
-Behaviour during ``tripwire validate`` stays byte-stable: the same
-checks run in the same order; the registry is enrichment metadata.
-"""
+"""Validator implementation catalog for workflow.yaml references."""
 
 from __future__ import annotations
 
+from pathlib import Path
+from textwrap import dedent
 
-def test_every_check_in_all_checks_is_registered() -> None:
-    """Every function in ``ALL_CHECKS`` must declare a station via
-    ``@registers_at``. The registry attribute is set as a function
-    attribute by the decorator; an undecorated check would silently
-    fall out of the gate runner's view."""
-    from tripwire.core.validator.checks import ALL_CHECKS
 
-    undecorated = [
-        fn.__name__
-        for fn in ALL_CHECKS
-        if not getattr(fn, "__tripwire_workflow_station__", None)
-    ]
-    assert not undecorated, (
-        f"checks missing @registers_at: {undecorated}. Each ALL_CHECKS "
-        f"entry must declare its (workflow, station)."
+def test_every_check_has_unique_workflow_catalog_id() -> None:
+    from tripwire.core.validator import ALL_CHECKS
+    from tripwire.core.workflow.registry import validator_id_for
+
+    ids = [validator_id_for(fn) for fn in ALL_CHECKS]
+    assert len(ids) == len(set(ids))
+    assert "v_uuid_present" in ids
+    assert "v_stale_concept" in ids
+    assert "v_check" not in ids
+
+
+def test_declared_validator_ids_come_from_workflow_yaml(tmp_path: Path) -> None:
+    from tripwire.core.workflow.registry import declared_validator_ids
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: queued
+                    next: executing
+                    validators: [v_uuid_present]
+                  - id: executing
+                    terminal: true
+                    validators: [v_reference_integrity, v_uuid_present]
+            """
+        ),
+        encoding="utf-8",
     )
 
-
-def test_register_at_populates_validator_registry() -> None:
-    """Importing the check modules must populate the registry — accessed
-    via :func:`known_validator_ids`. Empty after Step 1 ships, populated
-    after Step 2 decorates the existing checks."""
-    # Importing checks/__init__.py executes the decorators on every
-    # check function, which flips the registry's _validator_stations
-    # to a non-empty mapping.
-    import tripwire.core.validator.checks  # noqa: F401
-    from tripwire.core.workflow.registry import known_validator_ids
-
-    ids = known_validator_ids()
-    # Use a representative subset rather than the full set so reordering
-    # one check doesn't churn the test.
-    for vid in (
+    assert declared_validator_ids(tmp_path) == [
+        "v_workflow_well_formed",
         "v_uuid_present",
-        "v_enum_values",
         "v_reference_integrity",
-        "v_artifact_presence",
-    ):
-        assert vid in ids, f"{vid} missing from validator registry: {sorted(ids)}"
-
-
-def test_validators_for_station_returns_registered_ids() -> None:
-    import tripwire.core.validator.checks  # noqa: F401
-    from tripwire.core.workflow.registry import validators_for_station
-
-    executing = validators_for_station("coding-session", "executing")
-    in_review = validators_for_station("coding-session", "in_review")
-
-    assert "v_uuid_present" in executing
-    assert "v_artifact_presence" in in_review
-
-
-def test_validate_byte_stable_after_registration(tmp_path) -> None:
-    """`tripwire validate --strict` produces the same finding codes in
-    the same order before and after the registration refactor.
-
-    We can't compare the *exact* before/after on the same call (we are
-    after the refactor), so instead we assert a hard invariant: the
-    sequence of check function names in ALL_CHECKS matches a frozen
-    canonical list. Touching the order is a deliberate decision, not a
-    side effect of refactoring."""
-    from tripwire.core.validator.checks import ALL_CHECKS
-
-    canonical = [
-        "check_uuid_present",
-        "check_id_format",
-        "check_enum_values",
-        "check_reference_integrity",
-        "check_bidirectional_related",
-        # KUI-127 (v0.9 entity-graph-substrate, PR #74) added stale-pin
-        # validation in the references group; canonical position is here.
-        "check_no_stale_pins",
-        "check_issue_body_structure",
-        "check_status_transitions",
-        "check_freshness",
-        "check_manifest_schema",
-        "check_manifest_phase_ownership_consistent",
-        "check_artifact_presence",
-        "check_id_collisions",
-        "check_sequence_drift",
-        "check_timestamps",
-        "check_comment_provenance",
-        "check_project_standards",
-        "check_coverage_heuristics",
-        "check_phase_requirements",
-        "check_handoff_artifact",
-        "check_quality_consistency",
-        "check_session_issue_coherence",
-        "check_issue_artifact_presence",
-        "check_pm_response_covers_self_review",
-        "check_pm_response_followups_resolve",
-        "check_workflow_well_formed",
     ]
-    actual = [fn.__name__ for fn in ALL_CHECKS]
-    assert actual == canonical
+
+
+def test_no_validator_placement_decorators_remain() -> None:
+    root = Path("src/tripwire")
+    offenders: list[str] = []
+    for path in root.rglob("*.py"):
+        if ".venv" in path.parts:
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "registers_at(" in text or "__tripwire_workflow_status__" in text:
+            offenders.append(str(path))
+    assert offenders == []
+
+
+def test_all_declared_validators_resolve_to_implementations(tmp_path: Path) -> None:
+    from tripwire.core.workflow.registry import (
+        declared_validator_ids,
+        validator_checks_for_ids,
+        validator_id_for,
+    )
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: completed
+                    terminal: true
+                    validators: [v_uuid_present, v_enum_values]
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    ids = declared_validator_ids(tmp_path)
+    checks = validator_checks_for_ids(ids)
+    resolved = {validator_id_for(check) for check in checks}
+    assert {"v_workflow_well_formed", "v_uuid_present", "v_enum_values"} <= resolved
+
+
+def test_validate_project_runs_only_workflow_declared_validators(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tripwire.core import validator
+    from tripwire.core.validator._types import CheckResult
+
+    (tmp_path / "project.yaml").write_text(
+        "name: test\nkey_prefix: TST\nbase_branch: main\nstatuses: [planned]\n"
+        "status_transitions:\n  planned: []\nrepos: {}\nnext_issue_number: 1\n"
+        "next_session_number: 1\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: completed
+                    terminal: true
+                    validators: [v_selected]
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    def check_selected(ctx):
+        return [
+            CheckResult(
+                code="selected/fired",
+                severity="warning",
+                file=None,
+                message="selected fired",
+            )
+        ]
+
+    def check_omitted(ctx):
+        return [
+            CheckResult(
+                code="omitted/fired",
+                severity="warning",
+                file=None,
+                message="omitted fired",
+            )
+        ]
+
+    monkeypatch.setattr(validator, "ALL_CHECKS", [check_selected, check_omitted])
+
+    report = validator.validate_project(tmp_path)
+    codes = [finding.code for finding in report.warnings]
+    assert "selected/fired" in codes
+    assert "omitted/fired" not in codes

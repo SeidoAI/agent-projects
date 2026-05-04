@@ -16,6 +16,7 @@ interface TrackedConnection {
   refCount: number;
   status: UseProjectWebSocketStatus;
   statusListeners: Set<(status: UseProjectWebSocketStatus) => void>;
+  closeTimer: ReturnType<typeof globalThis.setTimeout> | null;
 }
 
 /**
@@ -24,6 +25,7 @@ interface TrackedConnection {
  * `ProjectLayout` during a dev reload would leak one socket per reload.
  */
 const connections = new Map<string, TrackedConnection>();
+const CLOSE_GRACE_MS = 50;
 
 /** Build the WebSocket URL. Exported for tests. */
 export function buildWebSocketUrl(projectId: string): string {
@@ -62,6 +64,7 @@ export function useProjectWebSocket(projectId: string): { status: UseProjectWebS
         refCount: 0,
         status: "connecting",
         statusListeners: new Set(),
+        closeTimer: null,
       };
       entry.client = createWebSocketClient({
         url: buildWebSocketUrl(projectId),
@@ -83,6 +86,9 @@ export function useProjectWebSocket(projectId: string): { status: UseProjectWebS
       });
       connections.set(projectId, entry);
       tracked = entry;
+    } else if (tracked.closeTimer) {
+      globalThis.clearTimeout(tracked.closeTimer);
+      tracked.closeTimer = null;
     }
 
     tracked.refCount += 1;
@@ -96,8 +102,12 @@ export function useProjectWebSocket(projectId: string): { status: UseProjectWebS
       entry.statusListeners.delete(listener);
       entry.refCount -= 1;
       if (entry.refCount <= 0) {
-        entry.client.close();
-        connections.delete(projectId);
+        entry.closeTimer = globalThis.setTimeout(() => {
+          const current = connections.get(projectId);
+          if (!current || current !== entry || current.refCount > 0) return;
+          current.client.close();
+          connections.delete(projectId);
+        }, CLOSE_GRACE_MS);
       }
     };
   }, [projectId, queryClient]);
@@ -108,6 +118,10 @@ export function useProjectWebSocket(projectId: string): { status: UseProjectWebS
 /** Test/HMR escape hatch — tear down every live connection. */
 export function __resetProjectWebSocketsForTests(): void {
   for (const entry of connections.values()) {
+    if (entry.closeTimer) {
+      globalThis.clearTimeout(entry.closeTimer);
+      entry.closeTimer = null;
+    }
     entry.client.close();
   }
   connections.clear();

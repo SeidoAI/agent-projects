@@ -1,8 +1,7 @@
 import { ChevronDown, ChevronRight, PanelLeftClose } from "lucide-react";
 import { useMemo, useState } from "react";
-
-import type { ReactFlowGraph, ReactFlowNode } from "@/lib/api/endpoints/graph";
 import { Button } from "@/components/ui/button";
+import type { ReactFlowGraph, ReactFlowNode } from "@/lib/api/endpoints/graph";
 import { cn } from "@/lib/utils";
 
 /**
@@ -46,6 +45,14 @@ const KIND_COLOR: Record<string, string> = {
   decision: "var(--color-tripwire)",
   requirement: "var(--color-rule)",
   model: "var(--color-ink)",
+  principle: "var(--color-rule)",
+  practice: "var(--color-gate)",
+  glossary: "var(--color-ink-2)",
+  metric: "var(--color-info)",
+  persona: "var(--color-ink-3)",
+  invariant: "var(--color-rule)",
+  anti_pattern: "var(--color-tripwire)",
+  skill: "var(--color-ink)",
   custom: "var(--color-ink-2)",
 };
 

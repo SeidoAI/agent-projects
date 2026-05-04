@@ -1,27 +1,22 @@
-"""Prompt-check station mapping (KUI-122).
+"""Prompt-check implementation catalog (KUI-122).
 
 A prompt-check is a slash command (``pm-session-review``,
 ``pm-session-launch``, etc.) that the project manager runs at a
-specific workflow station. The frontmatter on the slash command file
-declares the station via ``fires_at:``:
+workflow status declared by ``workflow.yaml``. Slash command files
+provide the implementation id and optional description:
 
 .. code-block:: yaml
 
     ---
     name: pm-session-review
-    fires_at: in_review
     description: ...
     ---
 
 This module enumerates every slash command file (packaged defaults
 under ``templates/commands/``, project-local overrides under
-``.tripwire/commands/``), parses the frontmatter, and exposes the
-``fires_at: → command-name`` mapping. The well-formedness validator
-uses this to resolve workflow.yaml's ``prompt_checks: [...]`` refs.
-
-Step 1 ships the surface; step 4 (KUI-122) backfills frontmatter on
-the existing slash commands and starts emitting findings for
-unresolved refs.
+``.tripwire/commands/``), parses the frontmatter, and exposes command
+ids. The well-formedness validator uses this to resolve
+workflow.yaml's ``prompt_checks: [...]`` refs.
 """
 
 from __future__ import annotations
@@ -34,10 +29,10 @@ import yaml
 
 @dataclass(frozen=True)
 class PromptCheck:
-    """A slash command that declares ``fires_at: <station-id>``."""
+    """A slash command that can be referenced by ``workflow.yaml``."""
 
     id: str  # the command name (matches the frontmatter `name:`)
-    fires_at: str
+    description: str
     source: Path  # absolute path to the .md file
 
 
@@ -49,12 +44,10 @@ def _packaged_commands_dir() -> Path:
 
 
 def collect_prompt_checks(project_dir: Path) -> list[PromptCheck]:
-    """Enumerate every slash command that declares ``fires_at:``.
+    """Enumerate slash commands that can be workflow prompt-checks.
 
     Resolution: project-local override (``.tripwire/commands/<name>.md``)
-    wins over the packaged default. Files without frontmatter, or
-    without a ``fires_at:`` key, are skipped — they're slash commands
-    that aren't workflow prompt-checks.
+    wins over the packaged default.
     """
     seen: dict[str, PromptCheck] = {}
     # Packaged defaults first; overrides applied after to win.
@@ -75,31 +68,33 @@ def collect_prompt_checks(project_dir: Path) -> list[PromptCheck]:
 def _parse_command_file(path: Path) -> PromptCheck | None:
     """Parse a single ``.md`` frontmatter and return a :class:`PromptCheck`.
 
-    Returns ``None`` if the file has no frontmatter, no ``fires_at:``,
-    or any parse failure — these aren't errors at this layer; they're
-    "this slash command isn't a prompt-check".
+    Returns ``None`` only when the file cannot be read or parsed. The
+    command name falls back to the file stem so workflow.yaml can
+    reference older commands that have no frontmatter.
     """
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
         return None
     if not text.startswith("---\n"):
-        return None
+        return PromptCheck(id=path.stem, description="", source=path)
     end = text.find("\n---", 4)
     if end == -1:
-        return None
+        return PromptCheck(id=path.stem, description="", source=path)
     fm_text = text[4:end]
     try:
         fm = yaml.safe_load(fm_text) or {}
     except yaml.YAMLError:
-        return None
+        return PromptCheck(id=path.stem, description="", source=path)
     if not isinstance(fm, dict):
-        return None
-    fires_at = fm.get("fires_at")
+        return PromptCheck(id=path.stem, description="", source=path)
     name = fm.get("name") or path.stem
-    if not isinstance(fires_at, str) or not fires_at:
-        return None
-    return PromptCheck(id=str(name), fires_at=fires_at, source=path)
+    description = fm.get("description")
+    return PromptCheck(
+        id=str(name),
+        description=str(description) if isinstance(description, str) else "",
+        source=path,
+    )
 
 
 __all__ = ["PromptCheck", "collect_prompt_checks"]
