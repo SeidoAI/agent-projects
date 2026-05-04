@@ -26,6 +26,11 @@ workflows:
             - id: verification-checklist
               label: verification-checklist.md
               path: sessions/{session_id}/artifacts/verification-checklist.md
+        work_steps:
+          - id: plan
+            actor: pm-agent
+            label: write plan + verification checklist
+            skills: [project-manager, verification]
       - id: queued
         next: executing
         artifacts:
@@ -34,6 +39,11 @@ workflows:
               label: plan.md
             - id: verification-checklist
               label: verification-checklist.md
+        work_steps:
+          - id: dispatch
+            actor: pm-agent
+            label: dispatch when unblocked
+            skills: [project-manager]
       - id: executing
         next: in_review
         artifacts:
@@ -65,6 +75,10 @@ workflows:
             - id: project-pr
               label: project-repo PR
         work_steps:
+          - id: monitor
+            actor: pm-agent
+            label: monitor execution
+            skills: [project-manager]
           - id: implement
             actor: coding-agent
             label: implement
@@ -110,6 +124,11 @@ workflows:
             - id: completion-comment
               label: completion-comment.yaml
               path: issues/{issue_key}/comments/{nnn}-completion-{yyyy-mm-dd}.yaml
+        work_steps:
+          - id: close-out
+            actor: pm-agent
+            label: write completion comment
+            skills: [project-manager, agent-messaging]
       - id: completed
         terminal: true
         artifacts:
@@ -121,6 +140,11 @@ workflows:
           produces:
             - id: session-signature
               label: session signature
+        work_steps:
+          - id: sign
+            actor: code
+            label: sign session
+            skills: []
     routes:
       - id: session-create
         actor: pm-agent
@@ -278,102 +302,6 @@ workflows:
         emits:
           events: [pr.merged]
 
-  pm-session-management:
-    actor: pm-agent
-    trigger: command.pm-session-create
-    brief-description: "PM's lifecycle for handling sessions."
-    statuses:
-      - id: inspect
-        next: create
-      - id: create
-        next: queue
-      - id: queue
-        next: spawn
-      - id: spawn
-        next: monitor
-      - id: monitor
-        next: review
-      - id: review
-        next:
-          - if: review.outcome == changes_requested
-            then: monitor
-          - else: complete
-      - id: complete
-        terminal: true
-    routes:
-      - id: inspect-readiness
-        actor: pm-agent
-        command: pm-session-check
-        trigger: command.pm-session-check
-        from: source:session-request
-        to: inspect
-        kind: forward
-        label: inspect readiness
-        skills: [project-manager]
-      - id: create-session
-        actor: pm-agent
-        command: pm-session-create
-        trigger: command.pm-session-create
-        from: inspect
-        to: create
-        kind: forward
-        label: create
-        skills: [project-manager]
-      - id: queue-session
-        actor: pm-agent
-        command: pm-session-queue
-        trigger: command.pm-session-queue
-        from: create
-        to: queue
-        kind: forward
-        label: queue
-        skills: [project-manager]
-      - id: spawn-session
-        actor: pm-agent
-        command: pm-session-spawn
-        trigger: command.pm-session-spawn
-        from: queue
-        to: spawn
-        kind: forward
-        label: spawn
-        skills: [project-manager, backend-development]
-      - id: monitor-session
-        actor: pm-agent
-        command: pm-session-monitor
-        trigger: command.pm-session-monitor
-        from: spawn
-        to: monitor
-        kind: forward
-        label: monitor
-        skills: [project-manager]
-      - id: review-session
-        actor: pm-agent
-        command: pm-session-review
-        trigger: command.pm-session-review
-        from: monitor
-        to: review
-        kind: forward
-        label: review
-        skills: [project-manager, verification]
-      - id: review-rework-loop
-        actor: pm-agent
-        command: pm-session-review
-        trigger: review.outcome == changes_requested
-        from: review
-        to: monitor
-        kind: return
-        label: rework
-        skills: [project-manager, verification]
-      - id: complete-session
-        actor: pm-agent
-        command: pm-session-complete
-        trigger: command.pm-session-complete
-        from: review
-        to: complete
-        kind: forward
-        label: complete
-        skills: [project-manager, verification]
-
   pm-scoping:
     actor: pm-agent
     trigger: command.pm-scope
@@ -451,6 +379,11 @@ workflows:
         next: act
       - id: act
         next: close
+        cross_links:
+          - workflow: coding-session
+            status: planned
+            label: triages into session
+            kind: triggers
       - id: close
         terminal: true
     routes:
