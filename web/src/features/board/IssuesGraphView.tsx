@@ -52,15 +52,23 @@ export function IssuesGraphView({ issues, statusValues, onNodeClick }: IssuesGra
 
   const layout = useMemo(() => {
     const visibleIds = new Set(issues.map((i) => i.id));
+    const rawEdges = issues.flatMap((i) =>
+      i.blocked_by
+        .filter((b) => visibleIds.has(b))
+        .map((b) => ({ source: b, target: i.id })),
+    );
+    // P1 from PR review: defend against `blocked_by` cycles. The
+    // layered-DAG's layer-assignment loop terminates by ids.length
+    // bound, but on a cycle the layer it picks is non-deterministic
+    // and the rendered ordering claims a partial order that doesn't
+    // exist. Drop the back-edges of any detected cycle and warn once
+    // per session so the data error surfaces.
+    const edges = stripCycles(rawEdges, issues.length);
     return layoutLayeredDag(
       {
         nodes: issues.map((i) => ({ id: i.id })),
         // blocker → blocked: same edge direction as SessionFlow.
-        edges: issues.flatMap((i) =>
-          i.blocked_by
-            .filter((b) => visibleIds.has(b))
-            .map((b) => ({ source: b, target: i.id })),
-        ),
+        edges,
         statusOrderOf: (id) =>
           statusIndex.get(issuesById.get(id)?.status ?? "") ?? statusValues.length,
       },
@@ -202,4 +210,80 @@ export function IssuesGraphView({ issues, statusValues, onNodeClick }: IssuesGra
 
 function truncate(s: string, n: number): string {
   return s.length <= n ? s : `${s.slice(0, n - 1)}…`;
+}
+
+/**
+ * Drop edges that participate in a cycle, preserving the rest. DFS
+ * with a recursion-stack set; back-edges are the offending ones. On
+ * the first detected cycle we emit a single console.warn so the
+ * underlying data error surfaces in dev — without crashing the
+ * page or silently lying about a partial order.
+ *
+ * Bounded by the issue count (also passed in for an explicit
+ * iteration cap belt-and-braces against a malformed adjacency).
+ */
+export function stripCycles(
+  edges: { source: string; target: string }[],
+  nodeCount: number,
+): { source: string; target: string }[] {
+  if (edges.length === 0) return edges;
+  const adjacency = new Map<string, string[]>();
+  for (const e of edges) {
+    let arr = adjacency.get(e.source);
+    if (!arr) {
+      arr = [];
+      adjacency.set(e.source, arr);
+    }
+    arr.push(e.target);
+  }
+
+  const visited = new Set<string>();
+  const onStack = new Set<string>();
+  const dropEdges = new Set<string>();
+  let warned = false;
+  const edgeKey = (s: string, t: string) => `${s}->${t}`;
+
+  // Iterative DFS so we don't blow the stack on long chains.
+  const dfs = (root: string) => {
+    const stack: { node: string; iter: Iterator<string> }[] = [];
+    const enter = (node: string) => {
+      visited.add(node);
+      onStack.add(node);
+      stack.push({ node, iter: (adjacency.get(node) ?? [])[Symbol.iterator]() });
+    };
+    enter(root);
+    let safety = nodeCount * (edges.length + 1);
+    while (stack.length > 0 && safety-- > 0) {
+      const top = stack[stack.length - 1];
+      if (!top) break;
+      const next = top.iter.next();
+      if (next.done) {
+        onStack.delete(top.node);
+        stack.pop();
+        continue;
+      }
+      const child = next.value;
+      if (onStack.has(child)) {
+        // Back-edge → cycle.
+        dropEdges.add(edgeKey(top.node, child));
+        if (!warned) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `IssuesGraphView: blocked_by cycle detected (back-edge ${top.node} → ${child}); ` +
+              "rendering remaining edges. Fix the issue YAMLs to break the cycle.",
+          );
+          warned = true;
+        }
+        continue;
+      }
+      if (!visited.has(child)) enter(child);
+    }
+  };
+
+  for (const start of adjacency.keys()) {
+    if (!visited.has(start)) dfs(start);
+  }
+
+  if (dropEdges.size === 0) return edges;
+  return edges.filter((e) => !dropEdges.has(edgeKey(e.source, e.target)));
 }

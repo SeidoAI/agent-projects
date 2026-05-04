@@ -37,7 +37,14 @@ import { cn } from "@/lib/utils";
 export function Monitor() {
   const { projectId } = useProjectShell();
   const sessionsQuery = useSessions(projectId);
-  const eventsQuery = useWorkflowEvents(projectId, {});
+  // P2 from PR review: filter at the source, not the client. The
+  // events log has a 200-event default cap; polling every 5s with no
+  // filter ships everything (validator runs, transitions, prompt
+  // checks) and then the client throws ~95% of it away. The
+  // backend supports `event=` server-side, so let it do the work
+  // and round-trip a smaller payload. Future-proofs Stage 2's
+  // worktree-scoped fire indicators (which want a tighter window).
+  const eventsQuery = useWorkflowEvents(projectId, { event: "jit_prompt.fired" });
 
   const sessions = sessionsQuery.data ?? [];
   const activeSessions = useMemo(
@@ -48,9 +55,6 @@ export function Monitor() {
   const tripwireFiresBySession = useMemo(() => {
     const m = new Map<string, WorkflowEvent[]>();
     for (const e of eventsQuery.data?.events ?? []) {
-      // jit_prompt.fired is the canonical "tripwire fired" signal —
-      // validators emit even on success, transitions are routine.
-      if (e.event !== "jit_prompt.fired") continue;
       const arr = m.get(e.instance) ?? [];
       arr.push(e);
       m.set(e.instance, arr);
@@ -324,6 +328,8 @@ function EmptyState({ totalSessions }: { totalSessions: number }) {
 }
 
 function formatTs(ts: string): string {
+  // Operator-facing surface: append UTC so "last fire 14:30:00" can't
+  // be silently misread as local time. Cheap, unambiguous.
   const t = ts.split("T")[1];
-  return t ? t.replace("Z", "") : ts;
+  return t ? `${t.replace("Z", "")} UTC` : ts;
 }

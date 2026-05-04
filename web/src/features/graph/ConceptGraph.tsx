@@ -194,6 +194,12 @@ export function ConceptGraph() {
     height: size.height,
     reseedNonce,
     reseedMode,
+    // P0 from PR review: "all" mode is one-shot. Without this reset
+    // the next refetch (default `staleTime` 30s, WS invalidation, ...)
+    // would re-enter the seed effect with mode still "all" and
+    // re-run the simulation across the just-persisted positions,
+    // thrashing node YAMLs whenever the user lands on the page.
+    onReseedComplete: () => setReseedMode("unsaved"),
   });
 
   const unsavedCount = useMemo(

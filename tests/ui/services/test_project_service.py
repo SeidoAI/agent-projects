@@ -244,6 +244,41 @@ class TestDiscoverProjects:
         assert result[0].node_count == 2
         assert result[0].session_count == 1
 
+    def test_pinned_index_is_not_widened_by_discover(self, tmp_path: Path):
+        """P2 from PR review: `seed_project_index([pinned])` must
+        prevent `discover_projects` from widening to other projects
+        on the filesystem.
+
+        Regression for the `--project-dir` flag's contract: when the
+        UI is launched against a single project, a later
+        `discover_projects` call (driven by cache expiry, a node
+        lookup, etc.) must NOT silently include other projects
+        accessible via cwd / project_roots / home — otherwise the
+        operator sees projects they explicitly didn't ask for.
+        """
+        pinned = _make_project(tmp_path / "pinned", name="pinned", key_prefix="PIN")
+        decoy = _make_project(tmp_path / "decoy", name="decoy", key_prefix="DEC")
+
+        seed_project_index([pinned])
+
+        # Stack the deck: cwd is inside the decoy, the user's
+        # project_roots also list the decoy. Discovery would normally
+        # find it. With the pin, it must not.
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
+            mock_path_cls.cwd.return_value = decoy
+            mock_path_cls.home.return_value = tmp_path / "fakehome"
+            mock_path_cls.side_effect = Path
+            cfg = UserConfig(project_roots=[tmp_path])
+            result = discover_projects(cfg)
+
+        # Only the pinned project surfaces — the decoy is invisible
+        # to discovery while the pin is set.
+        assert len(result) == 1
+        assert Path(result[0].dir) == pinned.resolve()
+        # Sanity: the decoy still exists on disk and would otherwise
+        # have been discovered if pinning weren't engaged.
+        assert (decoy / "project.yaml").is_file()
+
 
 class TestCache:
     def test_cache_hit(self, tmp_path: Path):

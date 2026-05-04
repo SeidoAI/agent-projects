@@ -550,8 +550,10 @@ function EmptyRow({ children }: { children: React.ReactNode }) {
 }
 
 function formatTs(ts: string): string {
+  // Operator-facing event log: append UTC so the chronological list
+  // can't be misread as local time at a glance.
   const t = ts.split("T")[1];
-  return t ? t.replace("Z", "") : ts;
+  return t ? `${t.replace("Z", "")} UTC` : ts;
 }
 
 function summarize(event: WorkflowEvent): string {

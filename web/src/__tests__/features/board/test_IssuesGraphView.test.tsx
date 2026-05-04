@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { IssuesGraphView } from "@/features/board/IssuesGraphView";
+import { IssuesGraphView, stripCycles } from "@/features/board/IssuesGraphView";
 import type { EnumValue } from "@/lib/api/endpoints/enums";
 import type { IssueSummary } from "@/lib/api/endpoints/issues";
 
@@ -130,5 +130,116 @@ describe("IssuesGraphView", () => {
     const rect = container.querySelector('g[data-testid="issues-graph-node-K-1"] rect');
     expect(rect).not.toBeNull();
     expect(rect?.getAttribute("stroke")).toBe("#3366cc");
+  });
+
+  // ===========================================================================
+  // P1 from PR review: blocked_by cycle defence
+  // ===========================================================================
+  describe("cycle defence", () => {
+    let warnSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    });
+    afterEach(() => {
+      warnSpy.mockRestore();
+    });
+
+    it("renders a 2-cycle without crashing and drops exactly one edge", () => {
+      const issues = [
+        makeIssue({ id: "A", title: "A", blocked_by: ["B"] }),
+        makeIssue({ id: "B", title: "B", blocked_by: ["A"] }),
+      ];
+      const { container } = render(
+        <IssuesGraphView issues={issues} statusValues={STATUS_VALUES} onNodeClick={() => {}} />,
+      );
+      // Both nodes still render.
+      expect(screen.getByTestId("issues-graph-node-A")).toBeInTheDocument();
+      expect(screen.getByTestId("issues-graph-node-B")).toBeInTheDocument();
+      // One edge survives — the back-edge is dropped, the forward
+      // edge keeps the partial order legible.
+      const paths = container.querySelectorAll("g[data-layer=edges] path");
+      expect(paths).toHaveLength(1);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0]?.[0]).toMatch(/cycle detected/i);
+    });
+
+    it("renders a 3-cycle and drops exactly the back-edge", () => {
+      const issues = [
+        makeIssue({ id: "A", title: "A", blocked_by: ["C"] }),
+        makeIssue({ id: "B", title: "B", blocked_by: ["A"] }),
+        makeIssue({ id: "C", title: "C", blocked_by: ["B"] }),
+      ];
+      const { container } = render(
+        <IssuesGraphView issues={issues} statusValues={STATUS_VALUES} onNodeClick={() => {}} />,
+      );
+      // 3 issues, 3 edges in YAML → 2 edges after cycle break.
+      const paths = container.querySelectorAll("g[data-layer=edges] path");
+      expect(paths).toHaveLength(2);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not warn or drop edges on an acyclic graph", () => {
+      const issues = [
+        makeIssue({ id: "A", title: "A", blocked_by: [] }),
+        makeIssue({ id: "B", title: "B", blocked_by: ["A"] }),
+        makeIssue({ id: "C", title: "C", blocked_by: ["B"] }),
+      ];
+      const { container } = render(
+        <IssuesGraphView issues={issues} statusValues={STATUS_VALUES} onNodeClick={() => {}} />,
+      );
+      const paths = container.querySelectorAll("g[data-layer=edges] path");
+      expect(paths).toHaveLength(2);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+  });
+});
+
+// ===========================================================================
+// stripCycles — direct unit tests (decoupled from rendering)
+// ===========================================================================
+describe("stripCycles", () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    // The cycle path emits a single console.warn — silence it in
+    // these direct unit tests so the global setup's "no unexpected
+    // console output" guard doesn't fail.
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it("returns the input unchanged when the graph is acyclic", () => {
+    const edges = [
+      { source: "A", target: "B" },
+      { source: "B", target: "C" },
+    ];
+    expect(stripCycles(edges, 3)).toEqual(edges);
+  });
+
+  it("drops the back-edge of a 2-cycle", () => {
+    const edges = [
+      { source: "A", target: "B" },
+      { source: "B", target: "A" },
+    ];
+    const out = stripCycles(edges, 2);
+    expect(out).toHaveLength(1);
+  });
+
+  it("returns the empty input unchanged", () => {
+    expect(stripCycles([], 0)).toEqual([]);
+  });
+
+  it("preserves edges that share a node with a cycle but aren't on it", () => {
+    const edges = [
+      { source: "A", target: "B" },
+      { source: "B", target: "A" }, // back-edge
+      { source: "A", target: "C" }, // not part of the cycle
+    ];
+    const out = stripCycles(edges, 3);
+    // Forward A→B + A→C survive; B→A dropped.
+    const keys = out.map((e) => `${e.source}->${e.target}`).sort();
+    expect(keys).toContain("A->C");
+    expect(keys).toHaveLength(2);
   });
 });

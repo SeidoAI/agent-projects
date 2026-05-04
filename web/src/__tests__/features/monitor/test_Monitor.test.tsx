@@ -42,7 +42,12 @@ function withRoute({ sessions = [], events = [] }: SeedOpts) {
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
   qc.setQueryData(queryKeys.sessions("p1"), sessions);
-  qc.setQueryData(queryKeys.workflowEvents("p1", {}), {
+  // Monitor passes `{ event: "jit_prompt.fired" }` so the backend
+  // filters server-side. Test fixtures seed THAT cache slot; events
+  // landed here are already pre-filtered (so test data should only
+  // contain `jit_prompt.fired`). This mirrors the events tab pattern
+  // in the Quality test.
+  qc.setQueryData(queryKeys.workflowEvents("p1", { event: "jit_prompt.fired" }), {
     events,
     total: events.length,
   });
@@ -173,7 +178,12 @@ describe("Monitor", () => {
   // ===========================================================================
   // Tripwire correlation
   // ===========================================================================
-  it("counts only jit_prompt.fired events per session, ignoring other event kinds", () => {
+  it("counts tripwire fires per session from the server-filtered events response", () => {
+    // P2 from PR review: filtering moved server-side. The fixture
+    // here seeds the `{ event: "jit_prompt.fired" }` query cache
+    // (see `withRoute`), so the backend has already discarded
+    // validator.run / transition.* events. The client groups what
+    // it gets by `instance` and counts each row as a tripwire fire.
     const Wrapper = withRoute({
       sessions: [
         makeSession({ id: "alpha", status: "executing" }),
@@ -197,15 +207,6 @@ describe("Monitor", () => {
           details: { id: "tw_write_count" },
         },
         {
-          // Validator runs are not tripwires — should be ignored.
-          ts: "2026-04-30T14:02:00Z",
-          workflow: "wf",
-          instance: "alpha",
-          status: "executing",
-          event: "validator.run",
-          details: { id: "v_uuid_present", outcome: "pass" },
-        },
-        {
           ts: "2026-04-30T14:03:00Z",
           workflow: "wf",
           instance: "beta",
@@ -219,6 +220,48 @@ describe("Monitor", () => {
     expect(screen.getByTestId("monitor-session-alpha")).toHaveAttribute("data-fires", "2");
     expect(screen.getByTestId("monitor-session-beta")).toHaveAttribute("data-fires", "1");
     expect(screen.getByTestId("monitor-stat-tripwires")).toHaveTextContent("3");
+  });
+
+  it("does NOT consume the unfiltered events cache (server-side filter contract)", () => {
+    // Pin the contract that Monitor calls `useWorkflowEvents` with
+    // `{ event: "jit_prompt.fired" }`. If a future change drops the
+    // filter, it would consume the unfiltered cache slot — this
+    // test seeds ONLY the unfiltered slot with a fake fire and
+    // asserts the count stays at zero.
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+    });
+    qc.setQueryData(queryKeys.sessions("p1"), [
+      makeSession({ id: "alpha", status: "executing" }),
+    ]);
+    // Wrong slot — the no-filter shape. Monitor must NOT read this.
+    qc.setQueryData(queryKeys.workflowEvents("p1", {}), {
+      events: [
+        {
+          ts: "2026-04-30T14:00:00Z",
+          workflow: "wf",
+          instance: "alpha",
+          status: "executing",
+          event: "jit_prompt.fired",
+          details: { id: "tw_x" },
+        },
+      ],
+      total: 1,
+    });
+    function Wrapper({ children }: { children: ReactNode }) {
+      return (
+        <QueryClientProvider client={qc}>
+          <MemoryRouter initialEntries={["/p/p1/monitor"]}>
+            <Routes>
+              <Route path="/p/:projectId/monitor" element={children} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+    }
+    render(<Monitor />, { wrapper: Wrapper });
+    expect(screen.getByTestId("monitor-session-alpha")).toHaveAttribute("data-fires", "0");
+    expect(screen.getByTestId("monitor-stat-tripwires")).toHaveTextContent("0");
   });
 
   it("renders the tripwire badge with last-fire timestamp when fires exist", () => {

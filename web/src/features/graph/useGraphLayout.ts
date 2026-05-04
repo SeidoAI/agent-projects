@@ -30,6 +30,17 @@ export interface UseGraphLayoutInput {
    * when there are no unsaved nodes.
    */
   reseedMode?: "unsaved" | "all";
+  /**
+   * Optional callback fired exactly once after a seed pass that ran in
+   * `reseedMode === "all"`. The parent flips `reseedMode` back to
+   * `"unsaved"` here so a subsequent re-render driven by an unrelated
+   * cache refetch does NOT spuriously re-run the simulation across
+   * pinned positions and rewrite YAMLs. Without this the "all" mode
+   * is sticky and any refetch (default `staleTime` 30s, WS
+   * invalidation, ...) re-enters the seed effect in "all" mode and
+   * thrashes node layouts.
+   */
+  onReseedComplete?: () => void;
 }
 
 export interface UseGraphLayoutResult {
@@ -92,6 +103,7 @@ export function useGraphLayout({
   height,
   reseedNonce = 0,
   reseedMode = "unsaved",
+  onReseedComplete,
 }: UseGraphLayoutInput): UseGraphLayoutResult {
   const [positions, setPositions] = useState<Record<string, Vec2>>(() => initialPositions(nodes));
   const [didSeed, setDidSeed] = useState<boolean>(false);
@@ -185,7 +197,12 @@ export function useGraphLayout({
     setPositions(next);
     setNewLayouts(seeded);
     setDidSeed(true);
-  }, [nodes, edges, width, height, seedKey, reseedMode]);
+
+    // P0 from PR review: "all"-mode is one-shot. Fire the callback
+    // so the parent can flip it back to "unsaved" before the next
+    // refetch re-enters this effect.
+    if (reseedMode === "all") onReseedComplete?.();
+  }, [nodes, edges, width, height, seedKey, reseedMode, onReseedComplete]);
 
   return { positions, newLayouts, didSeed };
 }
@@ -193,14 +210,22 @@ export function useGraphLayout({
 // Exported for unit testing — the seed step is the deterministic
 // part of layout. The d3-force pass after it is refinement; the
 // quality of the seed is what we verify.
+//
+// P1 from PR review: takes `cx`/`cy` explicitly so tests can exercise
+// non-centred canvases (a wide viewport whose centre isn't at
+// width/2, height/2). The convenience derivation that used to live
+// here masked any divergence between the test export and the
+// production callsite.
 export const __test__ = {
   seedSimNodes: (
     nodes: ReactFlowNode[],
     edges: ReactFlowEdge[],
+    cx: number,
+    cy: number,
     width: number,
     height: number,
     mode: "unsaved" | "all" = "unsaved",
-  ) => seedSimNodes(nodes, edges, width / 2, height / 2, width, height, mode),
+  ) => seedSimNodes(nodes, edges, cx, cy, width, height, mode),
 };
 
 function initialPositions(nodes: ReactFlowNode[]): Record<string, Vec2> {

@@ -211,6 +211,64 @@ describe("ConceptGraph layout (PM #25 round 2)", () => {
     expect(canvas?.contains(sidebar as Node)).toBe(false);
   });
 
+  it("encodes type-driven node sizing — principles render larger than glossary nodes", () => {
+    // P2 from PR review: the TYPE_SIZE_SCALE table at the top of
+    // ConceptGraph.tsx had no behavioural test. A row deletion
+    // (or accidental flattening of all scales to 1.0) would silently
+    // regress the visual hierarchy. We pin only the ORDERING — exact
+    // pixel radii are calibration knobs that should stay free to
+    // tune. Today: principle/invariant 1.4× > model/decision 1.0× >
+    // glossary/practice 0.85×.
+    const wrapper = withSeed({
+      nodes: [
+        {
+          id: "principle-x",
+          type: "concept",
+          position: { x: 100, y: 100 },
+          data: { label: "P", type: "principle", has_saved_layout: true },
+        },
+        {
+          id: "model-x",
+          type: "concept",
+          position: { x: 300, y: 100 },
+          data: { label: "M", type: "model", has_saved_layout: true },
+        },
+        {
+          id: "glossary-x",
+          type: "concept",
+          position: { x: 500, y: 100 },
+          data: { label: "G", type: "glossary", has_saved_layout: true },
+        },
+      ],
+      edges: [],
+      meta: {
+        kind: "concept",
+        focus: null,
+        upstream: false,
+        downstream: false,
+        depth: null,
+        node_count: 3,
+        edge_count: 0,
+        orphans: [],
+      },
+    });
+    const { container } = render(<ConceptGraph />, { wrapper });
+    const r = (id: string) =>
+      Number(
+        container
+          .querySelector(`[data-testid='node-circle-${id}']`)
+          ?.getAttribute("r"),
+      );
+    const rPrinciple = r("principle-x");
+    const rModel = r("model-x");
+    const rGlossary = r("glossary-x");
+    // Strict ordering — the table being adjusted up or down is
+    // fine; flattening to a single radius is the regression we
+    // want to catch.
+    expect(rPrinciple).toBeGreaterThan(rModel);
+    expect(rModel).toBeGreaterThan(rGlossary);
+  });
+
   it("truncates long node labels on the canvas to keep dense layouts readable (P1)", () => {
     const longLabel = "this is an extremely long concept node label";
     const wrapper = withSeed({
