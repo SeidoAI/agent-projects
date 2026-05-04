@@ -56,12 +56,15 @@ def test_pm_skill_total_size_under_budget() -> None:
     v0.9.6 (workflow codification stage 1) bumps to 160KB for the new
     MONITOR_CRITERIA.md reference doc — codifies the pm-monitor signal
     vocabulary the PM agent uses to drive the overseer loop.
+    v0.9.6 (continued) bumps to 166KB for WORKFLOWS_CODE_REVIEW.md —
+    the multi-reviewer cycle (self/superpowers/codex) split out of
+    WORKFLOWS_REVIEW.md as part of the four-primitive codification.
     """
     pm_dir = TEMPLATES_DIR / "skills" / "project-manager"
     total = _total_chars(pm_dir)
-    assert total < 160_000, (
+    assert total < 166_000, (
         f"PM skill is {total:,} chars ({total / 1024:.0f} KB). "
-        f"Budget is 160KB. Consolidate or trim reference docs."
+        f"Budget is 166KB. Consolidate or trim reference docs."
     )
 
 

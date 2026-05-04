@@ -850,3 +850,523 @@ workflows:
         kind: forward
         label: return to idle
         skills: [project-manager]
+
+  # code-review — multi-reviewer cycle. Cross-cutting workflow that
+  # takes a coding-session's PR pair through gate-check, three
+  # independent reviews (self/superpowers/codex), synthesis, and
+  # either merge+node-reconcile or relaunch. Triggered by
+  # `signal.session_pr_pair_open` from pm-monitor; cross-link source
+  # for concept-freshness.detected on merge and coding-session.executing
+  # on relaunch.
+  code-review:
+    actor: pm-agent
+    trigger: signal.session_pr_pair_open
+    brief-description: "two PRs in: review, decide, reconcile, merge."
+    statuses:
+      - id: received
+        next: gate-check
+        # Hard gates on the PR-pair preconditions. v_freshness keeps
+        # us from reviewing a stale branch; v_workflow_well_formed
+        # is the always-on schema check.
+        tripwires:
+          - v_freshness
+        work_steps:
+          - id: confirm-pr-pair
+            actor: pm-agent
+            label: confirm tripwire-pr + project-pr live
+            skills: [project-manager]
+      - id: gate-check
+        next: independent-reviews
+        # Branch must pass `tripwire validate` AND the verification
+        # checklist must be walked + verified.md written.
+        tripwires:
+          - v_artifact_presence
+          - v_handoff_artifact
+          - v_phase_requirements
+        work_steps:
+          - id: run-validate-on-branch
+            actor: pm-agent
+            label: validate on branch
+            skills: [project-manager, verification]
+          - id: walk-verification-checklist
+            actor: pm-agent
+            label: walk verification checklist
+            skills: [verification]
+          - id: write-verified-md
+            actor: pm-agent
+            label: write verified.md
+            skills: [project-manager, verification]
+      - id: independent-reviews
+        next: synthesis
+        work_steps:
+          - id: read-self-review
+            actor: pm-agent
+            label: read self-review.md
+            skills: [project-manager]
+          - id: launch-superpowers-subagent
+            actor: pm-agent
+            label: launch superpowers code-review subagent
+            skills: [project-manager]
+          - id: comment-codex-trigger
+            actor: pm-agent
+            label: comment @codex on project-pr
+            skills: [project-manager]
+          - id: collect-review-outputs
+            actor: pm-agent
+            label: collect three review outputs
+            skills: [project-manager]
+      - id: synthesis
+        next:
+          - if: review.verdict == merge
+            then: node-reconcile
+          - else: relaunch
+        # JIT prompt: hidden ack-required, surfaces if the PM seems to
+        # have skipped reading the reviews. Heuristic placeholder for
+        # stage 2 when scope-creep detection lands.
+        jit_prompts:
+          - self-review
+        work_steps:
+          - id: synthesize-findings
+            actor: pm-agent
+            label: synthesize three reviews
+            skills: [project-manager]
+          - id: decide-verdict
+            actor: pm-agent
+            label: decide merge or relaunch
+            skills: [project-manager]
+      - id: node-reconcile
+        next: merge
+        cross_links:
+          - workflow: concept-freshness
+            status: detected
+            label: trigger node refresh
+            kind: triggers
+        work_steps:
+          - id: identify-touched-nodes
+            actor: pm-agent
+            label: identify touched nodes
+            skills: [project-manager]
+          - id: identify-missing-nodes
+            actor: pm-agent
+            label: identify missing nodes
+            skills: [project-manager]
+          - id: update-or-create-nodes
+            actor: pm-agent
+            label: update or create nodes
+            skills: [project-manager]
+          - id: rehash-source-nodes
+            actor: pm-agent
+            label: rehash source nodes
+            skills: [project-manager]
+      - id: merge
+        terminal: true
+        # Final hard gates before pulling the trigger on the merges.
+        tripwires:
+          - v_done_implies_issue_artifacts_on_main
+        work_steps:
+          - id: merge-tripwire-pr
+            actor: pm-agent
+            label: merge tripwire-pr
+            skills: [project-manager]
+          - id: merge-project-pr
+            actor: pm-agent
+            label: merge project-pr
+            skills: [project-manager]
+          - id: emit-merge-event
+            actor: pm-agent
+            label: emit merge event
+            skills: [project-manager]
+      - id: relaunch
+        terminal: true
+        cross_links:
+          - workflow: coding-session
+            status: executing
+            label: relaunch agent with findings
+            kind: triggers
+            pm_subagent_dispatch: true
+        work_steps:
+          - id: write-pm-followup-artifact
+            actor: pm-agent
+            label: write PM followup artifact
+            skills: [project-manager]
+          - id: session-reopen-and-resume
+            actor: pm-agent
+            label: reopen session and resume coding agent
+            skills: [project-manager]
+    routes:
+      - id: pr-pair-received
+        actor: pm-agent
+        trigger: signal.session_pr_pair_open == true
+        signals: [signal.session_pr_pair_open]
+        from: source:session.in_review
+        to: received
+        kind: forward
+        label: receive PR pair
+        skills: [project-manager]
+      - id: pass-gate
+        actor: pm-agent
+        trigger: received.confirmed
+        from: received
+        to: gate-check
+        kind: forward
+        label: gate-check
+        skills: [project-manager]
+      - id: enter-reviews
+        actor: pm-agent
+        trigger: gate-check.passed
+        from: gate-check
+        to: independent-reviews
+        kind: forward
+        label: launch reviewers
+        skills: [project-manager]
+      - id: enter-synthesis
+        actor: pm-agent
+        trigger: reviews.collected
+        from: independent-reviews
+        to: synthesis
+        kind: forward
+        label: synthesize
+        skills: [project-manager]
+      - id: route-to-merge
+        actor: pm-agent
+        command: pm-session-review
+        trigger: review.verdict == merge
+        from: synthesis
+        to: node-reconcile
+        kind: forward
+        label: route to merge
+        controls:
+          prompt_checks: [pm-session-review]
+        skills: [project-manager]
+      - id: route-to-relaunch
+        actor: pm-agent
+        command: pm-session-review
+        trigger: review.verdict == relaunch
+        from: synthesis
+        to: relaunch
+        kind: return
+        label: route to relaunch
+        controls:
+          prompt_checks: [pm-session-review]
+        skills: [project-manager]
+      - id: do-merge
+        actor: pm-agent
+        trigger: node-reconcile.complete
+        from: node-reconcile
+        to: merge
+        kind: forward
+        label: merge PRs
+        skills: [project-manager]
+
+  # inbox-handling — what happens to an inbox row from intake to
+  # closure. Cross-link target from pm-monitor.dispatch (escalation
+  # bucket), pm-triage.act (won't-do or duplicate), and
+  # code-review.synthesis (off-track findings).
+  inbox-handling:
+    actor: pm-agent
+    trigger: signal.inbox_inbound_new
+    brief-description: "inbox row from intake to closure."
+    statuses:
+      - id: pending
+        next: triaged
+        # Concept-name-prose flag at intake time so the PM nudges
+        # toward structured node references when the inbox row will
+        # later seed a scoped issue.
+        heuristics:
+          - v_concept_name_prose
+        work_steps:
+          - id: receive-row
+            actor: pm-agent
+            label: receive inbox row
+            skills: [project-manager, agent-messaging]
+      - id: triaged
+        next: resolved
+        # Reference integrity: any handle the row points at must
+        # actually resolve before resolution.
+        tripwires:
+          - v_reference_integrity
+        prompt_checks: [pm-edit]
+        work_steps:
+          - id: classify-row
+            actor: pm-agent
+            label: classify and decide action
+            skills: [project-manager]
+      - id: resolved
+        terminal: true
+        work_steps:
+          - id: close-row
+            actor: pm-agent
+            label: close inbox row
+            skills: [project-manager]
+    routes:
+      - id: inbox-receive
+        actor: pm-agent
+        trigger: signal.inbox_inbound_new == true
+        signals: [signal.inbox_inbound_new, signal.comment_question]
+        from: source:inbox
+        to: pending
+        kind: forward
+        label: receive
+        skills: [project-manager]
+      - id: inbox-triage
+        actor: pm-agent
+        command: pm-edit
+        trigger: command.pm-edit
+        from: pending
+        to: triaged
+        kind: forward
+        label: triage
+        skills: [project-manager]
+      - id: inbox-resolve
+        actor: pm-agent
+        trigger: triage.action_taken
+        from: triaged
+        to: resolved
+        kind: forward
+        label: resolve
+        skills: [project-manager]
+
+  # pr-lifecycle — the PR object's own state transitions, separate from
+  # the coding-session that owns it. Cross-link target from
+  # coding-session.executing (PR opened) and code-review (review
+  # outcome). Models draft → ready → reviewing → approved → merged
+  # | rejected.
+  pr-lifecycle:
+    actor: pm-agent
+    trigger: pr.opened
+    brief-description: "PR object lifecycle."
+    statuses:
+      - id: draft
+        next: ready
+        work_steps:
+          - id: open-draft
+            actor: coding-agent
+            label: open draft PR
+            skills: [backend-development]
+      - id: ready
+        next: reviewing
+        # Branch alive + handoff artifact + comment provenance: the
+        # gates a PM relies on before advancing the PR into review.
+        tripwires:
+          - v_freshness
+          - v_handoff_artifact
+          - v_comment_provenance
+        work_steps:
+          - id: mark-ready
+            actor: coding-agent
+            label: mark ready for review
+            skills: [agent-messaging]
+      - id: reviewing
+        next:
+          - if: review.outcome == approved
+            then: approved
+          - else: rejected
+        cross_links:
+          - workflow: code-review
+            status: received
+            label: review consumes PR pair
+            kind: triggered_by
+        work_steps:
+          - id: under-review
+            actor: pm-agent
+            label: PR under review
+            skills: [project-manager]
+      - id: approved
+        next: merged
+        tripwires:
+          - v_done_implies_issue_artifacts_on_main
+        work_steps:
+          - id: hold-approved
+            actor: pm-agent
+            label: ready to merge
+            skills: [project-manager]
+      - id: merged
+        terminal: true
+        work_steps:
+          - id: emit-merge
+            actor: pm-agent
+            label: emit pr.merged event
+            skills: [project-manager]
+      - id: rejected
+        terminal: true
+        cross_links:
+          - workflow: coding-session
+            status: executing
+            label: rejection re-enters execution
+            kind: triggers
+        work_steps:
+          - id: hold-rejected
+            actor: pm-agent
+            label: rejected — relaunch session
+            skills: [project-manager]
+    routes:
+      - id: pr-open
+        actor: coding-agent
+        trigger: pr.opened
+        from: source:branch
+        to: draft
+        kind: forward
+        label: open PR
+        skills: [backend-development]
+      - id: pr-ready
+        actor: coding-agent
+        trigger: pr.ready_for_review
+        from: draft
+        to: ready
+        kind: forward
+        label: mark ready
+        skills: [backend-development]
+      - id: pr-enter-review
+        actor: pm-agent
+        trigger: review.requested
+        from: ready
+        to: reviewing
+        kind: forward
+        label: enter review
+        skills: [project-manager]
+      - id: pr-approve
+        actor: pm-agent
+        trigger: review.outcome == approved
+        from: reviewing
+        to: approved
+        kind: forward
+        label: approve
+        skills: [project-manager]
+      - id: pr-reject
+        actor: pm-agent
+        trigger: review.outcome == changes_requested
+        from: reviewing
+        to: rejected
+        kind: return
+        label: reject
+        skills: [project-manager]
+      - id: pr-merge
+        actor: pm-agent
+        trigger: pr.merge
+        from: approved
+        to: merged
+        kind: forward
+        label: merge
+        skills: [project-manager]
+
+  # phase-advancement — explicit phase boundary workflow. Drives the
+  # `project.phase` field through scoping → scoped → executing → reviewing.
+  # The PM advances each phase after the prior phase's requirements are
+  # met. v_phase_requirements gates the scoping → scoped boundary
+  # (gap-analysis.md + compliance.md present + complete).
+  phase-advancement:
+    actor: pm-agent
+    trigger: command.pm-phase
+    brief-description: "advance project.phase through scoping → reviewing."
+    statuses:
+      - id: scoping
+        next: scoped
+        work_steps:
+          - id: in-scoping
+            actor: pm-agent
+            label: scoping phase work
+            skills: [project-manager]
+      - id: scoped
+        next: executing
+        # Phase-requirements is the explicit gap-analysis + compliance
+        # docs check. The PM gates the boundary on this.
+        tripwires:
+          - v_phase_requirements
+        work_steps:
+          - id: in-scoped
+            actor: pm-agent
+            label: scoped — ready to execute
+            skills: [project-manager]
+      - id: executing
+        next: reviewing
+        work_steps:
+          - id: in-executing
+            actor: pm-agent
+            label: executing phase work
+            skills: [project-manager]
+      - id: reviewing
+        terminal: true
+        tripwires:
+          - v_done_implies_issue_artifacts_on_main
+        work_steps:
+          - id: in-reviewing
+            actor: pm-agent
+            label: reviewing phase work
+            skills: [project-manager]
+    routes:
+      - id: advance-to-scoped
+        actor: pm-agent
+        command: pm-phase
+        trigger: command.pm-phase
+        from: scoping
+        to: scoped
+        kind: forward
+        label: advance to scoped
+        skills: [project-manager]
+      - id: advance-to-executing
+        actor: pm-agent
+        command: pm-phase
+        trigger: command.pm-phase
+        from: scoped
+        to: executing
+        kind: forward
+        label: advance to executing
+        skills: [project-manager]
+      - id: advance-to-reviewing
+        actor: pm-agent
+        command: pm-phase
+        trigger: command.pm-phase
+        from: executing
+        to: reviewing
+        kind: forward
+        label: advance to reviewing
+        skills: [project-manager]
+
+  # issue-closure — split out from pm-incremental-update.publish when
+  # the command is pm-issue-close. Cross-link target from
+  # coding-session.completed (auto-close on session done) and
+  # pm-incremental-update.publish (manual close).
+  issue-closure:
+    actor: pm-agent
+    trigger: command.pm-issue-close
+    brief-description: "close an issue cleanly: gates + comment + artifacts."
+    statuses:
+      - id: closing
+        next: closed
+        # Hard gate: every required artifact for the issue must exist
+        # on merged main before the issue closes.
+        tripwires:
+          - v_done_implies_issue_artifacts_on_main
+          - v_done_implies_session_completed
+          - v_issue_artifact_presence
+        prompt_checks: [pm-issue-close]
+        work_steps:
+          - id: close-checks
+            actor: pm-agent
+            label: run close-time checks
+            skills: [project-manager]
+      - id: closed
+        terminal: true
+        work_steps:
+          - id: emit-closure
+            actor: pm-agent
+            label: emit closure event
+            skills: [project-manager]
+    routes:
+      - id: issue-close
+        actor: pm-agent
+        command: pm-issue-close
+        trigger: command.pm-issue-close
+        from: source:issue
+        to: closing
+        kind: forward
+        label: begin close
+        skills: [project-manager]
+      - id: issue-finalize
+        actor: pm-agent
+        trigger: close.checks_passed
+        from: closing
+        to: closed
+        kind: forward
+        label: finalize
+        skills: [project-manager]
