@@ -31,5 +31,5 @@ Concept nodes: [[storage-adapter]], [[kb-api-contract]].
 
 ## Acceptance criteria
 - [ ] All child issues in `done` status
-- [ ] `tripwire validate --strict` exits 0 with no backend issues open
+- [ ] `tripwire validate` exits 0 with no backend issues open
 - [ ] Integration tests across all backend endpoints pass
