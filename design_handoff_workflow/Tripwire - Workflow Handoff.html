@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tripwire — Workflow Page Handoff</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  body { margin: 0; background: #f0eee9; color: #1a1815; }
+  *   { box-sizing: border-box; }
+  ::selection { background: rgba(200, 61, 46, 0.18); }
+  pre, code { tab-size: 2; }
+  pre  { margin: 0; }
+  table { border-spacing: 0; }
+  /* lighten the chart guide rules in print */
+  @media print {
+    body { background: #f0eee9 !important; -webkit-print-color-adjust: exact; }
+  }
+  /* sticky table of contents */
+  #toc {
+    position: fixed; top: 24px; right: 24px;
+    background: #faf8f3; border: 1px solid #c9bfae;
+    padding: 12px 14px; font-family: 'Geist Mono', monospace;
+    font-size: 10px; letter-spacing: 0.06em; color: #4a453d;
+    z-index: 50; min-width: 200px;
+  }
+  #toc h4 { margin: 0 0 8px; font-size: 9px; letter-spacing: 0.22em;
+            color: #7a7368; text-transform: uppercase; font-weight: 600; }
+  #toc a  { display: block; color: #1a1815; text-decoration: none;
+            padding: 3px 0; line-height: 1.3; }
+  #toc a:hover { color: #c83d2e; }
+  #toc .num { color: #7a7368; margin-right: 6px; }
+  @media (max-width: 1280px) { #toc { display: none; } }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="handoff/styles.jsx"></script>
+<script type="text/babel" src="handoff/cover.jsx"></script>
+<script type="text/babel" src="handoff/anatomy.jsx"></script>
+<script type="text/babel" src="handoff/elements.jsx"></script>
+<script type="text/babel" src="handoff/schema.jsx"></script>
+<script type="text/babel" src="handoff/page-chrome.jsx"></script>
+<script type="text/babel" src="handoff/behaviour.jsx"></script>
+<script type="text/babel" src="handoff/closing.jsx"></script>
+</head>
+<body>
+<nav id="toc" aria-label="Table of contents">
+  <h4>contents</h4>
+  <a href="#anatomy"><span class="num">01</span>page anatomy</a>
+  <a href="#elements"><span class="num">02</span>elements</a>
+  <a href="#schema"><span class="num">03</span>data schema</a>
+  <a href="#page-chrome"><span class="num">04</span>page chrome</a>
+  <a href="#behaviour"><span class="num">05</span>behaviour</a>
+  <a href="#implementation"><span class="num">06</span>implementation</a>
+  <a href="#screenshots"><span class="num">07</span>reference</a>
+  <a href="#files"><span class="num">08</span>file map</a>
+</nav>
+<div id="root"></div>
+
+<script type="text/babel">
+  const { HdCover, HdAnatomy, HdElements, HdSchema, HdPageChrome, HdBehaviour, HdClosing } = window;
+  const App = () => (
+    <div style={{padding:'0 32px 80px', maxWidth:1080, margin:'0 auto'}}>
+      <HdCover/>
+      <HdAnatomy/>
+      <HdElements/>
+      <HdSchema/>
+      <HdPageChrome/>
+      <HdBehaviour/>
+      <HdClosing/>
+    </div>
+  );
+  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

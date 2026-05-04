@@ -34,6 +34,7 @@ from tripwire.core.workflow.schema import (
     WorkflowSpec,
     WorkflowStatus,
     WorkflowStatusArtifacts,
+    WorkflowWorkStep,
 )
 
 WORKFLOW_FILENAME = "workflow.yaml"
@@ -192,9 +193,31 @@ def _parse_status(
             validators=_str_list(raw.get("validators")),
             jit_prompts=_str_list(raw.get("jit_prompts")),
             artifacts=_parse_artifacts(raw.get("artifacts")),
+            work_steps=_parse_work_steps(raw.get("work_steps")),
         ),
         findings,
     )
+
+
+def _parse_work_steps(value: Any) -> list[WorkflowWorkStep]:
+    if not isinstance(value, list):
+        return []
+    out: list[WorkflowWorkStep] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            continue
+        ws_id = str(entry.get("id", "")).strip()
+        if not ws_id:
+            continue
+        out.append(
+            WorkflowWorkStep(
+                id=ws_id,
+                actor=str(entry.get("actor", "")).strip(),
+                label=str(entry.get("label") or ws_id).strip(),
+                skills=_str_list(entry.get("skills")),
+            )
+        )
+    return out
 
 
 def _parse_next(

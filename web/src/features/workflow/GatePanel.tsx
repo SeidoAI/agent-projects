@@ -1,28 +1,31 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
+import { sourceApi } from "@/lib/api/endpoints/source";
 import type {
   WorkflowRegistry,
+  WorkflowRegistryEntry,
   WorkflowRoute,
 } from "@/lib/api/endpoints/workflow";
-import { TX_H, type LaidOutTransitionRoute } from "./layout";
+import { SourceViewer } from "./SourceViewer";
 
 export interface GateRow {
   kind: "validator" | "prompt-check";
   id: string;
   label: string;
   blurb: string;
+  source: string;
 }
+
+const sourceOf = (entry?: WorkflowRegistryEntry): string =>
+  (entry?.source ?? "").trim();
 
 export function describeGateContents(
   route: WorkflowRoute,
   registry?: WorkflowRegistry,
 ): GateRow[] {
   const rows: GateRow[] = [];
-  const validators = registry?.validators ?? [];
-  const promptChecks = registry?.prompt_checks ?? [];
-  const valBy = new Map(validators.map((v) => [v.id, v]));
-  const pmtBy = new Map(promptChecks.map((p) => [p.id, p]));
-
+  const valBy = new Map((registry?.validators ?? []).map((v) => [v.id, v]));
+  const pmtBy = new Map((registry?.prompt_checks ?? []).map((p) => [p.id, p]));
   for (const id of route.controls.validators ?? []) {
     const entry = valBy.get(id);
     rows.push({
@@ -30,6 +33,7 @@ export function describeGateContents(
       id,
       label: id.replace(/^v_/, ""),
       blurb: entry?.description ?? entry?.label ?? "",
+      source: sourceOf(entry),
     });
   }
   for (const id of route.controls.prompt_checks ?? []) {
@@ -39,53 +43,56 @@ export function describeGateContents(
       id,
       label: id,
       blurb: entry?.description ?? entry?.label ?? "",
+      source: sourceOf(entry),
     });
   }
   return rows;
 }
 
 export interface GatePanelProps {
-  tx: LaidOutTransitionRoute;
-  chartWidth: number;
-  chartHeight: number;
+  route: WorkflowRoute;
   registry?: WorkflowRegistry;
   onClose: () => void;
+  // Page-pixel position (relative to the chart container) — passed by the host.
+  pageX?: number;
+  pageY?: number;
 }
 
 export function GatePanel({
-  tx,
-  chartWidth,
-  chartHeight,
+  route,
   registry,
   onClose,
+  pageX,
+  pageY,
 }: GatePanelProps) {
-  const rows = describeGateContents(tx.route, registry);
+  const rows = describeGateContents(route, registry);
+  const [sourcePath, setSourcePath] = useState<string | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        if (sourcePath) setSourcePath(null);
+        else onClose();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, sourcePath]);
 
   if (rows.length === 0) return null;
 
-  const leftPct = (tx.cx / chartWidth) * 100;
-  const topPct = ((tx.cy + TX_H / 2 + 10) / chartHeight) * 100;
-
   return (
     <div
-      data-testid={`workflow-gate-panel-${tx.route.id}`}
+      data-testid={`workflow-gate-panel-${route.id}`}
       role="dialog"
-      aria-label={`Gate checks for ${tx.route.label}`}
+      aria-label={`Gate checks for ${route.label}`}
       style={{
         position: "absolute",
-        left: `${leftPct}%`,
-        top: `${topPct}%`,
-        transform: "translateX(-50%)",
-        minWidth: 280,
-        maxWidth: 340,
+        left: pageX ?? "50%",
+        top: pageY ?? "50%",
+        transform: pageX == null ? "translate(-50%, -50%)" : "translateX(-50%)",
+        minWidth: 300,
+        maxWidth: 360,
         background: "var(--color-paper)",
         border: "1.5px solid var(--color-gate)",
         boxShadow: "0 14px 30px rgba(26,24,21,0.12)",
@@ -137,7 +144,7 @@ export function GatePanel({
           marginBottom: 8,
         }}
       >
-        on {tx.route.label}
+        on {route.label}
       </div>
       <div
         style={{
@@ -177,12 +184,40 @@ export function GatePanel({
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 10.5,
-                  color: "var(--color-ink)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 6,
                 }}
               >
-                {row.label}
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10.5,
+                    color: "var(--color-ink)",
+                  }}
+                >
+                  {row.label}
+                </span>
+                {row.source && (
+                  <button
+                    type="button"
+                    onClick={() => setSourcePath(row.source)}
+                    style={{
+                      cursor: "pointer",
+                      border: "1px solid var(--color-edge)",
+                      background: "var(--color-paper-2)",
+                      padding: "1px 6px",
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 9,
+                      color: "var(--color-ink-2)",
+                      letterSpacing: "0.04em",
+                    }}
+                    title={row.source}
+                  >
+                    src
+                  </button>
+                )}
               </div>
               {row.blurb && (
                 <div
@@ -201,6 +236,20 @@ export function GatePanel({
           </div>
         ))}
       </div>
+      {sourcePath && (
+        <SourceViewer
+          path={sourcePath}
+          onClose={() => setSourcePath(null)}
+          onOpenLocally={async () => {
+            try {
+              await sourceApi.open(sourcePath);
+            } catch (err) {
+              // soft-fail; the user can still copy the path
+              console.error("open failed", err);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

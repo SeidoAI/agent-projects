@@ -19,41 +19,105 @@ workflows:
           consumes:
             - id: issue-brief
               label: issue brief
-      - id: queued
-        next: executing
-        artifacts:
           produces:
             - id: plan
               label: plan.md
-              path: sessions/{session_id}/plan.md
+              path: sessions/{session_id}/artifacts/plan.md
+            - id: verification-checklist
+              label: verification-checklist.md
+              path: sessions/{session_id}/artifacts/verification-checklist.md
+      - id: queued
+        next: executing
+        artifacts:
+          consumes:
+            - id: plan
+              label: plan.md
+            - id: verification-checklist
+              label: verification-checklist.md
       - id: executing
         next: in_review
         artifacts:
           consumes:
             - id: plan
               label: plan.md
-              path: sessions/{session_id}/plan.md
+            - id: verification-checklist
+              label: verification-checklist.md
           produces:
             - id: diff
               label: implementation diff
+            - id: task-checklist
+              label: task-checklist.md
+              path: sessions/{session_id}/artifacts/task-checklist.md
+            - id: self-review
+              label: self-review.md
+              path: sessions/{session_id}/artifacts/self-review.md
+            - id: recommended-testing-plan
+              label: recommended-testing-plan.md
+              path: sessions/{session_id}/artifacts/recommended-testing-plan.md
+            - id: post-completion-comments
+              label: post-completion-comments.md
+              path: sessions/{session_id}/artifacts/post-completion-comments.md
+            - id: developer-doc
+              label: developer.md
+              path: issues/{issue_key}/developer.md
+            - id: tripwire-pr
+              label: tripwire-repo PR
+            - id: project-pr
+              label: project-repo PR
+        work_steps:
+          - id: implement
+            actor: coding-agent
+            label: implement
+            skills: [backend-development, agent-messaging]
+          - id: deliver
+            actor: coding-agent
+            label: open PRs + self-review
+            skills: [verification, agent-messaging]
       - id: in_review
         next: verified
         artifacts:
           consumes:
             - id: diff
               label: implementation diff
+            - id: self-review
+              label: self-review.md
+            - id: task-checklist
+              label: task-checklist.md
+            - id: recommended-testing-plan
+              label: recommended-testing-plan.md
+            - id: tripwire-pr
+              label: tripwire-repo PR
+            - id: project-pr
+              label: project-repo PR
           produces:
-            - id: review-notes
-              label: review notes
+            - id: pm-response
+              label: pm-response.yaml
+              path: sessions/{session_id}/artifacts/pm-response.yaml
+        work_steps:
+          - id: review
+            actor: pm-agent
+            label: review session
+            skills: [project-manager, verification]
       - id: verified
         next: completed
         artifacts:
           consumes:
-            - id: review-notes
-              label: review notes
+            - id: pm-response
+              label: pm-response.yaml
+            - id: self-review
+              label: self-review.md
+          produces:
+            - id: completion-comment
+              label: completion-comment.yaml
+              path: issues/{issue_key}/comments/{nnn}-completion-{yyyy-mm-dd}.yaml
       - id: completed
         terminal: true
         artifacts:
+          consumes:
+            - id: tripwire-pr
+              label: tripwire-repo PR
+            - id: project-pr
+              label: project-repo PR
           produces:
             - id: session-signature
               label: session signature

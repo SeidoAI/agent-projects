@@ -22,6 +22,13 @@ export interface WorkflowStatusArtifacts {
   consumes: WorkflowArtifactRef[];
 }
 
+export interface WorkflowWorkStep {
+  id: string;
+  actor: string;
+  label: string;
+  skills: string[];
+}
+
 export interface WorkflowStatus {
   id: string;
   label?: string;
@@ -31,6 +38,7 @@ export interface WorkflowStatus {
   jit_prompts: string[];
   prompt_checks: string[];
   artifacts: WorkflowStatusArtifacts;
+  work_steps: WorkflowWorkStep[];
 }
 
 export interface WorkflowRouteControls {

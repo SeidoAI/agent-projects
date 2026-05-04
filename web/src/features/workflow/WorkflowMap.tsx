@@ -12,6 +12,7 @@ import {
 import { isPmMode } from "@/lib/role";
 import {
   type FlowSelection,
+  type LayoutMode,
   WorkflowFlowchart,
 } from "./WorkflowFlowchart";
 import { WorkflowDrawer, type WorkflowSelection } from "./WorkflowDrawer";
@@ -28,6 +29,8 @@ export function WorkflowMap() {
   const { data: graph, isPending, isError, error, refetch } = query;
   const [selection, setSelection] = useState<WorkflowSelection | null>(null);
 
+  const layoutMode: LayoutMode =
+    searchParams.get("layout") === "dagre" ? "dagre" : "territory";
   const activeId = pickActiveWorkflow(graph, searchParams.get(WF_PARAM));
   const workflow = activeId
     ? graph?.workflows.find((w) => w.id === activeId)
@@ -40,7 +43,16 @@ export function WorkflowMap() {
     setSelection(null);
   };
 
-  const handleSelect = (s: FlowSelection) => setSelection(s);
+  const handleSelect = (s: FlowSelection) => {
+    if (s.kind === "work_step") {
+      const status = workflow?.statuses.find((st) => st.id === s.statusId);
+      const ws = status?.work_steps.find((w) => w.id === s.workStepId);
+      if (!ws) return;
+      setSelection({ kind: "work_step", statusId: s.statusId, workStep: ws });
+      return;
+    }
+    setSelection(s);
+  };
 
   const stateBranch: React.ReactNode = (() => {
     if (graph && workflow) {
@@ -49,6 +61,7 @@ export function WorkflowMap() {
           graph={graph}
           workflow={workflow}
           activeId={workflow.id}
+          layoutMode={layoutMode}
           onPick={handlePick}
           onSelect={handleSelect}
         />
@@ -76,6 +89,7 @@ interface WorkflowPageProps {
   graph: WorkflowGraph;
   workflow: WorkflowDefinition;
   activeId: string;
+  layoutMode: LayoutMode;
   onPick: (id: string) => void;
   onSelect: (s: FlowSelection) => void;
 }
@@ -84,13 +98,14 @@ function WorkflowPage({
   graph,
   workflow,
   activeId,
+  layoutMode,
   onPick,
   onSelect,
 }: WorkflowPageProps) {
   return (
     <section
       data-testid="workflow-page"
-      className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
+      className="flex min-h-0 flex-1 flex-col gap-3"
     >
       <WorkflowNavigator
         workflows={graph.workflows}
@@ -98,9 +113,16 @@ function WorkflowPage({
         onPick={onPick}
       />
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <p className="max-w-[780px] font-serif text-[15px] italic text-(--color-ink-2) leading-snug">
-          {workflow.brief_description ?? ""}
-        </p>
+        <div className="max-w-[780px]">
+          <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-(--color-ink-3)">
+            workflow · {workflow.id}
+          </div>
+          {workflow.brief_description && (
+            <p className="mt-1 font-serif text-[15px] italic text-(--color-ink-2) leading-snug">
+              {workflow.brief_description}
+            </p>
+          )}
+        </div>
         <div className="flex flex-col items-end gap-1.5 font-mono text-[11px] text-(--color-ink-3)">
           <span>workflow.yaml · v0.9.6 · gate-as-diamond</span>
           <div className="flex gap-1.5">
@@ -117,6 +139,7 @@ function WorkflowPage({
           workflow={workflow}
           registry={graph.registry}
           gateMode="diamond"
+          layout={layoutMode}
           onSelect={onSelect}
         />
       </div>

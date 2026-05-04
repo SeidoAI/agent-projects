@@ -11,9 +11,19 @@ workflows:
       - id: executing
         validators: [v_uuid_present]
         next: in_review
+        work_steps:
+          - id: implement
+            actor: coding-agent
+            label: implement
+            skills: [backend-development]
       - id: in_review
         validators: [v_reference_integrity, v_stale_concept]
         next: verified
+        work_steps:
+          - id: review
+            actor: pm-agent
+            label: review session
+            skills: [project-manager, verification]
       - id: verified
         next: completed
       - id: completed

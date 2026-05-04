@@ -97,6 +97,15 @@ def _workflow_to_dict(workflow: Workflow) -> dict[str, Any]:
                         _artifact_ref_to_dict(ref) for ref in status.artifacts.consumes
                     ],
                 },
+                "work_steps": [
+                    {
+                        "id": ws.id,
+                        "actor": ws.actor,
+                        "label": ws.label,
+                        "skills": list(ws.skills),
+                    }
+                    for ws in status.work_steps
+                ],
             }
             for status in workflow.statuses
         ],
@@ -181,10 +190,15 @@ def _build_validator_registry() -> list[dict[str, Any]]:
         if validator_id in seen:
             continue
         seen.add(validator_id)
+        try:
+            src = inspect.getfile(fn)
+        except (TypeError, OSError):
+            src = ""
         entry: dict[str, Any] = {
             "id": validator_id,
             "label": validator_label_for(fn),
             "description": validator_description_for(fn),
+            "source": src,
             "blocking": True,
         }
         out.append(entry)

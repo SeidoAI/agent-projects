@@ -189,6 +189,25 @@ class WorkflowStatusArtifacts:
 
 
 @dataclass(frozen=True)
+class WorkflowWorkStep:
+    """Work performed by an actor *inside* a status — no status change.
+
+    Routes (transitions) move between statuses; work_steps describe the
+    actor's labour while they are in the status. The canonical example
+    is `implement` inside `executing`: the coding agent loads its
+    SKILL.md files, reads the plan, and produces the diff. None of
+    that is a route — it's the work *between* the route that put the
+    session into `executing` and the route that advances it to
+    `in_review`.
+    """
+
+    id: str
+    actor: str
+    label: str
+    skills: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class WorkflowStatus:
     id: str
     next: NextSpec
@@ -196,6 +215,7 @@ class WorkflowStatus:
     validators: list[str] = field(default_factory=list)
     jit_prompts: list[str] = field(default_factory=list)
     artifacts: WorkflowStatusArtifacts = field(default_factory=WorkflowStatusArtifacts)
+    work_steps: list[WorkflowWorkStep] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -342,6 +362,31 @@ def _check_workflow(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
     seen: set[str] = set()
     has_terminal = False
     for status in wf.statuses:
+        # Surface duplicate skill loads across work_steps in the same
+        # status. Multiple steps loading the same skill is legal at
+        # runtime (the skill is loaded once, used by both) but the
+        # declaration carries no information beyond the second mention
+        # — a warning prods the author to drop the redundant entry.
+        ws_skill_seen: dict[str, str] = {}
+        for ws in status.work_steps:
+            for sk in ws.skills:
+                if sk in ws_skill_seen:
+                    out.append(
+                        WorkflowFinding(
+                            code="workflow/duplicate_skill_in_status",
+                            workflow=wf_id,
+                            status=status.id,
+                            severity="warning",
+                            message=(
+                                f"skill {sk!r} declared by both work_step "
+                                f"{ws_skill_seen[sk]!r} and {ws.id!r} in "
+                                f"status {status.id!r} — second declaration "
+                                f"is redundant (skills load once per region)"
+                            ),
+                        )
+                    )
+                else:
+                    ws_skill_seen[sk] = ws.id
         if status.id in seen:
             out.append(
                 WorkflowFinding(
@@ -631,5 +676,6 @@ __all__ = [
     "WorkflowSpec",
     "WorkflowStatus",
     "WorkflowStatusArtifacts",
+    "WorkflowWorkStep",
     "validate_workflow_spec",
 ]

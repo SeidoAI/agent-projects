@@ -28,6 +28,7 @@ function status(
     jit_prompts: [],
     prompt_checks: [],
     artifacts: { produces: [], consumes: [] },
+    work_steps: [],
     ...overrides,
   };
 }
@@ -63,6 +64,14 @@ function makeGraph(overrides: Partial<WorkflowGraph> = {}): WorkflowGraph {
           status("executing", {
             next: { kind: "single", single: "in_review" },
             jit_prompts: ["self-review"],
+            work_steps: [
+              {
+                id: "implement",
+                actor: "coding-agent",
+                label: "implement",
+                skills: ["backend-development", "agent-messaging"],
+              },
+            ],
           }),
           status("in_review", { next: { kind: "single", single: "verified" } }),
           status("verified", { next: { kind: "terminal" } }),
@@ -190,14 +199,16 @@ describe("WorkflowMap (V1 territory map)", () => {
     );
   });
 
-  it("renders the brief-description below the navigator", async () => {
+  it("renders the brief-description (page header + in-canvas panel)", async () => {
     server.use(
       http.get("/api/projects/:pid/workflow", () => HttpResponse.json(makeGraph())),
     );
     mountAt("/p/p1/workflow");
-    expect(
-      await screen.findByText("one session: plan, execute, review, ship."),
-    ).toBeInTheDocument();
+    const matches = await screen.findAllByText(
+      "one session: plan, execute, review, ship.",
+    );
+    // Both the page header <p> and the in-canvas Panel render the blurb.
+    expect(matches.length).toBeGreaterThanOrEqual(1);
   });
 
   it("opens the inline gate panel when the gate badge is clicked", async () => {
@@ -287,5 +298,29 @@ describe("WorkflowMap (V1 territory map)", () => {
     const region = await screen.findByTestId("workflow-region-executing");
     fireEvent.click(region);
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("renders work_step nodes inside the status region", async () => {
+    server.use(
+      http.get("/api/projects/:pid/workflow", () => HttpResponse.json(makeGraph())),
+    );
+    mountAt("/p/p1/workflow");
+    expect(
+      await screen.findByTestId("workflow-workstep-executing-implement"),
+    ).toBeInTheDocument();
+  });
+
+  it("opens the drawer with work_step details when the work_step is clicked", async () => {
+    server.use(
+      http.get("/api/projects/:pid/workflow", () => HttpResponse.json(makeGraph())),
+    );
+    mountAt("/p/p1/workflow");
+
+    fireEvent.click(
+      await screen.findByTestId("workflow-workstep-executing-implement"),
+    );
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent(/WORK/i);
+    expect(dialog).toHaveTextContent("backend-development");
   });
 });

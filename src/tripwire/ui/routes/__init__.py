@@ -35,6 +35,7 @@ def register_routes(app: FastAPI) -> None:
         orchestration,
         projects,
         sessions,
+        source,
         workflow,
         ws,
     )
@@ -56,6 +57,7 @@ def register_routes(app: FastAPI) -> None:
         events,
         workflow,
         drift,
+        source,
         ws,
     ]
 

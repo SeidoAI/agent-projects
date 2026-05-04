@@ -6,11 +6,13 @@ import type {
   WorkflowRegistryEntry,
   WorkflowRoute,
   WorkflowStatus,
+  WorkflowWorkStep,
 } from "@/lib/api/endpoints/workflow";
 
 export type WorkflowSelection =
   | { kind: "status"; status: WorkflowStatus }
   | { kind: "route"; route: WorkflowRoute }
+  | { kind: "work_step"; statusId: string; workStep: WorkflowWorkStep }
   | { kind: "jit_prompt"; id: string; statusId: string }
   | {
       kind: "artifact";
@@ -72,6 +74,43 @@ function renderContents(
             <pre className="whitespace-pre-wrap font-mono text-[12px] text-(--color-ink)">
               {JSON.stringify(s.next, null, 2)}
             </pre>
+          </FieldBlock>
+        </div>
+      ),
+    };
+  }
+
+  if (selection.kind === "work_step") {
+    const w = selection.workStep;
+    return {
+      title: w.label,
+      header: (
+        <div className="flex items-center gap-2">
+          <Stamp tone="info">WORK</Stamp>
+          <span className="font-mono text-[11px] text-(--color-ink-3)">
+            {w.actor} · in {selection.statusId}
+          </span>
+        </div>
+      ),
+      body: (
+        <div className="flex flex-col gap-4">
+          <DefinitionBlock>
+            A <strong>work_step</strong> is what the actor does <em>inside</em> a status —
+            no status change. The transition only fires once the work is done.
+          </DefinitionBlock>
+          {w.skills.length > 0 ? (
+            <FieldBlock label="Skills loaded">
+              <ul className="flex flex-col gap-1">
+                {w.skills.map((s) => (
+                  <li key={s} className="font-mono text-[12px] text-(--color-ink)">
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </FieldBlock>
+          ) : null}
+          <FieldBlock label="ID">
+            <span className="font-mono text-[12px] text-(--color-ink)">{w.id}</span>
           </FieldBlock>
         </div>
       ),
