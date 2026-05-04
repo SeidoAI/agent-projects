@@ -119,22 +119,26 @@ function ScoreBlock({
           : "text-(--color-ink-3)";
 
   return (
-    <div className="flex items-center gap-3" data-testid="drift-score-block">
-      <Icon className={cn("h-5 w-5 shrink-0", colorClass)} aria-hidden />
-      <div className="flex flex-col gap-0.5">
-        <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)">
-          coherence
-        </span>
-        <span
-          className={cn(
-            "font-sans font-semibold text-[24px] tabular-nums leading-none",
-            colorClass,
-          )}
-          data-testid="drift-score"
-        >
-          {pending ? "…" : (score ?? "—")}
-        </span>
-      </div>
+    <div className="flex items-baseline gap-2" data-testid="drift-score-block">
+      <Icon
+        className={cn("h-4 w-4 shrink-0 self-center", colorClass)}
+        aria-hidden
+      />
+      <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)">
+        coherence
+      </span>
+      <span aria-hidden className="text-(--color-ink-3)">
+        ·
+      </span>
+      <span
+        className={cn(
+          "font-sans font-semibold text-[15px] tabular-nums",
+          colorClass,
+        )}
+        data-testid="drift-score"
+      >
+        {pending ? "…" : (score ?? "—")}
+      </span>
     </div>
   );
 }
@@ -155,6 +159,9 @@ function BreakdownStat({
     <div className="flex items-baseline gap-2" data-testid={testId}>
       <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)">
         {label}
+      </span>
+      <span aria-hidden className="text-(--color-ink-3)">
+        ·
       </span>
       <span
         className={cn(
