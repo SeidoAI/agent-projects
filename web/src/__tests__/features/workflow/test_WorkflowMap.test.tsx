@@ -182,21 +182,21 @@ function mountAt(
 }
 
 describe("WorkflowMap (V1 territory map)", () => {
-  it("renders the navigator grouped by actor and the active workflow", async () => {
+  it("renders a flat navigator with one pill per workflow", async () => {
     server.use(
       http.get("/api/projects/:pid/workflow", () => HttpResponse.json(makeGraph())),
     );
     mountAt("/p/p1/workflow");
 
     const nav = await screen.findByTestId("workflow-navigator");
-    expect(nav).toHaveTextContent(/ACTOR · CODING-AGENT/i);
-    expect(nav).toHaveTextContent(/ACTOR · PM-AGENT/i);
+    // No actor-grouped column headings in the flat layout.
+    expect(nav).not.toHaveTextContent(/ACTOR · /);
+    expect(nav).toHaveTextContent(/WORKFLOWS/);
     expect(screen.getByTestId("workflow-nav-tile-coding-session")).toBeInTheDocument();
     expect(screen.getByTestId("workflow-nav-tile-pm-scoping")).toBeInTheDocument();
-    expect(screen.getByTestId("workflow-flowchart")).toHaveAttribute(
-      "data-workflow",
-      "coding-session",
-    );
+    // Both bands are present on the unified canvas at all times.
+    expect(screen.getByTestId("workflow-band-coding-session")).toBeInTheDocument();
+    expect(screen.getByTestId("workflow-band-pm-scoping")).toBeInTheDocument();
   });
 
   it("renders the brief-description (page header + in-canvas panel)", async () => {
@@ -240,7 +240,7 @@ describe("WorkflowMap (V1 territory map)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("switches the active workflow when a navigator tile is clicked", async () => {
+  it("flips the active pill when a navigator tile is clicked", async () => {
     server.use(
       http.get("/api/projects/:pid/workflow", () => HttpResponse.json(makeGraph())),
     );
@@ -249,20 +249,20 @@ describe("WorkflowMap (V1 territory map)", () => {
     fireEvent.click(await screen.findByTestId("workflow-nav-tile-pm-scoping"));
 
     await waitFor(() =>
-      expect(screen.getByTestId("workflow-flowchart")).toHaveAttribute(
-        "data-workflow",
-        "pm-scoping",
-      ),
+      expect(
+        screen.getByTestId("workflow-nav-tile-pm-scoping"),
+      ).toHaveAttribute("aria-pressed", "true"),
     );
   });
 
-  it("respects ?wf=<id> in the URL on initial render", async () => {
+  it("respects ?focus=<id> in the URL on initial render", async () => {
     server.use(
       http.get("/api/projects/:pid/workflow", () => HttpResponse.json(makeGraph())),
     );
-    mountAt("/p/p1/workflow?wf=pm-scoping");
-    const chart = await screen.findByTestId("workflow-flowchart");
-    expect(chart).toHaveAttribute("data-workflow", "pm-scoping");
+    mountAt("/p/p1/workflow?focus=pm-scoping");
+    expect(
+      await screen.findByTestId("workflow-nav-tile-pm-scoping"),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   it("shows the loading state while pending", async () => {

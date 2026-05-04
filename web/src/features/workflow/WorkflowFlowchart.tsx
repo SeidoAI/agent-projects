@@ -18,14 +18,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   WorkflowArtifactRef,
-  WorkflowDefinition,
+  WorkflowGraph,
   WorkflowRegistry,
   WorkflowRoute,
   WorkflowStatus,
 } from "@/lib/api/endpoints/workflow";
 import { ActorEdge, CrossLinkEdge, ReturnEdge } from "./flowEdges";
 import {
-  buildFlow,
+  buildUnifiedFlow,
   type BoundaryNodeData,
   type ChipNodeData,
   type DetourNodeData,
@@ -34,9 +34,7 @@ import {
   type TileNodeData,
   type WorkStepNodeData,
 } from "./flowGraph";
-import { buildFlowDagre } from "./flowGraphDagre";
 
-export type LayoutMode = "territory" | "dagre";
 import {
   AnchorNode,
   BoundaryTransitionNode,
@@ -83,22 +81,35 @@ const DEFAULT_EDGE_OPTIONS = {
 const VIEWPORT_STORAGE_PREFIX = "tripwire:workflow-viewport:";
 
 export type FlowSelection =
-  | { kind: "status"; status: WorkflowStatus }
-  | { kind: "route"; route: WorkflowRoute }
-  | { kind: "work_step"; statusId: string; workStepId: string }
-  | { kind: "jit_prompt"; id: string; statusId: string }
+  | { kind: "status"; workflowId: string; status: WorkflowStatus }
+  | { kind: "route"; workflowId: string; route: WorkflowRoute }
+  | {
+      kind: "work_step";
+      workflowId: string;
+      statusId: string;
+      workStepId: string;
+    }
+  | {
+      kind: "jit_prompt";
+      workflowId: string;
+      id: string;
+      statusId: string;
+    }
   | {
       kind: "artifact";
+      workflowId: string;
       artifact: WorkflowArtifactRef;
       statusId: string;
       direction: "produces" | "consumes";
     };
 
 export interface WorkflowFlowchartProps {
-  workflow: WorkflowDefinition;
+  /** All workflows in the project; rendered as stacked bands. */
+  graph: WorkflowGraph;
+  /** Which band to focus the viewport on initially / when this changes. */
+  focusId?: string | null;
   registry?: WorkflowRegistry;
   gateMode?: "lock" | "diamond";
-  layout?: LayoutMode;
   onSelect?: (selection: FlowSelection) => void;
 }
 
@@ -111,41 +122,56 @@ export function WorkflowFlowchart(props: WorkflowFlowchartProps) {
 }
 
 function FlowInner({
-  workflow,
+  graph,
+  focusId,
   registry,
   gateMode = "diamond",
-  layout = "territory",
   onSelect,
 }: WorkflowFlowchartProps) {
   const flow = useMemo(
-    () =>
-      layout === "dagre"
-        ? buildFlowDagre(workflow)
-        : buildFlow(workflow, { gateMode }),
-    [workflow, gateMode, layout],
+    () => buildUnifiedFlow(graph, { gateMode }),
+    [graph, gateMode],
   );
-  const [openedGateRouteId, setOpenedGateRouteId] = useState<string | null>(null);
+  // Stores the *namespaced* boundary node id of the currently-opened
+  // gate panel, so it survives across bands without route-id collisions.
+  const [openedBoundaryNodeId, setOpenedBoundaryNodeId] = useState<
+    string | null
+  >(null);
   const rf = useReactFlow();
   const nodesInitialized = useNodesInitialized();
-  const lastInitFor = useRef<string | null>(null);
+  const lastInitForFocus = useRef<string | null>(null);
 
-  // Restore viewport from sessionStorage on first mount per workflow.
-  const storageKey = `${VIEWPORT_STORAGE_PREFIX}${workflow.id}`;
+  // Restore viewport from sessionStorage on first mount per project. Use
+  // the project_id as the key so switching projects starts fresh.
+  const storageKey = `${VIEWPORT_STORAGE_PREFIX}${graph.project_id}`;
   useEffect(() => {
-    if (!nodesInitialized || lastInitFor.current === workflow.id) return;
-    lastInitFor.current = workflow.id;
-    const raw = typeof window !== "undefined" ? sessionStorage.getItem(storageKey) : null;
-    if (raw) {
+    if (!nodesInitialized) return;
+    const raw =
+      typeof window !== "undefined" ? sessionStorage.getItem(storageKey) : null;
+    if (raw && lastInitForFocus.current === null) {
       try {
         const v = JSON.parse(raw) as Viewport;
         rf.setViewport(v, { duration: 0 });
+        lastInitForFocus.current = focusId ?? "__initial__";
         return;
       } catch {
         /* fall through to fitView */
       }
     }
-    rf.fitView({ padding: 0.08, duration: 200 });
-  }, [nodesInitialized, workflow.id, storageKey, rf]);
+    // Either no saved viewport, or the focus changed — fit to the focused
+    // band (default: first band).
+    const targetBandId = focusId
+      ? `band:${focusId}`
+      : (flow.bands[0]?.parentNodeId ?? null);
+    if (targetBandId && lastInitForFocus.current !== focusId) {
+      rf.fitView({
+        nodes: [{ id: targetBandId }],
+        padding: 0.12,
+        duration: lastInitForFocus.current ? 600 : 200,
+      });
+      lastInitForFocus.current = focusId ?? "__initial__";
+    }
+  }, [nodesInitialized, focusId, storageKey, rf, flow.bands]);
 
   // Persist viewport on every settle.
   useOnViewportChange({
@@ -155,12 +181,6 @@ function FlowInner({
       }
     },
   });
-
-  const routeById = useMemo(() => {
-    const m = new Map<string, WorkflowRoute>();
-    workflow.routes.forEach((r) => m.set(r.id, r));
-    return m;
-  }, [workflow.routes]);
 
   // Cap the panning extent to the actual content bounds + a small margin.
   // Without this the user can pan into vast empty space at low zoom and
@@ -196,20 +216,45 @@ function FlowInner({
     ];
   }, [flow.nodes]);
 
+  // Walk the parent chain to find the band:<wf-id> ancestor — the
+  // workflow id this node belongs to. Returns null if the node isn't
+  // inside a band (shouldn't happen in unified mode).
+  const workflowIdOf = (nodeId: string): string | null => {
+    let cur: string | undefined = nodeId;
+    const byId = new Map(flow.nodes.map((n) => [n.id, n]));
+    for (let i = 0; i < 8 && cur; i += 1) {
+      const n = byId.get(cur);
+      if (!n) return null;
+      if (n.type === "band") {
+        const data = n.data as { workflowId?: string };
+        return data.workflowId ?? null;
+      }
+      cur = n.parentId;
+    }
+    return null;
+  };
+
   const handleNodeClick: NodeMouseHandler = (event, node) => {
     const target = event.target as HTMLElement;
     const gateBtn = target.closest('[data-testid^="workflow-gate-badge-"]');
     if (gateBtn) {
-      const id = gateBtn.getAttribute("data-testid")!.replace("workflow-gate-badge-", "");
-      setOpenedGateRouteId((prev) => (prev === id ? null : id));
+      // Find the ReactFlow node wrapper this badge lives in. Its
+      // data-id attribute is the namespaced node id.
+      const flowNodeEl = gateBtn.closest("[data-id]");
+      const namespacedId = flowNodeEl?.getAttribute("data-id");
+      if (namespacedId) {
+        setOpenedBoundaryNodeId((prev) =>
+          prev === namespacedId ? null : namespacedId,
+        );
+      }
       return;
     }
     const toolbarBtn = target.closest("[data-toolbar-action]");
     if (toolbarBtn) {
       const action = toolbarBtn.getAttribute("data-toolbar-action");
       if (action === "zoom-to-status") {
-        const sid = (node.data as unknown as StatusNodeData).status?.id;
-        if (sid) rf.fitView({ nodes: [{ id: `status:${sid}` }], padding: 0.2, duration: 600 });
+        // node here is the status node — its own id is namespaced.
+        rf.fitView({ nodes: [{ id: node.id }], padding: 0.2, duration: 600 });
         return;
       }
       if (action === "zoom-to-node") {
@@ -219,18 +264,20 @@ function FlowInner({
     }
 
     if (!onSelect) return;
+    const wfId = workflowIdOf(node.id);
+    if (!wfId) return;
     switch (node.type) {
       case "status": {
         const d = node.data as unknown as StatusNodeData;
-        // Single click on a region: zoom to it AND notify the page (drawer).
         rf.fitView({ nodes: [{ id: node.id }], padding: 0.15, duration: 500 });
-        onSelect({ kind: "status", status: d.status });
+        onSelect({ kind: "status", workflowId: wfId, status: d.status });
         break;
       }
       case "workStep": {
         const d = node.data as unknown as WorkStepNodeData;
         onSelect({
           kind: "work_step",
+          workflowId: wfId,
           statusId: d.statusId,
           workStepId: d.workStep.id,
         });
@@ -239,7 +286,7 @@ function FlowInner({
       case "boundary":
       case "detour": {
         const d = node.data as unknown as BoundaryNodeData | DetourNodeData;
-        onSelect({ kind: "route", route: d.route });
+        onSelect({ kind: "route", workflowId: wfId, route: d.route });
         break;
       }
       case "chip": {
@@ -247,6 +294,7 @@ function FlowInner({
         if (d.kind === "ref" && d.artifact) {
           onSelect({
             kind: "artifact",
+            workflowId: wfId,
             artifact: d.artifact,
             statusId: d.statusId,
             direction: "consumes",
@@ -258,6 +306,7 @@ function FlowInner({
         const d = node.data as unknown as TileNodeData;
         onSelect({
           kind: "artifact",
+          workflowId: wfId,
           artifact: d.artifact,
           statusId: d.statusId,
           direction: "produces",
@@ -266,20 +315,31 @@ function FlowInner({
       }
       case "jit": {
         const d = node.data as unknown as JitNodeData;
-        onSelect({ kind: "jit_prompt", id: d.id, statusId: d.statusId });
+        onSelect({
+          kind: "jit_prompt",
+          workflowId: wfId,
+          id: d.id,
+          statusId: d.statusId,
+        });
         break;
       }
     }
   };
 
-  const openedRoute = openedGateRouteId ? routeById.get(openedGateRouteId) : null;
+  const openedRoute = useMemo<WorkflowRoute | null>(() => {
+    if (!openedBoundaryNodeId) return null;
+    const node = flow.nodes.find((n) => n.id === openedBoundaryNodeId);
+    if (!node) return null;
+    const data = node.data as unknown as BoundaryNodeData | DetourNodeData;
+    return data?.route ?? null;
+  }, [openedBoundaryNodeId, flow.nodes]);
 
   return (
     <div
       className="relative w-full"
       style={{ height: 760 }}
       data-testid="workflow-flowchart"
-      data-workflow={workflow.id}
+      data-project={graph.project_id}
     >
       <ReactFlow
         nodes={flow.nodes}
@@ -316,7 +376,7 @@ function FlowInner({
         <GatePanel
           route={openedRoute}
           registry={registry}
-          onClose={() => setOpenedGateRouteId(null)}
+          onClose={() => setOpenedBoundaryNodeId(null)}
         />
       )}
     </div>
