@@ -5,7 +5,12 @@ import {
   type EdgeProps,
 } from "@xyflow/react";
 
-import { CROSSLINK_BUS_X, Y_DEEP_RETURN, Y_WORK } from "./flowGraph";
+import {
+  BAND_GUTTER,
+  CROSSLINK_BUS_X,
+  Y_DEEP_RETURN,
+  Y_WORK,
+} from "./flowGraph";
 import { ACTOR_COLOR, isKnownActor } from "./tokens";
 
 export interface ActorEdgeData extends Record<string, unknown> {
@@ -100,6 +105,11 @@ export function ActorEdge(props: EdgeProps) {
 export interface CrossLinkEdgeData extends Record<string, unknown> {
   sourceWorkflow: string;
   label?: string | null;
+  /** Absolute Y of the source band's south edge — used to route the
+   *  outbound horizontal through the inter-band gutter. */
+  sourceBandSouthY?: number | null;
+  /** Absolute Y of the target band's north edge. */
+  targetBandNorthY?: number | null;
 }
 
 // Cross-link colour — picked to stand apart from every actor hue:
@@ -118,21 +128,23 @@ export function CrossLinkEdge(props: EdgeProps) {
   const r = 12;
 
   // Route every cross-link through a shared vertical bus on the far
-  // left of the canvas (CROSSLINK_BUS_X). Path:
-  //   source dot ↓
-  //     ↓ short drop into the gutter just below source band
-  //     ← west across the gutter to the bus
-  //     ↓/↑ along the bus to the gutter just above target band
-  //     → east across that gutter to under target dot
-  //     ↓ into target dot
-  // Horizontal segments live in inter-band gutters; vertical segment
-  // lives in the bus. Nothing crosses an unrelated status region.
+  // left of the canvas (CROSSLINK_BUS_X). Horizontal segments live in
+  // the inter-band GUTTER (between source/target bands), vertical
+  // segment in the bus. Nothing crosses an unrelated band.
+  //
+  // The horizontal turns sit in the centre of each gutter — outboard
+  // of the band's outputs grid AND outboard of the (now closer)
+  // backflow lane, so the two never visually fight.
   const busX = CROSSLINK_BUS_X;
-  // Drop just below the source dot (it sits at the south edge of a
-  // status region, with the gutter immediately below it).
-  const sourceTurnY = sourceY + 32;
-  // Rise to just above the target dot (target dot is at north edge).
-  const targetTurnY = targetY - 32;
+  const FALLBACK_OFFSET = 320;
+  const sourceTurnY =
+    typeof d.sourceBandSouthY === "number"
+      ? d.sourceBandSouthY + BAND_GUTTER / 2
+      : sourceY + FALLBACK_OFFSET;
+  const targetTurnY =
+    typeof d.targetBandNorthY === "number"
+      ? d.targetBandNorthY - BAND_GUTTER / 2
+      : targetY - FALLBACK_OFFSET;
 
   const path = [
     `M ${sourceX} ${sourceY}`,
@@ -150,17 +162,24 @@ export function CrossLinkEdge(props: EdgeProps) {
   // Two labels per edge — one near each end — so the user reads the
   // link's purpose while looking AT the source dot OR the target dot,
   // not from the middle of the bus where it'd be off-screen.
-  // Labels sit on the horizontal segment in each gutter, ~140px in from
-  // the dot column (so they're visible without obscuring the dot).
-  const sourceLabelOffset = 140;
-  const targetLabelOffset = 140;
-  const sourceLabelX = sourceX - sourceLabelOffset;
-  const targetLabelX = targetX - targetLabelOffset;
+  //
+  // Labels are RIGHT-ANCHORED at a fixed inboard distance from the
+  // dot's X (translate -100% on X). This makes the label's right edge
+  // sit at exactly DOT_CLEARANCE px from the dot regardless of the
+  // label text length — long labels grow leftwards into open canvas,
+  // never crowding the dot.
+  const DOT_CLEARANCE = 56;
+  const sourceLabelRightX = sourceX - DOT_CLEARANCE;
+  const targetLabelRightX = targetX - DOT_CLEARANCE;
   const labelText = d.label ?? d.sourceWorkflow;
+  // Translucent paper background so the dashed line shows through the
+  // label rather than being masked by a solid halo. Label text + border
+  // remain at full opacity for legibility.
   const labelStyle: React.CSSProperties = {
     position: "absolute",
     padding: "2px 10px",
-    background: "var(--color-paper)",
+    background: "rgba(247, 245, 240, 0.78)",
+    backdropFilter: "blur(2px)",
     border: `1px dashed ${stroke}`,
     borderRadius: 2,
     fontFamily: "var(--font-mono)",
@@ -170,7 +189,6 @@ export function CrossLinkEdge(props: EdgeProps) {
     pointerEvents: "all",
     whiteSpace: "nowrap",
     zIndex: 50,
-    boxShadow: "0 0 0 4px var(--color-paper)",
   };
 
   return (
@@ -191,7 +209,7 @@ export function CrossLinkEdge(props: EdgeProps) {
           className="nodrag nopan"
           style={{
             ...labelStyle,
-            transform: `translate(-50%, -50%) translate(${sourceLabelX}px, ${sourceTurnY}px)`,
+            transform: `translate(-100%, -50%) translate(${sourceLabelRightX}px, ${sourceTurnY}px)`,
           }}
         >
           ↗ {labelText}
@@ -201,7 +219,7 @@ export function CrossLinkEdge(props: EdgeProps) {
           className="nodrag nopan"
           style={{
             ...labelStyle,
-            transform: `translate(-50%, -50%) translate(${targetLabelX}px, ${targetTurnY}px)`,
+            transform: `translate(-100%, -50%) translate(${targetLabelRightX}px, ${targetTurnY}px)`,
           }}
         >
           ↘ {labelText}

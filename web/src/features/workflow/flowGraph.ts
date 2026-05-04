@@ -73,11 +73,13 @@ export const Y_OUTPUTS_BOTTOM = REGION_H - REGION_PAD_BOTTOM;
 export const Y_OUTPUTS_TOP = Y_OUTPUTS_BOTTOM - OUTPUTS_BAND_H;
 export const Y_OUTPUTS_DIV = Y_OUTPUTS_TOP - 12;
 export const Y_WORK = (Y_INPUTS_BOTTOM + Y_OUTPUTS_DIV) / 2;
-// Deep south Y for return-flow edges. The user's spec is "2 standard node
-// heights down" (= 2 * WORK_H below Y_WORK). We clamp it to stay above the
-// outputs band so the return curve never crosses an output tile.
+// Deep south Y for return-flow edges. Backflow is INTRA-band (loop
+// within a single workflow), so it sits in the inner lane — closer to
+// the work line than cross-workflow links, which jump to the inter-band
+// gutter. Pulled in from the original "2 * WORK_H" spec so backflow
+// reads as the tighter, semantically-closer lane.
 export const Y_DEEP_RETURN = Math.min(
-  Y_WORK + 2 * WORK_H,
+  Y_WORK + WORK_H + 32,
   Y_OUTPUTS_TOP - 30,
 );
 export const Y_DETOUR_RETURN = Y_WORK + (Y_OUTPUTS_DIV - Y_WORK) / 2;
@@ -992,7 +994,14 @@ export function buildUnifiedFlow(
 
         // Edge connects the dots. Path is drawn by CrossLinkEdge, which
         // routes through the left bus (CROSSLINK_BUS_X) so the line
-        // never crosses a status region it doesn't terminate at.
+        // never crosses a status region it doesn't terminate at. We
+        // pass the source band's south Y and target band's north Y in
+        // the edge's data so the edge can route its horizontal segments
+        // through the BAND_GUTTER (between bands) instead of within
+        // the band itself — which puts it OUTSIDE the band's outputs
+        // grid and clearly past the inner backflow lane.
+        const srcBand = bands.find((b) => b.workflowId === wf.id);
+        const tgtBand = bands.find((b) => b.workflowId === link.workflow);
         allEdges.push({
           id: `xlink:${wf.id}:${status.id}:${i}`,
           type: "crosslink",
@@ -1009,6 +1018,10 @@ export function buildUnifiedFlow(
           data: {
             sourceWorkflow: wf.id,
             label: link.label ?? null,
+            sourceBandSouthY: srcBand
+              ? srcBand.bandTop + srcBand.height
+              : null,
+            targetBandNorthY: tgtBand ? tgtBand.bandTop : null,
           },
           zIndex: 1,
         });
