@@ -843,15 +843,15 @@ export function CrossLinkEndpointNode({ data }: NodeProps) {
           </span>
         </div>
       </NodeToolbar>
-      {/* Hidden ReactFlow handle so the edge can attach. South side
-          for source dots, north side for target dots. Don't override
-          left/top — let ReactFlow's default Position.Bottom/Top
-          (left:50%; translate(-50%,-50%)) centre the handle exactly on
-          the dot's geometric midpoint. */}
+      {/* Both dots sit on the work_step's NORTH edge — source dots
+          *exit* upward into the in-band cross-link lane, target dots
+          *receive* from that lane. So both handles use Position.Top
+          (default left:50% + translate(-50%,-50%) centres them on the
+          dot's geometric midpoint). */}
       <Handle
         id={d.role === "source" ? "south" : "north"}
         type={d.role === "source" ? "source" : "target"}
-        position={d.role === "source" ? Position.Bottom : Position.Top}
+        position={Position.Top}
         style={hiddenHandle}
       />
     </div>

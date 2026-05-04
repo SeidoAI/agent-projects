@@ -5,12 +5,7 @@ import {
   type EdgeProps,
 } from "@xyflow/react";
 
-import {
-  BAND_GUTTER,
-  CROSSLINK_BUS_X,
-  Y_DEEP_RETURN,
-  Y_WORK,
-} from "./flowGraph";
+import { CROSSLINK_BUS_X, Y_DEEP_RETURN, Y_WORK } from "./flowGraph";
 import { ACTOR_COLOR, isKnownActor } from "./tokens";
 
 export interface ActorEdgeData extends Record<string, unknown> {
@@ -105,11 +100,13 @@ export function ActorEdge(props: EdgeProps) {
 export interface CrossLinkEdgeData extends Record<string, unknown> {
   sourceWorkflow: string;
   label?: string | null;
-  /** Absolute Y of the source band's south edge — used to route the
-   *  outbound horizontal through the inter-band gutter. */
-  sourceBandSouthY?: number | null;
-  /** Absolute Y of the target band's north edge. */
-  targetBandNorthY?: number | null;
+  /** Absolute Y of the in-band cross-link lane in the SOURCE band
+   *  (Y_CROSSLINK_LANE relative to bandTop). Routing the outbound
+   *  horizontal here keeps the line in clear space between inputs and
+   *  work-steps. */
+  sourceLaneY?: number | null;
+  /** Absolute Y of the in-band cross-link lane in the TARGET band. */
+  targetLaneY?: number | null;
 }
 
 // Cross-link colour — picked to stand apart from every actor hue:
@@ -129,26 +126,38 @@ export function CrossLinkEdge(props: EdgeProps) {
 
   // Route every cross-link through a shared vertical bus on the far
   // left of the canvas (CROSSLINK_BUS_X). Horizontal segments live in
-  // the inter-band GUTTER (between source/target bands), vertical
-  // segment in the bus. Nothing crosses an unrelated band.
-  //
-  // The horizontal turns sit in the centre of each gutter — outboard
-  // of the band's outputs grid AND outboard of the (now closer)
-  // backflow lane, so the two never visually fight.
+  // the IN-BAND cross-link lane of each band — between the inputs band
+  // and the work line, an empty stripe at every region's top. So the
+  // line:
+  //   1) exits the source dot UPWARD (north of the work_step)
+  //   2) rises into the source band's in-band lane
+  //   3) runs west to the bus
+  //   4) up/down the bus to the target band's in-band lane
+  //   5) east across the target band to under the target dot
+  //   6) drops down into the target dot
+  // Nothing crosses inputs, outputs, work-steps, or the band edges.
   const busX = CROSSLINK_BUS_X;
-  const FALLBACK_OFFSET = 320;
+  const FALLBACK_OFFSET = 170;
   const sourceTurnY =
-    typeof d.sourceBandSouthY === "number"
-      ? d.sourceBandSouthY + BAND_GUTTER / 2
-      : sourceY + FALLBACK_OFFSET;
+    typeof d.sourceLaneY === "number"
+      ? d.sourceLaneY
+      : sourceY - FALLBACK_OFFSET;
   const targetTurnY =
-    typeof d.targetBandNorthY === "number"
-      ? d.targetBandNorthY - BAND_GUTTER / 2
+    typeof d.targetLaneY === "number"
+      ? d.targetLaneY
       : targetY - FALLBACK_OFFSET;
 
+  // Source dot is on the work_step's NORTH, lane is ABOVE it
+  // (smaller Y), so the source approach goes UP — we stop r below
+  // sourceTurnY (= sourceTurnY + r) before arcing west.
+  // Target dot is also on the work_step's NORTH, target lane is
+  // ABOVE it, so the final segment drops DOWN (lane → dot) — same
+  // sign as before.
+  const sourceApproachY =
+    sourceY > sourceTurnY ? sourceTurnY + r : sourceTurnY - r;
   const path = [
     `M ${sourceX} ${sourceY}`,
-    `L ${sourceX} ${sourceTurnY - r}`,
+    `L ${sourceX} ${sourceApproachY}`,
     `Q ${sourceX} ${sourceTurnY}, ${sourceX - r} ${sourceTurnY}`,
     `L ${busX + r} ${sourceTurnY}`,
     `Q ${busX} ${sourceTurnY}, ${busX} ${sourceTurnY + (targetTurnY > sourceTurnY ? r : -r)}`,
@@ -175,20 +184,23 @@ export function CrossLinkEdge(props: EdgeProps) {
   // Translucent paper background so the dashed line shows through the
   // label rather than being masked by a solid halo. Label text + border
   // remain at full opacity for legibility.
+  // Solid paper background so the dashed line is fully masked behind
+  // the label (label sits OVER the line) and text reads at full
+  // contrast. The original "translucent" interpretation was wrong —
+  // user wants the label to occlude the line, not blend with it.
   const labelStyle: React.CSSProperties = {
     position: "absolute",
-    padding: "2px 10px",
-    background: "rgba(247, 245, 240, 0.78)",
-    backdropFilter: "blur(2px)",
+    padding: "3px 10px",
+    background: "var(--color-paper)",
     border: `1px dashed ${stroke}`,
     borderRadius: 2,
     fontFamily: "var(--font-mono)",
-    fontSize: 10,
+    fontSize: 10.5,
     color: stroke,
-    letterSpacing: "0.06em",
+    letterSpacing: "0.04em",
     pointerEvents: "all",
     whiteSpace: "nowrap",
-    zIndex: 50,
+    zIndex: 1000,
   };
 
   return (

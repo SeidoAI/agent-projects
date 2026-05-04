@@ -759,10 +759,14 @@ export function buildFlow(
  *  this gutter (and in the cross-link lane just above each band). */
 export const BAND_GUTTER = 140;
 
-/** Cross-link lane sits this far above each band's top, so cross-edges
- *  dock at the band's north *outside* the inputs band (which lives
- *  below the region's top stripe). */
-export const CROSSLINK_LANE_OFFSET = 36;
+/** Cross-link lane Y inside a band — between the inputs band and the
+ *  work-step row. Routing horizontals here avoids crossing any chrome
+ *  (inputs above, work-steps below) and keeps the line entirely inside
+ *  the band's vertical span (so it never overshoots above the topmost
+ *  band or below the bottommost). Band-relative; absolute Y =
+ *  bandTop + Y_CROSSLINK_LANE.
+ */
+export const Y_CROSSLINK_LANE = Y_INPUTS_BOTTOM + 32;
 
 /** Distance from the canvas's left edge to the cross-link "bus" — a
  *  vertical lane shared by every cross-workflow link. Routing every
@@ -938,16 +942,22 @@ export function buildUnifiedFlow(
           ?.height ?? WORK_H;
         const tgtW = (tgtParent?.style as { width?: number } | undefined)
           ?.width ?? WORK_W;
-        // South dot at the bottom-centre of the source work_step (or
-        // region fallback). Explicit width/height so ReactFlow can
-        // measure; pointerEvents:auto overrides the band's "none".
+        // BOTH dots sit on the work_step's NORTH edge. Routing then
+        // travels up into the in-band cross-link lane (between inputs
+        // and the work line) — which is empty space, so the line never
+        // crosses any chrome (inputs are above the lane, work-steps
+        // below). Suppresses the previous bugs of crossing outputs on
+        // exit and overshooting above the topmost band on entry.
+        // (`srcH` is consumed only for the fallback case — kept for
+        // symmetry but no longer used in the dot position.)
+        void srcH;
         allNodes.push({
           id: srcDotId,
           type: "crosslinkEndpoint",
           parentId: sourceParentId,
           position: {
             x: srcW / 2 - CROSSLINK_DOT_SIZE / 2,
-            y: srcH - CROSSLINK_DOT_SIZE / 2,
+            y: -CROSSLINK_DOT_SIZE / 2,
           },
           draggable: false,
           selectable: false,
@@ -965,8 +975,6 @@ export function buildUnifiedFlow(
             label: link.label ?? null,
           },
         });
-        // North dot at the top-centre of the target work_step (or
-        // region fallback).
         allNodes.push({
           id: tgtDotId,
           type: "crosslinkEndpoint",
@@ -1018,10 +1026,13 @@ export function buildUnifiedFlow(
           data: {
             sourceWorkflow: wf.id,
             label: link.label ?? null,
-            sourceBandSouthY: srcBand
-              ? srcBand.bandTop + srcBand.height
-              : null,
-            targetBandNorthY: tgtBand ? tgtBand.bandTop : null,
+            // Absolute Y of each band's IN-BAND cross-link lane. The
+            // lane lives between the inputs band and the work line —
+            // empty horizontal space inside every region — so the line
+            // never crosses inputs/outputs/work-steps and never
+            // overshoots the canvas's top/bottom bands.
+            sourceLaneY: srcBand ? srcBand.bandTop + Y_CROSSLINK_LANE : null,
+            targetLaneY: tgtBand ? tgtBand.bandTop + Y_CROSSLINK_LANE : null,
           },
           zIndex: 1,
         });
