@@ -211,6 +211,56 @@ describe("ConceptGraph layout (PM #25 round 2)", () => {
     expect(canvas?.contains(sidebar as Node)).toBe(false);
   });
 
+  it("clicking the drift header's stale-only toggle dims non-stale nodes", () => {
+    // Drift restored as a header card on the Concepts page (the
+    // /drift route was retired in v0.9.7). The "show stale only"
+    // toggle is the in-page drift filter — non-stale nodes get
+    // data-dim="true" so the user can scan only the drift surface.
+    const wrapper = withSeed({
+      nodes: [
+        {
+          id: "fresh-1",
+          type: "concept",
+          position: { x: 100, y: 100 },
+          data: { label: "Fresh", type: "model", status: "active", has_saved_layout: true },
+        },
+        {
+          id: "stale-1",
+          type: "concept",
+          position: { x: 300, y: 100 },
+          data: { label: "Stale", type: "model", status: "stale", has_saved_layout: true },
+        },
+      ],
+      edges: [],
+      meta: {
+        kind: "concept",
+        focus: null,
+        upstream: false,
+        downstream: false,
+        depth: null,
+        node_count: 2,
+        edge_count: 0,
+        orphans: [],
+      },
+    });
+    const { container } = render(<ConceptGraph />, { wrapper });
+    const fresh = () => container.querySelector("[data-testid='node-group-fresh-1']");
+    const stale = () => container.querySelector("[data-testid='node-group-stale-1']");
+
+    // Initially: stale-only is off, neither node is dim.
+    expect(fresh()?.getAttribute("data-dim")).toBe("false");
+    expect(stale()?.getAttribute("data-dim")).toBe("false");
+
+    // Click the toggle in the drift header.
+    const toggle = screen.getByTestId("drift-stale-only-toggle");
+    expect(toggle).toHaveTextContent(/show stale only · 1/i);
+    fireEvent.click(toggle);
+
+    // Stale node still reads clearly; the fresh node dims.
+    expect(stale()?.getAttribute("data-dim")).toBe("false");
+    expect(fresh()?.getAttribute("data-dim")).toBe("true");
+  });
+
   it("encodes type-driven node sizing — principles render larger than glossary nodes", () => {
     // P2 from PR review: the TYPE_SIZE_SCALE table at the top of
     // ConceptGraph.tsx had no behavioural test. A row deletion

@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { ReactFlowNode } from "@/lib/api/endpoints/graph";
 import { type InboxItem, useInbox } from "@/lib/api/endpoints/inbox";
 import { cn } from "@/lib/utils";
+import { DriftHeader } from "./DriftHeader";
 import { GraphLegend } from "./GraphLegend";
 import { GraphRail } from "./GraphRail";
 import { colorForKind, GraphSidebar } from "./GraphSidebar";
@@ -152,6 +153,9 @@ export function ConceptGraph() {
   // came from automatic seeding, not user drags, so re-arranging is
   // the user's intent).
   const [reseedMode, setReseedMode] = useState<"unsaved" | "all">("unsaved");
+  // Drift filter — when on, non-stale nodes dim and the sidebar
+  // narrows to stale nodes only. Toggled from the DriftHeader card.
+  const [staleOnly, setStaleOnly] = useState(false);
 
   // Track canvas size so the d3-force seeding centres in the
   // visible area instead of the default 1000×600 viewBox.
@@ -173,6 +177,10 @@ export function ConceptGraph() {
   const concepts = useMemo<ReactFlowNode[]>(
     () => (data?.nodes ?? []).filter((n) => n.type === "concept"),
     [data?.nodes],
+  );
+  const staleCount = useMemo(
+    () => concepts.filter((n) => n.data?.status === "stale").length,
+    [concepts],
   );
 
   // Restrict edges to concept↔concept before handing them to
@@ -296,6 +304,14 @@ export function ConceptGraph() {
         </div>
       </header>
       <div className="border-(--color-edge) border-b px-7 py-3">
+        <DriftHeader
+          projectId={projectId}
+          staleCount={staleCount}
+          staleOnly={staleOnly}
+          onToggleStaleOnly={() => setStaleOnly((on) => !on)}
+        />
+      </div>
+      <div className="border-(--color-edge) border-b px-7 py-3">
         <GraphLegend />
       </div>
 
@@ -392,8 +408,15 @@ export function ConceptGraph() {
               if (!pos) return null;
               const isFocus = node.id === focus;
               const isNeighbour = neighbours.has(node.id);
-              const dim = focus !== null && !isFocus && !isNeighbour;
               const stale = node.data?.status === "stale";
+              // Two independent dim sources: focus mode (highlight a
+              // selected node + its neighbours) and stale-only mode
+              // (highlight stale nodes regardless of focus). Either
+              // engages dim; stale nodes always read clearly when
+              // stale-only is on.
+              const dimByFocus = focus !== null && !isFocus && !isNeighbour;
+              const dimByStaleOnly = staleOnly && !stale;
+              const dim = dimByFocus || dimByStaleOnly;
               const nodeType = String(node.data?.type ?? "concept");
               const typeColor = colorForKind(nodeType);
               const r = radiusForType(nodeType);
