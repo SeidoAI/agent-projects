@@ -77,14 +77,10 @@ def _known_tripwires() -> set[str]:
 
 
 def _known_heuristics() -> set[str]:
-    """Return implemented heuristic ids (soft warn-once primitives).
+    """Return implemented heuristic ids (soft warn-once primitives)."""
+    from tripwire._internal.heuristics import known_heuristic_ids
 
-    Stage 1 ships an empty registry; the heuristics module lands in a
-    follow-up commit. Returning an empty set means the spec validator
-    skips the unknown-id check (matching the existing pattern for the
-    other primitive sets).
-    """
-    return set()
+    return known_heuristic_ids()
 
 
 def _known_jit_prompts(project_dir) -> set[str]:  # type: ignore[no-untyped-def]

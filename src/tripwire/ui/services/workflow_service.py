@@ -230,15 +230,29 @@ def _build_tripwire_registry() -> list[dict[str, Any]]:
 def _build_heuristic_registry() -> list[dict[str, Any]]:
     """Soft warn-once primitives.
 
-    Stage 1 ships the empty registry — heuristics module
-    (``src/tripwire/_internal/heuristics/``) lands in a follow-up
-    commit. Returning an empty list here is intentional: the workflow
-    spec validator simply skips the unknown-id check when the registry
-    is empty (existing behaviour for ``known_*`` sets), so the new
-    field is forward-compatible.
+    Returns one entry per registered heuristic in
+    ``src/tripwire/_internal/heuristics/``. The implementations are
+    suppression wrappers over existing ``v_*`` validator checks — the
+    detector code lives in ``core/validator/lint/`` and
+    ``core/validator/checks/`` for now; the heuristic layer adds
+    marker-based ack handling on top.
     """
 
-    return []
+    from tripwire._internal.heuristics import heuristic_specs
+
+    out: list[dict[str, Any]] = []
+    for spec in heuristic_specs():
+        out.append(
+            {
+                "id": spec.id,
+                "label": spec.label,
+                "description": spec.description,
+                "entity": spec.entity,
+                "check_code_prefix": spec.check_code_prefix,
+                "blocking": False,
+            }
+        )
+    return out
 
 
 def _build_jit_prompt_registry(

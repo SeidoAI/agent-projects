@@ -19,6 +19,7 @@ from tripwire.cli.drift import drift_cmd
 from tripwire.cli.enums import enums_cmd
 from tripwire.cli.events import events_cmd
 from tripwire.cli.graph import graph_cmd
+from tripwire.cli.heuristic import heuristic_cmd
 from tripwire.cli.hooks import hook_cmd, hooks_cmd
 from tripwire.cli.inbox import inbox_cmd
 from tripwire.cli.init import init_cmd
@@ -125,6 +126,7 @@ cli.add_command(ui_cmd)
 cli.add_command(watch_cmd)
 cli.add_command(workspace_cmd)
 cli.add_command(jit_prompts_cmd)
+cli.add_command(heuristic_cmd)
 cli.add_command(test_jit_prompt_cmd)
 cli.add_command(prompt_check_cmd)
 cli.add_command(events_cmd)
