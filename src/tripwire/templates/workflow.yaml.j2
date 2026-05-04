@@ -46,6 +46,14 @@ workflows:
             skills: [project-manager]
       - id: executing
         next: in_review
+        # Mid-execute the agent opens both PRs; that hands off to the
+        # pr-lifecycle workflow which owns each PR's draft → ready →
+        # reviewing → approved → merged|rejected state machine.
+        cross_links:
+          - workflow: pr-lifecycle
+            status: draft
+            label: PRs opened mid-session
+            kind: triggers
         artifacts:
           consumes:
             - id: plan
@@ -89,6 +97,20 @@ workflows:
             skills: [verification, agent-messaging]
       - id: in_review
         next: verified
+        # Once a session is in_review, two things happen in parallel:
+        # the dedicated code-review workflow takes ownership of the PR
+        # pair (gate-check → reviews → synthesis), and the project-side
+        # PR enters its own pr-lifecycle. The cross-links make those
+        # handoffs first-class on the unified canvas.
+        cross_links:
+          - workflow: code-review
+            status: received
+            label: review takes ownership
+            kind: triggers
+          - workflow: pr-lifecycle
+            status: reviewing
+            label: PR enters review
+            kind: triggers
         artifacts:
           consumes:
             - id: diff
@@ -131,6 +153,13 @@ workflows:
             skills: [project-manager, agent-messaging]
       - id: completed
         terminal: true
+        # Session done implies the bound issue is ready to close. The
+        # cross-link makes the issue-closure workflow the auto-target.
+        cross_links:
+          - workflow: issue-closure
+            status: closing
+            label: bound issue auto-closes
+            kind: triggers
         artifacts:
           consumes:
             - id: tripwire-pr
@@ -564,6 +593,10 @@ workflows:
             status: planned
             label: incremental update spawns session
             kind: triggers
+          - workflow: issue-closure
+            status: closing
+            label: pm-issue-close path
+            kind: triggers
         work_steps:
           - id: publish
             actor: pm-agent
@@ -760,6 +793,19 @@ workflows:
             label: handle agent question
             kind: triggers
             pm_subagent_dispatch: true
+          - workflow: code-review
+            status: received
+            label: launch review on PR pair
+            kind: triggers
+            pm_subagent_dispatch: true
+          - workflow: inbox-handling
+            status: pending
+            label: escalate to user
+            kind: triggers
+          - workflow: concept-freshness
+            status: detected
+            label: stale-node count high
+            kind: triggers
         work_steps:
           - id: spawn-action
             actor: pm-agent
@@ -1369,4 +1415,80 @@ workflows:
         to: closed
         kind: forward
         label: finalize
+        skills: [project-manager]
+
+  # concept-freshness — project-wide reconciliation loop for stale
+  # concept nodes. Cross-link target from pm-monitor.dispatch (when
+  # `signal.stale_node_count_high` fires) and code-review.node-reconcile
+  # (after a session-driven reconcile, kicks the broader scan).
+  # Walks each stale node and resolves it to refresh / accept-divergence
+  # / delete. See `WORKFLOWS_NODE_RECONCILIATION.md`.
+  concept-freshness:
+    actor: pm-agent
+    trigger: signal.stale_node_count_high
+    brief-description: "stale-node queue → reviewed → reconciled."
+    statuses:
+      - id: detected
+        next: reviewing
+        # Always-on schema check; the staleness queue itself is what
+        # triggered entry, no further entry tripwire needed.
+        work_steps:
+          - id: enumerate-stale-nodes
+            actor: pm-agent
+            label: enumerate stale nodes
+            skills: [project-manager]
+      - id: reviewing
+        next: reconciled
+        # Reference integrity guards related: cleanup when a deletion
+        # outcome cascades through the graph.
+        tripwires:
+          - v_reference_integrity
+        work_steps:
+          - id: read-source-and-node
+            actor: pm-agent
+            label: read live source against node body
+            skills: [project-manager]
+          - id: decide-outcome
+            actor: pm-agent
+            label: decide refresh / accept-divergence / delete
+            skills: [project-manager]
+          - id: apply-outcome
+            actor: pm-agent
+            label: apply outcome (rehash, edit body, or delete)
+            skills: [project-manager]
+      - id: reconciled
+        terminal: true
+        # Exit gate: zero `v_freshness` errors at terminal entry.
+        tripwires:
+          - v_freshness
+        work_steps:
+          - id: emit-reconcile-event
+            actor: pm-agent
+            label: emit reconcile event
+            skills: [project-manager]
+    routes:
+      - id: freshness-detected
+        actor: pm-agent
+        trigger: signal.stale_node_count_high == true
+        signals: [signal.stale_node_count_high]
+        from: source:nodes
+        to: detected
+        kind: forward
+        label: receive staleness queue
+        skills: [project-manager]
+      - id: enter-reviewing
+        actor: pm-agent
+        trigger: detected.enumerated
+        from: detected
+        to: reviewing
+        kind: forward
+        label: walk the queue
+        skills: [project-manager]
+      - id: enter-reconciled
+        actor: pm-agent
+        trigger: reviewing.queue_empty
+        from: reviewing
+        to: reconciled
+        kind: forward
+        label: reconcile complete
         skills: [project-manager]
