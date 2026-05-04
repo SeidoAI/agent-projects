@@ -19,7 +19,7 @@ def _seed_workflow_events(pd: Path) -> None:
         pd,
         workflow="coding-session",
         instance="sess-1",
-        station="executing",
+        status="executing",
         event="validator.run",
         details={"id": "v_uuid_present", "outcome": "pass"},
     )
@@ -27,7 +27,7 @@ def _seed_workflow_events(pd: Path) -> None:
         pd,
         workflow="coding-session",
         instance="sess-1",
-        station="executing",
+        status="executing",
         event="validator.run",
         details={"id": "v_reference_integrity", "outcome": "fail"},
     )
@@ -35,15 +35,15 @@ def _seed_workflow_events(pd: Path) -> None:
         pd,
         workflow="coding-session",
         instance="sess-1",
-        station="in_review",
+        status="in_review",
         event="transition.completed",
-        details={"from_station": "executing", "to_station": "in_review"},
+        details={"from_status": "executing", "to_status": "in_review"},
     )
     emit_event(
         pd,
         workflow="coding-session",
         instance="sess-2",
-        station="executing",
+        status="executing",
         event="jit_prompt.fired",
         details={"id": "tw_self_review", "session_id": "sess-2"},
     )
@@ -63,7 +63,8 @@ def test_workflow_events_lists_chronologically(seeded_client, project_dir, proje
         assert "ts" in row
         assert "workflow" in row
         assert "instance" in row
-        assert "station" in row
+        assert "status" in row
+        assert "station" not in row
         assert "event" in row
         assert "details" in row
 
@@ -128,7 +129,7 @@ def test_workflow_stats_top_n_rules(seeded_client, project_dir, project_id):
             project_dir,
             workflow="coding-session",
             instance="sess-3",
-            station="executing",
+            status="executing",
             event="validator.run",
             details={"id": "v_freshness", "outcome": "fail"},
         )
@@ -137,7 +138,7 @@ def test_workflow_stats_top_n_rules(seeded_client, project_dir, project_id):
             project_dir,
             workflow="coding-session",
             instance="sess-3",
-            station="executing",
+            status="executing",
             event="validator.run",
             details={"id": "v_uuid_present", "outcome": "fail"},
         )

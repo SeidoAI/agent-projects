@@ -2,7 +2,6 @@
 name: pm-session-review
 description: Structured session-PR review vs issue specs, with independent verification.
 argument-hint: "<session-id> [--pr <number>]"
-fires_at: in_review
 ---
 
 You are the project manager. Load the project-manager skill if not active.
@@ -50,7 +49,7 @@ supposed to back them.
 5. **Independent validation gate.** From the project tracking repo
    (not the code repo):
    ```bash
-   tripwire validate --strict
+   tripwire validate
    ```
    Don't trust the executor's claim that this passed — run it
    yourself. If it fails, the PR fails review.
@@ -68,11 +67,17 @@ supposed to back them.
    - `gh pr review <pr> --approve|--request-changes --body "..."`
      with your richer four-lens body.
 
-8. **Plan post-merge work.** If any concept nodes were touched, note
+8. **Record the workflow prompt-check when approving.** If the review
+   result allows the session to enter `verified`, run:
+   ```bash
+   tripwire prompt-check invoke pm-session-review <session-id> --status verified
+   ```
+
+9. **Plan post-merge work.** If any concept nodes were touched, note
    them so you can do the §8 reconciliation in `WORKFLOWS_REVIEW.md`
    after merge.
 
-9. **Report back:**
+10. **Report back:**
    - Overall verdict
    - Blocking findings
    - Suggested follow-up issues

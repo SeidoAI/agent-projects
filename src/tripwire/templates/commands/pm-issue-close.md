@@ -32,7 +32,7 @@ Workflow:
    - Body = the closing note, or a default describing the session +
      PR closure if applicable.
 6. Write the comment file to the issue's `comments/` directory.
-7. Run `tripwire validate --strict`. Fix any errors.
+7. Run `tripwire validate`. Fix any errors.
 8. Commit: `close: <issue-key>`.
 
 If the issue has downstream consumers (other issues that `blocked_by`

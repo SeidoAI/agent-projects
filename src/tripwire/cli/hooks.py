@@ -4,7 +4,7 @@ Two distinct verbs live here:
 
 - ``tripwire hook validate-on-edit`` (singular) — the Claude Code
   PostToolUse handler. Reads the hook envelope from stdin, runs
-  ``tripwire validate --strict`` in-process, and emits a
+  ``tripwire validate`` in-process (strict-by-default), and emits a
   ``decision: "block"`` JSON to stdout if the edit produced an invalid
   state. All defensive paths exit 0 silently so the hook never breaks
   unrelated agent work.
@@ -310,7 +310,7 @@ def validate_on_edit_cmd(timeout_seconds: int) -> None:
         formatted_errors += f"\n  …and {len(report.errors) - 20} more"
 
     reason = (
-        f"tripwire validate --strict failed after edit to {rel}:\n\n"
+        f"tripwire validate failed after edit to {rel}:\n\n"
         f"{formatted_errors}\n\n"
         f"Re-read the file, fix the validation errors, and re-edit."
     )

@@ -63,7 +63,7 @@ describe("EventLog", () => {
         ts: "2026-04-30T14:00:00Z",
         workflow: "coding-session",
         instance: "sess-1",
-        station: "executing",
+        status: "executing",
         event: "validator.run",
         details: { id: "v_uuid_present", outcome: "pass" },
       },
@@ -71,9 +71,9 @@ describe("EventLog", () => {
         ts: "2026-04-30T14:01:00Z",
         workflow: "coding-session",
         instance: "sess-1",
-        station: "in_review",
+        status: "in_review",
         event: "transition.completed",
-        details: { from_station: "executing", to_station: "in_review" },
+        details: { from_status: "executing", to_status: "in_review" },
       },
     ];
     const Wrapper = withSeededRoute(events);
@@ -111,7 +111,7 @@ describe("EventLog", () => {
     expect(screen.getByText(/no events yet/i)).toBeInTheDocument();
   });
 
-  it("renders distinct rows even when (workflow, instance, station, event, ts, details.id) collide", () => {
+  it("renders distinct rows even when (workflow, instance, status, event, ts, details.id) collide", () => {
     // Codex P1: events log emits at second granularity, so a dense
     // burst of identical-tuple rows must still produce unique React
     // keys + clickable rows. The synthId fallback adds an
@@ -121,7 +121,7 @@ describe("EventLog", () => {
         ts: "2026-04-30T14:00:00Z",
         workflow: "coding-session",
         instance: "sess-1",
-        station: "executing",
+        status: "executing",
         event: "validator.run",
         details: { id: "v_uuid_present", outcome: "pass" },
       },
@@ -129,7 +129,7 @@ describe("EventLog", () => {
         ts: "2026-04-30T14:00:00Z",
         workflow: "coding-session",
         instance: "sess-1",
-        station: "executing",
+        status: "executing",
         event: "validator.run",
         details: { id: "v_uuid_present", outcome: "pass" },
       },
@@ -137,7 +137,7 @@ describe("EventLog", () => {
         ts: "2026-04-30T14:00:00Z",
         workflow: "coding-session",
         instance: "sess-1",
-        station: "executing",
+        status: "executing",
         event: "validator.run",
         details: { id: "v_uuid_present", outcome: "pass" },
       },

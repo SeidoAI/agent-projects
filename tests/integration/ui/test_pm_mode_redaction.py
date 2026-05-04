@@ -62,7 +62,7 @@ def project_id(project_dir: Path) -> str:
 def test_no_header_redacts_jit_prompts(client: TestClient, project_id: str) -> None:
     resp = client.get(f"/api/projects/{project_id}/workflow")
     assert resp.status_code == 200, resp.text
-    for prompt in resp.json()["jit_prompts"]:
+    for prompt in resp.json()["registry"]["jit_prompts"]:
         assert prompt["prompt_revealed"] is None
         assert prompt["prompt_redacted"]
 
@@ -75,7 +75,7 @@ def test_pm_header_reveals_jit_prompts(client: TestClient, project_id: str) -> N
     assert resp.status_code == 200
     revealed = [
         prompt["prompt_revealed"]
-        for prompt in resp.json()["jit_prompts"]
+        for prompt in resp.json()["registry"]["jit_prompts"]
         if prompt["prompt_revealed"]
     ]
     assert revealed, "expected revealed prompts in PM mode"
@@ -89,7 +89,7 @@ def test_pm_header_value_unrelated_role_falls_back_to_redacted(
         headers={"X-Tripwire-Role": "anonymous"},
     )
     assert resp.status_code == 200
-    for prompt in resp.json()["jit_prompts"]:
+    for prompt in resp.json()["registry"]["jit_prompts"]:
         assert prompt["prompt_revealed"] is None
 
 
@@ -101,7 +101,7 @@ def test_pm_header_case_insensitive_value(client: TestClient, project_id: str) -
     assert resp.status_code == 200
     revealed = [
         prompt["prompt_revealed"]
-        for prompt in resp.json()["jit_prompts"]
+        for prompt in resp.json()["registry"]["jit_prompts"]
         if prompt["prompt_revealed"]
     ]
     assert revealed

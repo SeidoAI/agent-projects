@@ -154,6 +154,55 @@ class TestDiscoverProjects:
 
         assert len(result) == 1
 
+    def test_deduplicates_worktree_copies_by_project_identity(self, tmp_path: Path):
+        root = tmp_path / "projects"
+        canonical = _make_project(
+            root / "project-tripwire-v0",
+            name="project-tripwire-v0",
+            key_prefix="KUI",
+        )
+        _make_project(
+            root / "worktree-project-tripwire-v0-v08-board",
+            name="project-tripwire-v0",
+            key_prefix="KUI",
+        )
+        _make_project(
+            root / "worktree-project-tripwire-v0-v09-workflow-substrate",
+            name="project-tripwire-v0",
+            key_prefix="KUI",
+        )
+
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
+            mock_path_cls.cwd.return_value = tmp_path / "empty"
+            mock_path_cls.home.return_value = tmp_path / "fakehome"
+            mock_path_cls.side_effect = Path
+            result = discover_projects(UserConfig(project_roots=[root]))
+
+        assert [(p.name, p.key_prefix) for p in result] == [
+            ("project-tripwire-v0", "KUI")
+        ]
+        assert Path(result[0].dir) == canonical.resolve()
+        assert get_project_dir(result[0].id) == canonical.resolve()
+
+    def test_keeps_single_worktree_copy_when_no_canonical_project_exists(
+        self, tmp_path: Path
+    ):
+        root = tmp_path / "projects"
+        worktree = _make_project(
+            root / "worktree-project-tripwire-v0-v08-board",
+            name="project-tripwire-v0",
+            key_prefix="KUI",
+        )
+
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
+            mock_path_cls.cwd.return_value = tmp_path / "empty"
+            mock_path_cls.home.return_value = tmp_path / "fakehome"
+            mock_path_cls.side_effect = Path
+            result = discover_projects(UserConfig(project_roots=[root]))
+
+        assert len(result) == 1
+        assert Path(result[0].dir) == worktree.resolve()
+
     def test_unreadable_project_yaml_skipped(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ):

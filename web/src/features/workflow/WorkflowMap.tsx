@@ -5,65 +5,76 @@ import { useProjectShell } from "@/app/ProjectShell";
 import { Stamp } from "@/components/ui/stamp";
 import { ApiError } from "@/lib/api/client";
 import {
+  type WorkflowGraph,
   useWorkflow,
-  type WorkflowYamlBranch,
-  type WorkflowYamlDefinition,
-  type WorkflowYamlStation,
 } from "@/lib/api/endpoints/workflow";
 import { isPmMode } from "@/lib/role";
-import { ArtifactCard } from "./ArtifactCard";
-import { ConnectorCurve } from "./ConnectorCurve";
-import { JitPromptCard } from "./JitPromptCard";
-import { StationCard } from "./StationCard";
 import {
-  computeWorkflowLayout,
-  type PositionedConnector,
-  type PositionedStation,
-  WORKFLOW_CANVAS,
-} from "./useWorkflowLayout";
-import { ValidatorCard } from "./ValidatorCard";
+  type FlowSelection,
+  WorkflowFlowchart,
+} from "./WorkflowFlowchart";
 import { WorkflowDrawer, type WorkflowSelection } from "./WorkflowDrawer";
+import { WorkflowLegend } from "./WorkflowLegend";
+import { WorkflowNavigator } from "./WorkflowNavigator";
 
-/**
- * Workflow Map — process-definition surface at `/p/:projectId/workflow`.
- *
- * Read-only visualisation of how Tripwire orchestrates a session.
- * Sources flow in LEFT, sinks flow out RIGHT, the lifecycle wire
- * runs through the centre, validators and JIT prompts sit above
- * their gating station, artifacts below their producer.
- *
- * Per [[dec-critical-path-elon-method]] this is process spec, not
- * live state — there is no per-session highlighting and no
- * "active now" overlay; the dashboard is the live-state surface.
- */
+const FOCUS_PARAM = "focus";
+
 export function WorkflowMap() {
   const { projectId } = useProjectShell();
-  const [searchParams] = useSearchParams();
-  // Detect PM-mode BEFORE the fetch so the hook can pin
-  // X-Tripwire-Role on the request and the React Query cache key
-  // — the backend nulls `jit_prompts[*].prompt_revealed` for non-PM
-  // viewers, so without this the drawer never has the prompt body
-  // even when ?role=pm is set.
+  const [searchParams, setSearchParams] = useSearchParams();
   const pmMode = useMemo(() => isPmMode(searchParams.get("role")), [searchParams]);
   const query = useWorkflow(projectId, { pmMode });
   const { data: graph, isPending, isError, error, refetch } = query;
-
-  const layout = useMemo(() => (graph ? computeWorkflowLayout(graph) : null), [graph]);
-  const [hovered, setHovered] = useState<HoverKey | null>(null);
   const [selection, setSelection] = useState<WorkflowSelection | null>(null);
 
-  // Distinct surfaces per query state (Codex P2):
-  //  - pending  → skeleton placeholder so flaky-network users don't
-  //               briefly read "no graph"
-  //  - error (non-404) → error chrome with retry
-  //  - empty (404 or genuine empty graph) → existing copy
-  //  - success → real canvas
-  // 404 still falls through to "empty" — Strand Y is additive,
-  // pre-shipping clients see 404 until the endpoint lands.
+  const focusId = pickFocus(graph, searchParams.get(FOCUS_PARAM));
+
+  const handlePick = (id: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set(FOCUS_PARAM, id);
+    setSearchParams(next, { replace: false });
+    setSelection(null);
+  };
+
+  const handleSelect = (s: FlowSelection) => {
+    if (!graph) return;
+    if (s.kind === "work_step") {
+      const wf = graph.workflows.find((w) => w.id === s.workflowId);
+      const status = wf?.statuses.find((st) => st.id === s.statusId);
+      const ws = status?.work_steps.find((w) => w.id === s.workStepId);
+      if (!ws) return;
+      setSelection({ kind: "work_step", statusId: s.statusId, workStep: ws });
+      return;
+    }
+    if (s.kind === "status") {
+      setSelection({ kind: "status", status: s.status });
+      return;
+    }
+    if (s.kind === "route") {
+      setSelection({ kind: "route", route: s.route });
+      return;
+    }
+    if (s.kind === "jit_prompt") {
+      setSelection({ kind: "jit_prompt", id: s.id, statusId: s.statusId });
+      return;
+    }
+    setSelection({
+      kind: "artifact",
+      artifact: s.artifact,
+      statusId: s.statusId,
+      direction: s.direction,
+    });
+  };
+
   const stateBranch: React.ReactNode = (() => {
-    if (layout) {
+    if (graph && graph.workflows.length > 0) {
       return (
-        <Canvas layout={layout} hovered={hovered} onHover={setHovered} onSelect={setSelection} />
+        <WorkflowPage
+          graph={graph}
+          focusId={focusId}
+          onPick={handlePick}
+          onSelect={handleSelect}
+        />
       );
     }
     if (isPending) return <LoadingState />;
@@ -73,462 +84,88 @@ export function WorkflowMap() {
 
   return (
     <div className="flex h-full flex-col gap-4 p-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="font-sans font-semibold text-[28px] text-(--color-ink) tracking-[-0.02em] leading-tight">
-          Workflow
-        </h1>
-        <p className="font-serif text-[14px] italic text-(--color-ink-2) leading-snug">
-          how Tripwire orchestrates a session — read this once, the dashboard reads it every day.
-        </p>
-      </header>
-      <Legend />
       {stateBranch}
-      <WorkflowsPanel workflows={graph?.workflows ?? []} />
-      <WorkflowDrawer selection={selection} pmMode={pmMode} onClose={() => setSelection(null)} />
+      <WorkflowDrawer
+        selection={selection}
+        registry={graph?.registry}
+        pmMode={pmMode}
+        onClose={() => setSelection(null)}
+      />
     </div>
   );
 }
 
-/**
- * Workflow.yaml-derived panel (KUI-125).
- *
- * Renders one card per declared workflow with stations, conditional
- * branches, and the validators/JIT prompts/prompt-checks each station
- * references. Sits below the canvas so the existing introspection-
- * derived view (lifecycle wire) stays visible at the top — the panel
- * is the new shape; the canvas is the live one. Future iterations
- * fold the canvas into this panel; for v0.9 they coexist.
- */
-function WorkflowsPanel({ workflows }: { workflows: WorkflowYamlDefinition[] }) {
-  if (!workflows || workflows.length === 0) {
-    return null;
-  }
+interface WorkflowPageProps {
+  graph: WorkflowGraph;
+  focusId: string | null;
+  onPick: (id: string) => void;
+  onSelect: (s: FlowSelection) => void;
+}
+
+function WorkflowPage({ graph, focusId, onPick, onSelect }: WorkflowPageProps) {
   return (
     <section
-      aria-label="Workflow definitions"
-      data-testid="workflow-yaml-panel"
-      className="flex flex-col gap-3 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) p-4"
+      data-testid="workflow-page"
+      className="flex min-h-0 flex-1 flex-col gap-3"
     >
-      <header className="flex items-center justify-between">
-        <h2 className="font-sans font-semibold text-[14px] uppercase tracking-[0.04em] text-(--color-ink-2)">
-          workflow.yaml
-        </h2>
-        <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)">
-          {workflows.length} workflow{workflows.length === 1 ? "" : "s"}
-        </span>
+      <WorkflowNavigator
+        workflows={graph.workflows}
+        activeId={focusId}
+        onPick={onPick}
+      />
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="max-w-[780px]">
+          <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-(--color-ink-3)">
+            workflow map · {graph.workflows.length} workflows
+          </div>
+          <p className="mt-1 font-serif text-[15px] italic text-(--color-ink-2) leading-snug">
+            All workflows on one canvas. Use the navigator to jump between bands;
+            cross-workflow handoffs render as dashed indigo links.
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-1.5 font-mono text-[11px] text-(--color-ink-3)">
+          <span>workflow.yaml · v0.9.6 · unified</span>
+          <div className="flex gap-1.5">
+            <Stamp tone="rule">DEFINITION</Stamp>
+            <Stamp tone="default">
+              {totalStatuses(graph)} ST · {totalRoutes(graph)} RT
+            </Stamp>
+          </div>
+        </div>
       </header>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        {workflows.map((wf) => (
-          <WorkflowDefinitionCard key={wf.id} workflow={wf} />
-        ))}
+      <WorkflowLegend />
+      <div className="rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) p-3">
+        <WorkflowFlowchart
+          graph={graph}
+          focusId={focusId}
+          registry={graph.registry}
+          gateMode="diamond"
+          onSelect={onSelect}
+        />
       </div>
     </section>
   );
 }
 
-function WorkflowDefinitionCard({ workflow }: { workflow: WorkflowYamlDefinition }) {
-  return (
-    <article
-      data-testid={`workflow-yaml-card-${workflow.id}`}
-      className="flex flex-col gap-3 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) p-3"
-    >
-      <header className="flex items-center gap-2">
-        <Stamp tone="rule">{workflow.id}</Stamp>
-        <span className="font-mono text-[11px] text-(--color-ink-2)">
-          actor: {workflow.actor || "—"}
-        </span>
-        <span className="ml-auto font-mono text-[11px] text-(--color-ink-3)">
-          trigger: {workflow.trigger || "—"}
-        </span>
-      </header>
-      <ol className="flex flex-col gap-1.5 font-mono text-[11px] text-(--color-ink-2)">
-        {workflow.stations.map((station, idx) => (
-          <li key={station.id}>
-            <WorkflowStationRow station={station} index={idx} total={workflow.stations.length} />
-          </li>
-        ))}
-      </ol>
-    </article>
-  );
+function totalStatuses(graph: WorkflowGraph): number {
+  return graph.workflows.reduce((n, w) => n + w.statuses.length, 0);
 }
 
-function WorkflowStationRow({
-  station,
-  index,
-  total: _total,
-}: {
-  station: WorkflowYamlStation;
-  index: number;
-  total: number;
-}) {
-  return (
-    <div
-      data-testid={`workflow-yaml-station-${station.id}`}
-      className="flex flex-col gap-1 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) px-2 py-1.5"
-    >
-      <div className="flex items-center gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)">
-          {String(index + 1).padStart(2, "0")}
-        </span>
-        <span className="font-sans font-semibold text-(--color-ink)">{station.id}</span>
-        <NextSpec next={station.next} />
-      </div>
-      {(station.validators.length || station.jit_prompts.length || station.prompt_checks.length) >
-      0 ? (
-        <div className="flex flex-wrap gap-1.5 text-[10px]">
-          {station.validators.map((v) => (
-            <span
-              key={`v-${v}`}
-              data-testid={`yaml-station-${station.id}-validator-${v}`}
-              className="rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-1.5 py-0.5 text-(--color-ink-2)"
-            >
-              gate: {v}
-            </span>
-          ))}
-          {station.jit_prompts.map((t) => (
-            <span
-              key={`t-${t}`}
-              data-testid={`yaml-station-${station.id}-jit-prompt-${t}`}
-              className="rounded-(--radius-stamp) border border-(--color-tripwire) bg-(--color-paper) px-1.5 py-0.5 text-(--color-tripwire)"
-            >
-              JIT prompt: {t}
-            </span>
-          ))}
-          {station.prompt_checks.map((p) => (
-            <span
-              key={`pc-${p}`}
-              data-testid={`yaml-station-${station.id}-pc-${p}`}
-              className="rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-1.5 py-0.5 text-(--color-ink-2)"
-            >
-              prompt: {p}
-            </span>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
+function totalRoutes(graph: WorkflowGraph): number {
+  return graph.workflows.reduce((n, w) => n + w.routes.length, 0);
 }
 
-function NextSpec({ next }: { next: WorkflowYamlStation["next"] }) {
-  if (next.kind === "terminal") {
-    return (
-      <span
-        data-testid="next-terminal"
-        className="ml-auto font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)"
-      >
-        terminal
-      </span>
-    );
-  }
-  if (next.kind === "single") {
-    return (
-      <span
-        data-testid="next-single"
-        className="ml-auto font-mono text-[10px] text-(--color-ink-3)"
-      >
-        → {next.single}
-      </span>
-    );
-  }
-  return (
-    <span
-      data-testid="next-conditional"
-      className="ml-auto flex flex-col items-end gap-0.5 font-mono text-[10px] text-(--color-ink-3)"
-    >
-      {next.branches.map((b) => {
-        const label = branchLabel(b);
-        return <span key={label}>{label}</span>;
-      })}
-    </span>
-  );
-}
-
-function branchLabel(branch: WorkflowYamlBranch): string {
-  if ("else" in branch) return `else → ${branch.else}`;
-  return `if ${branch.if} → ${branch.then}`;
+function pickFocus(
+  graph: WorkflowGraph | undefined,
+  paramId: string | null,
+): string | null {
+  if (!graph || graph.workflows.length === 0) return null;
+  if (paramId && graph.workflows.some((w) => w.id === paramId)) return paramId;
+  return graph.workflows[0]?.id ?? null;
 }
 
 function is404(err: unknown): boolean {
   return err instanceof ApiError && err.status === 404;
-}
-
-type HoverKey =
-  | { kind: "validator"; id: string }
-  | { kind: "jit_prompt"; id: string }
-  | { kind: "artifact"; id: string }
-  | { kind: "source"; id: string }
-  | { kind: "sink"; id: string };
-
-interface CanvasProps {
-  layout: NonNullable<ReturnType<typeof computeWorkflowLayout>>;
-  hovered: HoverKey | null;
-  onHover: (k: HoverKey | null) => void;
-  onSelect: (s: WorkflowSelection) => void;
-}
-
-function Canvas({ layout, hovered, onHover, onSelect }: CanvasProps) {
-  const { stations, validators, jit_prompts, artifacts, sources, sinks, viewBox } = layout;
-  const stationsById = new Map(stations.map((s) => [s.id, s] as const));
-  const hl = useMemo(() => computeHighlight(hovered), [hovered]);
-
-  return (
-    <section
-      // Vertical scroll: per round-3 PM follow-up the canvas is
-      // not space-constrained — at high entity density the dynamic
-      // viewBox grows beyond the visible viewport and the user
-      // scrolls. `flex-1 min-h-0` lets the section take whatever
-      // height is left after the page header + legend strip.
-      className="relative flex-1 w-full min-h-0 overflow-auto rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2)"
-      aria-label="Workflow map canvas"
-    >
-      <svg
-        viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
-        width={viewBox.width}
-        height={viewBox.height}
-        preserveAspectRatio="xMinYMin meet"
-        style={{ display: "block" }}
-      >
-        <title>Workflow orchestration graph</title>
-        <line
-          x1={WORKFLOW_CANVAS.gutterLeft}
-          x2={WORKFLOW_CANVAS.width - WORKFLOW_CANVAS.gutterRight}
-          y1={WORKFLOW_CANVAS.wireY}
-          y2={WORKFLOW_CANVAS.wireY}
-          stroke="var(--color-rule)"
-          strokeWidth={1.6}
-          strokeLinecap="round"
-        />
-        {sources.map((c) => (
-          <ConnectorCurve
-            key={`source-${c.id}`}
-            id={`source-${c.id}`}
-            from={{ x: c.x, y: c.y }}
-            to={attachmentPoint(c, stationsById)}
-            dimmed={hl.connectorDimmed(`source-${c.id}`)}
-          />
-        ))}
-        {sinks.map((c) => (
-          <ConnectorCurve
-            key={`sink-${c.id}`}
-            id={`sink-${c.id}`}
-            from={attachmentPoint(c, stationsById)}
-            to={{ x: c.x, y: c.y }}
-            dimmed={hl.connectorDimmed(`sink-${c.id}`)}
-          />
-        ))}
-        {artifacts.map((a) => {
-          const producer = stationsById.get(a.produced_by);
-          const consumer = a.consumed_by ? stationsById.get(a.consumed_by) : null;
-          return (
-            <g key={`artifact-wires-${a.id}`}>
-              {producer ? (
-                <ConnectorCurve
-                  id={`artifact-out-${a.id}`}
-                  from={{ x: producer.x, y: producer.y + 10 }}
-                  to={{ x: a.x, y: a.y - 30 }}
-                  dimmed={hl.connectorDimmed(`artifact-out-${a.id}`)}
-                  stroke="var(--color-info)"
-                />
-              ) : null}
-              {consumer ? (
-                <ConnectorCurve
-                  id={`artifact-in-${a.id}`}
-                  from={{ x: a.x, y: a.y - 30 }}
-                  to={{ x: consumer.x, y: consumer.y + 10 }}
-                  dimmed={hl.connectorDimmed(`artifact-in-${a.id}`)}
-                  stroke="var(--color-info)"
-                />
-              ) : null}
-            </g>
-          );
-        })}
-        {stations.map((s) => (
-          <StationCard key={`station-${s.id}`} station={s} x={s.x} y={s.y} />
-        ))}
-        {validators.map((v) => (
-          <ValidatorCard
-            key={`validator-${v.id}`}
-            validator={v}
-            x={v.x}
-            y={v.y}
-            dimmed={hl.entityDimmed(`validator-${v.id}`)}
-            onClick={() => onSelect({ kind: "validator", entity: v })}
-            onMouseEnter={() => onHover({ kind: "validator", id: v.id })}
-            onMouseLeave={() => onHover(null)}
-          />
-        ))}
-        {jit_prompts.map((t) => (
-          <JitPromptCard
-            key={`jit-prompt-${t.id}`}
-            jitPrompt={t}
-            x={t.x}
-            y={t.y}
-            dimmed={hl.entityDimmed(`jit_prompt-${t.id}`)}
-            onClick={() => onSelect({ kind: "jit_prompt", entity: t })}
-            onMouseEnter={() => onHover({ kind: "jit_prompt", id: t.id })}
-            onMouseLeave={() => onHover(null)}
-          />
-        ))}
-        {artifacts.map((a) => (
-          <ArtifactCard
-            key={`artifact-${a.id}`}
-            artifact={a}
-            x={a.x}
-            y={a.y}
-            dimmed={hl.entityDimmed(`artifact-${a.id}`)}
-            onClick={() => onSelect({ kind: "artifact", entity: a })}
-            onMouseEnter={() => onHover({ kind: "artifact", id: a.id })}
-            onMouseLeave={() => onHover(null)}
-          />
-        ))}
-        {sources.map((c) => (
-          <ConnectorEndpoint
-            key={`source-end-${c.id}`}
-            connector={c}
-            side="left"
-            dimmed={hl.entityDimmed(`source-${c.id}`)}
-            onMouseEnter={() => onHover({ kind: "source", id: c.id })}
-            onMouseLeave={() => onHover(null)}
-          />
-        ))}
-        {sinks.map((c) => (
-          <ConnectorEndpoint
-            key={`sink-end-${c.id}`}
-            connector={c}
-            side="right"
-            dimmed={hl.entityDimmed(`sink-${c.id}`)}
-            onMouseEnter={() => onHover({ kind: "sink", id: c.id })}
-            onMouseLeave={() => onHover(null)}
-          />
-        ))}
-      </svg>
-    </section>
-  );
-}
-
-const ENDPOINT_W = 132;
-const ENDPOINT_H = 32;
-
-function ConnectorEndpoint({
-  connector,
-  side,
-  dimmed,
-  onMouseEnter,
-  onMouseLeave,
-}: {
-  connector: PositionedConnector;
-  side: "left" | "right";
-  dimmed: boolean;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
-}) {
-  return (
-    <foreignObject
-      x={side === "left" ? connector.x - ENDPOINT_W : connector.x}
-      y={connector.y - ENDPOINT_H / 2}
-      width={ENDPOINT_W}
-      height={ENDPOINT_H}
-      opacity={dimmed ? 0.25 : 1}
-      style={{ transition: "opacity 120ms ease-out", overflow: "visible" }}
-    >
-      <div
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-        // visualisation; connector endpoints are NOT focusable (the
-        // cards above the wire are the real click/focus targets).
-        // We don't attach onFocus/onBlur because there's no
-        // tabIndex and adding one would imply interactivity that
-        // doesn't exist.
-        role="img"
-        aria-label={`${side === "left" ? "Source" : "Sink"} ${connector.name}`}
-        className="flex h-full w-full items-center justify-center gap-1.5 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-2"
-      >
-        <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-(--color-ink-3)">
-          {side === "left" ? "src" : "sink"}
-        </span>
-        <span className="font-sans font-semibold text-[12px] text-(--color-ink) leading-tight">
-          {connector.name}
-        </span>
-      </div>
-    </foreignObject>
-  );
-}
-
-function attachmentPoint(
-  c: PositionedConnector,
-  stationsById: Map<string, PositionedStation>,
-): { x: number; y: number } {
-  const s = c.attachStation ? stationsById.get(c.attachStation) : undefined;
-  if (s) return { x: s.x, y: s.y };
-  return { x: WORKFLOW_CANVAS.width / 2, y: WORKFLOW_CANVAS.wireY };
-}
-
-interface Highlight {
-  /** Returns true when the connector should drop to dim opacity. */
-  connectorDimmed: (id: string) => boolean;
-  /** Returns true when the entity card should drop to dim opacity. */
-  entityDimmed: (id: string) => boolean;
-}
-
-function computeHighlight(hovered: HoverKey | null): Highlight {
-  if (!hovered) {
-    return {
-      connectorDimmed: () => false,
-      entityDimmed: () => false,
-    };
-  }
-  const liveEntity = `${hovered.kind}-${hovered.id}`;
-  const liveConnectors = new Set<string>();
-  if (hovered.kind === "artifact") {
-    liveConnectors.add(`artifact-out-${hovered.id}`);
-    liveConnectors.add(`artifact-in-${hovered.id}`);
-  } else if (hovered.kind === "source") {
-    liveConnectors.add(`source-${hovered.id}`);
-  } else if (hovered.kind === "sink") {
-    liveConnectors.add(`sink-${hovered.id}`);
-  }
-  return {
-    connectorDimmed: (id) => !liveConnectors.has(id),
-    entityDimmed: (id) => id !== liveEntity,
-  };
-}
-
-/**
- * Legend strip — one `<Stamp>` pill chip per category, the chip
- * IS the label (no parallel "legend version" of the chip per
- * round-3 PM follow-up). The data-stamp-tone attribute on each
- * chip is what tests assert against to check we're using the
- * shared `Stamp` primitive.
- */
-const LEGEND_CHIPS: {
-  label: string;
-  tone: React.ComponentProps<typeof Stamp>["tone"];
-  copy: string;
-}[] = [
-  { label: "SOURCE", tone: "default", copy: "external input wired in" },
-  { label: "STATION", tone: "rule", copy: "lifecycle stage on the wire" },
-  { label: "SINK", tone: "default", copy: "external output wired out" },
-  { label: "GATE", tone: "gate", copy: "validator blocks until rule passes" },
-  { label: "JIT PROMPT", tone: "tripwire", copy: "fires on event - agent must ack" },
-  { label: "ARTIFACT", tone: "info", copy: "typed document the workflow produces" },
-];
-
-function Legend() {
-  return (
-    <section
-      aria-label="Legend"
-      className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-4 py-3"
-    >
-      {LEGEND_CHIPS.map((c) => (
-        <div key={c.label} className="flex items-center gap-2">
-          <Stamp tone={c.tone}>{c.label}</Stamp>
-          <span className="font-serif text-[12px] italic text-(--color-ink-3) leading-snug">
-            {c.copy}
-          </span>
-        </div>
-      ))}
-    </section>
-  );
 }
 
 function StateFrame({ children }: { children: React.ReactNode }) {
@@ -545,8 +182,11 @@ function StateFrame({ children }: { children: React.ReactNode }) {
 function LoadingState() {
   return (
     <StateFrame>
-      <p data-loading="workflow" className="font-serif text-[14px] italic text-(--color-ink-3)">
-        Loading workflow…
+      <p
+        data-loading="workflow"
+        className="font-serif text-[14px] italic text-(--color-ink-3)"
+      >
+        Loading workflow...
       </p>
     </StateFrame>
   );
@@ -557,7 +197,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
     <StateFrame>
       <div className="flex flex-col items-center gap-3">
         <p className="font-serif text-[14px] italic text-(--color-rule)">
-          Couldn't load the workflow graph.
+          Couldn't load the workflow map.
         </p>
         <button
           type="button"
@@ -575,7 +215,7 @@ function EmptyState() {
   return (
     <StateFrame>
       <p className="font-serif text-[14px] italic text-(--color-ink-3)">
-        Workflow not yet available — backend has not registered the orchestration graph.
+        Workflow not yet available.
       </p>
     </StateFrame>
   );

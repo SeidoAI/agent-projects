@@ -22,7 +22,7 @@ Before editing any files:
 4. Apply the minimal set of edits needed.
 5. If the change touches the concept graph (new `[[node]]` refs or
    a new node file), verify graph consistency via `tripwire refs check`.
-6. Run `tripwire validate --strict`. Fix any errors.
+6. Run `tripwire validate`. Fix any errors.
 7. Commit with a focused message describing just this change.
 
 Do not expand scope. Incremental updates stay surgical.

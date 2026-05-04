@@ -21,7 +21,7 @@ Workflow:
 
 1. Run `tripwire brief` to load current project state.
 2. Fetch the PR diff via `gh pr diff $ARGUMENTS` or equivalent.
-3. Run `tripwire validate --strict` on the PR branch.
+3. Run `tripwire validate` on the PR branch.
 4. Read the substance of the changes:
    - Did the agent close the issue(s) it claimed to close?
    - Are the session artifacts complete (plan, task-checklist,

@@ -9,7 +9,6 @@ from tripwire.core.graph.refs import extract_references
 from tripwire.core.parser import ParseError, parse_frontmatter_body
 from tripwire.core.status import is_status_reachable
 from tripwire.core.validator._types import CheckResult, ValidationContext
-from tripwire.core.workflow.registry import registers_at
 from tripwire.models.issue import Issue
 from tripwire.models.session import AgentSession
 
@@ -38,7 +37,6 @@ def _is_epic(issue) -> bool:
     return any(label == "type/epic" for label in getattr(issue, "labels", []))
 
 
-@registers_at("coding-session", "executing")
 def check_issue_body_structure(ctx: ValidationContext) -> list[CheckResult]:
     """Required Markdown headings, acceptance checkbox, stop-and-ask, refs count.
 
@@ -136,7 +134,6 @@ def _section(body: str, heading: str) -> str | None:
     return after[:next_heading]
 
 
-@registers_at("coding-session", "executing")
 def check_status_transitions(ctx: ValidationContext) -> list[CheckResult]:
     """Every issue's status must be reachable from the project's start state."""
     if ctx.project_config is None:
@@ -161,7 +158,6 @@ def check_status_transitions(ctx: ValidationContext) -> list[CheckResult]:
     return results
 
 
-@registers_at("coding-session", "executing")
 def check_handoff_artifact(ctx: ValidationContext) -> list[CheckResult]:
     """v0.6a: sessions in ``queued`` state require a valid handoff.yaml.
 

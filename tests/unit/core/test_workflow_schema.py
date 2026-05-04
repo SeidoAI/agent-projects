@@ -27,7 +27,7 @@ def test_loader_parses_minimal_workflow(tmp_path: Path) -> None:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: queued
                     next: spawned
                   - id: spawned
@@ -41,10 +41,10 @@ def test_loader_parses_minimal_workflow(tmp_path: Path) -> None:
     wf = spec.workflows["coding-session"]
     assert wf.actor == "coding-agent"
     assert wf.trigger == "session.spawn"
-    assert [s.id for s in wf.stations] == ["queued", "spawned"]
-    assert wf.stations[0].next.kind == "single"
-    assert wf.stations[0].next.single == "spawned"
-    assert wf.stations[1].next.kind == "terminal"
+    assert [s.id for s in wf.statuses] == ["queued", "spawned"]
+    assert wf.statuses[0].next.kind == "single"
+    assert wf.statuses[0].next.single == "spawned"
+    assert wf.statuses[1].next.kind == "terminal"
 
 
 def test_loader_parses_conditional_next(tmp_path: Path) -> None:
@@ -57,7 +57,7 @@ def test_loader_parses_conditional_next(tmp_path: Path) -> None:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: executing
                     next:
                       - if: agent.role == frontend
@@ -72,7 +72,7 @@ def test_loader_parses_conditional_next(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     spec = load_workflows(tmp_path)
-    nxt = spec.workflows["coding-session"].stations[0].next
+    nxt = spec.workflows["coding-session"].statuses[0].next
     assert nxt.kind == "conditional"
     assert nxt.conditional is not None
     assert len(nxt.conditional) == 2
@@ -96,7 +96,7 @@ def test_loader_parses_inequality_predicate(tmp_path: Path) -> None:
               w:
                 actor: a
                 trigger: t
-                stations:
+                statuses:
                   - id: s1
                     next:
                       - if: agent.role != frontend
@@ -110,14 +110,211 @@ def test_loader_parses_inequality_predicate(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    nxt = load_workflows(tmp_path).workflows["w"].stations[0].next
+    nxt = load_workflows(tmp_path).workflows["w"].statuses[0].next
     assert nxt.conditional is not None
     assert nxt.conditional[0].predicate is not None
     assert nxt.conditional[0].predicate.op == "!="
 
 
-def test_loader_parses_prompt_checks_validators_tripwires(tmp_path: Path) -> None:
+def test_loader_parses_prompt_checks_tripwires_jit_prompts(tmp_path: Path) -> None:
     from tripwire.core.workflow.loader import load_workflows
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: s1
+                    next: s2
+                    prompt_checks: [pm-session-launch]
+                    tripwires: [schema-valid, refs-resolved]
+                    heuristics: [quality-drift, mega-issue]
+                    jit_prompts: [cost-ceiling]
+                  - id: s2
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    s1 = load_workflows(tmp_path).workflows["w"].statuses[0]
+    assert s1.prompt_checks == ["pm-session-launch"]
+    assert s1.tripwires == ["schema-valid", "refs-resolved"]
+    assert s1.heuristics == ["quality-drift", "mega-issue"]
+    assert s1.jit_prompts == ["cost-ceiling"]
+
+
+def test_loader_parses_route_signals_and_heuristics(tmp_path: Path) -> None:
+    """Routes carry pm-monitor signal vocabulary + heuristic controls."""
+
+    from tripwire.core.workflow.loader import load_workflows
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              pm-monitor:
+                actor: pm-agent
+                trigger: command.pm-monitor
+                statuses:
+                  - id: scan
+                    next: dispatch
+                  - id: dispatch
+                    terminal: true
+                routes:
+                  - id: dispatch-launch
+                    actor: pm-agent
+                    from: scan
+                    to: dispatch
+                    kind: forward
+                    signals: [signal.session_unblocked, signal.inbox_inbound_new]
+                    controls:
+                      tripwires: [v_session_state_readable]
+                      heuristics: [stale-node-count-high]
+            """
+        ),
+        encoding="utf-8",
+    )
+    route = load_workflows(tmp_path).workflows["pm-monitor"].routes[0]
+    assert route.signals == [
+        "signal.session_unblocked",
+        "signal.inbox_inbound_new",
+    ]
+    assert route.controls.tripwires == ["v_session_state_readable"]
+    assert route.controls.heuristics == ["stale-node-count-high"]
+
+
+def test_loader_parses_cross_link_pm_subagent_dispatch(tmp_path: Path) -> None:
+    """Cross-links carry the pm_subagent_dispatch flag for pm-monitor."""
+
+    from tripwire.core.workflow.loader import load_workflows
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              pm-monitor:
+                actor: pm-agent
+                trigger: command.pm-monitor
+                statuses:
+                  - id: dispatch
+                    terminal: true
+                    cross_links:
+                      - workflow: code-review
+                        status: received
+                        label: launch review
+                        kind: triggers
+                        pm_subagent_dispatch: true
+                      - workflow: inbox-handling
+                        status: pending
+                        label: escalate to user
+                        kind: triggers
+            """
+        ),
+        encoding="utf-8",
+    )
+    links = load_workflows(tmp_path).workflows["pm-monitor"].statuses[0].cross_links
+    assert links[0].pm_subagent_dispatch is True
+    assert links[1].pm_subagent_dispatch is False
+
+
+def test_loader_parses_status_artifacts(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: s1
+                    terminal: true
+                    artifacts:
+                      consumes:
+                        - id: issue-brief
+                          label: issue brief
+                      produces:
+                        - id: plan
+                          label: plan.md
+                          path: sessions/{session_id}/plan.md
+            """
+        ),
+        encoding="utf-8",
+    )
+    status = load_workflows(tmp_path).workflows["w"].statuses[0]
+    assert [a.id for a in status.artifacts.consumes] == ["issue-brief"]
+    assert status.artifacts.produces[0].id == "plan"
+    assert status.artifacts.produces[0].label == "plan.md"
+    assert status.artifacts.produces[0].path == "sessions/{session_id}/plan.md"
+
+
+def test_loader_parses_explicit_routes(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                    next: executing
+                  - id: executing
+                    terminal: true
+                routes:
+                  - id: planned-to-executing
+                    actor: pm-agent
+                    command: pm-session-spawn
+                    trigger: command.pm-session-spawn
+                    from: planned
+                    to: executing
+                    label: spawn
+                    controls:
+                      tripwires: [v_uuid_present]
+                      jit_prompts: [self-review]
+                      prompt_checks: [pm-session-spawn]
+                    skills: [project-manager, backend-development]
+                    emits:
+                      artifacts:
+                        - id: plan
+                          label: plan.md
+                          path: sessions/{session_id}/plan.md
+                      events: [session.spawn]
+                      comments: [spawned]
+                      status_changes: [executing]
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    route = load_workflows(tmp_path).workflows["coding-session"].routes[0]
+
+    assert route.id == "planned-to-executing"
+    assert route.actor == "pm-agent"
+    assert route.command == "pm-session-spawn"
+    assert route.trigger == "command.pm-session-spawn"
+    assert route.from_ref == "planned"
+    assert route.to_ref == "executing"
+    assert route.kind == "forward"
+    assert route.controls.tripwires == ["v_uuid_present"]
+    assert route.controls.jit_prompts == ["self-review"]
+    assert route.controls.prompt_checks == ["pm-session-spawn"]
+    assert route.skills == ["project-manager", "backend-development"]
+    assert [artifact.id for artifact in route.emits.artifacts] == ["plan"]
+    assert route.emits.events == ["session.spawn"]
+    assert route.emits.comments == ["spawned"]
+    assert route.emits.status_changes == ["executing"]
+
+
+def test_loader_reports_stale_stations_key(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
 
     (tmp_path / "workflow.yaml").write_text(
         dedent(
@@ -128,20 +325,22 @@ def test_loader_parses_prompt_checks_validators_tripwires(tmp_path: Path) -> Non
                 trigger: t
                 stations:
                   - id: s1
-                    next: s2
-                    prompt_checks: [pm-session-launch]
-                    validators: [schema-valid, refs-resolved]
-                    jit_prompts: [cost-ceiling]
-                  - id: s2
                     terminal: true
             """
         ),
         encoding="utf-8",
     )
-    s1 = load_workflows(tmp_path).workflows["w"].stations[0]
-    assert s1.prompt_checks == ["pm-session-launch"]
-    assert s1.validators == ["schema-valid", "refs-resolved"]
-    assert s1.jit_prompts == ["cost-ceiling"]
+    spec = load_workflows(tmp_path)
+    assert spec.workflows["w"].statuses == []
+    findings = validate_workflow_spec(
+        spec,
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    assert [finding.code for finding in findings] == ["workflow/stale_stations_key"]
+    assert "stale `stations:`" in findings[0].message
 
 
 def test_loader_supports_multiple_workflows(tmp_path: Path) -> None:
@@ -154,13 +353,13 @@ def test_loader_supports_multiple_workflows(tmp_path: Path) -> None:
               a:
                 actor: a
                 trigger: t
-                stations:
+                statuses:
                   - id: s
                     terminal: true
               b:
                 actor: a
                 trigger: t
-                stations:
+                statuses:
                   - id: s
                     terminal: true
             """
@@ -184,7 +383,7 @@ def test_loader_does_not_mutate_state(tmp_path: Path) -> None:
 
     yml = tmp_path / "workflow.yaml"
     yml.write_text(
-        "workflows:\n  w:\n    actor: a\n    trigger: t\n    stations:\n"
+        "workflows:\n  w:\n    actor: a\n    trigger: t\n    statuses:\n"
         "      - id: s\n        terminal: true\n",
         encoding="utf-8",
     )
@@ -211,7 +410,7 @@ def test_validator_rejects_unreferenced_station_in_next(tmp_path: Path) -> None:
               w:
                 actor: a
                 trigger: t
-                stations:
+                statuses:
                   - id: s1
                     next: nonexistent
                   - id: s2
@@ -223,12 +422,13 @@ def test_validator_rejects_unreferenced_station_in_next(tmp_path: Path) -> None:
     spec = load_workflows(tmp_path)
     findings = validate_workflow_spec(
         spec,
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
     codes = [f.code for f in findings]
-    assert "workflow/unknown_next_station" in codes
+    assert "workflow/unknown_next_status" in codes
 
 
 def test_validator_rejects_undeclared_validator_ref(tmp_path: Path) -> None:
@@ -242,9 +442,9 @@ def test_validator_rejects_undeclared_validator_ref(tmp_path: Path) -> None:
               w:
                 actor: a
                 trigger: t
-                stations:
+                statuses:
                   - id: s1
-                    validators: [does-not-exist]
+                    tripwires: [does-not-exist]
                     terminal: true
             """
         ),
@@ -252,12 +452,13 @@ def test_validator_rejects_undeclared_validator_ref(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators={"schema-valid"},
+        known_tripwires={"schema-valid"},
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
     codes = [f.code for f in findings]
-    assert "workflow/unknown_validator" in codes
+    assert "workflow/unknown_tripwire" in codes
 
 
 def test_validator_rejects_undeclared_tripwire_ref(tmp_path: Path) -> None:
@@ -271,7 +472,7 @@ def test_validator_rejects_undeclared_tripwire_ref(tmp_path: Path) -> None:
               w:
                 actor: a
                 trigger: t
-                stations:
+                statuses:
                   - id: s1
                     jit_prompts: [unknown-tw]
                     terminal: true
@@ -281,7 +482,8 @@ def test_validator_rejects_undeclared_tripwire_ref(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts={"self-review"},
         known_prompt_checks=set(),
     )
@@ -300,7 +502,7 @@ def test_validator_rejects_undeclared_prompt_check_ref(tmp_path: Path) -> None:
               w:
                 actor: a
                 trigger: t
-                stations:
+                statuses:
                   - id: s1
                     prompt_checks: [unknown-prompt-check]
                     terminal: true
@@ -310,7 +512,8 @@ def test_validator_rejects_undeclared_prompt_check_ref(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks={"pm-session-launch"},
     )
@@ -318,9 +521,67 @@ def test_validator_rejects_undeclared_prompt_check_ref(tmp_path: Path) -> None:
     assert "workflow/unknown_prompt_check" in codes
 
 
+def test_validator_rejects_bad_route_refs(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: planned
+                    next: completed
+                  - id: completed
+                    terminal: true
+                routes:
+                  - id: bad-route
+                    actor: outsider
+                    command: pm-missing
+                    from: planned
+                    to: missing
+                    controls:
+                      tripwires: [v_missing]
+                      jit_prompts: [missing-prompt]
+                      prompt_checks: [pm-missing-check]
+                    skills: [missing-skill]
+                  - id: bad-route
+                    actor: pm-agent
+                    from: ""
+                    to: completed
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires={"v_uuid_present"},
+        known_heuristics=set(),
+        known_jit_prompts={"self-review"},
+        known_prompt_checks={"pm-session-spawn"},
+        known_commands={"pm-session-spawn"},
+        known_skills={"project-manager"},
+    )
+
+    codes = [f.code for f in findings]
+    assert "workflow/duplicate_route_id" in codes
+    assert "workflow/unknown_actor" in codes
+    assert "workflow/missing_route_endpoint" in codes
+    assert "workflow/unknown_route_status" in codes
+    assert "workflow/unknown_command" in codes
+    assert "workflow/unknown_skill" in codes
+    assert "workflow/unknown_tripwire" in codes
+    assert "workflow/unknown_jit_prompt" in codes
+    assert "workflow/unknown_prompt_check" in codes
+
+
 def test_validator_rejects_terminal_with_next(tmp_path: Path) -> None:
-    """A station can be terminal OR declare next, never both — cyclic
-    terminal misuse means a station marked terminal that nonetheless
+    """A status can be terminal OR declare next, never both — cyclic
+    terminal misuse means a status marked terminal that nonetheless
     chains forward."""
     from tripwire.core.workflow.loader import load_workflows
     from tripwire.core.workflow.schema import validate_workflow_spec
@@ -332,7 +593,7 @@ def test_validator_rejects_terminal_with_next(tmp_path: Path) -> None:
               w:
                 actor: a
                 trigger: t
-                stations:
+                statuses:
                   - id: s1
                     next: s2
                     terminal: true
@@ -344,7 +605,8 @@ def test_validator_rejects_terminal_with_next(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
@@ -352,7 +614,7 @@ def test_validator_rejects_terminal_with_next(tmp_path: Path) -> None:
     assert "workflow/terminal_with_next" in codes
 
 
-def test_validator_rejects_duplicate_station_ids(tmp_path: Path) -> None:
+def test_validator_rejects_duplicate_status_ids(tmp_path: Path) -> None:
     from tripwire.core.workflow.loader import load_workflows
     from tripwire.core.workflow.schema import validate_workflow_spec
 
@@ -363,7 +625,7 @@ def test_validator_rejects_duplicate_station_ids(tmp_path: Path) -> None:
               w:
                 actor: a
                 trigger: t
-                stations:
+                statuses:
                   - id: s1
                     terminal: true
                   - id: s1
@@ -374,15 +636,16 @@ def test_validator_rejects_duplicate_station_ids(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
     codes = [f.code for f in findings]
-    assert "workflow/duplicate_station_id" in codes
+    assert "workflow/duplicate_status_id" in codes
 
 
-def test_validator_rejects_no_terminal_station(tmp_path: Path) -> None:
+def test_validator_rejects_no_terminal_status(tmp_path: Path) -> None:
     """Every workflow must reach a terminal — no all-cyclic graphs."""
     from tripwire.core.workflow.loader import load_workflows
     from tripwire.core.workflow.schema import validate_workflow_spec
@@ -394,7 +657,7 @@ def test_validator_rejects_no_terminal_station(tmp_path: Path) -> None:
               w:
                 actor: a
                 trigger: t
-                stations:
+                statuses:
                   - id: s1
                     next: s2
                   - id: s2
@@ -405,12 +668,13 @@ def test_validator_rejects_no_terminal_station(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators=set(),
+        known_tripwires=set(),
+        known_heuristics=set(),
         known_jit_prompts=set(),
         known_prompt_checks=set(),
     )
     codes = [f.code for f in findings]
-    assert "workflow/no_terminal_station" in codes
+    assert "workflow/no_terminal_status" in codes
 
 
 def test_validator_clean_on_well_formed(tmp_path: Path) -> None:
@@ -424,12 +688,12 @@ def test_validator_clean_on_well_formed(tmp_path: Path) -> None:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: queued
                     next: executing
                     prompt_checks: [pm-session-launch]
                   - id: executing
-                    validators: [schema-valid]
+                    tripwires: [schema-valid]
                     jit_prompts: [cost-ceiling]
                     next:
                       - if: agent.role == frontend
@@ -447,11 +711,126 @@ def test_validator_clean_on_well_formed(tmp_path: Path) -> None:
     )
     findings = validate_workflow_spec(
         load_workflows(tmp_path),
-        known_validators={"schema-valid"},
+        known_tripwires={"schema-valid"},
+        known_heuristics=set(),
         known_jit_prompts={"cost-ceiling"},
         known_prompt_checks={"pm-session-launch"},
     )
     assert findings == []
+
+
+# ----------------------------------------------------------------------
+# Cross-links
+# ----------------------------------------------------------------------
+
+
+def test_loader_parses_cross_links(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              triage:
+                actor: pm-agent
+                trigger: t
+                statuses:
+                  - id: act
+                    next: done
+                    cross_links:
+                      - workflow: coding-session
+                        status: planned
+                        label: spawn coding session
+                  - id: done
+                    terminal: true
+              coding-session:
+                actor: coding-agent
+                trigger: t
+                statuses:
+                  - id: planned
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    spec = load_workflows(tmp_path)
+    act = spec.workflows["triage"].statuses_by_id["act"]
+    assert len(act.cross_links) == 1
+    link = act.cross_links[0]
+    assert link.workflow == "coding-session"
+    assert link.status == "planned"
+    assert link.label == "spawn coding session"
+    assert link.kind == "triggers"
+
+
+def test_validator_warns_on_unknown_cross_link_workflow(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: s1
+                    terminal: true
+                    cross_links:
+                      - workflow: nonexistent-workflow
+                        status: somewhere
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    codes = [f.code for f in findings]
+    assert "workflow/cross_link_unknown_workflow" in codes
+
+
+def test_validator_warns_on_unknown_cross_link_status(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              triage:
+                actor: pm-agent
+                trigger: t
+                statuses:
+                  - id: act
+                    terminal: true
+                    cross_links:
+                      - workflow: coding-session
+                        status: nonexistent-status
+              coding-session:
+                actor: coding-agent
+                trigger: t
+                statuses:
+                  - id: planned
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    codes = [f.code for f in findings]
+    assert "workflow/cross_link_unknown_status" in codes
 
 
 # ----------------------------------------------------------------------

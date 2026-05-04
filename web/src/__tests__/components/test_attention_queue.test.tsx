@@ -97,7 +97,9 @@ describe("AttentionQueue", () => {
       onSelectItem,
     });
     // The row's title button (not the resolve ✓) carries the row click.
-    fireEvent.click(screen.getByText("click me").closest("button")!);
+    const rowButton = screen.getByText("click me").closest("button");
+    if (!rowButton) throw new Error("missing attention queue row button");
+    fireEvent.click(rowButton);
     expect(onSelectItem).toHaveBeenCalledWith("b1");
   });
 

@@ -1,4 +1,4 @@
-"""PM-review workflow station (KUI-150 / J1).
+"""PM-review workflow status (KUI-150 / J1).
 
 PM-review is the workflow the project manager runs against an
 in_review session at handover. It re-runs the 10 most consequential

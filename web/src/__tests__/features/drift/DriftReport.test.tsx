@@ -27,20 +27,35 @@ describe("DriftReport", () => {
         stale_pins: 1,
         unresolved_refs: 2,
         stale_concepts: 0,
-        workflow_drift_events: 3,
+        workflow_drift_findings: 2,
       },
-      workflow_drift_events: [
-        { event: "workflow_drift", at: "2026-04-30T10:00:00+00:00", kind: "stale_pin" },
-        { event: "workflow_drift", at: "2026-04-29T10:00:00+00:00", kind: "missing_artifact" },
-        { event: "workflow_drift", at: "2026-04-28T10:00:00+00:00", kind: "stale_pin" },
+      workflow_drift_findings: [
+        {
+          code: "drift/prompt_check_missing",
+          workflow: "coding-session",
+          instance: "session-a",
+          status: "queued",
+          severity: "error",
+          message: "missing prompt check",
+        },
+        {
+          code: "drift/jit_prompt_should_have_fired",
+          workflow: "coding-session",
+          instance: "session-b",
+          status: "executing",
+          severity: "error",
+          message: "missing JIT prompt",
+        },
       ],
     });
 
     expect(screen.getByTestId("drift-score")).toHaveTextContent("78");
+    expect(screen.getByTestId("drift-score")).toHaveTextContent("watch");
+    expect(screen.getByTestId("drift-score")).toHaveTextContent("out of 100");
     expect(screen.getByText("Stale pins")).toBeInTheDocument();
     expect(screen.getByText("Unresolved references")).toBeInTheDocument();
     expect(screen.getByText("Stale concepts")).toBeInTheDocument();
-    expect(screen.getByText("Workflow drift events")).toBeInTheDocument();
+    expect(screen.getByText("Workflow drift findings")).toBeInTheDocument();
   });
 
   it("clean project shows score 100 and empty drill-down", () => {
@@ -50,13 +65,14 @@ describe("DriftReport", () => {
         stale_pins: 0,
         unresolved_refs: 0,
         stale_concepts: 0,
-        workflow_drift_events: 0,
+        workflow_drift_findings: 0,
       },
-      workflow_drift_events: [],
+      workflow_drift_findings: [],
     });
     expect(screen.getByTestId("drift-score")).toHaveTextContent("100");
+    expect(screen.getByTestId("drift-score")).toHaveTextContent("healthy");
     expect(screen.getByTestId("drift-drill-down")).toHaveTextContent(
-      /no recent workflow_drift events/i,
+      /no active workflow drift findings/i,
     );
   });
 
@@ -68,21 +84,35 @@ describe("DriftReport", () => {
         stale_pins: 1,
         unresolved_refs: 0,
         stale_concepts: 0,
-        workflow_drift_events: 2,
+        workflow_drift_findings: 2,
       },
-      workflow_drift_events: [
-        { event: "workflow_drift", at: "2026-04-30T10:00:00+00:00", kind: "stale_pin" },
-        { event: "workflow_drift", at: "2026-04-29T10:00:00+00:00", kind: "missing_artifact" },
+      workflow_drift_findings: [
+        {
+          code: "drift/prompt_check_missing",
+          workflow: "coding-session",
+          instance: "session-a",
+          status: "queued",
+          severity: "error",
+          message: "missing prompt check",
+        },
+        {
+          code: "drift/jit_prompt_should_have_fired",
+          workflow: "coding-session",
+          instance: "session-b",
+          status: "executing",
+          severity: "error",
+          message: "missing JIT prompt",
+        },
       ],
     });
 
     const drillDown = screen.getByTestId("drift-drill-down");
-    expect(drillDown).toHaveTextContent("stale_pin");
-    expect(drillDown).toHaveTextContent("missing_artifact");
+    expect(drillDown).toHaveTextContent("drift/prompt_check_missing");
+    expect(drillDown).toHaveTextContent("missing JIT prompt");
 
-    // Click the workflow_drift_events row to filter — list stays
-    // populated since the only events are workflow_drift.
-    await user.click(screen.getByText("Workflow drift events"));
+    // Click the workflow_drift_findings row to filter — list stays
+    // populated since the only findings are workflow drift findings.
+    await user.click(screen.getByText("Workflow drift findings"));
     expect(screen.getByText("clear filter")).toBeInTheDocument();
   });
 });

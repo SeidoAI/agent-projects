@@ -3,7 +3,7 @@
 The substrate is a per-project append-only JSON-Lines log under
 ``<project>/events/``. One file per UTC date
 (``events/<YYYY-MM-DD>.jsonl``). Schema:
-``{ts, workflow, instance, station, event, details}``.
+``{ts, workflow, instance, status, event, details}``.
 
 All emission goes via :func:`tripwire.core.events.log.emit_event`.
 Validators (KUI-120), tripwires (KUI-121), and transitions (KUI-159)
@@ -35,7 +35,7 @@ def test_emit_event_appends_jsonl_line(tmp_path: Path) -> None:
         pd,
         workflow="coding-session",
         instance="v09-workflow-substrate",
-        station="executing",
+        status="executing",
         event="validator.run",
         details={"id": "v_uuid_present", "outcome": "pass"},
     )
@@ -48,12 +48,12 @@ def test_emit_event_appends_jsonl_line(tmp_path: Path) -> None:
         "ts",
         "workflow",
         "instance",
-        "station",
+        "status",
         "event",
         "details",
     }
     assert payload["workflow"] == "coding-session"
-    assert payload["station"] == "executing"
+    assert payload["status"] == "executing"
     assert payload["event"] == "validator.run"
     assert payload["details"] == {"id": "v_uuid_present", "outcome": "pass"}
 
@@ -67,7 +67,7 @@ def test_emit_event_appends_to_same_file_for_same_date(tmp_path: Path) -> None:
             pd,
             workflow="coding-session",
             instance="s",
-            station="executing",
+            status="executing",
             event="validator.run",
             details={"i": i},
         )
@@ -89,7 +89,7 @@ def test_emit_event_filename_is_utc_date(tmp_path: Path) -> None:
         pd,
         workflow="w",
         instance="i",
-        station="s",
+        status="s",
         event="e",
         details={},
     )
@@ -106,7 +106,7 @@ def test_read_events_filters_by_workflow(tmp_path: Path) -> None:
         pd,
         workflow="coding-session",
         instance="s",
-        station="executing",
+        status="executing",
         event="e",
         details={},
     )
@@ -114,7 +114,7 @@ def test_read_events_filters_by_workflow(tmp_path: Path) -> None:
         pd,
         workflow="other-workflow",
         instance="s",
-        station="executing",
+        status="executing",
         event="e",
         details={},
     )
@@ -132,7 +132,7 @@ def test_read_events_filters_by_session_instance(tmp_path: Path) -> None:
             pd,
             workflow="w",
             instance=inst,
-            station="s",
+            status="s",
             event="e",
             details={},
         )
@@ -150,7 +150,7 @@ def test_read_events_filters_by_event_kind(tmp_path: Path) -> None:
             pd,
             workflow="w",
             instance="i",
-            station="s",
+            status="s",
             event=kind,
             details={},
         )
@@ -177,7 +177,7 @@ def test_emit_event_validates_required_fields(tmp_path: Path) -> None:
             pd,
             workflow="",
             instance="i",
-            station="s",
+            status="s",
             event="e",
             details={},
         )
@@ -186,7 +186,7 @@ def test_emit_event_validates_required_fields(tmp_path: Path) -> None:
             pd,
             workflow="w",
             instance="i",
-            station="s",
+            status="s",
             event="",
             details={},
         )
@@ -206,7 +206,7 @@ def test_cli_events_tail_shows_recent(tmp_path: Path) -> None:
             pd,
             workflow="w",
             instance="i",
-            station="s",
+            status="s",
             event="e",
             details={"i": i},
         )
@@ -235,7 +235,7 @@ def test_cli_events_filter_narrows_results(tmp_path: Path) -> None:
         pd,
         workflow="w",
         instance="a",
-        station="s",
+        status="s",
         event="validator.run",
         details={},
     )
@@ -243,7 +243,7 @@ def test_cli_events_filter_narrows_results(tmp_path: Path) -> None:
         pd,
         workflow="w",
         instance="b",
-        station="s",
+        status="s",
         event="jit_prompt.fired",
         details={},
     )

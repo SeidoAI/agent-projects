@@ -1,4 +1,4 @@
-"""PM-review workflow station (KUI-150).
+"""PM-review workflow status (KUI-150).
 
 Drives ``run_pm_review`` against a fixture project and asserts:
 
@@ -43,7 +43,7 @@ def _scaffold_project(tmp_path: Path) -> Path:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: planned
                     next: queued
                   - id: queued
@@ -59,7 +59,7 @@ def _scaffold_project(tmp_path: Path) -> Path:
               pm-review:
                 actor: pm-agent
                 trigger: session.handover
-                stations:
+                statuses:
                   - id: review
                     next:
                       - if: pm_review.outcome == auto-merge

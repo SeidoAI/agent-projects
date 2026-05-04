@@ -40,7 +40,7 @@ def _project_dir(tmp_path: Path) -> Path:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: planned
                     next: queued
                   - id: queued
@@ -106,8 +106,6 @@ def test_full_lifecycle_drives_via_transition_only(
     tmp_path: Path, clean_validator
 ) -> None:
     """Drive planned → completed using `tripwire transition` only."""
-    import json
-
     from tripwire.cli.drift import drift_cmd
     from tripwire.cli.transition import transition_cmd
     from tripwire.core.events.log import read_events
@@ -115,21 +113,8 @@ def test_full_lifecycle_drives_via_transition_only(
     pd = _project_dir(tmp_path)
     runner = CliRunner()
 
-    stations = ["queued", "executing", "in_review", "verified", "completed"]
-    for target in stations:
-        # Mirror the agent's real-world drive: before crossing into
-        # `verified`, the self-review tripwire (registered at
-        # `coding-session:verified` via its class-level `at = (...)`)
-        # must be acknowledged. The agent does this by writing
-        # self-review.md and re-running the transition with `--ack`;
-        # here we drop the substantive ack marker directly because
-        # the test isn't exercising the ack-writer CLI.
-        if target == "verified":
-            ack_path = pd / ".tripwire" / "acks" / "self-review-e2e-session.json"
-            ack_path.parent.mkdir(parents=True, exist_ok=True)
-            ack_path.write_text(
-                json.dumps({"declared_no_findings": True}), encoding="utf-8"
-            )
+    statuses = ["queued", "executing", "in_review", "verified", "completed"]
+    for target in statuses:
         result = runner.invoke(
             transition_cmd, ["e2e-session", target, "--project-dir", str(pd)]
         )
@@ -146,7 +131,7 @@ def test_full_lifecycle_drives_via_transition_only(
     events = list(read_events(pd, instance="e2e-session"))
     completed = [e for e in events if e["event"] == "transition.completed"]
     assert len(completed) == 5
-    assert [e["details"]["to_station"] for e in completed] == stations
+    assert [e["details"]["to_status"] for e in completed] == statuses
 
     # Drift findings (KUI-124 / workflow gate) is clean.
     # Note: `tripwire drift report` (KUI-128 / coherence score, from #74)
@@ -162,7 +147,7 @@ def test_full_lifecycle_drives_via_transition_only(
 def test_unreachable_target_emits_structured_reason(
     tmp_path: Path,
 ) -> None:
-    """Trying to skip stations produces `transition_not_reachable`."""
+    """Trying to skip statuses produces `transition_not_reachable`."""
     from tripwire.cli.transition import transition_cmd
     from tripwire.core.events.log import read_events
 
@@ -181,9 +166,9 @@ def test_unreachable_target_emits_structured_reason(
 
 
 def test_drift_surfaces_when_required_step_skipped(tmp_path: Path) -> None:
-    """A workflow.yaml with a declared prompt-check on `queued` produces
+    """A workflow.yaml with a declared prompt-check on target `executing` produces
     a `drift/prompt_check_missing` finding once the session leaves
-    `queued` without that prompt-check."""
+    `queued` and enters `executing` without that prompt-check."""
     from tripwire.cli.drift import drift_cmd
     from tripwire.core.events.log import emit_event
 
@@ -197,14 +182,14 @@ def test_drift_surfaces_when_required_step_skipped(tmp_path: Path) -> None:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: planned
                     next: queued
                   - id: queued
                     next: executing
-                    prompt_checks: [pm-session-queue]
                   - id: executing
                     next: in_review
+                    prompt_checks: [pm-session-queue]
                   - id: in_review
                     next: verified
                   - id: verified
@@ -220,9 +205,9 @@ def test_drift_surfaces_when_required_step_skipped(tmp_path: Path) -> None:
         pd,
         workflow="coding-session",
         instance="e2e-session",
-        station="executing",
+        status="executing",
         event="transition.completed",
-        details={"from_station": "queued", "to_station": "executing"},
+        details={"from_status": "queued", "to_status": "executing"},
     )
     runner = CliRunner()
     result = runner.invoke(

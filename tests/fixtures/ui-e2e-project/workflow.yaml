@@ -1,0 +1,74 @@
+workflows:
+  coding-session:
+    actor: coding-agent
+    trigger: session.spawn
+    brief-description: "one session: plan, execute, review, ship."
+    statuses:
+      - id: planned
+        next: queued
+      - id: queued
+        next: executing
+      - id: executing
+        tripwires: [v_uuid_present]
+        next: in_review
+        work_steps:
+          - id: implement
+            actor: coding-agent
+            label: implement
+            skills: [backend-development]
+      - id: in_review
+        tripwires: [v_reference_integrity]
+        heuristics: [v_stale_concept]
+        next: verified
+        work_steps:
+          - id: review
+            actor: pm-agent
+            label: review session
+            skills: [project-manager, verification]
+      - id: verified
+        next: completed
+      - id: completed
+        jit_prompts: [self-review]
+        terminal: true
+    routes:
+      - id: planned-to-queued
+        actor: pm-agent
+        from: planned
+        to: queued
+        kind: forward
+        label: queue session
+      - id: queued-to-executing
+        actor: pm-agent
+        command: pm-session-spawn
+        from: queued
+        to: executing
+        kind: forward
+        label: spawn coding agent
+        controls:
+          tripwires: [v_uuid_present]
+      - id: executing-to-review
+        actor: coding-agent
+        from: executing
+        to: in_review
+        kind: forward
+        label: submit for review
+      - id: review-approved
+        actor: pm-agent
+        command: pm-session-review
+        from: in_review
+        to: verified
+        kind: forward
+        label: approve
+      - id: review-changes-requested
+        actor: pm-agent
+        command: pm-session-review
+        from: in_review
+        to: executing
+        kind: return
+        label: request changes
+      - id: verified-to-completed
+        actor: pm-agent
+        from: verified
+        to: completed
+        kind: forward
+        label: complete

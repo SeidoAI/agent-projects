@@ -8,7 +8,7 @@ One row per emitted event:
       "ts": "2026-04-30T15:00:00Z",
       "workflow": "coding-session",
       "instance": "v09-workflow-substrate",
-      "station": "executing",
+      "status": "executing",
       "event": "validator.run",
       "details": { "id": "v_uuid_present", "outcome": "pass" }
     }
@@ -38,7 +38,7 @@ class Event:
     ts: str
     workflow: str
     instance: str
-    station: str
+    status: str
     event: str
     details: dict[str, Any] = field(default_factory=dict)
 
@@ -47,7 +47,7 @@ class Event:
             "ts": self.ts,
             "workflow": self.workflow,
             "instance": self.instance,
-            "station": self.station,
+            "status": self.status,
             "event": self.event,
             "details": dict(self.details),
         }
@@ -58,7 +58,7 @@ class Event:
             ts=str(payload.get("ts", "")),
             workflow=str(payload.get("workflow", "")),
             instance=str(payload.get("instance", "")),
-            station=str(payload.get("station", "")),
+            status=str(payload.get("status", "")),
             event=str(payload.get("event", "")),
             details=dict(payload.get("details") or {}),
         )

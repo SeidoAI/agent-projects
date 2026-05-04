@@ -179,7 +179,9 @@ class TestScaffoldText:
         target = tmp_path / "p"
         _init_project(runner, target)
         result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
-        assert "tripwire validate --strict" in result.output
+        assert "tripwire validate" in result.output
+        # --strict was hard-removed in stage 1 of the workflow codification.
+        assert "--strict" not in result.output
 
     def test_id_allocation_instructions_present(
         self, runner: CliRunner, tmp_path: Path

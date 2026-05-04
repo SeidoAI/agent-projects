@@ -79,6 +79,15 @@ message after writing `plan.md` and before starting implementation:
 Then **stop and exit**. The orchestrator will re-engage you with the
 human's response via `check_messages`.
 
+The `awaiting_plan_approval` agent state corresponds to the
+`plan_approval` JIT prompt fired during `coding-session.executing`
+in `workflow.yaml`. The session blocks until the human responds in
+the plan thread or the agent receives a `--ack`. See
+`.claude/skills/project-manager/references/WORKFLOWS_CODE_REVIEW.md`
+for how the review side picks up after approval, and the
+`coding-session` workflow node in `workflow.yaml` for the route that
+emits this state.
+
 ### Blocking questions (when you can't proceed)
 
 If you have a genuine ambiguity that blocks correct work, send a

@@ -16,6 +16,34 @@ compatibility: >-
 
 # Verification
 
+## When this skill loads
+
+In v0.9.6 verification is no longer a free-standing agent. The
+checklist below is consumed at four stations of the wider workflow
+graph:
+
+- **`code-review.gate-check`** — the PM walks the verification
+  checklist against the project-pr before reviewers are dispatched.
+  See `WORKFLOWS_CODE_REVIEW.md`.
+- **`code-review.synthesis`** — the PM compares the three independent
+  reviews (self, superpowers subagent, codex) against this checklist
+  to produce the `merge | relaunch` verdict.
+- **superpowers code-review subagent** — dispatched as one of the
+  three independent reviewers; applies the same checklist read-only
+  and writes `<project>/sessions/<id>/reviews/superpowers.yaml`.
+- **`coding-session.executing` (deliver work-step)** — the coding
+  agent uses the same lens when writing its own
+  `sessions/<id>/artifacts/self-review.md`.
+
+The body of this document is the checklist; the framing depends on
+which station loaded it. The "you cannot push code" rule below still
+applies whenever this skill is loaded by a subagent or a PM acting in
+a read-only capacity. The coding agent's self-review is the
+exception — it's writing a self-assessment of work it already did,
+not policing someone else's diff.
+
+## Original framing (kept for the read-only reviewer use-case)
+
 You are the verification agent. A coding agent has finished an issue
 and opened a PR. Your job is to independently and rigorously verify
 the work.
@@ -146,7 +174,7 @@ incomplete implementation.
     Definition of Done says they should be.
 15. **Run the project-level validator**:
     ```bash
-    tripwire validate --strict
+    tripwire validate
     ```
     Any errors must be fixed before approval.
 
@@ -175,7 +203,7 @@ incomplete implementation.
 
     ### Evidence
     - `make test` → 42 passed in 3.2s
-    - `tripwire validate --strict` → exit 0
+    - `tripwire validate` → exit 0
     - `tripwire node check` → all fresh
 
     Approved.
@@ -204,7 +232,7 @@ incomplete implementation.
     2. Rewrite `test_expired_token` to use real timestamps
     3. Rehash [[user-model]] and update `updated_at`
 
-    After fixing, re-run `tripwire validate --strict` and
+    After fixing, re-run `tripwire validate` and
     push again. I will re-verify.
     EOF
     )"
@@ -228,7 +256,7 @@ incomplete implementation.
     write access to the project repo, just not the target repo).
     Branch: `verifier/<KEY>-verified`.
 
-21. **Run `tripwire validate --strict`** on the project repo
+21. **Run `tripwire validate`** on the project repo
     before pushing your commit. Your own changes must pass the gate.
 
 ## Operating rules

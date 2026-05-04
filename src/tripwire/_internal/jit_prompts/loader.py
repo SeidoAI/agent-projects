@@ -97,22 +97,7 @@ def _instantiate(entry: dict, *, project_dir: Path) -> JitPrompt:
     if not isinstance(cls, type) or not issubclass(cls, JitPrompt):
         raise TypeError(f"{cls!r} is not a JitPrompt subclass")
 
-    instance = cls()
-    _register_station(instance)
-    return instance
-
-
-def _register_station(instance: JitPrompt) -> None:
-    """Record ``instance.at`` with the workflow station registry when set."""
-    pair = getattr(instance.__class__, "at", ())
-    if not isinstance(pair, tuple) or len(pair) != 2:
-        return
-    workflow, station = pair
-    if not isinstance(workflow, str) or not isinstance(station, str):
-        return
-    from tripwire.core.workflow.registry import register_jit_prompt_station
-
-    register_jit_prompt_station(instance.id, workflow, station)
+    return cls()
 
 
 def _find_jit_prompt_class(module: Any, declared_id: str | None) -> type[JitPrompt]:

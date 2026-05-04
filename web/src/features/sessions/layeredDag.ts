@@ -75,6 +75,11 @@ interface LayoutNode {
   edgeIndex?: number;
 }
 
+function requireValue<T>(value: T | undefined, label: string): T {
+  if (value === undefined) throw new Error(`Missing DAG layout value: ${label}`);
+  return value;
+}
+
 export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): DagLayout {
   const o = { ...DEFAULTS, ...opts };
   const ids = input.nodes.map((n) => n.id);
@@ -99,9 +104,12 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
     if (!changed) break;
   }
 
-  const numLayers = ids.length === 0 ? 0 : (Math.max(0, ...layer.values()) + 1);
+  const numLayers = ids.length === 0 ? 0 : Math.max(0, ...layer.values()) + 1;
   const layers: LayoutNode[][] = Array.from({ length: numLayers }, () => []);
-  for (const id of ids) layers[layer.get(id) ?? 0]!.push({ id, kind: "real" });
+  for (const id of ids) {
+    const targetLayer = requireValue(layers[layer.get(id) ?? 0], `layer for ${id}`);
+    targetLayer.push({ id, kind: "real" });
+  }
 
   // ---------------- 2. Dummy insertion for skip-layer edges -------------
   const chained: ChainEdge[] = [];
@@ -120,8 +128,8 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
   const dummyOwner = new Map<string, number>();
 
   rawEdges.forEach((e, idx) => {
-    const ls = layer.get(e.source)!;
-    const lt = layer.get(e.target)!;
+    const ls = requireValue(layer.get(e.source), `layer for ${e.source}`);
+    const lt = requireValue(layer.get(e.target), `layer for ${e.target}`);
     if (lt - ls <= 1) {
       ensure(segOut, e.source).push(e.target);
       ensure(segIn, e.target).push(e.source);
@@ -133,7 +141,11 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
     for (let li = ls + 1; li < lt; li += 1) {
       const dId = `__dummy__${idx}__${li}`;
       dummies.push(dId);
-      layers[li]!.push({ id: dId, kind: "dummy", edgeIndex: idx });
+      requireValue(layers[li], `dummy layer ${li}`).push({
+        id: dId,
+        kind: "dummy",
+        edgeIndex: idx,
+      });
       layer.set(dId, li);
       dummyOwner.set(dId, idx);
       ensure(segOut, prev).push(dId);
@@ -147,7 +159,11 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
 
   // ---------------- 3. Status-biased barycenter -------------------------
   const order = new Map<string, number>();
-  for (const lyr of layers) lyr.forEach((n, i) => order.set(n.id, i));
+  for (const lyr of layers) {
+    lyr.forEach((n, i) => {
+      order.set(n.id, i);
+    });
+  }
 
   // Status used for the bias: real nodes use their own status; dummies
   // inherit the source status of the edge they belong to.
@@ -155,7 +171,7 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
   const nodeStatusOrder = (id: string): number => {
     const ownerIdx = dummyOwner.get(id);
     if (ownerIdx !== undefined) {
-      const owner = chained[ownerIdx]!;
+      const owner = requireValue(chained[ownerIdx], `chain ${ownerIdx}`);
       return statusOrderOf(owner.source);
     }
     return statusOrderOf(id);
@@ -167,7 +183,7 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
       ? [...layers.keys()].slice(1)
       : [...layers.keys()].slice(0, -1).reverse();
     for (const li of range) {
-      const lyr = layers[li]!;
+      const lyr = requireValue(layers[li], `sweep layer ${li}`);
       const bc = new Map<string, number>();
       for (const n of lyr) {
         const ns = (downward ? segIn.get(n.id) : segOut.get(n.id)) ?? [];
@@ -178,7 +194,9 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
         bc.set(n.id, baseline + STATUS_BIAS * nodeStatusOrder(n.id));
       }
       lyr.sort((a, b) => (bc.get(a.id) ?? 0) - (bc.get(b.id) ?? 0));
-      lyr.forEach((n, i) => order.set(n.id, i));
+      lyr.forEach((n, i) => {
+        order.set(n.id, i);
+      });
     }
   };
   // Four alternating sweeps converge well for the small graphs we see here.
@@ -195,7 +213,9 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
   layers.forEach((lyr) => {
     const span = lyr.length * o.rowStride;
     const startY = o.paddingY + (colHeight - span) / 2 + o.nodeHeight / 2;
-    lyr.forEach((n, i) => yOf.set(n.id, startY + i * o.rowStride));
+    lyr.forEach((n, i) => {
+      yOf.set(n.id, startY + i * o.rowStride);
+    });
   });
 
   const xForLayer = (li: number) => o.paddingX + li * o.layerStride + o.nodeWidth / 2;
@@ -203,7 +223,10 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
 
   const positions: Record<string, { x: number; y: number }> = {};
   for (const id of ids) {
-    positions[id] = { x: xForLayer(layer.get(id)!), y: yOf.get(id) ?? 0 };
+    positions[id] = {
+      x: xForLayer(requireValue(layer.get(id), `layer for ${id}`)),
+      y: yOf.get(id) ?? 0,
+    };
   }
 
   // ---------------- 5. Per-corridor lane allocation ---------------------
@@ -219,13 +242,13 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
   // value is source y; we sort by it later
   const recordSegment = (ci: number, sourceId: string, sourceY: number) => {
     if (!sourcesByCorridor.has(ci)) sourcesByCorridor.set(ci, new Map());
-    const m = sourcesByCorridor.get(ci)!;
+    const m = requireValue(sourcesByCorridor.get(ci), `corridor ${ci}`);
     if (!m.has(sourceId)) m.set(sourceId, sourceY);
   };
 
   chained.forEach((ce) => {
     let cur = ce.source;
-    let ci = layer.get(cur)!;
+    let ci = requireValue(layer.get(cur), `layer for ${cur}`);
     for (const d of ce.dummies) {
       recordSegment(ci, cur, yOf.get(cur) ?? 0);
       cur = d;
@@ -249,18 +272,18 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
   // ---------------- 6. Build edge polylines ----------------------------
   const dagEdges: DagEdgeRoute[] = chained.map((ce) => {
     const points: { x: number; y: number }[] = [];
-    const sPos = positions[ce.source]!;
+    const sPos = requireValue(positions[ce.source], `position for ${ce.source}`);
     points.push({ x: sPos.x + halfWidthOf(ce.source), y: sPos.y });
 
     const chain = [...ce.dummies, ce.target];
     let cur = ce.source;
-    let ci = layer.get(cur)!;
+    let ci = requireValue(layer.get(cur), `layer for ${cur}`);
     for (const next of chain) {
-      const lane = laneFor.get(`${ci}::${cur}`)!;
+      const lane = requireValue(laneFor.get(`${ci}::${cur}`), `lane ${ci}::${cur}`);
       const curY = yOf.get(cur) ?? 0;
       const nextPos =
         next === ce.target
-          ? positions[next]!
+          ? requireValue(positions[next], `position for ${next}`)
           : { x: xForLayer(ci + 1), y: yOf.get(next) ?? 0 };
       const nextY = nextPos.y;
       points.push({ x: lane, y: curY });
@@ -283,20 +306,17 @@ export function layoutLayeredDag(input: DagInput, opts: LayoutOptions = {}): Dag
  * radius `r`, clamped to half the shorter incident segment so paths
  * with short legs don't overshoot.
  */
-export function roundedOrthogonalPath(
-  points: { x: number; y: number }[],
-  radius = 8,
-): string {
+export function roundedOrthogonalPath(points: { x: number; y: number }[], radius = 8): string {
   if (points.length === 0) return "";
-  const first = points[0]!;
+  const first = requireValue(points[0], "first point");
   if (points.length === 1) {
     return `M ${first.x.toFixed(2)} ${first.y.toFixed(2)}`;
   }
   let d = `M ${first.x.toFixed(2)} ${first.y.toFixed(2)}`;
   for (let i = 1; i < points.length - 1; i += 1) {
-    const prev = points[i - 1]!;
-    const curr = points[i]!;
-    const next = points[i + 1]!;
+    const prev = requireValue(points[i - 1], `point ${i - 1}`);
+    const curr = requireValue(points[i], `point ${i}`);
+    const next = requireValue(points[i + 1], `point ${i + 1}`);
     const inLen = Math.hypot(curr.x - prev.x, curr.y - prev.y);
     const outLen = Math.hypot(next.x - curr.x, next.y - curr.y);
     if (inLen === 0 || outLen === 0) continue;
@@ -317,7 +337,7 @@ export function roundedOrthogonalPath(
     d += ` L ${preX.toFixed(2)} ${preY.toFixed(2)}`;
     d += ` Q ${curr.x.toFixed(2)} ${curr.y.toFixed(2)} ${postX.toFixed(2)} ${postY.toFixed(2)}`;
   }
-  const last = points[points.length - 1]!;
+  const last = requireValue(points[points.length - 1], "last point");
   d += ` L ${last.x.toFixed(2)} ${last.y.toFixed(2)}`;
   return d;
 }

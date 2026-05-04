@@ -32,7 +32,7 @@ def project_with_events(tmp_path: Path) -> Path:
             pd,
             workflow="pm-review",
             instance=sid,
-            station="review",
+            status="review",
             event="pm_review.completed",
             details={
                 "outcome": outcome,

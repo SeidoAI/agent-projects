@@ -41,7 +41,7 @@ run. The pattern this catches: long edit-only stretches accumulate
 drift between code state and the validators' last clean run, and
 late surprises become harder to attribute.
 
-Run `tripwire validate --strict` now. Walk the findings:
+Run `tripwire validate` now. Walk the findings:
 
   - Each error → fix in this session, before completing.
   - Each warning → ack inline (commit message references it) or
@@ -59,7 +59,7 @@ notices.
 
 Now:
 
-  1. Run `tripwire validate --strict` from the session worktree.
+  1. Run `tripwire validate` from the session worktree.
   2. Walk the findings — fix or ack each one.
   3. Commit the fix(es) and reference the SHAs in the ack marker.
 
@@ -73,7 +73,7 @@ validation.
 
 Concretely:
 
-  - `tripwire validate --strict` from the session worktree.
+  - `tripwire validate` from the session worktree.
   - For each error: fix it in a single commit; reference the SHA
     in the ack marker.
   - For each warning: either fix in-line OR file a follow-up issue

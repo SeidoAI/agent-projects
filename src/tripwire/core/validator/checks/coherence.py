@@ -5,7 +5,6 @@ from __future__ import annotations
 from tripwire.core import freshness as freshness_mod
 from tripwire.core import paths
 from tripwire.core.validator._types import CheckResult, ValidationContext
-from tripwire.core.workflow.registry import registers_at
 from tripwire.models.comment import Comment
 from tripwire.models.session import AgentSession
 
@@ -107,7 +106,6 @@ def _resolve_session_state(value: str) -> str:
     return normalize_session_status(value)
 
 
-@registers_at("coding-session", "executing")
 def check_freshness(ctx: ValidationContext) -> list[CheckResult]:
     """Concept node freshness — content_hash must match live content."""
     if ctx.project_config is None:
@@ -141,7 +139,6 @@ def check_freshness(ctx: ValidationContext) -> list[CheckResult]:
     return results
 
 
-@registers_at("coding-session", "executing")
 def check_comment_provenance(ctx: ValidationContext) -> list[CheckResult]:
     """Every comment has author/type/created_at; type is in the active enum."""
     results: list[CheckResult] = []
@@ -180,7 +177,6 @@ def check_comment_provenance(ctx: ValidationContext) -> list[CheckResult]:
     return results
 
 
-@registers_at("coding-session", "executing")
 def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
     """Layer-3 coherence: session.status vs. referenced issue statuses.
 
@@ -246,7 +242,6 @@ def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
 #     "orphan completion" cases where the closeout sweep didn't run.
 
 
-@registers_at("coding-session", "executing")
 def check_issue_session_status_compatibility(
     ctx: ValidationContext,
 ) -> list[CheckResult]:
@@ -300,7 +295,6 @@ def check_issue_session_status_compatibility(
     return results
 
 
-@registers_at("coding-session", "executing")
 def check_done_implies_session_completed(
     ctx: ValidationContext,
 ) -> list[CheckResult]:
@@ -357,7 +351,6 @@ def check_done_implies_session_completed(
     return results
 
 
-@registers_at("coding-session", "verified")
 def check_pm_response_covers_self_review(
     ctx: ValidationContext,
 ) -> list[CheckResult]:
@@ -467,7 +460,6 @@ def check_pm_response_covers_self_review(
     return results
 
 
-@registers_at("coding-session", "verified")
 def check_pm_response_followups_resolve(
     ctx: ValidationContext,
 ) -> list[CheckResult]:

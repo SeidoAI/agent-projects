@@ -17,7 +17,7 @@ export interface WorkflowEvent {
   ts: string;
   workflow: string;
   instance: string;
-  station: string;
+  status: string;
   event: string;
   details: Record<string, unknown>;
 }
@@ -30,7 +30,7 @@ export interface WorkflowEventsPage {
 export interface WorkflowEventsFilters {
   workflow?: string;
   instance?: string;
-  station?: string;
+  status?: string;
   event?: string;
   limit?: number;
 }
@@ -72,10 +72,7 @@ export interface WorkflowStatsResponse {
  */
 export const WORKFLOW_EVENTS_REFETCH_MS = 5_000;
 
-export function useWorkflowEvents(
-  pid: string,
-  filters: WorkflowEventsFilters = {},
-) {
+export function useWorkflowEvents(pid: string, filters: WorkflowEventsFilters = {}) {
   return useQuery<WorkflowEventsPage>({
     queryKey: queryKeys.workflowEvents(pid, filters),
     queryFn: () => workflowEventsApi.list(pid, filters),
@@ -84,10 +81,7 @@ export function useWorkflowEvents(
   });
 }
 
-export function useWorkflowStats(
-  pid: string,
-  opts: { workflow?: string; top_n?: number } = {},
-) {
+export function useWorkflowStats(pid: string, opts: { workflow?: string; top_n?: number } = {}) {
   return useQuery<WorkflowStatsResponse>({
     queryKey: queryKeys.workflowStats(pid, opts),
     queryFn: () => workflowEventsApi.stats(pid, opts),

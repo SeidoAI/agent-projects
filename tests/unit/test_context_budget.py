@@ -53,12 +53,23 @@ def test_pm_skill_total_size_under_budget() -> None:
     v0.8x bumps to 153KB for the new SCHEMA_INBOX.md reference doc + the
     "Inbox — escalating to the human" section in SKILL.md (PM-as-curator
     of the dashboard's left-column attention queue).
+    v0.9.6 (workflow codification stage 1) bumps to 160KB for the new
+    MONITOR_CRITERIA.md reference doc — codifies the pm-monitor signal
+    vocabulary the PM agent uses to drive the overseer loop.
+    v0.9.6 (continued) bumps to 166KB for WORKFLOWS_CODE_REVIEW.md —
+    the multi-reviewer cycle (self/superpowers/codex) split out of
+    WORKFLOWS_REVIEW.md as part of the four-primitive codification.
+    v0.9.6 (final, C15) bumps to 170KB for SCHEMA_WORKFLOW.md (NEW;
+    user-facing workflow.yaml schema reference) plus the
+    SUBAGENT_DELEGATION.md rewrite (2.6KB → 3.8KB; "NOT YET ENABLED"
+    stub replaced with the pm_subagent_dispatch contract from plan
+    §9). Net of WORKFLOWS_REVIEW.md deletion.
     """
     pm_dir = TEMPLATES_DIR / "skills" / "project-manager"
     total = _total_chars(pm_dir)
-    assert total < 153_000, (
+    assert total < 170_000, (
         f"PM skill is {total:,} chars ({total / 1024:.0f} KB). "
-        f"Budget is 153KB. Consolidate or trim reference docs."
+        f"Budget is 170KB. Consolidate or trim reference docs."
     )
 
 
@@ -81,7 +92,7 @@ def test_pm_skill_md_under_budget() -> None:
 
 
 def test_total_templates_under_budget() -> None:
-    """Everything `tripwire init` copies must stay under 332KB total.
+    """Everything `tripwire init` copies must stay under the total budget.
 
     v0.2 was ~217KB. v0.6a bumped to 275KB. v0.7b bumped to 285KB for
     spawn/defaults.yaml + issue_artifacts + /pm-issue-artifact. v0.7.2
@@ -93,11 +104,15 @@ def test_total_templates_under_budget() -> None:
     monitor invocation fields. v0.7.10 §D (KUI-95) bumps to 325KB for
     the codex-review workflow + codex-reviewer agent + protocol doc.
     v0.8x bumps to 332KB for the inbox primitive (SCHEMA_INBOX.md
-    reference doc + the SKILL.md inbox-authoring section).
+    reference doc + the SKILL.md inbox-authoring section). v0.9.6 first
+    bumped to 335KB for workflow.yaml source-of-truth gates and prompt-check
+    invocation instructions, then to 345KB when the default process map
+    started declaring PM workflows, routes, commands, skills, and emitted
+    artifacts as first-class workflow.yaml data.
     """
     total = _total_chars(TEMPLATES_DIR)
-    assert total < 332_000, (
-        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 332KB."
+    assert total < 345_000, (
+        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 345KB."
     )
 
 

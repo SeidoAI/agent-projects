@@ -106,11 +106,6 @@ class SelfReviewJitPrompt(JitPrompt):
     id: ClassVar[str] = "self-review"
     fires_on: ClassVar[str] = "session.complete"
     blocks: ClassVar[bool] = True
-    # KUI-121: workflow station declaration. The self-review JIT prompt
-    # belongs to the `verified` station of the `coding-session` workflow
-    # — fires as the session transitions out of verified toward
-    # completed (which is what `session.complete` is, lifecycle-wise).
-    at: ClassVar[tuple[str, str]] = ("coding-session", "verified")
 
     def fire(self, ctx: JitPromptContext) -> str:
         idx = ctx.variation_index(len(_VARIATIONS))

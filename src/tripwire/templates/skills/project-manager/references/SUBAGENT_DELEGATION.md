@@ -1,70 +1,105 @@
-# Subagent delegation protocol (NOT YET ENABLED)
+# Subagent delegation
 
-**DO NOT USE SUBAGENTS for writing files.** This document captures
-learnings from v0.2 testing for future implementation. The active
-instruction is in SKILL.md: "DO NOT USE SUBAGENTS for writing
-project entities."
+The PM agent dispatches Claude Code subagents during
+`pm-monitor.dispatch` when a cross-link in `workflow.yaml` carries
+`pm_subagent_dispatch: true`. This document codifies that contract.
 
-## v0.2 findings
+The general "don't delegate entity writes to subagents" rule in
+`SKILL.md` still holds. This protocol is narrower: the dispatched
+subagent is **scoped to one workflow's allowable operations**, not
+free-form file generation. The parent PM still owns the audit trail.
 
-A PM agent was tested against a 6,700-line planning corpus. It
-delegated to 9 subagents and produced 92 issues, 53 nodes, and 20
-sessions. Results:
+## When the PM dispatches a subagent
 
-1. **The PM agent never read a single file its subagents produced.**
-   When asked to describe a random issue from memory, it guessed from
-   the prompt it sent the subagent, not from the actual file contents.
-   It had "high structural confidence, low semantic confidence."
+The PM acts as a conductor. On every tick, `pm-monitor.scan` collects
+state and `pm-monitor.classify` emits one or more signals (vocabulary
+in `MONITOR_CRITERIA.md`). Each signal maps to a cross-link out of
+`pm-monitor.dispatch`. When that cross-link has
+`pm_subagent_dispatch: true`, the PM spawns a subagent rather than
+walking the target workflow inline.
 
-2. **The first subagent batch had zero `[[node-id]]` references**
-   because the subagent wasn't given the node ID list. The PM agent
-   had to patch all 16 files post-hoc.
+## Input payload
 
-3. **The worst subagent invented dangling references** (`[[kb-pivot-spec]]`)
-   to nodes that don't exist, because it wasn't given the list of valid
-   node IDs.
+The PM hands the subagent:
 
-4. **Self-review became meaningless.** The gap analysis and compliance
-   steps require the PM agent to review its own output. If it didn't
-   write the output, it can't meaningfully review it.
+- **Workflow id + target status** — the cross-link target (e.g.
+  `code-review.received`).
+- **Signal payload** — the entity uuids that matched the predicate
+  and a one-paragraph evidence summary the PM extracted from `scan`.
+- **Scoped task description** — "advance this entity through this
+  workflow"; not free-form. The workflow's status declares the
+  artifacts and controls.
+- **Audit-trail pointer** — the path to the
+  `<project>/orchestration/monitor-log.yaml` entry the PM has just
+  appended for this dispatch. The subagent appends its return
+  summary to that entry on exit.
 
-5. **Key allocation split across contexts.** The PM agent pre-allocated
-   76 keys but the epic subagent allocated its own 16, causing the
-   sequence to jump from 76 to 93 while KBP-1 through KBP-76 were
-   still empty.
+## Subagent scope
 
-## Protocol (for future implementation)
+The subagent's system prompt restricts it to the dispatched workflow.
+The "no subagents for entity writing" rule is preserved by making the
+dispatched subagent **scoped to one workflow's operations** — not
+free-form delegation.
 
-When subagent delegation is re-enabled, the following protocol must be
-followed:
+The subagent's prompt names exactly one workflow id and forbids:
 
-### Context requirements per subagent
+- Opening any other workflow.
+- Writing files outside the artifacts that workflow's statuses
+  declare under `produces:`.
+- Spawning further subagents (no recursion).
+- Modifying `workflow.yaml`, `project.yaml`, or any enum file.
 
-Each subagent MUST receive:
-- The canonical example file for the entity type
-- The complete list of valid concept node IDs
-- The pre-allocated keys and UUIDs for that batch
-- The body section requirements (all 9 for concrete, 3 for epics)
-- The `related:` cross-reference expectations
+The subagent runs `tripwire validate` before returning; if validate
+fails on its own writes, it must repair before exit.
 
-### Mandatory read-back
+## Return summary
 
-After each subagent returns, the PM agent MUST:
-- Read at least 3 random files from the batch
-- Run `tripwire validate --strict --select <batch-range>+` on the batch
-- Verify that `[[node-id]]` references are semantically correct (not
-  just syntactically present)
-- Be able to describe any file's contents from memory
+The subagent emits a structured summary on exit. The PM appends it
+to the matching entry in `monitor-log.yaml`:
 
-### Quality verification
+```yaml
+subagent_summary:
+  workflow: code-review
+  status: received          # status the subagent owned on exit
+  artifacts:
+    - sessions/<id>/reviews/synthesis.md
+  outcome: success           # success | partial | failed
+  reason: >
+    Three reviewers returned, synthesis written, verdict=merge.
+```
 
-If the PM agent cannot describe a random file's contents when asked,
-the delegation failed and the batch must be rewritten.
+`outcome` enum:
 
-### Reconciliation
+- **`success`** — advanced to the next status (or terminal) and
+  wrote every required artifact.
+- **`partial`** — made progress but did not reach a hand-off-ready
+  state. The PM decides whether to re-dispatch or escalate.
+- **`failed`** — could not advance. The PM opens an inbox item.
 
-After all subagent batches are complete:
-- Run full validation
-- Check cross-batch consistency (do issues from batch A correctly
-  reference nodes from batch B?)
-- Run `tripwire refs summary` to verify node coverage
+`reason` is one paragraph of plain text. The artifacts list points
+at the actual writes.
+
+## Allowed dispatched workflows
+
+ALLOWED:
+
+- **`code-review`** — `independent-reviews` station for the
+  superpowers reviewer specifically; full workflow for the relaunch
+  path.
+- **`pm-triage`** — full workflow. Inbox intake and classification.
+- **`pm-incremental-update`** — full workflow. Small atomic edits
+  to existing entities.
+
+NOT ALLOWED:
+
+- **`pm-scoping`** — requires PM full-context judgment per plan §9.
+- **`phase-advancement`** — requires PM full-context judgment per
+  plan §9.
+- **`pm-monitor`** itself — recursion. Subagents must not spawn
+  further subagents.
+
+## See also
+
+- `WORKFLOWS_CODE_REVIEW.md` — canonical multi-reviewer workflow.
+- `MONITOR_CRITERIA.md` — signal vocabulary and dispatch contract.
+- `nodes/pm-monitor-loop.yaml` — the overseer pattern as a node.

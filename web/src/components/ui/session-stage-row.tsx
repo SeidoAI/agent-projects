@@ -33,13 +33,13 @@ export const SESSION_STAGES: SessionStage[] = [
   {
     id: "planned",
     label: "planned",
-    color: "#9a9285",
+    color: "#b8b0a0",
     matches: (s) => s === "planned",
   },
   {
     id: "queued",
     label: "queued",
-    color: "#7a7368",
+    color: "#b07a2c",
     matches: (s) => s === "queued",
   },
   {

@@ -4,11 +4,10 @@ Single endpoint:
 
     GET  /api/projects/{project_id}/workflow
 
-Returns the full orchestration graph (lifecycle stations, validators,
-JIT prompts, connectors, artifacts) for the Workflow Map UI. PM-mode
-header (`X-Tripwire-Role: pm`) controls whether JIT prompt
-`prompt_revealed` fields are populated. See
-`docs/specs/2026-04-26-v08-handoff.md` §2.1.
+Returns the workflow territory payload: `workflow.yaml` definitions,
+shallow registry metadata, and workflow drift findings. PM-mode header
+(`X-Tripwire-Role: pm`) controls whether JIT prompt `prompt_revealed`
+fields are populated.
 """
 
 from __future__ import annotations
@@ -29,7 +28,7 @@ async def get_workflow_route(
     request: Request,
     project: ProjectContext = Depends(get_project),  # noqa: B008
 ) -> dict[str, Any]:
-    """Return the orchestration graph, with PM-mode redaction applied."""
+    """Return the workflow territory payload, with PM-mode redaction applied."""
     return build_workflow(
         project.project_dir,
         project_id=project.project_id,

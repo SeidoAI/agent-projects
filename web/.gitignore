@@ -4,3 +4,6 @@ dist/
 # anywhere inside the frontend tree (the previous unanchored entry at
 # the repo root was over-broad).
 .vite/
+# Playwright run artifacts
+test-results/
+playwright-report/

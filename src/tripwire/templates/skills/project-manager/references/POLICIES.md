@@ -38,5 +38,6 @@ Edit this file to add them.
 ## See also
 
 - `<project>/standards.md` — top-level project standards
-- `WORKFLOWS_REVIEW.md` — PM review procedure
+- `WORKFLOWS_CODE_REVIEW.md` — PM review procedure
+- `WORKFLOWS_NODE_RECONCILIATION.md` — post-merge node reconciliation
 - `ANTI_PATTERNS.md` — common mistakes to avoid

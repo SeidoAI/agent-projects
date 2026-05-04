@@ -421,9 +421,7 @@ describe("ConceptGraph", () => {
     });
     const { container } = render(<ConceptGraph />, { wrapper });
     const get = (rel: string) =>
-      container.querySelector(
-        `[data-edge-relation='${rel}']`,
-      ) as SVGLineElement | null;
+      container.querySelector(`[data-edge-relation='${rel}']`) as SVGLineElement | null;
     expect(get("cites")?.getAttribute("stroke-dasharray")).toBe("0");
     expect(get("references")?.getAttribute("stroke-dasharray")).toBe("0");
     expect(get("related")?.getAttribute("stroke-dasharray")).toBe("3 3");

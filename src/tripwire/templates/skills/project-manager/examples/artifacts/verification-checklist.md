@@ -31,5 +31,5 @@
 - [x] developer.md draft at `issues/SEI-42/developer.md`
 
 ## PM review gate
-- [x] `tripwire validate --strict` exits 0
+- [x] `tripwire validate` exits 0
 - [x] No standards violations from `standards.md`

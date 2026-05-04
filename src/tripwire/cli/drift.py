@@ -5,18 +5,17 @@ Two subcommands, both shipped in v0.9:
 - ``tripwire drift report`` (KUI-128 / A3) — single 0-100 coherence
   score with per-signal breakdown across stale pins, unresolved
   references, stale concept-node freshness, and recent
-  workflow-drift events. Higher = healthier.
+  workflow-drift findings. Higher = healthier.
 
 - ``tripwire drift findings`` (KUI-124) — list every workflow drift
-  finding (missing required prompt-checks, tripwires that
+  finding (missing required prompt-checks, JIT prompts that
   should-have-fired, unexpected transitions). Output is one finding
-  per line as ``<code> <workflow>:<instance> <station?> :: <message>``
+  per line as ``<code> <workflow>:<instance> <status?> :: <message>``
   so it pipes cleanly into agents and log greppers; exit non-zero on
   any finding.
 
 Both subcommands consume `<project>/events/*.jsonl` (KUI-123 substrate)
-when present; `report` aggregates into a score, `findings` prints
-them. Future iterations will add ``--since`` for week-over-week deltas.
+when present; `report` aggregates into a score, `findings` prints them.
 """
 
 from __future__ import annotations
@@ -27,7 +26,7 @@ from pathlib import Path
 import click
 
 from tripwire.cli._utils import require_project as _require_project
-from tripwire.core.drift import compute_coherence
+from tripwire.core.drift import compute_coherence, drift_finding_to_dict
 from tripwire.core.store import ProjectNotFoundError, load_project
 from tripwire.core.workflow.drift import detect_drift
 
@@ -64,7 +63,14 @@ def report_cmd(project_dir: Path, output_format: str) -> None:
     if output_format == "json":
         click.echo(
             json.dumps(
-                {"score": result.score, "breakdown": result.breakdown},
+                {
+                    "score": result.score,
+                    "breakdown": result.breakdown,
+                    "workflow_drift_findings": [
+                        drift_finding_to_dict(finding)
+                        for finding in result.workflow_drift_findings
+                    ],
+                },
                 indent=2,
             )
         )
@@ -75,6 +81,15 @@ def report_cmd(project_dir: Path, output_format: str) -> None:
     click.echo("Breakdown:")
     for name, count in result.breakdown.items():
         click.echo(f"  {name}: {count}")
+    if result.workflow_drift_findings:
+        click.echo("")
+        click.echo("Workflow drift findings:")
+        for finding in result.workflow_drift_findings:
+            status = finding.status or "-"
+            click.echo(
+                f"  {finding.code} {finding.workflow}:{finding.instance} "
+                f"{status} :: {finding.message}"
+            )
 
 
 @drift_cmd.command(name="findings")
@@ -106,8 +121,8 @@ def findings_cmd(project_dir: Path, instance: str | None, workflow_id: str) -> N
         click.echo("no drift detected")
         return
     for f in findings:
-        station = f.station or "-"
-        click.echo(f"{f.code} {f.workflow}:{f.instance} {station} :: {f.message}")
+        status = f.status or "-"
+        click.echo(f"{f.code} {f.workflow}:{f.instance} {status} :: {f.message}")
     raise click.exceptions.Exit(code=1)
 
 

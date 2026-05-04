@@ -161,6 +161,56 @@ class ArtifactManifestRequirements(BaseModel):
     )
 
 
+class MonitorSessionCrashConfig(BaseModel):
+    """Threshold values for the ``signal.session_crashed`` predicate."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    stale_engagement_minutes: int = 15
+    no_heartbeat_minutes: int = 5
+
+
+class MonitorSessionPausedQuestionConfig(BaseModel):
+    """Threshold values for ``signal.session_paused_question``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    no_human_reply_minutes: int = 10
+
+
+class MonitorWorkflowDriftConfig(BaseModel):
+    """Threshold values for ``signal.workflow_drift_detected``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    min_severity: str = "warning"
+
+
+class MonitorConfig(BaseModel):
+    """``project.yaml.monitor`` — pm-monitor signal thresholds.
+
+    The overseer loop in ``workflow.yaml::pm-monitor`` reads these to
+    decide when each ``signal.*`` predicate fires. See
+    ``references/MONITOR_CRITERIA.md``. Tunable per-project so the
+    initial code-shipped values can be calibrated by use rather than
+    re-released every time a threshold needs an adjustment.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    tick_seconds: int = 60
+    session_crash: MonitorSessionCrashConfig = Field(
+        default_factory=MonitorSessionCrashConfig
+    )
+    session_paused_question: MonitorSessionPausedQuestionConfig = Field(
+        default_factory=MonitorSessionPausedQuestionConfig
+    )
+    stale_node_count_high: int = 5
+    workflow_drift: MonitorWorkflowDriftConfig = Field(
+        default_factory=MonitorWorkflowDriftConfig
+    )
+
+
 class ProjectConfig(BaseModel):
     """The project's root config, parsed from `<project>/project.yaml`."""
 
@@ -214,6 +264,11 @@ class ProjectConfig(BaseModel):
     jit_prompts: ProjectJitPromptsConfig = Field(
         default_factory=ProjectJitPromptsConfig
     )
+
+    # v0.9.6 (workflow codification stage 1): pm-monitor signal
+    # thresholds. The overseer loop reads these at tick time to decide
+    # which signals fire. Defaults are starting values to iterate on.
+    monitor: MonitorConfig = Field(default_factory=MonitorConfig)
 
     # v0.7b: per-project artifact manifest overrides layered on top of
     # templates/artifacts/manifest.yaml. Useful for adding project-specific

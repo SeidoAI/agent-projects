@@ -89,7 +89,7 @@ async def list_workflow_events_route(
     project: ProjectContext = Depends(get_project),  # noqa: B008
     workflow: str | None = Query(None),
     instance: str | None = Query(None),
-    station: str | None = Query(None),
+    status: str | None = Query(None),
     event: str | None = Query(None),
     limit: int = Query(
         workflow_events_service.DEFAULT_LIMIT,
@@ -102,7 +102,7 @@ async def list_workflow_events_route(
         project.project_dir,
         workflow=workflow,
         instance=instance,
-        station=station,
+        status=status,
         event=event,
         limit=limit,
     )

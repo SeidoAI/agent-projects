@@ -1,19 +1,20 @@
 """Integration tests for the drift report route (KUI-157 / I4).
 
 Exercises ``GET /api/projects/{project_id}/drift``: returns
-``{score, breakdown, workflow_drift_events}``.
+``{score, breakdown, workflow_drift_findings}``.
 """
 
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
 from pathlib import Path
+from textwrap import dedent
 
 import pytest
 import yaml
 from fastapi.testclient import TestClient
 
+from tripwire.core.events.log import emit_event
 from tripwire.ui.dependencies import reset_project_cache
 from tripwire.ui.server import create_app
 from tripwire.ui.services import project_service as _project_svc
@@ -59,6 +60,26 @@ def project_id(project_dir: Path) -> str:
     return _project_svc._project_id(project_dir.resolve())
 
 
+def _write_workflow(project_dir: Path) -> None:
+    (project_dir / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: queued
+                    next: executing
+                  - id: executing
+                    prompt_checks: [pm-session-queue]
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_drift_route_returns_score_and_breakdown(
     client: TestClient, project_id: str
 ) -> None:
@@ -73,7 +94,7 @@ def test_drift_route_returns_score_and_breakdown(
         "stale_pins",
         "unresolved_refs",
         "stale_concepts",
-        "workflow_drift_events",
+        "workflow_drift_findings",
     }.issubset(breakdown.keys())
 
 
@@ -85,40 +106,50 @@ def test_drift_route_clean_project_returns_full_score(
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["score"] == 100
-    assert payload["workflow_drift_events"] == []
+    assert "workflow_drift_events" not in payload
+    assert payload["workflow_drift_findings"] == []
 
 
-def test_drift_route_includes_recent_workflow_drift_events(
+def test_drift_route_includes_workflow_drift_findings_from_events_log(
     client: TestClient, project_id: str, project_dir: Path
 ) -> None:
-    """Recent workflow_drift events are surfaced for the drill-down."""
+    """Workflow findings come from canonical ``events/*.jsonl`` rows."""
+    _write_workflow(project_dir)
+    emit_event(
+        project_dir,
+        workflow="coding-session",
+        instance="session-a",
+        status="executing",
+        event="transition.completed",
+        details={"from_status": "queued", "to_status": "executing"},
+    )
+    resp = client.get(f"/api/projects/{project_id}/drift")
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["breakdown"]["workflow_drift_findings"] == 1
+    assert payload["score"] == 98
+    findings = payload["workflow_drift_findings"]
+    assert len(findings) == 1
+    assert findings[0]["code"] == "drift/prompt_check_missing"
+    assert findings[0]["workflow"] == "coding-session"
+    assert findings[0]["instance"] == "session-a"
+
+
+def test_drift_route_ignores_legacy_tripwire_events_log(
+    client: TestClient, project_id: str, project_dir: Path
+) -> None:
+    """The v0.9 route must not read stale ``.tripwire/events.log``."""
     events_log = project_dir / ".tripwire" / "events.log"
     events_log.parent.mkdir(parents=True, exist_ok=True)
-    now = datetime.now(tz=timezone.utc).isoformat()
     events_log.write_text(
         yaml.safe_dump(
-            {"event": "workflow_drift", "at": now, "kind": "missing_artifact"},
+            {"event": "workflow_drift", "at": "2026-05-01T00:00:00Z", "kind": "old"},
             default_flow_style=True,
-        ).strip()
-        + "\n"
-        + yaml.safe_dump(
-            {"event": "workflow_drift", "at": now, "kind": "stale_pin"},
-            default_flow_style=True,
-        ).strip()
-        + "\n"
-        + yaml.safe_dump(
-            {"event": "other", "at": now, "kind": "noise"},
-            default_flow_style=True,
-        ).strip()
-        + "\n",
+        ),
         encoding="utf-8",
     )
     resp = client.get(f"/api/projects/{project_id}/drift")
     assert resp.status_code == 200
     payload = resp.json()
-    drift_events = payload["workflow_drift_events"]
-    assert len(drift_events) == 2
-    # Newest first ordering — same timestamp here, but the filter
-    # only includes the workflow_drift kind.
-    kinds = {ev["kind"] for ev in drift_events}
-    assert kinds == {"missing_artifact", "stale_pin"}
+    assert payload["breakdown"]["workflow_drift_findings"] == 0
+    assert payload["workflow_drift_findings"] == []

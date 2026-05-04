@@ -22,6 +22,8 @@ All emission goes via :func:`emit_event`. Three callers:
 - :mod:`tripwire.core.workflow.transitions` (KUI-159) — emits
   ``transition.requested`` / ``transition.completed`` /
   ``transition.rejected`` for each gate run.
+- :mod:`tripwire.cli.prompt_check` — emits ``prompt_check.invoked``
+  when a PM slash-command check has been run for a workflow status.
 
 The drift detector (KUI-124) consumes via :func:`read_events`.
 """
@@ -57,7 +59,7 @@ def emit_event(
     *,
     workflow: str,
     instance: str,
-    station: str,
+    status: str,
     event: str,
     details: dict[str, Any] | None = None,
     now: datetime | None = None,
@@ -68,15 +70,15 @@ def emit_event(
     pass ``None`` and pick up the current time. Returns the
     :class:`Event` written so callers can chain logging or assertions.
 
-    Empty ``workflow`` / ``event`` / ``instance`` / ``station`` strings
+    Empty ``workflow`` / ``event`` / ``instance`` / ``status`` strings
     raise :class:`ValueError` — the schema demands them.
     """
     if not workflow:
         raise ValueError("workflow must be a non-empty string")
     if not instance:
         raise ValueError("instance must be a non-empty string")
-    if not station:
-        raise ValueError("station must be a non-empty string")
+    if not status:
+        raise ValueError("status must be a non-empty string")
     if not event:
         raise ValueError("event must be a non-empty string")
 
@@ -85,7 +87,7 @@ def emit_event(
         ts=_isoformat_z(when),
         workflow=workflow,
         instance=instance,
-        station=station,
+        status=status,
         event=event,
         details=dict(details or {}),
     )
@@ -108,7 +110,7 @@ def read_events(
     *,
     workflow: str | None = None,
     instance: str | None = None,
-    station: str | None = None,
+    status: str | None = None,
     event: str | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Yield events matching the given filters in chronological order.
@@ -143,7 +145,7 @@ def read_events(
                 continue
             if instance is not None and payload.get("instance") != instance:
                 continue
-            if station is not None and payload.get("station") != station:
+            if status is not None and payload.get("status") != status:
                 continue
             if event is not None and payload.get("event") != event:
                 continue

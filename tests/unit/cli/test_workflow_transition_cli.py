@@ -1,8 +1,8 @@
 """End-to-end tests for ``tripwire transition`` (KUI-159).
 
 The transition CLI is the gate runner: it loads workflow.yaml, runs
-the station's validators → JIT prompts → prompt-checks, and on pass
-moves the session to the new station and assigns a station-instance
+the status's validators → JIT prompts → prompt-checks, and on pass
+moves the session to the new status and assigns a status-instance
 id. On fail it emits ``transition.rejected`` with a structured
 ``reason`` and the session stays put.
 
@@ -35,7 +35,7 @@ def _project_dir(tmp_path: Path) -> Path:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
-                stations:
+                statuses:
                   - id: planned
                     next: queued
                   - id: queued
@@ -104,16 +104,20 @@ def clean_validator(monkeypatch):
     fetched, which test fixtures aren't)."""
     from tripwire.core.validator._types import ValidationReport
 
+    calls = []
+
     def _clean(*args, **kwargs):
+        calls.append({"args": args, "kwargs": kwargs})
         return ValidationReport(exit_code=0, errors=[], warnings=[])
 
+    _clean.calls = calls
     monkeypatch.setattr("tripwire.cli.transition.validate_project", _clean)
     return _clean
 
 
 def test_transition_pass_path_advances_session(tmp_path: Path, clean_validator) -> None:
     """Happy path: gate passes, session.status flips, transition.completed
-    emitted, station-instance id written."""
+    emitted, status-instance id written."""
     from tripwire.cli.transition import transition_cmd
     from tripwire.core.events.log import read_events
 
@@ -128,8 +132,8 @@ def test_transition_pass_path_advances_session(tmp_path: Path, clean_validator) 
     # Session status flipped.
     session_yaml = (pd / "sessions" / "test-session" / "session.yaml").read_text()
     assert "status: queued" in session_yaml
-    # Station-instance id present.
-    assert "current_station_instance:" in session_yaml
+    # Status-instance id present.
+    assert "current_status_instance:" in session_yaml
     assert "coding-session:test-session:queued:1" in session_yaml
 
     # transition.requested + transition.completed emitted (no .rejected).
@@ -140,8 +144,142 @@ def test_transition_pass_path_advances_session(tmp_path: Path, clean_validator) 
     assert "transition.rejected" not in kinds
 
 
+def test_transition_uses_target_status_validators(
+    tmp_path: Path, clean_validator
+) -> None:
+    from tripwire.cli.transition import transition_cmd
+
+    pd = _project_dir(tmp_path)
+    (pd / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                    next: queued
+                    tripwires: [v_id_format]
+                  - id: queued
+                    next: executing
+                    tripwires: [v_uuid_present]
+                  - id: executing
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        transition_cmd,
+        ["test-session", "queued", "--project-dir", str(pd)],
+    )
+
+    assert result.exit_code == 0, result.output
+    call = clean_validator.calls[-1]
+    assert call["kwargs"]["validator_ids"] == ["v_uuid_present"]
+    assert call["kwargs"]["workflow"] == "coding-session"
+    assert call["kwargs"]["status"] == "queued"
+
+
+def test_transition_uses_route_controls_when_routes_declared(
+    tmp_path: Path, clean_validator
+) -> None:
+    from tripwire.cli.transition import transition_cmd
+
+    pd = _project_dir(tmp_path)
+    (pd / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                    next: queued
+                  - id: queued
+                    terminal: true
+                    tripwires: [v_status_only]
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    controls:
+                      tripwires: [v_route_only]
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        transition_cmd,
+        ["test-session", "queued", "--project-dir", str(pd)],
+    )
+
+    assert result.exit_code == 0, result.output
+    call = clean_validator.calls[-1]
+    assert call["kwargs"]["validator_ids"] == ["v_route_only"]
+
+
+def test_transition_prompt_check_gate_accepts_recorded_invocation(
+    tmp_path: Path, clean_validator
+) -> None:
+    from tripwire.cli.prompt_check import prompt_check_cmd
+    from tripwire.cli.transition import transition_cmd
+
+    pd = _project_dir(tmp_path)
+    (pd / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                    next: queued
+                  - id: queued
+                    next: executing
+                    prompt_checks: [pm-session-queue]
+                  - id: executing
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+
+    rejected = runner.invoke(
+        transition_cmd,
+        ["test-session", "queued", "--project-dir", str(pd)],
+    )
+    assert rejected.exit_code != 0
+    assert "prompt_checks_missing" in rejected.output
+
+    invoked = runner.invoke(
+        prompt_check_cmd,
+        [
+            "invoke",
+            "pm-session-queue",
+            "test-session",
+            "--project-dir",
+            str(pd),
+        ],
+    )
+    assert invoked.exit_code == 0, invoked.output
+
+    accepted = runner.invoke(
+        transition_cmd,
+        ["test-session", "queued", "--project-dir", str(pd)],
+    )
+    assert accepted.exit_code == 0, accepted.output
+
+
 def test_transition_rejects_disallowed_target(tmp_path: Path) -> None:
-    """Rejecting an unreachable station emits transition.rejected with
+    """Rejecting an unreachable status emits transition.rejected with
     a structured reason naming the gate check that failed."""
     from tripwire.cli.transition import transition_cmd
     from tripwire.core.events.log import read_events
@@ -167,10 +305,10 @@ def test_transition_rejects_disallowed_target(tmp_path: Path) -> None:
     assert rows[0]["details"]["reason"].startswith("transition_not_reachable")
 
 
-def test_transition_increments_station_instance_n(
+def test_transition_increments_status_instance_n(
     tmp_path: Path, clean_validator
 ) -> None:
-    """Repeat visits to a station bump the {n} suffix."""
+    """Repeat visits to a status bump the {n} suffix."""
     from tripwire.cli.transition import transition_cmd
 
     pd = _project_dir(tmp_path)
@@ -208,10 +346,10 @@ def test_transition_unknown_station_errors(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(
         transition_cmd,
-        ["test-session", "nonexistent-station", "--project-dir", str(pd)],
+        ["test-session", "nonexistent-status", "--project-dir", str(pd)],
     )
     assert result.exit_code != 0
-    assert "unknown station" in result.output.lower()
+    assert "unknown status" in result.output.lower()
 
 
 def test_transition_lockfile_serialises_concurrent(
@@ -229,7 +367,7 @@ def test_transition_lockfile_serialises_concurrent(
     assert (pd / ".tripwire").is_dir()
 
 
-def test_transition_completed_event_carries_station_instance(
+def test_transition_completed_event_carries_status_instance(
     tmp_path: Path, clean_validator
 ) -> None:
     from tripwire.cli.transition import transition_cmd
@@ -246,14 +384,14 @@ def test_transition_completed_event_carries_station_instance(
     )
     assert len(completed) == 1
     assert (
-        completed[0]["details"]["station_instance"]
+        completed[0]["details"]["status_instance"]
         == "coding-session:test-session:queued:1"
     )
 
 
-def test_transition_rejected_when_validators_fail(tmp_path: Path) -> None:
-    """If `tripwire validate --strict` reports errors at the destination
-    station, the gate rejects with reason=validators_failed."""
+def test_transition_rejected_when_tripwires_fail(tmp_path: Path) -> None:
+    """If `tripwire validate` reports errors at the destination status,
+    the gate rejects with reason=tripwires_failed."""
     from tripwire.cli.transition import transition_cmd
     from tripwire.core.events.log import read_events
 
@@ -272,7 +410,7 @@ def test_transition_rejected_when_validators_fail(tmp_path: Path) -> None:
     assert result.exit_code != 0
     rows = list(read_events(pd, instance="test-session", event="transition.rejected"))
     assert any(
-        r["details"].get("reason", "").startswith("validators_failed") for r in rows
+        r["details"].get("reason", "").startswith("tripwires_failed") for r in rows
     )
     # Session did NOT advance.
     session_yaml = (pd / "sessions" / "test-session" / "session.yaml").read_text()
@@ -362,7 +500,7 @@ def test_transition_reloads_session_inside_lock(
     # queued → executing is reachable, so this should succeed.
     assert result.exit_code == 0, result.output
 
-    # The transition.completed event records `from_station: queued`,
+    # The transition.completed event records `from_status: queued`,
     # which is what was on disk INSIDE the lock — not whatever
     # pre-lock snapshot some prior call to load_session captured.
     completed = [
@@ -371,5 +509,5 @@ def test_transition_reloads_session_inside_lock(
         if e["event"] == "transition.completed"
     ]
     assert completed
-    assert completed[-1]["details"]["from_station"] == "queued"
-    assert completed[-1]["details"]["to_station"] == "executing"
+    assert completed[-1]["details"]["from_status"] == "queued"
+    assert completed[-1]["details"]["to_status"] == "executing"

@@ -20,7 +20,9 @@ from tripwire.core.validator.checks.artifacts import (
 )
 from tripwire.core.validator.checks.coherence import (
     check_comment_provenance,
+    check_done_implies_session_completed,
     check_freshness,
+    check_issue_session_status_compatibility,
     check_pm_response_covers_self_review,
     check_pm_response_followups_resolve,
     check_session_issue_coherence,
@@ -94,6 +96,8 @@ COHERENCE_CHECKS = [
     check_freshness,
     check_comment_provenance,
     check_session_issue_coherence,
+    check_issue_session_status_compatibility,
+    check_done_implies_session_completed,
     check_pm_response_covers_self_review,
     check_pm_response_followups_resolve,
 ]
@@ -138,6 +142,8 @@ ALL_CHECKS = [
     check_handoff_artifact,
     check_quality_consistency,
     check_session_issue_coherence,
+    check_issue_session_status_compatibility,
+    check_done_implies_session_completed,
     check_issue_artifact_presence,
     check_pm_response_covers_self_review,
     check_pm_response_followups_resolve,

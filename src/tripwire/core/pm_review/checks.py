@@ -1,4 +1,4 @@
-"""Named-check catalogue for the pm-review station.
+"""Named-check catalogue for the pm-review status.
 
 The plan calls out 10 checks — schema, refs, status transition, fields,
 markdown structure, freshness, artifact presence, no orphan additions,

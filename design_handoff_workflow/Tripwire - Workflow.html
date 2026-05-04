@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tripwire — Workflow v2</title>
+<link rel="stylesheet" href="philosophy/styles.css" />
+<style>body { background: #d8d2c2; }</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="screens/design-canvas.jsx"></script>
+<script type="text/babel" src="screens/theme.jsx"></script>
+<script type="text/babel" src="screens/theme-tweaks.jsx"></script>
+<script type="text/babel" src="screens/screen-shell.jsx"></script>
+
+<script type="text/babel" src="workflow/data.jsx"></script>
+<script type="text/babel" src="workflow/registry.jsx"></script>
+<script type="text/babel" src="workflow/atoms.jsx"></script>
+<script type="text/babel" src="workflow/navigator.jsx"></script>
+<script type="text/babel" src="workflow/layout.jsx"></script>
+<script type="text/babel" src="workflow/flowchart.jsx"></script>
+<script type="text/babel" src="workflow/page.jsx"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { DesignCanvas, DCSection, DCArtboard, Screen, ThemeRoot, WorkflowPage } = window;
+const T = ({children}) => <ThemeRoot>{children}</ThemeRoot>;
+
+const App = () => (
+  <DesignCanvas>
+    <DCSection id="brief" title="00 · The brief" subtitle="traditional flowchart, with the philosophy intact">
+      <DCArtboard id="brief" label="00 · brief" width={1100} height={620}>
+        <div style={{padding:'40px 56px', height:'100%', overflow:'auto', background:'#f0eee9',
+                     fontFamily:"'Bricolage Grotesque', sans-serif", color:'#1a1815'}}>
+          <div style={{fontFamily:"'Geist Mono', monospace", fontSize:11, letterSpacing:'0.18em',
+                       color:'#7a7368', textTransform:'uppercase'}}>workflow page · v0.9.6 · take 2</div>
+          <h1 style={{margin:'12px 0 0', fontSize:46, fontWeight:600, lineHeight:1, letterSpacing:'-0.025em'}}>
+            Statuses are territory.<br/>Transitions are nodes.
+          </h1>
+          <p style={{maxWidth:780, marginTop:18, fontFamily:"'Instrument Serif', serif", fontStyle:'italic',
+                       fontSize:17, lineHeight:1.45, color:'#4a453d'}}>
+            A traditional process graph that respects the grammar. Status regions are
+            shaded bands; transitions are labeled boxes that sit on a region boundary;
+            commands invoke transitions; gate clusters lock the door into them; JIT
+            prompts are their own nodes anchored within the region they fire in;
+            skills ride above the transition that loads them (dashed underline =
+            conditional); artifacts dock south of the producing transition;
+            sources/sinks are boundary ports.
+          </p>
+          <div style={{marginTop:24, display:'grid', gridTemplateColumns:'1fr 1fr', gap:18}}>
+            <Brief n="V1" h="Gate as lock badge" sub="A padlock chip with a count sits on the entry edge of every guarded transition. Click to expand the full validator/prompt-check list. The lifecycle stays clean and the gate is one chip until you ask for more."/>
+            <Brief n="V2" h="Gate as diamond decision" sub="Where a transition really branches (PM review approve/request-changes; validate pass/gap), it becomes a BPMN-style diamond with named outcome labels on the outgoing edges. Plain transitions stay rectangles."/>
+          </div>
+        </div>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection id="v1" title="V1 · Gate as lock badge" subtitle="dense lifecycle, expandable gate cluster">
+      <DCArtboard id="v1-coding" label="V1 · coding-session (gate open)" width={1440} height={1200}>
+        <Screen tab="workflow · marlin" url="tripwire.app/marlin/workflow" active="process">
+          <T><WorkflowPage initialWorkflowId="coding-session" gateMode="lock"/></T>
+        </Screen>
+      </DCArtboard>
+      <DCArtboard id="v1-pm-review" label="V1 · pm-session-management" width={1440} height={1200}>
+        <Screen tab="workflow · marlin" url="tripwire.app/marlin/workflow" active="process">
+          <T><WorkflowPage initialWorkflowId="pm-session-management" gateMode="lock"/></T>
+        </Screen>
+      </DCArtboard>
+      <DCArtboard id="v1-pm-scoping" label="V1 · pm-scoping" width={1440} height={1200}>
+        <Screen tab="workflow · marlin" url="tripwire.app/marlin/workflow" active="process">
+          <T><WorkflowPage initialWorkflowId="pm-scoping" gateMode="lock"/></T>
+        </Screen>
+      </DCArtboard>
+      <DCArtboard id="v1-maint" label="V1 · project-maintenance" width={1440} height={1200}>
+        <Screen tab="workflow · marlin" url="tripwire.app/marlin/workflow" active="process">
+          <T><WorkflowPage initialWorkflowId="project-maintenance" gateMode="lock"/></T>
+        </Screen>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection id="v2" title="V2 · Gate as diamond decision" subtitle="branched transitions become decisions">
+      <DCArtboard id="v2-coding" label="V2 · coding-session" width={1440} height={1200}>
+        <Screen tab="workflow · marlin" url="tripwire.app/marlin/workflow" active="process">
+          <T><WorkflowPage initialWorkflowId="coding-session" gateMode="diamond"/></T>
+        </Screen>
+      </DCArtboard>
+      <DCArtboard id="v2-pm-incremental" label="V2 · pm-incremental-update" width={1440} height={1200}>
+        <Screen tab="workflow · marlin" url="tripwire.app/marlin/workflow" active="process">
+          <T><WorkflowPage initialWorkflowId="pm-incremental-update" gateMode="diamond"/></T>
+        </Screen>
+      </DCArtboard>
+      <DCArtboard id="v2-scoping" label="V2 · pm-scoping" width={1440} height={1200}>
+        <Screen tab="workflow · marlin" url="tripwire.app/marlin/workflow" active="process">
+          <T><WorkflowPage initialWorkflowId="pm-scoping" gateMode="diamond"/></T>
+        </Screen>
+      </DCArtboard>
+    </DCSection>
+  </DesignCanvas>
+);
+
+const Brief = ({n,h,sub}) => (
+  <div style={{borderTop:'1.5px solid #1a1815', paddingTop:10}}>
+    <div style={{display:'flex', alignItems:'baseline', gap:10}}>
+      <span style={{fontFamily:"'Geist Mono', monospace", fontSize:11, fontWeight:600, letterSpacing:'0.18em'}}>{n}</span>
+      <span style={{fontFamily:"'Bricolage Grotesque', sans-serif", fontWeight:600, fontSize:18, lineHeight:1.1, letterSpacing:'-0.01em'}}>{h}</span>
+    </div>
+    <div style={{marginTop:5, fontFamily:"'Instrument Serif', serif", fontStyle:'italic', fontSize:14, lineHeight:1.4, color:'#4a453d'}}>{sub}</div>
+  </div>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

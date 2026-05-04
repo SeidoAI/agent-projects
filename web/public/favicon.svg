@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <path d="M 20 210 L 96 210 Q 118 178 140 210 L 236 210" stroke="#c83d2e" stroke-width="6" fill="none" stroke-linecap="round"></path>
+  <g transform="rotate(8 128 200)">
+    <text x="128" y="168" text-anchor="middle" font-size="200" fill="#1a1815" letter-spacing="-3">p</text>
+  </g>
+</svg>

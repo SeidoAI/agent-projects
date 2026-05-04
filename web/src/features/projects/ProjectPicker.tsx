@@ -1,4 +1,4 @@
-import { FolderOpen, ArrowRight } from "lucide-react";
+import { ArrowRight, FolderOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useNavigationType } from "react-router-dom";
 
@@ -17,9 +17,7 @@ type DirectoryPickerOptions = {
 };
 declare global {
   interface Window {
-    showDirectoryPicker?: (
-      options?: DirectoryPickerOptions,
-    ) => Promise<FileSystemDirectoryHandle>;
+    showDirectoryPicker?: (options?: DirectoryPickerOptions) => Promise<FileSystemDirectoryHandle>;
   }
 }
 
@@ -63,7 +61,10 @@ export function ProjectPicker() {
       return;
     }
 
-    const name = content.match(/^name:\s*(.+)$/m)?.[1]?.trim().replace(/^['"]|['"]$/g, "");
+    const name = content
+      .match(/^name:\s*(.+)$/m)?.[1]
+      ?.trim()
+      .replace(/^['"]|['"]$/g, "");
     const key_prefix = content
       .match(/^key_prefix:\s*(.+)$/m)?.[1]
       ?.trim()
@@ -94,7 +95,7 @@ export function ProjectPicker() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-(--color-paper) px-6">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-xl">
         <img src="/img/mark-accent.svg" alt="tripwire" className="mb-8 h-14 w-auto" />
 
         <h1 className="font-sans font-semibold text-[28px] text-(--color-ink) leading-tight tracking-[-0.02em]">
@@ -116,13 +117,21 @@ export function ProjectPicker() {
                 onClick={() => navigate(`/p/${p.id}`)}
                 className="flex w-full items-center justify-between rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) px-4 py-3 text-left transition-colors hover:bg-(--color-paper-3)"
               >
-                <div className="flex flex-col gap-0.5">
+                <div className="flex min-w-0 flex-col gap-0.5">
                   <span className="font-sans font-medium text-[14px] text-(--color-ink)">
                     {p.name.replace(/^project-/, "")}
                   </span>
                   <span className="font-mono text-[10px] text-(--color-ink-3) tracking-[0.04em]">
                     {p.key_prefix} · {p.issue_count} issues · {p.node_count} concepts
                   </span>
+                  {p.dir && (
+                    <span
+                      title={p.dir}
+                      className="font-mono text-[10px] text-(--color-ink-3) leading-snug break-all"
+                    >
+                      {p.dir}
+                    </span>
+                  )}
                 </div>
                 <ArrowRight className="h-4 w-4 shrink-0 text-(--color-ink-3)" aria-hidden />
               </button>

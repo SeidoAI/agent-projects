@@ -124,7 +124,7 @@ Picking the split is the user-decision-shaped reason this is
 
 ## After writing
 
-1. Run `tripwire validate --strict`. The validator checks schema
+1. Run `tripwire validate`. The validator checks schema
    shape and that every entry in `references` resolves to a real
    entity (dangling refs are lint errors).
 2. The file watcher emits a `FileChangedEvent` with

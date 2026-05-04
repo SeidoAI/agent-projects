@@ -4,13 +4,9 @@ Runs the typed loader against ``<project>/workflow.yaml`` and routes
 each :class:`WorkflowFinding` into the validator's standard
 :class:`CheckResult` channel. Surfaces under ``tripwire validate``.
 
-This first cut runs with empty ``known_validators`` /
-``known_jit_prompts`` / ``known_prompt_checks`` sets — meaning the
-ref-existence checks short-circuit. Subsequent v0.9 sessions tighten
-the contract by populating those sets from the station registries
-(KUI-120 validators, KUI-121 JIT prompts, KUI-122 prompt-checks). The
-schema-shape checks (unknown_next_station, terminal_with_next, …)
-fire today.
+Reference checks resolve against implementation catalogs. The catalogs
+only prove an id exists; ``workflow.yaml`` is the sole source of where
+that id runs.
 """
 
 from __future__ import annotations
@@ -19,11 +15,9 @@ import yaml
 
 from tripwire.core.validator._types import CheckResult, ValidationContext
 from tripwire.core.workflow.loader import WORKFLOW_FILENAME, load_workflows
-from tripwire.core.workflow.registry import registers_at
 from tripwire.core.workflow.schema import validate_workflow_spec
 
 
-@registers_at("coding-session", "executing")
 def check_workflow_well_formed(ctx: ValidationContext) -> list[CheckResult]:
     """Validate ``<project>/workflow.yaml`` shape and references.
 
@@ -51,9 +45,12 @@ def check_workflow_well_formed(ctx: ValidationContext) -> list[CheckResult]:
 
     findings = validate_workflow_spec(
         spec,
-        known_validators=_known_validators(),
-        known_jit_prompts=_known_jit_prompts(),
+        known_tripwires=_known_tripwires(),
+        known_heuristics=_known_heuristics(),
+        known_jit_prompts=_known_jit_prompts(ctx.project_dir),
         known_prompt_checks=_known_prompt_checks(ctx.project_dir),
+        known_commands=_known_commands(ctx.project_dir),
+        known_skills=_known_skills(ctx.project_dir),
     )
     for finding in findings:
         out.append(
@@ -63,8 +60,8 @@ def check_workflow_well_formed(ctx: ValidationContext) -> list[CheckResult]:
                 file=WORKFLOW_FILENAME,
                 message=finding.message,
                 field=(
-                    f"{finding.workflow}.{finding.station}"
-                    if finding.station is not None
+                    f"{finding.workflow}.{finding.status}"
+                    if finding.status is not None
                     else finding.workflow
                 ),
             )
@@ -72,49 +69,43 @@ def check_workflow_well_formed(ctx: ValidationContext) -> list[CheckResult]:
     return out
 
 
-def _known_validators() -> set[str]:
-    """Return the registry-declared validator ids.
-
-    Populated by KUI-120 once each check declares its station via
-    ``@registers_at``. Returns an empty set today, which the schema
-    treats as "skip the ref-existence check".
-    """
+def _known_tripwires() -> set[str]:
+    """Return implemented tripwire ids (hard-gate primitives)."""
     from tripwire.core.workflow.registry import known_validator_ids
 
     return known_validator_ids()
 
 
-def _known_jit_prompts() -> set[str]:
-    """Return the registry-declared JIT prompt ids.
+def _known_heuristics() -> set[str]:
+    """Return implemented heuristic ids (soft warn-once primitives)."""
+    from tripwire._internal.heuristics import known_heuristic_ids
 
-    Populated by KUI-121 once each JitPrompt subclass declares its
-    station via ``at = (...)``.
+    return known_heuristic_ids()
 
-    KNOWN GAP (codex P2 on PR #73): the registry is populated as a
-    side-effect of `_instantiate()` in jit_prompts/loader.py, which only
-    runs when `load_jit_prompt_registry(project_dir)` is called. `tripwire
-    validate` does not call it, so this set is usually empty during
-    workflow.yaml ref-checks — which silently disables the
-    `workflow/unknown_jit_prompt` finding. Force-loading from this
-    callsite would mutate global registry state in a way that leaks
-    into the gate runtime in transitions.py (the same registry is
-    used to enforce JIT-prompts-at-stations during `tripwire
-    transition`), turning workflow.yaml validation into an
-    unintentional precondition for transition behaviour. Filed as
-    follow-up: see post-completion-comments.md §Follow-ups
-    "snapshot/restore JIT prompt registry for validate-time ref checks".
-    """
+
+def _known_jit_prompts(project_dir) -> set[str]:  # type: ignore[no-untyped-def]
+    """Return implemented JIT prompt ids."""
     from tripwire.core.workflow.registry import known_jit_prompt_ids
 
-    return known_jit_prompt_ids()
+    return known_jit_prompt_ids(project_dir)
 
 
 def _known_prompt_checks(project_dir):  # type: ignore[no-untyped-def]
-    """Return the registry-declared prompt-check ids.
-
-    Populated by KUI-122 once each PM-skill slash command declares
-    ``fires_at:`` in its frontmatter.
-    """
+    """Return implemented prompt-check command ids."""
     from tripwire.core.workflow.registry import known_prompt_check_ids
 
     return known_prompt_check_ids(project_dir)
+
+
+def _known_commands(project_dir):  # type: ignore[no-untyped-def]
+    """Return implemented slash command ids."""
+    from tripwire.core.workflow.registry import known_command_ids
+
+    return known_command_ids(project_dir)
+
+
+def _known_skills(project_dir):  # type: ignore[no-untyped-def]
+    """Return implemented skill ids."""
+    from tripwire.core.workflow.registry import known_skill_ids
+
+    return known_skill_ids(project_dir)

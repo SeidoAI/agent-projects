@@ -2,7 +2,6 @@
 name: pm-session-complete
 description: Close out a session — review, artifacts, node reconciliation, cleanup.
 argument-hint: "<session-id> [closing note]"
-fires_at: verified
 ---
 
 You are the project manager. Load the project-manager skill if not active.
@@ -24,11 +23,13 @@ Workflow:
    - For each proposal: accept
      `tripwire session insights apply <session-id> --proposal <id>` or reject
      `tripwire session insights reject <session-id> --proposal <id> --reason "..."`.
-5. Run `tripwire session complete <session-id>` (real — drops `--dry-run`).
-6. Run `tripwire validate --strict` — the Layer 3 coherence check should
+5. Record the workflow prompt-check:
+   `tripwire prompt-check invoke pm-session-complete <session-id> --status completed`.
+6. Run `tripwire session complete <session-id>` (real — drops `--dry-run`).
+7. Run `tripwire validate` — the Layer 3 coherence check should
    pass now that issues and session both read `done`.
-7. Commit: `complete: <session-id> (<comma-separated issue keys>)`.
-8. Report back:
+8. Commit: `complete: <session-id> (<comma-separated issue keys>)`.
+9. Report back:
    - Issues closed
    - Nodes updated (with downstream impact via `tripwire refs reverse`)
    - Sessions unblocked

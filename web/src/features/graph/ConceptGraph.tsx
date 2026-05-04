@@ -9,7 +9,7 @@ import { type InboxItem, useInbox } from "@/lib/api/endpoints/inbox";
 import { cn } from "@/lib/utils";
 import { GraphLegend } from "./GraphLegend";
 import { GraphRail } from "./GraphRail";
-import { GraphSidebar, colorForKind } from "./GraphSidebar";
+import { colorForKind, GraphSidebar } from "./GraphSidebar";
 import { useConceptGraph } from "./hooks/useGraph";
 import { useGraphLayout } from "./useGraphLayout";
 import { useLayoutPersistence } from "./useLayoutPersistence";
@@ -213,228 +213,233 @@ export function ConceptGraph() {
       </div>
 
       <div className={cn("sticky top-0 flex h-[calc(100vh-3.5rem)] min-h-0", railOpen ? "" : "")}>
-      {sidebarOpen ? (
-        <GraphSidebar
-          graph={data}
-          selectedId={focus}
-          onSelect={setFocus}
-          onCollapse={() => setSidebarOpen(false)}
-        />
-      ) : (
-        <div className="flex items-start justify-start border-(--color-edge) border-r bg-(--color-paper-2) p-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Expand panel"
-          >
-            <PanelLeftOpen className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+        {sidebarOpen ? (
+          <GraphSidebar
+            graph={data}
+            selectedId={focus}
+            onSelect={setFocus}
+            onCollapse={() => setSidebarOpen(false)}
+          />
+        ) : (
+          <div className="flex items-start justify-start border-(--color-edge) border-r bg-(--color-paper-2) p-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Expand panel"
+            >
+              <PanelLeftOpen className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
 
-      <section
-        ref={canvasRef}
-        data-testid="concept-graph-canvas"
-        // Independent scroll container — must not share scroll with
-        // the sidebar (PM #25 round 2 P1). The SVG below sizes to
-        // the layout's bbox in pixels, so when the layout exceeds
-        // the visible canvas this <section> scrolls vertically.
-        className="relative min-h-0 flex-1 overflow-auto bg-(--color-paper-2)"
-      >
-        <svg
-          role="img"
-          aria-label="Concept graph canvas"
-          className="block"
-          width={bbox.width}
-          height={bbox.height}
-          viewBox={`${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`}
-          preserveAspectRatio="xMinYMin meet"
+        <section
+          ref={canvasRef}
+          data-testid="concept-graph-canvas"
+          // Independent scroll container — must not share scroll with
+          // the sidebar (PM #25 round 2 P1). The SVG below sizes to
+          // the layout's bbox in pixels, so when the layout exceeds
+          // the visible canvas this <section> scrolls vertically.
+          className="relative min-h-0 flex-1 overflow-auto bg-(--color-paper-2)"
         >
-          <title>Concept graph canvas</title>
-          <defs>
-            <pattern id="concept-graph-ledger" width={40} height={40} patternUnits="userSpaceOnUse">
-              <path
-                d="M 40 0 L 0 0 0 40"
-                fill="none"
-                stroke="var(--color-paper-3)"
-                strokeWidth={0.5}
-              />
-            </pattern>
-          </defs>
-          <rect
-            x={bbox.x}
-            y={bbox.y}
+          <svg
+            role="img"
+            aria-label="Concept graph canvas"
+            className="block"
             width={bbox.width}
             height={bbox.height}
-            fill="url(#concept-graph-ledger)"
-          />
-
-          {/* edges */}
-          {data.edges.map((edge) => {
-            const a = layout.positions[edge.source];
-            const b = layout.positions[edge.target];
-            if (!a || !b) return null;
-            const isFocused = focus !== null && (edge.source === focus || edge.target === focus);
-            const dashed = !isSolidRelation(edge.relation);
-            return (
-              <line
-                key={edge.id}
-                data-edge-relation={edge.relation}
-                data-edge-focused={isFocused ? "true" : "false"}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke={isFocused ? "var(--color-rule)" : "var(--color-edge)"}
-                strokeWidth={isFocused ? 1.4 : 0.7}
-                strokeDasharray={dashed ? "3 3" : "0"}
-                opacity={focus !== null && !isFocused ? 0.3 : 0.85}
-              />
-            );
-          })}
-
-          {/* nodes */}
-          {concepts.map((node) => {
-            const pos = layout.positions[node.id];
-            if (!pos) return null;
-            const isFocus = node.id === focus;
-            const isNeighbour = neighbours.has(node.id);
-            const dim = focus !== null && !isFocus && !isNeighbour;
-            const stale = node.data?.status === "stale";
-            const nodeType = String(node.data?.type ?? "concept");
-            const typeColor = colorForKind(nodeType);
-            const r = NODE_RADIUS;
-            const inboxCount = inboxByNode.get(node.id)?.length ?? 0;
-            return (
-              // biome-ignore lint/a11y/useSemanticElements: HTML <button> isn't a valid SVG child; role="button" on a <g> is the standard pattern for interactive SVG groups
-              <g
-                key={node.id}
-                role="button"
-                tabIndex={0}
-                aria-label={`Focus ${String(node.data?.label ?? node.id)}`}
-                data-testid={`node-group-${node.id}`}
-                data-focus={isFocus ? "true" : "false"}
-                data-dim={dim ? "true" : "false"}
-                opacity={dim ? 0.35 : 1}
-                style={{ cursor: "pointer", transition: "opacity 200ms ease", outline: "none" }}
-                onClick={() => setFocus(node.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setFocus(node.id);
-                  }
-                }}
+            viewBox={`${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`}
+            preserveAspectRatio="xMinYMin meet"
+          >
+            <title>Concept graph canvas</title>
+            <defs>
+              <pattern
+                id="concept-graph-ledger"
+                width={40}
+                height={40}
+                patternUnits="userSpaceOnUse"
               >
-                <circle
-                  data-testid={`node-circle-${node.id}`}
-                  data-stale={stale ? "true" : "false"}
-                  cx={pos.x}
-                  cy={pos.y}
-                  r={r}
-                  fill={typeColor}
-                  fillOpacity={isFocus ? 1 : 0.5}
-                  stroke={stale ? "#c8861f" : typeColor}
-                  strokeWidth={isFocus ? 2.2 : stale ? 1.6 : 1.1}
-                  strokeDasharray={stale ? "3 2" : "0"}
+                <path
+                  d="M 40 0 L 0 0 0 40"
+                  fill="none"
+                  stroke="var(--color-paper-3)"
+                  strokeWidth={0.5}
                 />
-                {isFocus ? (
+              </pattern>
+            </defs>
+            <rect
+              x={bbox.x}
+              y={bbox.y}
+              width={bbox.width}
+              height={bbox.height}
+              fill="url(#concept-graph-ledger)"
+            />
+
+            {/* edges */}
+            {data.edges.map((edge) => {
+              const a = layout.positions[edge.source];
+              const b = layout.positions[edge.target];
+              if (!a || !b) return null;
+              const isFocused = focus !== null && (edge.source === focus || edge.target === focus);
+              const dashed = !isSolidRelation(edge.relation);
+              return (
+                <line
+                  key={edge.id}
+                  data-edge-relation={edge.relation}
+                  data-edge-focused={isFocused ? "true" : "false"}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke={isFocused ? "var(--color-rule)" : "var(--color-edge)"}
+                  strokeWidth={isFocused ? 1.4 : 0.7}
+                  strokeDasharray={dashed ? "3 3" : "0"}
+                  opacity={focus !== null && !isFocused ? 0.3 : 0.85}
+                />
+              );
+            })}
+
+            {/* nodes */}
+            {concepts.map((node) => {
+              const pos = layout.positions[node.id];
+              if (!pos) return null;
+              const isFocus = node.id === focus;
+              const isNeighbour = neighbours.has(node.id);
+              const dim = focus !== null && !isFocus && !isNeighbour;
+              const stale = node.data?.status === "stale";
+              const nodeType = String(node.data?.type ?? "concept");
+              const typeColor = colorForKind(nodeType);
+              const r = NODE_RADIUS;
+              const inboxCount = inboxByNode.get(node.id)?.length ?? 0;
+              return (
+                // biome-ignore lint/a11y/useSemanticElements: HTML <button> isn't a valid SVG child; role="button" on a <g> is the standard pattern for interactive SVG groups
+                <g
+                  key={node.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Focus ${String(node.data?.label ?? node.id)}`}
+                  data-testid={`node-group-${node.id}`}
+                  data-focus={isFocus ? "true" : "false"}
+                  data-dim={dim ? "true" : "false"}
+                  opacity={dim ? 0.35 : 1}
+                  style={{ cursor: "pointer", transition: "opacity 200ms ease", outline: "none" }}
+                  onClick={() => setFocus(node.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setFocus(node.id);
+                    }
+                  }}
+                >
                   <circle
+                    data-testid={`node-circle-${node.id}`}
+                    data-stale={stale ? "true" : "false"}
                     cx={pos.x}
                     cy={pos.y}
-                    r={r + 6}
-                    fill="none"
-                    stroke="var(--color-rule)"
-                    strokeWidth={1}
-                    strokeDasharray="3 3"
+                    r={r}
+                    fill={typeColor}
+                    fillOpacity={isFocus ? 1 : 0.5}
+                    stroke={stale ? "#c8861f" : typeColor}
+                    strokeWidth={isFocus ? 2.2 : stale ? 1.6 : 1.1}
+                    strokeDasharray={stale ? "3 2" : "0"}
                   />
-                ) : null}
-                <text
-                  data-testid={`node-label-${node.id}`}
-                  x={pos.x}
-                  y={pos.y + r + 12}
-                  textAnchor="middle"
-                  fontFamily="var(--font-sans)"
-                  fontSize={11}
-                  fontWeight={500}
-                  fill={isFocus ? "var(--color-ink)" : "var(--color-ink-2)"}
-                >
-                  {truncateLabel(String(node.data?.label ?? node.id))}
-                </text>
-                <text
-                  x={pos.x}
-                  y={pos.y + r + 24}
-                  textAnchor="middle"
-                  fontFamily="var(--font-mono)"
-                  fontSize={8.5}
-                  fill="var(--color-ink-3)"
-                  letterSpacing={0.5}
-                >
-                  {String(node.data?.type ?? "concept")}
-                </text>
-                {inboxCount > 0 ? (
-                  <g
-                    data-testid={`inbox-badge-${node.id}`}
-                    aria-label={`${inboxCount} inbox entries reference this concept`}
-                  >
+                  {isFocus ? (
                     <circle
-                      cx={pos.x + r - 4}
-                      cy={pos.y - r + 4}
-                      r={NODE_RADIUS_SMALL / 2}
-                      fill="var(--color-rule)"
-                      stroke="var(--color-paper-2)"
-                      strokeWidth={1.4}
+                      cx={pos.x}
+                      cy={pos.y}
+                      r={r + 6}
+                      fill="none"
+                      stroke="var(--color-rule)"
+                      strokeWidth={1}
+                      strokeDasharray="3 3"
                     />
-                    <text
-                      x={pos.x + r - 4}
-                      y={pos.y - r + 7}
-                      textAnchor="middle"
-                      fontFamily="var(--font-mono)"
-                      fontSize={9}
-                      fontWeight={600}
-                      fill="var(--color-paper)"
+                  ) : null}
+                  <text
+                    data-testid={`node-label-${node.id}`}
+                    x={pos.x}
+                    y={pos.y + r + 12}
+                    textAnchor="middle"
+                    fontFamily="var(--font-sans)"
+                    fontSize={11}
+                    fontWeight={500}
+                    fill={isFocus ? "var(--color-ink)" : "var(--color-ink-2)"}
+                  >
+                    {truncateLabel(String(node.data?.label ?? node.id))}
+                  </text>
+                  <text
+                    x={pos.x}
+                    y={pos.y + r + 24}
+                    textAnchor="middle"
+                    fontFamily="var(--font-mono)"
+                    fontSize={8.5}
+                    fill="var(--color-ink-3)"
+                    letterSpacing={0.5}
+                  >
+                    {String(node.data?.type ?? "concept")}
+                  </text>
+                  {inboxCount > 0 ? (
+                    <g
+                      data-testid={`inbox-badge-${node.id}`}
+                      aria-label={`${inboxCount} inbox entries reference this concept`}
                     >
-                      {inboxCount > 9 ? "9+" : String(inboxCount)}
-                    </text>
-                  </g>
-                ) : null}
-              </g>
-            );
-          })}
-        </svg>
+                      <circle
+                        cx={pos.x + r - 4}
+                        cy={pos.y - r + 4}
+                        r={NODE_RADIUS_SMALL / 2}
+                        fill="var(--color-rule)"
+                        stroke="var(--color-paper-2)"
+                        strokeWidth={1.4}
+                      />
+                      <text
+                        x={pos.x + r - 4}
+                        y={pos.y - r + 7}
+                        textAnchor="middle"
+                        fontFamily="var(--font-mono)"
+                        fontSize={9}
+                        fontWeight={600}
+                        fill="var(--color-paper)"
+                      >
+                        {inboxCount > 9 ? "9+" : String(inboxCount)}
+                      </text>
+                    </g>
+                  ) : null}
+                </g>
+              );
+            })}
+          </svg>
 
-        <div
-          className={cn(
-            "pointer-events-none absolute top-3 right-3 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) px-2 py-1",
-            "font-mono text-[10px] text-(--color-ink-3) tracking-[0.06em]",
-          )}
-        >
-          {data.meta.node_count} nodes · {data.meta.edge_count} edges
-        </div>
-      </section>
-
-      {railOpen ? (
-        <GraphRail
-          projectId={projectId}
-          node={focusedNode}
-          incident={incidentEdges}
-          allNodes={concepts}
-          referencingInbox={focus ? (inboxByNode.get(focus) ?? []) : []}
-          onSelectNeighbour={setFocus}
-          onCollapse={() => setRailOpen(false)}
-        />
-      ) : (
-        <div className="flex items-start justify-end border-(--color-edge) border-l bg-(--color-paper) p-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setRailOpen(true)}
-            aria-label="Expand panel"
+          <div
+            className={cn(
+              "pointer-events-none absolute top-3 right-3 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper-2) px-2 py-1",
+              "font-mono text-[10px] text-(--color-ink-3) tracking-[0.06em]",
+            )}
           >
-            <PanelRightOpen className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+            {data.meta.node_count} nodes · {data.meta.edge_count} edges
+          </div>
+        </section>
+
+        {railOpen ? (
+          <GraphRail
+            projectId={projectId}
+            node={focusedNode}
+            incident={incidentEdges}
+            allNodes={concepts}
+            referencingInbox={focus ? (inboxByNode.get(focus) ?? []) : []}
+            onSelectNeighbour={setFocus}
+            onCollapse={() => setRailOpen(false)}
+          />
+        ) : (
+          <div className="flex items-start justify-end border-(--color-edge) border-l bg-(--color-paper) p-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setRailOpen(true)}
+              aria-label="Expand panel"
+            >
+              <PanelRightOpen className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -50,7 +50,7 @@ the agent will try to enforce.
 ## Validation gate
 
 - Every batch of file writes must be followed by:
-  `tripwire validate --strict`
+  `tripwire validate`
 - Fix every error. Do not commit until `exit_code` is 0.
 - The gate also rebuilds the graph cache as a side effect — no need to
   run `refs rebuild` separately.

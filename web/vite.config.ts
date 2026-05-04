@@ -12,10 +12,7 @@ import { defineConfig } from "vite";
 // readable (e.g. when the frontend is built outside the monorepo).
 function readTripwireVersion(): string {
   try {
-    const pyproject = fs.readFileSync(
-      path.resolve(__dirname, "../pyproject.toml"),
-      "utf-8",
-    );
+    const pyproject = fs.readFileSync(path.resolve(__dirname, "../pyproject.toml"), "utf-8");
     const match = pyproject.match(/^version\s*=\s*"([^"]+)"/m);
     return match?.[1] ?? "dev";
   } catch {
@@ -31,6 +28,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     passWithNoTests: true,
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    exclude: ["e2e/**", "node_modules/**", "dist/**"],
     setupFiles: ["./src/__tests__/setup.ts"],
     coverage: {
       provider: "v8",

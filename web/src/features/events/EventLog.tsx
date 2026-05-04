@@ -9,7 +9,7 @@ import { useWorkflowEvents, type WorkflowEvent } from "@/lib/api/endpoints/workf
  * Event Log viewer (KUI-155 / I2).
  *
  * Read-only chronological surface over the v0.9 events log. Filter
- * chips persist in the URL via ``?event=...&instance=...&station=...``
+ * chips persist in the URL via ``?event=...&instance=...&status=...``
  * so deep-links survive reload. The log itself is append-only —
  * ``useWorkflowEvents`` polls every 5s; intermediate-state WS bridge
  * is a future follow-up. The right pane shows the full ``details``
@@ -37,7 +37,7 @@ export function EventLog() {
     () => ({
       workflow: searchParams.get("workflow") ?? undefined,
       instance: searchParams.get("instance") ?? undefined,
-      station: searchParams.get("station") ?? undefined,
+      status: searchParams.get("status") ?? undefined,
       event: searchParams.get("event") ?? undefined,
     }),
     [searchParams],
@@ -48,7 +48,7 @@ export function EventLog() {
   const query = useWorkflowEvents(projectId, filters);
   const events = query.data?.events ?? [];
 
-  const setFilter = (key: "event" | "workflow" | "instance" | "station", value: string | null) => {
+  const setFilter = (key: "event" | "workflow" | "instance" | "status", value: string | null) => {
     const next = new URLSearchParams(searchParams);
     if (value && value !== "") next.set(key, value);
     else next.delete(key);
@@ -56,8 +56,8 @@ export function EventLog() {
   };
 
   // Synthesize a stable per-row id. The events log emits at second
-  // granularity, so a single session/station can produce many rows
-  // with the same `(workflow, instance, station, event, ts)` tuple
+  // granularity, so a single session/status can produce many rows
+  // with the same `(workflow, instance, status, event, ts)` tuple
   // — codex P1. We disambiguate by also including `details.id`
   // (pins validator/tripwire fires apart) and, when ties remain,
   // an occurrence-count suffix `|#N`. The events array is the
@@ -257,8 +257,8 @@ function DetailPane({ event }: { event: WorkflowEvent }) {
         <dd className="text-(--color-ink)">{event.workflow}</dd>
         <dt>instance</dt>
         <dd className="text-(--color-ink)">{event.instance}</dd>
-        <dt>station</dt>
-        <dd className="text-(--color-ink)">{event.station}</dd>
+        <dt>status</dt>
+        <dd className="text-(--color-ink)">{event.status}</dd>
       </dl>
       <pre
         data-testid="event-detail-json"
@@ -283,20 +283,20 @@ function formatTs(ts: string): string {
 function summarize(event: WorkflowEvent): string {
   const d = event.details ?? {};
   const id = (d as { id?: string }).id;
-  if (id) return `${event.station} · ${id}`;
+  if (id) return `${event.status} · ${id}`;
   const reason = (d as { reason?: string }).reason;
-  if (reason) return `${event.station} · ${reason}`;
+  if (reason) return `${event.status} · ${reason}`;
   const outcome = (d as { outcome?: string }).outcome;
-  if (outcome) return `${event.station} · ${outcome}`;
-  return event.station;
+  if (outcome) return `${event.status} · ${outcome}`;
+  return event.status;
 }
 
 function synthIdBase(event: WorkflowEvent): string {
   // Events log doesn't carry an explicit id; derive one from
-  // (workflow, instance, station, event, ts, details.id). The
+  // (workflow, instance, status, event, ts, details.id). The
   // base alone may still collide on dense same-second bursts of
   // the same kind/id; the caller appends an occurrence-count
   // suffix to disambiguate (see `keyedEvents` in EventLog).
   const detailsId = (event.details as { id?: string } | null)?.id ?? "";
-  return `${event.workflow}|${event.instance}|${event.station}|${event.event}|${event.ts}|${detailsId}`;
+  return `${event.workflow}|${event.instance}|${event.status}|${event.event}|${event.ts}|${detailsId}`;
 }

@@ -36,6 +36,12 @@
   --color-gate: #2d5a3d;
   --color-tripwire: #b8741a;
   --color-info: #2d3a7c;
+  /* Soft warning — heuristics (warn-once, non-blocking). Amber matches
+   * the workflow chart's `queued` status hex so the soft-warning
+   * primitive reads as a sibling of the queued lifecycle state. The
+   * existing --color-tripwire is reserved for the JIT-prompt visual
+   * treatment until the stage-2 rename to --color-jit-prompt lands. */
+  --color-warn: #b07a2c;
 
   /* Map shadcn semantic tokens onto the cream palette so existing
    * components (button, card, input, dialog) inherit the new look

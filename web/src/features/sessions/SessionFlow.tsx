@@ -148,8 +148,7 @@ export function SessionFlow({ sessions, focusId, onSelect, showAllCompleted }: S
             const baseColor = sourceSession
               ? colorForStatus(sourceSession.status)
               : "var(--color-edge)";
-            const isOnFocus =
-              focusId !== null && (e.source === focusId || e.target === focusId);
+            const isOnFocus = focusId !== null && (e.source === focusId || e.target === focusId);
             const stroke = isOnFocus ? "var(--color-rule)" : baseColor;
             const opacity = focusId !== null && !isOnFocus ? 0.18 : 0.85;
             return (
@@ -176,8 +175,10 @@ export function SessionFlow({ sessions, focusId, onSelect, showAllCompleted }: S
             const color = style.color;
             const isFocus = s.id === focusId;
             const fillOpacity = isFocus ? 1 : style.fillOpacity;
-            const textColor = style.textOnFill === "paper" ? "var(--color-paper)" : "var(--color-ink)";
-            const subTextColor = style.textOnFill === "paper" ? "var(--color-paper)" : "var(--color-ink-2)";
+            const textColor =
+              style.textOnFill === "paper" ? "var(--color-paper)" : "var(--color-ink)";
+            const subTextColor =
+              style.textOnFill === "paper" ? "var(--color-paper)" : "var(--color-ink-2)";
             return (
               // biome-ignore lint/a11y/useSemanticElements: SVG <g role="button"> is the standard pattern.
               <g

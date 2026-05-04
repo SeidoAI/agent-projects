@@ -1,28 +1,32 @@
 """Workflow drift detection (KUI-124).
 
 Drift is the gap between the workflow.yaml-declared lifecycle and what
-the events log records actually happened. Three classes of drift:
+the events log records actually happened. Four classes of drift:
 
-- ``drift/prompt_check_missing`` — a station declared
-  ``prompt_checks: [...]`` but the session left the station without a
-  ``prompt_check.invoked`` event for one of the declared ids. The PM
-  forgot to run a required check.
-- ``drift/jit_prompt_should_have_fired`` — a station declared
-  ``jit_prompts: [...]`` but the session left without a
+- ``drift/prompt_check_missing`` — a target status declared
+  ``prompt_checks: [...]`` but the session entered that status without a
+  ``prompt_check.invoked`` event for one of the declared ids.
+- ``drift/jit_prompt_should_have_fired`` — a target status declared
+  ``jit_prompts: [...]`` but the session entered it without a
   ``jit_prompt.fired`` event for one of them. Either the JIT prompt is
   miswired or the gate runner skipped it.
+- ``drift/heuristic_should_have_fired`` — a target status declared
+  ``heuristics: [...]`` but the session entered it without any
+  ``heuristic.fired`` event for those ids in the stay window. Severity
+  is ``warning`` (not ``error``) — heuristics are advisory by design,
+  so the absence is a softer signal than a missed jit_prompt.
 - ``drift/unexpected_transition`` — session.yaml currently sits at a
-  station that's NOT reachable from the last
-  ``transition.completed.to_station``. Means somebody (or some tool)
+  status that's NOT reachable from the last
+  ``transition.completed.to_status``. Means somebody (or some tool)
   flipped session.status directly without going through
   ``tripwire transition``.
 
 Surfaced via :func:`detect_drift` (returns
 :class:`DriftFinding` list) and the ``tripwire drift report`` CLI.
 
-The reader walks the events log chronologically, partitions events by
-station-stay (each ``transition.completed`` ends one stay), and for
-each completed stay checks the declared prompt-checks/JIT prompts.
+The reader walks the events log chronologically and checks each
+``transition.completed`` row against the target status entry gate
+declared in ``workflow.yaml``.
 """
 
 from __future__ import annotations
@@ -34,7 +38,7 @@ from typing import Literal
 
 from tripwire.core.events.log import read_events
 from tripwire.core.workflow.loader import load_workflows
-from tripwire.core.workflow.schema import NextSpec, Workflow
+from tripwire.core.workflow.schema import NextSpec, Workflow, WorkflowRouteControls
 
 
 @dataclass(frozen=True)
@@ -44,7 +48,7 @@ class DriftFinding:
     code: str
     workflow: str
     instance: str
-    station: str | None
+    status: str | None
     message: str
     severity: Literal["error", "warning"] = "error"
 
@@ -74,69 +78,103 @@ def detect_drift(
 
 
 def _scan_stay_drift(rows: list[dict], workflow: Workflow) -> list[DriftFinding]:
-    """For each `transition.completed` row, look at the FROM station's
-    declared prompt-checks + JIT prompts and confirm one of each was
-    observed during the stay.
-
-    A "stay" is the contiguous run of events on a session at a given
-    station, ending in `transition.completed.from_station == <station>`.
-    The opening boundary is either the previous `transition.completed`
-    (same instance) or the start of the events log.
-    """
+    """Check each completed transition's target-status entry controls."""
     out: list[DriftFinding] = []
     by_instance: dict[str, list[dict]] = {}
     for row in rows:
         inst = row.get("instance") or ""
         by_instance.setdefault(inst, []).append(row)
 
-    stations_by_id = workflow.stations_by_id
+    statuses_by_id = workflow.statuses_by_id
     for inst, inst_rows in by_instance.items():
         stay_start = 0
         for idx, row in enumerate(inst_rows):
             if row.get("event") != "transition.completed":
                 continue
             details = row.get("details") or {}
-            from_station = details.get("from_station")
-            if not isinstance(from_station, str):
+            to_status = details.get("to_status")
+            from_status = details.get("from_status")
+            if not isinstance(to_status, str):
                 continue
-            station = stations_by_id.get(from_station)
-            if station is None:
+            status = statuses_by_id.get(to_status)
+            if status is None:
                 continue
+            controls = _controls_for_observed_transition(
+                workflow,
+                from_status=from_status if isinstance(from_status, str) else None,
+                to_status=to_status,
+                status=status,
+            )
             stay_rows = inst_rows[stay_start:idx]
             invoked_pcs = _ids_for_event(stay_rows, "prompt_check.invoked")
             fired_prompts = _ids_for_event(stay_rows, "jit_prompt.fired")
-            for pc in station.prompt_checks:
+            fired_heuristics = _ids_for_event(stay_rows, "heuristic.fired")
+            for pc in controls.prompt_checks:
                 if pc not in invoked_pcs:
                     out.append(
                         DriftFinding(
                             code="drift/prompt_check_missing",
                             workflow=workflow.id,
                             instance=inst,
-                            station=from_station,
+                            status=to_status,
                             message=(
-                                f"session {inst!r} left station "
-                                f"{from_station!r} without invoking required "
+                                f"session {inst!r} entered status "
+                                f"{to_status!r} without invoking required "
                                 f"prompt-check {pc!r}"
                             ),
                         )
                     )
-            for prompt_id in station.jit_prompts:
+            for prompt_id in controls.jit_prompts:
                 if prompt_id not in fired_prompts:
                     out.append(
                         DriftFinding(
                             code="drift/jit_prompt_should_have_fired",
                             workflow=workflow.id,
                             instance=inst,
-                            station=from_station,
+                            status=to_status,
                             message=(
-                                f"session {inst!r} left station "
-                                f"{from_station!r} without firing declared "
+                                f"session {inst!r} entered status "
+                                f"{to_status!r} without firing declared "
                                 f"JIT prompt {prompt_id!r}"
                             ),
                         )
                     )
+            # Heuristics are advisory — a missed one is a warning, not
+            # an error. The detection layer is forward-compat; the
+            # `heuristic.fired` event emission is wired in stage 2.
+            for heuristic_id in controls.heuristics:
+                if heuristic_id not in fired_heuristics:
+                    out.append(
+                        DriftFinding(
+                            code="drift/heuristic_should_have_fired",
+                            workflow=workflow.id,
+                            instance=inst,
+                            status=to_status,
+                            message=(
+                                f"session {inst!r} entered status "
+                                f"{to_status!r} without firing declared "
+                                f"heuristic {heuristic_id!r}"
+                            ),
+                            severity="warning",
+                        )
+                    )
             stay_start = idx + 1
     return out
+
+
+def _controls_for_observed_transition(
+    workflow: Workflow, *, from_status: str | None, to_status: str, status
+) -> WorkflowRouteControls:
+    if from_status is not None:
+        for route in workflow.routes:
+            if route.from_ref == from_status and route.to_ref == to_status:
+                return route.controls
+    return WorkflowRouteControls(
+        tripwires=list(status.tripwires),
+        heuristics=list(status.heuristics),
+        jit_prompts=list(status.jit_prompts),
+        prompt_checks=list(status.prompt_checks),
+    )
 
 
 def _ids_for_event(rows: Iterable[dict], event: str) -> set[str]:
@@ -156,8 +194,8 @@ def _scan_unexpected_transitions(
     project_dir: Path, rows: list[dict], workflow: Workflow
 ) -> list[DriftFinding]:
     """Compare session.yaml's current status against the last
-    `transition.completed.to_station` from the events log. If the
-    session sits at a station NOT reachable from the last logged stop,
+    `transition.completed.to_status` from the events log. If the
+    session sits at a status NOT reachable from the last logged stop,
     surface `drift/unexpected_transition` — somebody flipped status
     directly.
 
@@ -171,10 +209,10 @@ def _scan_unexpected_transitions(
         if row.get("event") != "transition.completed":
             continue
         details = row.get("details") or {}
-        to_station = details.get("to_station")
+        to_status = details.get("to_status")
         inst = row.get("instance") or ""
-        if isinstance(to_station, str) and inst:
-            last_to_by_instance[inst] = to_station
+        if isinstance(to_status, str) and inst:
+            last_to_by_instance[inst] = to_status
 
     for inst, last_to in last_to_by_instance.items():
         actual = _read_session_status(project_dir, inst)
@@ -183,10 +221,12 @@ def _scan_unexpected_transitions(
         if actual == last_to:
             continue  # in sync
         # Reachable-from-last-stop?
-        last_station = workflow.stations_by_id.get(last_to)
-        if last_station is None:
+        last_status = workflow.statuses_by_id.get(last_to)
+        if last_status is None:
             continue
-        if _is_reachable_via(last_station.next, actual):
+        if _is_reachable(
+            workflow, last_status.next, from_status=last_to, target=actual
+        ):
             continue  # legitimate single-step move; the gate just hasn't
             # logged a `transition.completed` for it yet.
         out.append(
@@ -194,12 +234,12 @@ def _scan_unexpected_transitions(
                 code="drift/unexpected_transition",
                 workflow=workflow.id,
                 instance=inst,
-                station=actual,
+                status=actual,
                 message=(
                     f"session {inst!r} session.yaml status={actual!r} but "
                     f"last logged transition.completed was to "
                     f"{last_to!r}, and {actual!r} is not reachable from "
-                    f"{last_to!r} via workflow.yaml's `next:` declaration "
+                    f"{last_to!r} via workflow.yaml's route declaration "
                     f"— suggests a gate-bypass status flip"
                 ),
             )
@@ -207,7 +247,14 @@ def _scan_unexpected_transitions(
     return out
 
 
-def _is_reachable_via(spec: NextSpec, target: str) -> bool:
+def _is_reachable(
+    workflow: Workflow, spec: NextSpec, *, from_status: str, target: str
+) -> bool:
+    if workflow.routes:
+        return any(
+            route.from_ref == from_status and route.to_ref == target
+            for route in workflow.routes
+        )
     if spec.kind == "single":
         return spec.single == target
     if spec.kind == "conditional" and spec.conditional is not None:

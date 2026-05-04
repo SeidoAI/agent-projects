@@ -77,7 +77,7 @@ Use a section-heavy structure so reviewers can skim:
 - sessions/api-endpoints-core/artifacts/plan.md (new)
 
 ## Validator
-`tripwire validate --strict` exits 0.
+`tripwire validate` exits 0.
 
 ## Concept graph
 - Created [[auth-token-endpoint]] pointing at src/api/auth.py:45-82
@@ -99,5 +99,6 @@ Don't mix feature work and unrelated housekeeping in one PR.
 
 ## See also
 
-- `WORKFLOWS_REVIEW.md` — the PM review side of PRs
+- `WORKFLOWS_CODE_REVIEW.md` — the PM review side of PRs
+- `WORKFLOWS_NODE_RECONCILIATION.md` — `reconcile:` commit convention for node updates
 - `ANTI_PATTERNS.md` — anti-patterns around commits and PRs
