@@ -28,9 +28,9 @@ def _make_graph() -> FullGraphResult:
             GraphNode(id="E", kind="node"),
         ],
         edges=[
-            GraphEdge(from_id="A", to_id="B", type="references"),
-            GraphEdge(from_id="B", to_id="C", type="references"),
-            GraphEdge(from_id="A", to_id="D", type="references"),
+            GraphEdge(from_id="A", to_id="B", type="refs"),
+            GraphEdge(from_id="B", to_id="C", type="refs"),
+            GraphEdge(from_id="A", to_id="D", type="refs"),
         ],
     )
 

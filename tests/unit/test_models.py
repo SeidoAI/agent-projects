@@ -391,18 +391,18 @@ class TestGraphEdge:
     def test_alias_population_from(self) -> None:
         # Edges in the YAML cache use `from`/`to` (Python keywords).
         e = GraphEdge.model_validate(
-            {"from": "SEI-1", "to": "user-model", "type": "references"}
+            {"from": "SEI-1", "to": "user-model", "type": "refs"}
         )
         assert e.from_id == "SEI-1"
         assert e.to_id == "user-model"
 
     def test_alias_population_field_name(self) -> None:
-        e = GraphEdge(from_id="SEI-1", to_id="SEI-2", type="blocked_by")
+        e = GraphEdge(from_id="SEI-1", to_id="SEI-2", type="depends_on")
         assert e.from_id == "SEI-1"
         assert e.to_id == "SEI-2"
 
     def test_dump_by_alias(self) -> None:
-        e = GraphEdge(from_id="SEI-1", to_id="user-model", type="references")
+        e = GraphEdge(from_id="SEI-1", to_id="user-model", type="refs")
         dumped = e.model_dump(by_alias=True)
         assert "from" in dumped
         assert "to" in dumped

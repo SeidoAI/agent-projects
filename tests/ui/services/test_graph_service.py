@@ -38,8 +38,8 @@ class TestBuildDependencyGraph:
         ids = {n.id for n in g.nodes}
         assert ids == {"TST-1", "TST-2", "TST-3"}
 
-        # All edges carry relation = "blocked_by"
-        assert all(e.relation == "blocked_by" for e in g.edges)
+        # All edges carry relation = canonical "depends_on"
+        assert all(e.relation == "depends_on" for e in g.edges)
 
         # Edge set: TST-2 → TST-1 and TST-3 → TST-2
         edge_pairs = {(e.source, e.target) for e in g.edges}
@@ -131,8 +131,8 @@ class TestBuildConceptGraph:
 
         g = build_concept_graph(tmp_path_project)
         relations = {e.relation for e in g.edges}
-        assert "references" in relations  # TST-* body has [[user-model]]
-        assert "blocked_by" in relations
+        assert "refs" in relations  # TST-* body has [[user-model]]
+        assert "depends_on" in relations
         assert "parent" in relations
 
     def test_react_flow_shape_complies(

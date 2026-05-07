@@ -183,8 +183,8 @@ class TestFullRebuild:
         assert "nodes/user-model.yaml" in cache.files
         assert "nodes/auth-endpoint.yaml" in cache.files
 
-        # Edges: TST-1 → user-model, TST-1 → auth-endpoint (both `references`)
-        ref_edges = [e for e in cache.edges if e.type == "references"]
+        # Edges: TST-1 → user-model, TST-1 → auth-endpoint (both `refs`)
+        ref_edges = [e for e in cache.edges if e.type == "refs"]
         assert len(ref_edges) == 2
         targets = {e.to_id for e in ref_edges}
         assert targets == {"user-model", "auth-endpoint"}
@@ -227,7 +227,13 @@ class TestFullRebuild:
         make_node(tmp_path, "node-a", related=["node-b"])
         make_node(tmp_path, "node-b", related=["node-a"])
         cache = full_rebuild(tmp_path)
-        related_edges = [e for e in cache.edges if e.type == "related"]
+        # Concept-node `related` edges are emitted under the canonical
+        # `refs` kind (bidirectional reference).
+        related_edges = [
+            e
+            for e in cache.edges
+            if e.type == "refs" and e.from_id in {"node-a", "node-b"}
+        ]
         assert len(related_edges) == 2  # a→b and b→a
 
 
@@ -251,7 +257,7 @@ class TestIncrementalUpdate:
         assert cache is not None
         assert "issues/TST-1/issue.yaml" in cache.files
         assert "nodes/user-model.yaml" in cache.files
-        ref_edges = [e for e in cache.edges if e.type == "references"]
+        ref_edges = [e for e in cache.edges if e.type == "refs"]
         assert len(ref_edges) == 1
 
     def test_modify_issue_removes_old_edges(self, tmp_path: Path) -> None:
@@ -270,7 +276,7 @@ class TestIncrementalUpdate:
         ref_targets = {
             e.to_id
             for e in cache.edges
-            if e.type == "references" and e.from_id == "TST-1"
+            if e.type == "refs" and e.from_id == "TST-1"
         }
         assert ref_targets == {"node-b"}
 
@@ -379,7 +385,7 @@ class TestEnsureFresh:
         ref_targets = {
             e.to_id
             for e in cache.edges
-            if e.from_id == "TST-1" and e.type == "references"
+            if e.from_id == "TST-1" and e.type == "refs"
         }
         assert ref_targets == {"other-model"}
 

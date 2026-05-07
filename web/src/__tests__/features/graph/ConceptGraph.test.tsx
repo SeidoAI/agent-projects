@@ -477,13 +477,13 @@ describe("ConceptGraph", () => {
     expect(related?.getAttribute("stroke-dasharray")).toBe("3 3");
   });
 
-  it("treats cites and references as solid relations; related as dashed (PM #25 round 4 P2)", () => {
+  it("treats cites and refs as solid relations; depends_on as dashed (PM #25 round 4 P2)", () => {
     // Regression: edges previously rendered solid only when
-    // `relation === "cites"`, so backend `references` edges showed
-    // dashed even though the legend's solid swatch is meant to
-    // cover both. The mapping is now explicit: solid for cites +
-    // references; dashed for everything else (related, blocked_by,
-    // parent, …).
+    // `relation === "cites"`, so reference edges showed dashed even
+    // though the legend's solid swatch is meant to cover both. The
+    // mapping is now explicit: solid for cites + refs (the canonical
+    // EdgeKind for both body references and concept-node `related`);
+    // dashed for everything else (depends_on, parent, …).
     const wrapper = withSeed({
       nodes: [
         {
@@ -513,8 +513,8 @@ describe("ConceptGraph", () => {
       ],
       edges: [
         { id: "e1", source: "a", target: "b", relation: "cites", data: {} },
-        { id: "e2", source: "b", target: "c", relation: "references", data: {} },
-        { id: "e3", source: "c", target: "d", relation: "related", data: {} },
+        { id: "e2", source: "b", target: "c", relation: "refs", data: {} },
+        { id: "e3", source: "c", target: "d", relation: "depends_on", data: {} },
       ],
       meta: {
         kind: "concept",
@@ -531,8 +531,8 @@ describe("ConceptGraph", () => {
     const get = (rel: string) =>
       container.querySelector(`[data-edge-relation='${rel}']`) as SVGLineElement | null;
     expect(get("cites")?.getAttribute("stroke-dasharray")).toBe("0");
-    expect(get("references")?.getAttribute("stroke-dasharray")).toBe("0");
-    expect(get("related")?.getAttribute("stroke-dasharray")).toBe("3 3");
+    expect(get("refs")?.getAttribute("stroke-dasharray")).toBe("0");
+    expect(get("depends_on")?.getAttribute("stroke-dasharray")).toBe("3 3");
   });
 
   it("draws the dashed amber stroke on stale concept nodes", () => {

@@ -72,9 +72,9 @@ class TestUnifiedIndexInverseQuery:
     def _cache(self) -> GraphIndex:
         cache = GraphIndex(version=2)
         cache.edges = [
-            GraphEdge(from_id="KUI-2", to_id="KUI-1", type="blocked_by"),
+            GraphEdge(from_id="KUI-2", to_id="KUI-1", type="depends_on"),
             GraphEdge(from_id="KUI-3", to_id="KUI-1", type="implements"),
-            GraphEdge(from_id="comment-1", to_id="KUI-1", type="references"),
+            GraphEdge(from_id="comment-1", to_id="KUI-1", type="refs"),
         ]
         return cache
 

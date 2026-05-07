@@ -323,7 +323,7 @@ def _issue_edges(issue: Issue, rel_path: str, body: str) -> list[GraphEdge]:
     """Emit every edge sourced from a single issue file."""
     edges: list[GraphEdge] = []
 
-    # [[node-id]] in body → references
+    # [[node-id]] in body → refs
     seen_refs: set[str] = set()
     for ref in extract_references(body):
         if ref in seen_refs:
@@ -333,18 +333,18 @@ def _issue_edges(issue: Issue, rel_path: str, body: str) -> list[GraphEdge]:
             GraphEdge(
                 from_id=issue.id,
                 to_id=ref,
-                type="references",
+                type="refs",
                 source_file=rel_path,
             )
         )
 
-    # blocked_by → blocked_by edges
+    # blocked_by → depends_on edges
     for blocker in issue.blocked_by:
         edges.append(
             GraphEdge(
                 from_id=issue.id,
                 to_id=blocker,
-                type="blocked_by",
+                type="depends_on",
                 source_file=rel_path,
             )
         )
@@ -465,13 +465,13 @@ def _node_edges(node: ConceptNode, rel_path: str, body: str) -> list[GraphEdge]:
     """Emit every edge sourced from a single node file."""
     edges: list[GraphEdge] = []
 
-    # related → related edges
+    # related → refs edges (bidirectional reference between concept nodes)
     for related_id in node.related:
         edges.append(
             GraphEdge(
                 from_id=node.id,
                 to_id=related_id,
-                type="related",
+                type="refs",
                 source_file=rel_path,
             )
         )
@@ -486,7 +486,7 @@ def _node_edges(node: ConceptNode, rel_path: str, body: str) -> list[GraphEdge]:
             GraphEdge(
                 from_id=node.id,
                 to_id=ref,
-                type="references",
+                type="refs",
                 source_file=rel_path,
             )
         )
@@ -620,20 +620,12 @@ def _rebuild_derived_tables(cache: GraphIndex, project_dir: Path) -> None:
     for entries in by_type.values():
         entries.sort()
 
-    # `referenced_by` is the inverse of every "this references that" edge —
-    # legacy on-disk strings ("references", "blocked_by", "related") AND the
-    # canonical v0.9 EdgeKind values ("refs", "depends_on") emitted by
-    # session/comment resolvers. Without "refs"/"depends_on" here, sessions
-    # or comments that reference an issue or node would be invisible to
-    # consumers that read `cache.referenced_by` (reverse-ref counts, "is
-    # this node referenced anywhere?" lookups).
-    _REFERENCING_EDGE_TYPES = (
-        "references",
-        "blocked_by",
-        "related",
-        "refs",
-        "depends_on",
-    )
+    # `referenced_by` is the inverse of every "this references that" edge.
+    # Both `refs` (body / related) and `depends_on` (blockers) count — a
+    # session or comment that references an issue, or an issue that lists
+    # a blocker, must be reachable via reverse-ref counts and "is this
+    # node referenced anywhere?" lookups.
+    _REFERENCING_EDGE_TYPES = ("refs", "depends_on")
     for edge in cache.edges:
         if edge.type in _REFERENCING_EDGE_TYPES:
             referenced_by.setdefault(edge.to_id, []).append(edge.from_id)
