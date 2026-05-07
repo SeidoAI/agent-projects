@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from tripwire.core import paths
 from tripwire.core.validator._types import CheckResult, ValidationContext
-from tripwire.models.enums import SessionStatus
 from tripwire.models.manifest import ArtifactManifest
 from tripwire.models.session import AgentSession
 
@@ -84,40 +83,52 @@ def check_manifest_phase_ownership_consistent(
 
 
 def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
-    """Sessions at status=completed must have all required artifacts.
+    """Sessions at-or-past `produced_at` must have each required artifact.
 
-    The terminal-success state is `completed`. If a future release adds a
-    distinct post-merge state, extend the predicate below.
+    Mirrors `check_issue_artifact_presence` — consults `produced_at` per
+    manifest entry rather than gating every artifact at a single status.
+    A session that has reached the threshold for one artifact but not for
+    another is checked only against the first.
     """
+    from tripwire.core.issue_artifact_store import status_at_or_past
+
     manifest, _ = _load_manifest(ctx)
     if manifest is None:
         return []
-    required_files = [a.file for a in manifest.artifacts if a.required]
 
     results: list[CheckResult] = []
     for entity in ctx.sessions:
         session: AgentSession = entity.model
-        if session.status != SessionStatus.COMPLETED:
-            continue
         artifacts_dir = paths.session_artifacts_dir(ctx.project_dir, session.id)
-        for artifact_file in required_files:
-            if not (artifacts_dir / artifact_file).exists():
-                results.append(
-                    CheckResult(
-                        code="artifact/missing",
-                        severity="error",
-                        file=entity.rel_path,
-                        field="artifacts",
-                        message=(
-                            f"Completed session {session.id!r} is missing required artifact "
-                            f"{artifact_file!r}."
-                        ),
-                        fix_hint=(
-                            f"Write {paths.SESSIONS_DIR}/{session.id}/"
-                            f"{paths.SESSION_ARTIFACTS_SUBDIR}/{artifact_file}."
-                        ),
-                    )
+        for entry in manifest.artifacts:
+            if not entry.required:
+                continue
+            if not status_at_or_past(
+                str(session.status),
+                entry.produced_at,
+                ctx.project_dir,
+                enum_name="session_status",
+            ):
+                continue
+            if (artifacts_dir / entry.file).exists():
+                continue
+            results.append(
+                CheckResult(
+                    code="artifact/missing",
+                    severity="error",
+                    file=entity.rel_path,
+                    field="artifacts",
+                    message=(
+                        f"Session {session.id!r} ({session.status}) has reached "
+                        f"{entry.produced_at!r} but is missing required artifact "
+                        f"{entry.file!r}."
+                    ),
+                    fix_hint=(
+                        f"Write {paths.SESSIONS_DIR}/{session.id}/"
+                        f"{paths.SESSION_ARTIFACTS_SUBDIR}/{entry.file}."
+                    ),
                 )
+            )
     return results
 
 
