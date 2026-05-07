@@ -6,31 +6,24 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Stamp } from "@/components/ui/stamp";
+import { Stamp, type StampTone } from "@/components/ui/stamp";
 import { type ProjectSummary, useProjects } from "@/lib/api/endpoints/project";
-import {
-  type WorkspaceSummary,
-  useWorkspaces,
-} from "@/lib/api/endpoints/workspace";
-
-const UNWORKSPACED_HEADING = "Unworkspaced";
-const NO_WORKSPACE = "__none__";
 
 /**
- * v0.10.0 — top-of-rail project switcher.
+ * Top-of-rail project switcher.
  *
  * Replaces the legacy `<ProjectChip>` click-through-to-picker so users
- * can flit between every registered project (and any workspace's
- * member projects) without leaving the current page.
+ * can flit between every discovered project without leaving the
+ * current page. Lists every project flat, sorted by friendly name —
+ * users find their project by scanning, not by navigating workspace
+ * groupings.
  *
- * Grouping: projects with `workspace_id` set are listed under their
- * workspace's name; the rest fall into the "Unworkspaced" bucket. When
- * `useWorkspaces()` returns an empty list (no `workspace_roots`
- * configured), the dropdown degrades to a single ungrouped list.
+ * Each row's right-side badge is the project's lifecycle phase, with
+ * a tone keyed off the phase value so a glance tells you which
+ * projects are scoping vs executing vs reviewing.
  *
  * Navigation preserves the sub-path: `/p/{currentId}/board` →
  * `/p/{newId}/board` works because React Router's `useParams` is
@@ -45,13 +38,12 @@ export interface ProjectSwitcherProps {
 
 export function ProjectSwitcher({ projectId, currentLabel }: ProjectSwitcherProps) {
   const projects = useProjects();
-  const workspaces = useWorkspaces();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const groups = useMemo(
-    () => groupProjectsByWorkspace(projects.data ?? [], workspaces.data ?? []),
-    [projects.data, workspaces.data],
+  const sorted = useMemo(
+    () => sortProjects(projects.data ?? []),
+    [projects.data],
   );
 
   const onSelect = (newId: string) => {
@@ -71,18 +63,21 @@ export function ProjectSwitcher({ projectId, currentLabel }: ProjectSwitcherProp
         <ChevronDown className="h-3 w-3 shrink-0 text-(--color-ink-3)" aria-hidden />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-56" sideOffset={4}>
-        {groups.length === 0 ? (
+        {sorted.length === 0 ? (
           <DropdownMenuItem disabled>No projects discovered</DropdownMenuItem>
         ) : (
-          groups.map((group, gi) => (
-            <SwitcherGroup
-              key={group.workspaceId}
-              group={group}
-              showHeading={shouldShowHeading(groups)}
-              isFirst={gi === 0}
-              currentProjectId={projectId}
-              onSelect={onSelect}
-            />
+          sorted.map((p) => (
+            <DropdownMenuItem
+              key={p.id}
+              onSelect={() => onSelect(p.id)}
+              className="flex items-center justify-between gap-3"
+              data-active={p.id === projectId ? "true" : undefined}
+            >
+              <span className="truncate text-(--color-ink)">
+                {p.name.replace(/^project-/, "")}
+              </span>
+              {p.phase ? <Stamp tone={phaseTone(p.phase)}>{p.phase}</Stamp> : null}
+            </DropdownMenuItem>
           ))
         )}
         <DropdownMenuSeparator />
@@ -95,105 +90,44 @@ export function ProjectSwitcher({ projectId, currentLabel }: ProjectSwitcherProp
   );
 }
 
-interface ProjectGroup {
-  workspaceId: string;
-  workspaceName: string;
-  projects: ProjectSummary[];
-}
-
-function shouldShowHeading(groups: ProjectGroup[]): boolean {
-  // No reason to show "Unworkspaced" as a heading when it's the only
-  // group — the dropdown is already implicitly "all your projects".
-  return groups.length > 1;
-}
-
-function SwitcherGroup({
-  group,
-  showHeading,
-  isFirst,
-  currentProjectId,
-  onSelect,
-}: {
-  group: ProjectGroup;
-  showHeading: boolean;
-  isFirst: boolean;
-  currentProjectId: string;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <>
-      {!isFirst && showHeading ? <DropdownMenuSeparator /> : null}
-      {showHeading ? (
-        <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.18em] text-(--color-ink-3)">
-          {group.workspaceName}
-        </DropdownMenuLabel>
-      ) : null}
-      {group.projects.map((p) => (
-        <DropdownMenuItem
-          key={p.id}
-          onSelect={() => onSelect(p.id)}
-          className="flex items-center justify-between gap-3"
-          data-active={p.id === currentProjectId ? "true" : undefined}
-        >
-          <span className="truncate text-(--color-ink)">
-            {p.name.replace(/^project-/, "")}
-          </span>
-          {p.phase ? <Stamp tone="rule">{p.phase}</Stamp> : null}
-        </DropdownMenuItem>
-      ))}
-    </>
-  );
-}
-
 /**
- * Group projects by `workspace_id`, ordered by workspace slug (stable
- * across renders), with the "Unworkspaced" group always last.
+ * Sort projects by friendly name (with the `project-` prefix stripped).
  *
  * Exported for unit testing.
  */
-export function groupProjectsByWorkspace(
-  projects: ProjectSummary[],
-  workspaces: WorkspaceSummary[],
-): ProjectGroup[] {
-  const wsById = new Map(workspaces.map((w) => [w.id, w]));
-  const groupsById = new Map<string, ProjectGroup>();
+export function sortProjects(projects: ProjectSummary[]): ProjectSummary[] {
+  const friendly = (p: ProjectSummary) => p.name.replace(/^project-/, "");
+  return [...projects].sort((a, b) => friendly(a).localeCompare(friendly(b)));
+}
 
-  for (const p of projects) {
-    // If workspace_id is set but the workspace isn't in the discovery
-    // result (cache races, /api/projects ahead of /api/workspaces, the
-    // backend pointer resolved to a directory not registered in
-    // workspace_roots), fall through to the Unworkspaced bucket
-    // rather than spawning a phantom "Unknown workspace" group.
-    const wsId =
-      p.workspace_id && wsById.has(p.workspace_id)
-        ? p.workspace_id
-        : NO_WORKSPACE;
-    if (!groupsById.has(wsId)) {
-      groupsById.set(wsId, {
-        workspaceId: wsId,
-        workspaceName:
-          wsId === NO_WORKSPACE
-            ? UNWORKSPACED_HEADING
-            : wsById.get(wsId)!.name,
-        projects: [],
-      });
-    }
-    groupsById.get(wsId)!.projects.push(p);
+/**
+ * Map a project's lifecycle phase to a Stamp tone. Each phase gets a
+ * distinct colour so a glance across the dropdown tells you which
+ * projects are scoping vs executing vs reviewing.
+ *
+ * Palette rationale:
+ *  - scoping  → info (blue)    — exploring, planning
+ *  - scoped   → default (ink)  — plan locked, ready to start
+ *  - executing → rule (red)    — active work, primary attention
+ *  - reviewing → gate (yellow) — held on review/approval
+ *
+ * Unknown phases fall through to the default ink tone.
+ *
+ * Exported for unit testing.
+ */
+export function phaseTone(phase: string): StampTone {
+  switch (phase) {
+    case "scoping":
+      return "info";
+    case "scoped":
+      return "default";
+    case "executing":
+      return "rule";
+    case "reviewing":
+      return "gate";
+    default:
+      return "default";
   }
-
-  const ordered = [...groupsById.values()].sort((a, b) => {
-    if (a.workspaceId === NO_WORKSPACE) return 1;
-    if (b.workspaceId === NO_WORKSPACE) return -1;
-    return a.workspaceName.localeCompare(b.workspaceName);
-  });
-
-  for (const group of ordered) {
-    group.projects.sort((a, b) =>
-      a.name.replace(/^project-/, "").localeCompare(b.name.replace(/^project-/, "")),
-    );
-  }
-
-  return ordered;
 }
 
 /**
