@@ -36,6 +36,21 @@ def test_status_at_or_past_unknown_returns_false():
     assert status_at_or_past("in_review", "qa") is False
 
 
+def test_status_at_or_past_session_status_default_order():
+    """v0.11.1: helper accepts enum_name='session_status' for session-side
+    callers. Both default lifecycle enums share the canonical order today."""
+    assert (
+        status_at_or_past("completed", "in_review", enum_name="session_status") is True
+    )
+    assert (
+        status_at_or_past("in_review", "completed", enum_name="session_status") is False
+    )
+    assert (
+        status_at_or_past("executing", "completed", enum_name="session_status") is False
+    )
+    assert status_at_or_past("verified", "verified", enum_name="session_status") is True
+
+
 def test_project_override_appends(tmp_path_project: Path):
     project_yaml = tmp_path_project / "project.yaml"
     data = yaml.safe_load(project_yaml.read_text(encoding="utf-8"))
