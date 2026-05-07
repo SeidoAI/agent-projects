@@ -9,8 +9,11 @@ Subcommands:
 - ``tripwire migrate graph-edges`` — rewrite pre-v0.9 edge type strings
   in the cache (``references`` → ``refs``, ``blocked_by`` → ``depends_on``,
   ``related`` → ``refs``).
+- ``tripwire migrate status-values`` — rewrite pre-v0.9.4 issue and
+  session ``status:`` values to the canonical v0.9.4 taxonomy
+  (``backlog`` → ``planned``, ``active`` → ``executing``, etc.).
 
-All three are idempotent — running twice is a no-op.
+All four are idempotent — running twice is a no-op.
 """
 
 from __future__ import annotations
@@ -24,6 +27,11 @@ import click
 import yaml
 
 from tripwire.core import paths
+from tripwire.core.parser import (
+    ParseError,
+    parse_frontmatter_body,
+    serialize_frontmatter_body,
+)
 
 # Source (flat) → destination (under templates/) mapping for the v0.10.0
 # layout migration. The destination paths are now the canonical layout
@@ -380,6 +388,166 @@ def migrate_graph_edges_cmd(project_dir: Path, dry_run: bool) -> None:
     click.echo(
         f"Rewrote {rewritten} edge(s) "
         f"({already_canonical} already canonical) in {paths.GRAPH_CACHE}."
+    )
+
+
+# ---------------------------------------------------------------------------
+# status-values migration — rewrites pre-v0.9.4 issue + session statuses
+# ---------------------------------------------------------------------------
+
+# Pre-v0.9.4 → canonical status rewrites. The IssueStatus / SessionStatus
+# StrEnums and their `_missing_` aliases were ripped in commit bb7b2ff;
+# this command is the only path back to a loadable project for any tree
+# that still carries the legacy values.
+_ISSUE_STATUS_RENAMES: dict[str, str] = {
+    "backlog": "planned",
+    "todo": "queued",
+    "in_progress": "executing",
+    "done": "completed",
+    "canceled": "abandoned",
+}
+
+_SESSION_STATUS_RENAMES: dict[str, str] = {
+    "active": "executing",
+    "waiting_for_ci": "executing",
+    "waiting_for_review": "in_review",
+    "waiting_for_deploy": "executing",
+    "re_engaged": "executing",
+}
+
+
+def _rewrite_status_in_place(
+    path: Path,
+    rename_map: dict[str, str],
+    *,
+    dry_run: bool,
+) -> tuple[bool, str | None, str | None]:
+    """Rewrite ``status:`` in *path*'s frontmatter using *rename_map*.
+
+    Returns ``(changed, before, after)``:
+    - ``changed`` — whether the file's status was a legacy value that
+      this call rewrote (or would rewrite, in dry-run).
+    - ``before`` / ``after`` — the legacy and canonical strings, for
+      output. ``None`` for files that needed no rewrite.
+
+    Files that can't be parsed are skipped silently with ``(False, None,
+    None)`` — the validator should already be flagging them, and this
+    command's job is rewriting, not reporting.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False, None, None
+    try:
+        frontmatter, body = parse_frontmatter_body(text)
+    except ParseError:
+        return False, None, None
+    status = frontmatter.get("status")
+    if not isinstance(status, str) or status not in rename_map:
+        return False, None, None
+
+    canonical = rename_map[status]
+    if dry_run:
+        return True, status, canonical
+
+    frontmatter["status"] = canonical
+    path.write_text(
+        serialize_frontmatter_body(frontmatter, body), encoding="utf-8"
+    )
+    return True, status, canonical
+
+
+@migrate_cmd.command("status-values")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+    help="Project root to migrate.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Print the rewrites without performing them.",
+)
+def migrate_status_values_cmd(project_dir: Path, dry_run: bool) -> None:
+    """Rewrite pre-v0.9.4 ``status:`` values to the canonical taxonomy.
+
+    Walks every ``issues/<KEY>/issue.yaml`` and
+    ``sessions/<id>/session.yaml`` under the project, finds frontmatter
+    ``status:`` values that match the legacy taxonomy, and rewrites
+    them in place:
+
+      \b
+      Issue:    backlog → planned, todo → queued, in_progress → executing,
+                done → completed, canceled → abandoned
+      Session:  active / waiting_for_ci / waiting_for_deploy / re_engaged → executing,
+                waiting_for_review → in_review
+
+    Idempotent — files already on the canonical taxonomy are left alone.
+    Missing files (no ``issues/``, no ``sessions/``) are tolerated.
+    """
+    project_dir = project_dir.expanduser().resolve()
+    if not (project_dir / "project.yaml").is_file():
+        raise click.ClickException(
+            f"{project_dir} doesn't look like a tripwire project "
+            "(no project.yaml at the root)."
+        )
+
+    rewritten: list[tuple[str, str, str]] = []  # (rel_path, before, after)
+    scanned = 0
+
+    # Issues — issues/<KEY>/issue.yaml
+    issues_root = paths.issues_dir(project_dir)
+    if issues_root.is_dir():
+        for idir in sorted(p for p in issues_root.iterdir() if p.is_dir()):
+            if idir.name.startswith("."):
+                continue
+            yaml_path = idir / paths.ISSUE_FILENAME
+            if not yaml_path.is_file():
+                continue
+            scanned += 1
+            changed, before, after = _rewrite_status_in_place(
+                yaml_path, _ISSUE_STATUS_RENAMES, dry_run=dry_run
+            )
+            if changed and before is not None and after is not None:
+                rewritten.append(
+                    (str(yaml_path.relative_to(project_dir)), before, after)
+                )
+
+    # Sessions — sessions/<id>/session.yaml
+    sessions_root = paths.sessions_dir(project_dir)
+    if sessions_root.is_dir():
+        for sdir in sorted(p for p in sessions_root.iterdir() if p.is_dir()):
+            if sdir.name.startswith("."):
+                continue
+            yaml_path = sdir / paths.SESSION_FILENAME
+            if not yaml_path.is_file():
+                continue
+            scanned += 1
+            changed, before, after = _rewrite_status_in_place(
+                yaml_path, _SESSION_STATUS_RENAMES, dry_run=dry_run
+            )
+            if changed and before is not None and after is not None:
+                rewritten.append(
+                    (str(yaml_path.relative_to(project_dir)), before, after)
+                )
+
+    if not rewritten:
+        click.echo(
+            f"All {scanned} file(s) already on canonical statuses — "
+            "nothing to migrate."
+        )
+        return
+
+    prefix = "[dry-run] would rewrite" if dry_run else "rewrote"
+    for rel, before, after in rewritten:
+        click.echo(f"{prefix}: {rel}  status: {before} → {after}")
+
+    summary_verb = "would be rewritten" if dry_run else "rewritten"
+    click.echo(
+        f"\n{len(rewritten)} file(s) {summary_verb} "
+        f"({scanned - len(rewritten)} already canonical)."
     )
 
 

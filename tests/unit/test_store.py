@@ -273,3 +273,50 @@ class TestCacheInvalidationOnSave:
         # Either no cache file at all, or the cache doesn't include TST-99.
         if cache is not None:
             assert "issues/TST-99/issue.yaml" not in cache.files
+
+
+# ============================================================================
+# Legacy status interception (concern 1)
+# ============================================================================
+
+
+class TestLegacyIssueStatus:
+    """`load_issue` / `list_issues` must intercept Pydantic's
+    ValidationError when it fires on a pre-v0.9.4 ``status:`` value
+    and surface a tight, actionable migration message instead.
+    """
+
+    def _write_legacy(self, project_dir: Path, key: str, status: str) -> Path:
+        from tripwire.core.parser import serialize_frontmatter_body
+
+        idir = project_dir / "issues" / key
+        idir.mkdir(parents=True, exist_ok=True)
+        fm = {
+            "uuid": "11111111-2222-4333-8444-555555555555",
+            "id": key,
+            "title": f"Legacy {key}",
+            "status": status,
+            "priority": "medium",
+            "executor": "ai",
+            "verifier": "required",
+        }
+        text = serialize_frontmatter_body(fm, "## Context\n")
+        path = idir / "issue.yaml"
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def test_load_issue_legacy_status_raises(self, project_dir: Path) -> None:
+        from tripwire.core.store import LegacyIssueStatusError
+
+        self._write_legacy(project_dir, "TST-1", "in_progress")
+        with pytest.raises(LegacyIssueStatusError) as exc_info:
+            load_issue(project_dir, "TST-1")
+        assert exc_info.value.status == "in_progress"
+        assert "tripwire migrate status-values" in str(exc_info.value)
+
+    def test_list_issues_legacy_status_raises(self, project_dir: Path) -> None:
+        from tripwire.core.store import LegacyIssueStatusError
+
+        self._write_legacy(project_dir, "TST-1", "backlog")
+        with pytest.raises(LegacyIssueStatusError):
+            list_issues(project_dir)
