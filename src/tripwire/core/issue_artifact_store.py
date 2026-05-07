@@ -111,6 +111,22 @@ def _status_ordering(
     return list(values) if values else list(_DEFAULT_STATUS_ORDER)
 
 
+SIDE_STATES: frozenset[str] = frozenset({"paused", "abandoned", "failed", "deferred"})
+"""Statuses that exist outside the linear lifecycle progression.
+
+A session/issue in one of these states is in limbo — paused awaiting
+human input, deferred, abandoned without success, or failed mid-run.
+Artifact-presence and coherence gates that test "have we reached
+status X yet?" should treat side states as "not reached" regardless of
+where they happen to sit in the enum's declared order.
+
+Without this, projects whose `session_status.yaml` declares
+`paused`/`failed`/`abandoned` AFTER `completed` would have
+`status_at_or_past("paused", "completed")` return True — incorrectly
+demanding completed-state artifacts from a paused session.
+"""
+
+
 def status_at_or_past(
     current: str,
     threshold: str,
@@ -125,7 +141,15 @@ def status_at_or_past(
     `enum_name` selects which lifecycle enum to consult. Defaults to
     `issue_status` so existing issue-side callers continue to work
     unchanged; session-side callers should pass `enum_name="session_status"`.
+
+    v0.12: short-circuits to False when `current` is in `SIDE_STATES`
+    (paused/abandoned/failed/deferred). Side states are off-lifecycle;
+    artifact gates do not apply while a session/issue sits in one. When
+    the entity transitions back onto the lifecycle, the gates re-engage
+    based on the new status.
     """
+    if current in SIDE_STATES:
+        return False
     order = _status_ordering(project_dir, enum_name=enum_name)
     try:
         return order.index(current) >= order.index(threshold)
