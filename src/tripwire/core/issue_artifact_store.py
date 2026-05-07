@@ -92,27 +92,41 @@ def load_issue_artifact_manifest(project_dir: Path) -> IssueArtifactManifest:
     return IssueArtifactManifest(artifacts=entries)
 
 
-def _status_ordering(project_dir: Path | None) -> list[str]:
+def _status_ordering(
+    project_dir: Path | None, enum_name: str = "issue_status"
+) -> list[str]:
     """Canonical lifecycle order: enum's declared order for the project,
-    falling back to the tripwire default if the project has no override."""
+    falling back to the tripwire default if the project has no override.
+
+    `enum_name` selects which lifecycle enum to read — `issue_status` for
+    issue-side gating (default), `session_status` for session-side. The
+    canonical default is the same for both today.
+    """
     if project_dir is None:
         return list(_DEFAULT_STATUS_ORDER)
     try:
-        values = load_enum(project_dir, "issue_status")
+        values = load_enum(project_dir, enum_name)
     except FileNotFoundError:
         return list(_DEFAULT_STATUS_ORDER)
     return list(values) if values else list(_DEFAULT_STATUS_ORDER)
 
 
 def status_at_or_past(
-    current: str, threshold: str, project_dir: Path | None = None
+    current: str,
+    threshold: str,
+    project_dir: Path | None = None,
+    enum_name: str = "issue_status",
 ) -> bool:
     """Is `current` at or past `threshold` in the enum's declared order?
 
     Returns False if either status isn't declared — the caller should treat
     unknown statuses as "not reached" rather than raise.
+
+    `enum_name` selects which lifecycle enum to consult. Defaults to
+    `issue_status` so existing issue-side callers continue to work
+    unchanged; session-side callers should pass `enum_name="session_status"`.
     """
-    order = _status_ordering(project_dir)
+    order = _status_ordering(project_dir, enum_name=enum_name)
     try:
         return order.index(current) >= order.index(threshold)
     except ValueError:
