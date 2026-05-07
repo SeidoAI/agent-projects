@@ -16,6 +16,23 @@
 - [x] No hardcoded secrets (JWT_SECRET read from env at startup)
 - [x] No unused imports or debug prints
 
+## Schema parity
+
+This session ships an OpenAPI schema fragment for `POST /v1/auth/token`.
+
+- [x] Located the canonical shape in the issue body or referenced
+      spec section. File: `issues/SEI-42/issue.yaml:78` (under the
+      `## OpenAPI fragment` heading).
+- [x] Located the shipped shape in the implementation. File:
+      `web-app-backend/src/api/openapi/auth.yaml:14`.
+- [x] Verified BYTE-EQUIVALENT match between the two. Method:
+      side-by-side diff via `diff <(yq '.openapi_fragment' issue.yaml) auth.yaml`.
+- [x] If the shapes diverge, STOPPED AND ASKED — N/A, no divergence.
+- [x] Authored at least one TDD test that asserts the CANONICAL shape.
+      Test: `tests/api/test_auth_token_schema.py::test_response_matches_openapi_fragment`.
+- [x] Recorded any shape change in `decisions.md` — N/A, shipped
+      canonical.
+
 ## Concept graph
 - [x] [[auth-token-endpoint]] node created and referenced in SEI-42
 - [x] [[user-model]] rehashed after touching `src/models/user.py` (no-op; not touched)

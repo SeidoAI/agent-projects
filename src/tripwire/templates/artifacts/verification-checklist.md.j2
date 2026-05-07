@@ -15,6 +15,30 @@ confirm every item. Anything that can't be ticked blocks completion._
 - [ ] No hardcoded secrets
 - [ ] No unused imports, dead code, or debug prints left behind
 
+## Schema parity — for sessions shipping schemas / types / contracts
+
+If this session ships a TypeScript type, JSON schema, OpenAPI contract,
+GraphQL SDL, protobuf, Pydantic model, or any other declarative shape
+quoted literally in an issue body or referenced spec section:
+
+- [ ] Located the canonical shape in the issue body or referenced
+      spec section. File: `<path:line>`.
+- [ ] Located the shipped shape in the implementation. File: `<path:line>`.
+- [ ] Verified BYTE-EQUIVALENT match between the two (modulo formatting
+      differences a formatter would produce). Method: side-by-side
+      diff, or grep / AST compare for type signatures.
+- [ ] If the shapes diverge, STOPPED AND ASKED in the issue
+      comments rather than substituting a variant.
+- [ ] Authored at least one TDD test that asserts the CANONICAL shape
+      (not the agent's variant). The test must instantiate or destructure
+      every required field/variant from the canonical spec.
+- [ ] Recorded any shape change in `decisions.md` with the spec quote,
+      shipped quote, and the user-facing reason for the divergence.
+
+If this session ships no schemas, mark this section N/A and explain
+in one line which session-shipped artifact (if any) this section
+would have applied to.
+
 ## Concept graph
 - [ ] Every new artifact has a concept node if referenced in more than one place
 - [ ] Every `[[reference]]` in committed markdown resolves to an existing node

@@ -117,10 +117,14 @@ def test_total_templates_under_budget() -> None:
     referenced a `frontend-development` skill that didn't exist in
     templates/skills/. The new skill is 27KB (under the per-skill 30KB
     cap); the bump is sized to leave ~8KB headroom for future trims.
+    v0.12.2 bumps to 415KB to absorb the Schema parity section in the
+    verification-checklist template + matching SCHEMA_ISSUES /
+    WORKFLOWS_CODE_REVIEW additions + sixth mortal sin in PM SKILL.md
+    + filled-in example. Total markdown delta ~2KB.
     """
     total = _total_chars(TEMPLATES_DIR)
-    assert total < 410_000, (
-        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 410KB."
+    assert total < 415_000, (
+        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 415KB."
     )
 
 

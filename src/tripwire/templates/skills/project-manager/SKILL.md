@@ -136,15 +136,20 @@ Every entity has **both** a `uuid` and a human-readable `id`:
 
 Full details: `references/ID_ALLOCATION.md`.
 
-## The five mortal sins
+## The six mortal sins
 
-Each fails validation and costs an iteration:
+Each fails validation or warrants `REQUEST_CHANGES` at PM review:
 
 1. **Inventing fields** — validator rejects unknown frontmatter keys.
 2. **Skipping `validate`** before declaring done.
 3. **Hand-picking issue numbers** instead of `next-key` — counter drifts.
 4. **Hand-writing UUIDs** — RFC 4122 v4 bits get checked.
 5. **Dangling refs** — `[[unknown-node]]`, `blocked_by: [INVENTED-99]`.
+6. **Shipping a schema variant** instead of the canonical shape from
+   the spec — `REQUEST_CHANGES` on the PR; do not let it merge with a
+   deferred fix. The verification-checklist's Schema parity section is
+   the agent-side gate (see `references/SCHEMA_ISSUES.md` § Schemas in
+   issue bodies).
 
 Full list with examples: `references/ANTI_PATTERNS.md`.
 
