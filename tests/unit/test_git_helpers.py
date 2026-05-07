@@ -11,6 +11,7 @@ from tripwire.core.git_helpers import (
     fetch_origin,
     rebase_branch_onto,
     worktree_add,
+    worktree_attach,
     worktree_is_dirty,
     worktree_list,
     worktree_path_for_session,
@@ -164,6 +165,33 @@ def _commit(
         ],
         check=True,
     )
+
+
+class TestWorktreeAttach:
+    """v0.12.1: worktree_attach attaches an existing local branch as a
+    new worktree. Used by --resume recreation when `tripwire session
+    complete` removed the worktree but left the branch behind."""
+
+    def test_attaches_existing_branch(self, tmp_path):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _init_repo(repo)
+        # Create a local branch (no worktree on it).
+        subprocess.run(["git", "-C", str(repo), "branch", "feat/x"], check=True)
+        wt = tmp_path / "feat-wt"
+        worktree_attach(repo, wt, "feat/x")
+        assert wt.is_dir()
+        assert (wt / ".git").exists()
+
+    def test_errors_on_nonexistent_branch(self, tmp_path):
+        """Attaching a branch that doesn't exist locally fails — the
+        caller should fall back to worktree_add (with `-b`) instead."""
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _init_repo(repo)
+        wt = tmp_path / "feat-wt"
+        with pytest.raises(subprocess.CalledProcessError):
+            worktree_attach(repo, wt, "feat/does-not-exist")
 
 
 class TestRebaseBranchOnto:

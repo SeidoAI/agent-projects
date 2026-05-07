@@ -111,6 +111,20 @@ def reopen_session(
                 stub_lines.append("PR(s) under review:")
                 stub_lines.extend(pr_lines)
                 stub_lines.append("")
+            # v0.12.1: tell the resumed agent + future PM what's about
+            # to happen on the next spawn. `tripwire session complete`
+            # cleans the worktrees; `--resume` recreates them off
+            # latest origin/main. The agent should open a NEW fix
+            # branch inside the recreated worktree, not push to the
+            # merged branch.
+            stub_lines.append(
+                "Worktrees were cleaned at completion. They will be "
+                "recreated off latest `origin/main` on the next "
+                "`tripwire session spawn <sid> --resume`. Open a new "
+                "fix branch inside the recreated worktree; do NOT push "
+                "to the merged branch."
+            )
+            stub_lines.append("")
             stub_lines.append(
                 "Address each PM finding in priority order; see the "
                 "PR comments for specifics."

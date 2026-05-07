@@ -602,6 +602,8 @@ class TestResolveWorktreesResume:
     def test_resume_errors_when_worktree_vanished(
         self, tmp_path_project, save_test_session
     ):
+        """When the repo clone itself is missing, resume still errors —
+        we can't manufacture a clone out of thin air."""
         from tripwire.runtimes.prep import resolve_worktrees
 
         save_test_session(
@@ -627,6 +629,156 @@ class TestResolveWorktreesResume:
                     base_ref="main",
                     resume=True,
                 )
+
+    def test_resume_recreates_when_worktree_path_missing_branch_exists(
+        self, tmp_path, tmp_path_project, save_test_session, monkeypatch
+    ):
+        """v0.12.1: --resume falls through to creation when the
+        worktree was cleaned (e.g. by `tripwire session complete`) but
+        the local branch still exists. Closes the post-merge fix-loop
+        catch-22.
+        """
+        from tripwire.core.git_helpers import worktree_path_for_session
+        from tripwire.runtimes.prep import resolve_worktrees
+
+        code_clone = tmp_path / "code-clone"
+        code_clone.mkdir()
+        _init_repo(code_clone)
+        # Create the branch locally (simulates `complete` having merged
+        # the branch but left it behind locally).
+        subprocess.run(["git", "-C", str(code_clone), "branch", "feat/s1"], check=True)
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="paused",
+            repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
+        )
+
+        from tripwire.core.session_store import load_session
+
+        session = load_session(tmp_path_project, "s1")
+
+        # Stub the draft-PR opener so we don't depend on `gh`.
+        monkeypatch.setattr(
+            "tripwire.runtimes.prep._open_draft_pr",
+            lambda **_: None,
+        )
+
+        # Confirm the worktree path doesn't exist before the call.
+        wt_path = worktree_path_for_session(code_clone, "s1")
+        assert not wt_path.exists()
+
+        with patch(
+            "tripwire.runtimes.prep._resolve_clone_path",
+            return_value=code_clone,
+        ):
+            entries = resolve_worktrees(
+                session=session,
+                project_dir=tmp_path_project,
+                branch="feat/s1",
+                base_ref="main",
+                resume=True,
+            )
+
+        assert len(entries) == 1
+        assert Path(entries[0].worktree_path).is_dir()
+        # The worktree is attached to the existing branch (not a new one).
+        assert entries[0].branch == "feat/s1"
+
+    def test_resume_recreates_when_worktree_and_branch_both_missing(
+        self, tmp_path, tmp_path_project, save_test_session, monkeypatch
+    ):
+        """v0.12.1: --resume falls through to creation when both the
+        worktree path AND the local branch are gone. New branch is
+        created off the base ref.
+        """
+        from tripwire.runtimes.prep import resolve_worktrees
+
+        code_clone = tmp_path / "code-clone"
+        code_clone.mkdir()
+        _init_repo(code_clone)
+        # Note: branch `feat/s1` does NOT exist (simulates `complete`
+        # having deleted it as part of cleanup, or remote-only branch).
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="paused",
+            repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
+        )
+
+        from tripwire.core.session_store import load_session
+
+        session = load_session(tmp_path_project, "s1")
+
+        monkeypatch.setattr(
+            "tripwire.runtimes.prep._open_draft_pr",
+            lambda **_: None,
+        )
+
+        with patch(
+            "tripwire.runtimes.prep._resolve_clone_path",
+            return_value=code_clone,
+        ):
+            entries = resolve_worktrees(
+                session=session,
+                project_dir=tmp_path_project,
+                branch="feat/s1",
+                base_ref="main",
+                resume=True,
+            )
+
+        assert len(entries) == 1
+        assert Path(entries[0].worktree_path).is_dir()
+        assert entries[0].branch == "feat/s1"
+
+    def test_resume_recreate_tolerates_draft_pr_failure(
+        self, tmp_path, tmp_path_project, save_test_session, monkeypatch
+    ):
+        """v0.12.1: on --resume recreate, draft-PR opening is best-effort.
+        If it raises (e.g. PR already exists from the prior session),
+        the resume continues without a new draft PR rather than failing.
+        """
+        from tripwire.runtimes.prep import resolve_worktrees
+
+        code_clone = tmp_path / "code-clone"
+        code_clone.mkdir()
+        _init_repo(code_clone)
+
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="paused",
+            repos=[{"repo": "SeidoAI/code", "base_branch": "main"}],
+        )
+
+        from tripwire.core.session_store import load_session
+
+        session = load_session(tmp_path_project, "s1")
+
+        def boom(**_):
+            raise subprocess.CalledProcessError(
+                1, ["gh", "pr", "create"], stderr="PR already exists"
+            )
+
+        monkeypatch.setattr("tripwire.runtimes.prep._open_draft_pr", boom)
+
+        with patch(
+            "tripwire.runtimes.prep._resolve_clone_path",
+            return_value=code_clone,
+        ):
+            entries = resolve_worktrees(
+                session=session,
+                project_dir=tmp_path_project,
+                branch="feat/s1",
+                base_ref="main",
+                resume=True,
+            )
+
+        assert len(entries) == 1
+        assert Path(entries[0].worktree_path).is_dir()
+        assert entries[0].draft_pr_url is None
 
 
 class TestBuildClaudeArgsResumePropagation:

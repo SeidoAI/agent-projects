@@ -58,6 +58,31 @@ def worktree_add(
     )
 
 
+def worktree_attach(clone_path: Path, wt_path: Path, branch: str) -> None:
+    """Attach an existing local branch as a new worktree at ``wt_path``.
+
+    Unlike :func:`worktree_add`, this does NOT create a new branch — the
+    branch must already exist in ``clone_path``. Used by ``--resume``
+    recreation (v0.12.1) when ``tripwire session complete`` removed the
+    worktree but left the local branch behind, so the resumed session
+    picks up where the agent left off.
+    """
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(clone_path),
+            "worktree",
+            "add",
+            str(wt_path),
+            branch,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
 def worktree_remove(clone_path: Path, wt_path: Path) -> None:
     """Remove a git worktree. No-op if it doesn't exist."""
     if not wt_path.exists():
