@@ -22,6 +22,7 @@ from tripwire.core.branch_naming import SESSION_ID_PREFIX
 from tripwire.core.git_helpers import (
     branch_exists,
     worktree_add,
+    worktree_attach,
     worktree_path_for_session,
 )
 from tripwire.models.session import AgentSession, WorktreeEntry
@@ -223,26 +224,46 @@ def resolve_worktrees(
                 )
             # resume: reuse existing worktree (and any prior draft PR)
         else:
-            if resume:
-                raise RuntimeError(
-                    f"Worktree {wt_path} was expected to exist for "
-                    f"--resume but does not. Run "
-                    f"'tripwire session cleanup {session.id}' then "
-                    f"spawn without --resume."
-                )
-            if branch_exists(clone_path, branch):
-                raise RuntimeError(
-                    f"Branch '{branch}' already exists in {clone_path}. "
-                    f"Delete the branch or pick a different name."
-                )
+            # v0.12.1: --resume falls through to creation when the
+            # worktree was cleaned (e.g. by `tripwire session complete`).
+            # Branch may still exist locally — attach if so, otherwise
+            # create off the base ref. Closes the post-merge fix-loop
+            # catch-22 where reopen → spawn --resume previously raised.
             base_branch = rb.base_branch or base_ref
-            worktree_add(clone_path, wt_path, branch, base_branch)
-            draft_pr_url = _open_draft_pr(
-                worktree=wt_path,
-                branch=branch,
-                base_branch=base_branch,
-                session_id=session.id,
-            )
+            local_branch_exists = branch_exists(clone_path, branch)
+            if local_branch_exists:
+                if not resume:
+                    raise RuntimeError(
+                        f"Branch '{branch}' already exists in {clone_path}. "
+                        f"Delete the branch or pick a different name."
+                    )
+                worktree_attach(clone_path, wt_path, branch)
+            else:
+                worktree_add(clone_path, wt_path, branch, base_branch)
+            try:
+                draft_pr_url = _open_draft_pr(
+                    worktree=wt_path,
+                    branch=branch,
+                    base_branch=base_branch,
+                    session_id=session.id,
+                )
+            except subprocess.CalledProcessError as exc:
+                # On --resume recreate, the original PR may already
+                # exist (open, merged, or closed). Don't fail the
+                # resume just because we couldn't open a fresh draft PR.
+                if not resume:
+                    raise
+                log.warning(
+                    "session %s: could not open draft PR on --resume "
+                    "recreate for %s (likely PR already exists for "
+                    "branch %s); continuing without new draft PR. "
+                    "Error: %s",
+                    session.id,
+                    wt_path,
+                    branch,
+                    exc,
+                )
+                draft_pr_url = None
         entries.append(
             WorktreeEntry(
                 repo=rb.repo,
@@ -347,26 +368,45 @@ def maybe_add_project_tracking_worktree(
             )
         # resume: reuse existing worktree (and any prior draft PR)
     else:
-        if resume:
-            raise RuntimeError(
-                f"Project-tracking worktree {proj_wt_path} was expected "
-                f"to exist for --resume but does not. Run "
-                f"'tripwire session cleanup {session.id}' then "
-                f"spawn without --resume."
+        # v0.12.1: --resume falls through to creation when the PT
+        # worktree was cleaned (e.g. by `tripwire session complete`).
+        # Branch may still exist locally — attach if so, else create
+        # off the project's default branch.
+        local_branch_exists = branch_exists(project_dir, proj_branch)
+        if local_branch_exists:
+            if not resume:
+                raise RuntimeError(
+                    f"Branch '{proj_branch}' already exists in {project_dir}. "
+                    f"Delete the branch or pick a different session id."
+                )
+            worktree_attach(project_dir, proj_wt_path, proj_branch)
+        else:
+            base_ref = _resolve_project_default_branch(project_dir)
+            worktree_add(project_dir, proj_wt_path, proj_branch, base_ref)
+        try:
+            draft_pr_url = _open_draft_pr(
+                worktree=proj_wt_path,
+                branch=proj_branch,
+                base_branch=_resolve_project_default_branch(project_dir),
+                session_id=session.id,
             )
-        if branch_exists(project_dir, proj_branch):
-            raise RuntimeError(
-                f"Branch '{proj_branch}' already exists in {project_dir}. "
-                f"Delete the branch or pick a different session id."
+        except subprocess.CalledProcessError as exc:
+            # On --resume recreate, the original PT PR may already
+            # exist. Don't fail the resume just because we couldn't
+            # open a fresh draft PR.
+            if not resume:
+                raise
+            log.warning(
+                "session %s: could not open draft PR on --resume "
+                "recreate for PT worktree %s (likely PR already exists "
+                "for branch %s); continuing without new draft PR. "
+                "Error: %s",
+                session.id,
+                proj_wt_path,
+                proj_branch,
+                exc,
             )
-        base_ref = _resolve_project_default_branch(project_dir)
-        worktree_add(project_dir, proj_wt_path, proj_branch, base_ref)
-        draft_pr_url = _open_draft_pr(
-            worktree=proj_wt_path,
-            branch=proj_branch,
-            base_branch=base_ref,
-            session_id=session.id,
-        )
+            draft_pr_url = None
 
     return WorktreeEntry(
         repo=project_dir.name,

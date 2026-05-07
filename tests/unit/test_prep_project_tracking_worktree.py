@@ -164,6 +164,43 @@ class TestMaybeAddProjectTrackingWorktree:
         assert first.worktree_path == second.worktree_path
         assert first.branch == second.branch
 
+    def test_resume_recreates_pt_worktree_when_path_missing(
+        self, tmp_path_project, save_test_session
+    ):
+        """v0.12.1: PT worktree recreation on --resume after the worktree
+        was cleaned (e.g. by `tripwire session complete`). Closes the
+        post-merge fix-loop catch-22."""
+        from tripwire.core.git_helpers import worktree_remove
+
+        _init_repo(tmp_path_project)
+        _add_fake_remote(tmp_path_project)
+        save_test_session(tmp_path_project, "tst-s5", status="completed")
+        session = load_session(tmp_path_project, "tst-s5")
+
+        # Create the PT worktree once, then remove it (simulates `complete`
+        # having cleaned up). The branch stays on disk per worktree_remove
+        # semantics.
+        first = maybe_add_project_tracking_worktree(
+            project_dir=tmp_path_project,
+            session=session,
+        )
+        assert first is not None
+        first_path = Path(first.worktree_path)
+        assert first_path.is_dir()
+        worktree_remove(tmp_path_project, first_path)
+        assert not first_path.exists()
+
+        # Now --resume the session: the helper should recreate the
+        # worktree (attaching to the existing local branch).
+        second = maybe_add_project_tracking_worktree(
+            project_dir=tmp_path_project,
+            session=session,
+            resume=True,
+        )
+        assert second is not None
+        assert Path(second.worktree_path).is_dir()
+        assert second.branch == first.branch
+
     def test_bases_proj_branch_on_main_not_operators_checkout(
         self, tmp_path_project, save_test_session
     ):
