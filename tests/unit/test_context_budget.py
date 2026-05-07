@@ -112,10 +112,15 @@ def test_total_templates_under_budget() -> None:
     template (-51KB vs. pre-trim) and bumped to 360KB to absorb the
     PM-expansion content that survived the trim. v0.9.7 merge bumps to
     380KB for the node-type expansion (8 new example files + enum).
+    v0.11.0 bumps to 410KB for the new frontend-development skill —
+    closes the gap where templates/agent_templates/frontend-coder.yaml
+    referenced a `frontend-development` skill that didn't exist in
+    templates/skills/. The new skill is 27KB (under the per-skill 30KB
+    cap); the bump is sized to leave ~8KB headroom for future trims.
     """
     total = _total_chars(TEMPLATES_DIR)
-    assert total < 380_000, (
-        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 380KB."
+    assert total < 410_000, (
+        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 410KB."
     )
 
 
