@@ -443,3 +443,111 @@ class TestPrReviewTransitionGate:
         assert "pr_review/missing_evidence" in result.output
         # Status was rolled back.
         assert load_session(tmp_path_project, "s1").status == "in_review"
+
+
+class TestPrepareReviewCmd:
+    """v0.12: `tripwire session prepare-review <sid>` scaffolds
+    pr-review.yaml from the session's member-issue ACs."""
+
+    def test_scaffolds_skeleton_from_member_issues(
+        self, tmp_path_project, save_test_session, save_test_issue
+    ):
+        from click.testing import CliRunner
+
+        from tripwire.cli.session import session_cmd
+
+        # Issue with three explicit ACs.
+        ac_body = (
+            "## Context\nx\n\n"
+            "## Acceptance criteria\n"
+            "- [ ] alpha thing implemented\n"
+            "- [ ] beta thing tested\n"
+            "- [ ] gamma thing documented\n\n"
+            "## Test plan\n```\nuv run pytest\n```\n"
+        )
+        save_test_issue(tmp_path_project, "TMP-1", body=ac_body)
+        save_test_session(tmp_path_project, "s1", status="in_review", issues=["TMP-1"])
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            [
+                "prepare-review",
+                "s1",
+                "--project-dir",
+                str(tmp_path_project),
+            ],
+        )
+        assert result.exit_code == 0, result.output
+
+        target = tmp_path_project / "sessions" / "s1" / "pr-review.yaml"
+        assert target.is_file()
+        scaffold = yaml.safe_load(target.read_text(encoding="utf-8"))
+        assert scaffold["verdict"] == "approved"
+        assert len(scaffold["issues"]) == 1
+        issue_block = scaffold["issues"][0]
+        assert issue_block["key"] == "TMP-1"
+        # Three ACs scaffolded with empty evidence (so the validator's
+        # missing_evidence rule fires until the PM fills them in).
+        assert len(issue_block["acs"]) == 3
+        assert all(ac["verified_by"] == [] for ac in issue_block["acs"])
+        ac_texts = [ac["text"] for ac in issue_block["acs"]]
+        assert any("alpha" in t for t in ac_texts)
+
+    def test_refuses_overwrite_without_force(self, tmp_path_project, save_test_session):
+        from click.testing import CliRunner
+
+        from tripwire.cli.session import session_cmd
+
+        save_test_session(tmp_path_project, "s1", status="in_review")
+        _seed_pr_review(
+            tmp_path_project,
+            "s1",
+            "# existing content\nverdict: approved\n",
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            [
+                "prepare-review",
+                "s1",
+                "--project-dir",
+                str(tmp_path_project),
+            ],
+        )
+        assert result.exit_code != 0
+        assert "already exists" in result.output
+        # Original content preserved.
+        target = tmp_path_project / "sessions" / "s1" / "pr-review.yaml"
+        assert "existing content" in target.read_text(encoding="utf-8")
+
+    def test_force_overwrites(self, tmp_path_project, save_test_session):
+        from click.testing import CliRunner
+
+        from tripwire.cli.session import session_cmd
+
+        save_test_session(tmp_path_project, "s1", status="in_review")
+        _seed_pr_review(
+            tmp_path_project,
+            "s1",
+            "# existing content\nverdict: approved\n",
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(
+            session_cmd,
+            [
+                "prepare-review",
+                "s1",
+                "--project-dir",
+                str(tmp_path_project),
+                "--force",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        target = tmp_path_project / "sessions" / "s1" / "pr-review.yaml"
+        assert "existing content" not in target.read_text(encoding="utf-8")
+        # Newly scaffolded structure is parseable YAML with verdict.
+        scaffold = yaml.safe_load(target.read_text(encoding="utf-8"))
+        assert "verdict" in scaffold

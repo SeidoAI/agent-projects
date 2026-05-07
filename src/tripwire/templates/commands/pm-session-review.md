@@ -16,11 +16,20 @@ supposed to back them.
 
 1. Parse `<session-id>` from the arguments.
 
-2. Run `tripwire session review <session-id> --format json --no-post-pr-comments`.
-   Parse the JSON. If exit code 2, the CLI already identified
-   blocking issues — confirm them and stop here.
+2. **Scaffold the review record.** Run:
+   ```bash
+   tripwire session prepare-review <session-id>
+   ```
+   This writes `sessions/<id>/pr-review.yaml` populated with every member-issue
+   AC and empty `verified_by` arrays. Your job is to fill the evidence in.
 
-3. **Per-issue verification.** For each issue in the session:
+3. **Run the per-PR audit report (optional but recommended).** Run
+   `tripwire session review <session-id> --format json --no-post-pr-comments`
+   for the structured AC-vs-PR-diff comparison. Use its findings as
+   evidence input for `pr-review.yaml`. If exit code 2, the CLI already
+   identified blocking issues — confirm them.
+
+4. **Per-issue verification.** For each issue in the session:
    - Open `issues/<key>/issue.yaml` and read the acceptance criteria.
    - Open the PR (`gh pr view <pr> --diff` for read-only;
      `gh pr checkout <pr>` if you need to run code or tests).
@@ -29,59 +38,94 @@ supposed to back them.
      this issue. For each, find the code or test that backs it.
      Soft-yeses (claim without evidence) get downgraded to `[ ]`
      in your notes.
-   - Update `issues/<key>/verified.md` with specific evidence:
-     `path/file.py:42`, test name, or "manual smoke passed +
-     screenshot." No vague "looks good."
+   - **Fill `pr-review.yaml.issues[].acs[].verified_by`** with concrete
+     `path/file.py:42` citations or short evidence strings. Placeholders
+     like "manual verification needed" or empty arrays will fail the
+     `pr_review/missing_evidence` gate.
+   - Update `issues/<key>/verified.md` with the same evidence summary.
 
-4. **Four-lens scrutiny on the PR overall.** Apply each lens
+5. **Four-lens scrutiny on the PR overall.** Apply each lens
    independently — don't trust the executor's self-review:
 
    | Lens | What to check | Evidence |
    |------|---------------|----------|
-   | AC met but not really | Soft-yeses surfaced in step 3 | Code diff vs claim |
+   | AC met but not really | Soft-yeses surfaced in step 4 | Code diff vs claim |
    | Unilateral decisions | PR diff diverges from issue spec or session plan | List divergences with rationale or fix |
    | Skipped workflow | Commit history vs the executor's declared workflow (TDD red commits, validate runs, status messaging) | `git log --oneline` |
    | Quality degradation | Last commit vs first | Test density, naming, comment hygiene |
 
-   Capture findings in your draft PR review body — one short note
-   per lens.
+   Record each finding under `pr-review.yaml.four_lens.<lens>.findings`
+   with `severity` (0–100), `decision`, and matching evidence
+   (`fix_commit` for `fixed`, `follow_up: <KEY>` for `deferred`,
+   `note` for `accepted`/`rejected`).
 
-5. **Independent validation gate.** From the project tracking repo
+6. **External-reviewer comment** — *only if the project configures it*.
+   Read `project.yaml.review.external_reviewer_mention`. If set
+   (e.g. `"@codex"`), post the mention on the PR:
+   ```bash
+   gh pr comment <pr> --body "@codex please review"
+   ```
+   Then record the resulting comment URL under
+   `pr-review.yaml.external_reviews.codex.comment_url`. The
+   `pr_review/external_reviewer_missing` validator rule blocks
+   transition until this is recorded. (Skip this step entirely if
+   the project hasn't configured a mention.)
+
+7. **Code-review skill** — *only if the project configures it*.
+   Read `project.yaml.review.code_review_skill`. If set
+   (e.g. `"superpowers:code-review:code-review"`), invoke that skill
+   against the PR. Capture each finding it produces — at minimum
+   `severity`, `category`, `location`, `text` — under
+   `pr-review.yaml.external_reviews.code_review_skill.findings`,
+   plus `invoked_at` (ISO timestamp). The
+   `pr_review/code_review_skill_missing` rule blocks transition
+   until invocation is recorded.
+
+8. **Apply severity threshold.** For each finding (four-lens or
+   code-review skill) at-or-above
+   `project.yaml.review.severity_threshold` (default 65), the finding
+   must have a `decision` of `fixed` (with `fix_commit`),
+   `deferred` (with `follow_up`), or `rejected` (with `note`).
+   Aggregate any unresolved high-severity findings into
+   `pr-review.yaml.threshold_findings.unaddressed`. The
+   `pr_review/threshold_findings_unaddressed` rule blocks transition
+   if this list is non-empty.
+
+9. **Independent validation gate.** From the project tracking repo
    (not the code repo):
    ```bash
-   tripwire validate
+   tripwire validate --format=summary
    ```
-   Don't trust the executor's claim that this passed — run it
-   yourself. If it fails, the PR fails review.
+   This prints what `tripwire session transition` would catch — useful
+   as a preview, but the real gate runs inside transition itself
+   (v0.12: transition is atomic with validate).
 
-6. **Decide:**
-   - All AC verified, no unresolved lens findings, validate clean
-     → approve (and merge if `auto_merge_on_pass`).
-   - Anything unverified or any blocking finding → `gh pr review
-     --request-changes` with the specific gaps; route back to the
-     executor.
+10. **Decide and transition:**
+    - All gates pass:
+      ```bash
+      tripwire session transition <session-id> verified
+      ```
+      The CLI runs validate atomically. If any `pr_review/*` rule fires,
+      the transition is rolled back and you'll see exactly which gates
+      failed — fix and retry.
+    - Blocking findings: `gh pr review --request-changes` with the
+      specific gaps; route back to the executor. Do not transition.
 
-7. **Post the review:**
-   - `tripwire session review <session-id> --post-pr-comments` for
-     the per-issue verification summary, OR
-   - `gh pr review <pr> --approve|--request-changes --body "..."`
-     with your richer four-lens body.
+11. **Record the workflow prompt-check when approving.** If the review
+    result allowed the session to enter `verified`, run:
+    ```bash
+    tripwire prompt-check invoke pm-session-review <session-id> --status verified
+    ```
 
-8. **Record the workflow prompt-check when approving.** If the review
-   result allows the session to enter `verified`, run:
-   ```bash
-   tripwire prompt-check invoke pm-session-review <session-id> --status verified
-   ```
+12. **Plan post-merge work.** If any concept nodes were touched, note
+    them so you can do the §8 reconciliation in `WORKFLOWS_REVIEW.md`
+    after merge.
 
-9. **Plan post-merge work.** If any concept nodes were touched, note
-   them so you can do the §8 reconciliation in `WORKFLOWS_REVIEW.md`
-   after merge.
-
-10. **Report back:**
-   - Overall verdict
-   - Blocking findings
-   - Suggested follow-up issues
-   - Nodes to reconcile post-merge (if any)
+13. **Report back:**
+    - Overall verdict (matches `pr-review.yaml.verdict`)
+    - Blocking findings + remediation
+    - Suggested follow-up issues
+    - Nodes to reconcile post-merge (if any)
 
 ## Red flags — common rationalizations
 
