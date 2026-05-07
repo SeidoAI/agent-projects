@@ -87,7 +87,7 @@ blocks: [SEI-42]        # derived from SEI-42.blocked_by
 it. If you're confused about what blocks what, look at the cache:
 
 ```bash
-cat graph/index.yaml | grep -A 3 "SEI-40"
+cat nodes/tripwire-graph-index.yaml | grep -A 3 "SEI-40"
 ```
 
 ## Dangling references

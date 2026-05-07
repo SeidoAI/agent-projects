@@ -28,13 +28,9 @@ from tripwire.core.store import list_issues, load_project
 from tripwire.templates import get_templates_dir
 
 # Issue statuses that count as "closed" for the at-a-glance summary.
-# `done` and `canceled` are the explicit terminal states in the default
-# transitions; `verified` is debatable but most projects treat verified
-# as "closed enough".
-# v0.9.4: canonical names ("completed", "abandoned") plus legacy aliases.
-_CLOSED_ISSUE_STATUSES: frozenset[str] = frozenset(
-    {"completed", "abandoned", "done", "canceled"}
-)
+# `completed` and `abandoned` are the explicit terminal states in the
+# default transitions.
+_CLOSED_ISSUE_STATUSES: frozenset[str] = frozenset({"completed", "abandoned"})
 
 # Default template lives under packaged templates.
 DEFAULT_TEMPLATE_RELPATH = "readme/default.md.j2"

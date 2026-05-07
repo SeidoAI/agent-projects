@@ -44,22 +44,23 @@ JINJA_RENDERED_SUBDIRS: tuple[str, ...] = (PROJECT_TEMPLATE_SUBDIR,)
 # `project` is handled separately because its files are rendered into
 # the project root.
 #
-# `agent_templates` → `agents` is a rename (the source name is clearer
-# for the package, but the destination name matches the rest of the
-# plan's layout).
+# v0.10.0 consolidated all template/config dirs under one
+# ``templates/`` parent at the project root, so source subdirs map to
+# nested destinations: ``agent_templates`` → ``templates/agents``,
+# ``issue_templates`` → ``templates/issues``, etc. Source folder names
+# stay as-is (clearer for the package); destinations use the shorter
+# ``templates/<plural-noun>`` shape.
 #
-# `artifacts` is the one exception that stays nested under `templates/`
-# in the destination — it's the set of templates that SESSIONS use to
-# produce their session artifacts at runtime.
+# Keep destinations in sync with ``core/paths.py``'s ``*_DIR`` constants.
 VERBATIM_TEMPLATE_MAPPINGS: tuple[tuple[str, str], ...] = (
-    ("enums", "enums"),
-    ("issue_templates", "issue_templates"),
-    ("comment_templates", "comment_templates"),
-    ("artifacts", "templates/artifacts"),
-    ("scoping-artifacts", "plans/artifacts"),
-    ("agent_templates", "agents"),
-    ("session_templates", "session_templates"),
-    ("orchestration", "orchestration"),
+    ("enums", paths.ENUMS_DIR),  # templates/enums
+    ("issue_templates", paths.ISSUE_TEMPLATES_DIR),  # templates/issues
+    ("comment_templates", paths.COMMENT_TEMPLATES_DIR),  # templates/comments
+    ("artifacts", paths.TEMPLATES_ARTIFACTS_DIR),  # templates/artifacts
+    ("scoping-artifacts", paths.PLANS_ARTIFACTS_DIR),  # plans/artifacts
+    ("agent_templates", paths.AGENTS_DIR),  # templates/agents
+    ("session_templates", paths.SESSION_TEMPLATES_DIR),  # templates/sessions
+    ("orchestration", paths.ORCHESTRATION_DIR),  # templates/orchestration
     ("skills", ".claude/skills"),
     ("commands", ".claude/commands"),
 )

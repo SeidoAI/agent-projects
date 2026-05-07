@@ -560,10 +560,10 @@ class TestTemplates:
         result = runner.invoke(cli, ["templates", "list", "--project-dir", str(target)])
         assert result.exit_code == 0
         # Every major template subdirectory should appear in the list.
-        assert "issue_templates/default.yaml.j2" in result.output
-        assert "comment_templates/" in result.output
+        assert "templates/issues/default.yaml.j2" in result.output
+        assert "templates/comments/" in result.output
         assert "templates/artifacts/manifest.yaml" in result.output
-        assert "agents/backend-coder.yaml" in result.output
+        assert "templates/agents/backend-coder.yaml" in result.output
 
     def test_list_empty_when_removed(self, runner: CliRunner, tmp_path: Path) -> None:
         """If a project has no templates (deleted after init), list says so."""
@@ -591,15 +591,15 @@ class TestTemplates:
         target = tmp_path / "p"
         init_project(runner, target)
         # Add a project-specific template alongside the packaged defaults.
-        tpl_dir = target / "issue_templates"
+        tpl_dir = target / "templates" / "issues"
         tpl_dir.mkdir(exist_ok=True)
         (tpl_dir / "bug.yaml.j2").write_text("---\nid: {{id}}\n---\n")
 
         result = runner.invoke(cli, ["templates", "list", "--project-dir", str(target)])
         assert result.exit_code == 0
-        assert "issue_templates/bug.yaml.j2" in result.output
+        assert "templates/issues/bug.yaml.j2" in result.output
         # The packaged default should still be listed too.
-        assert "issue_templates/default.yaml.j2" in result.output
+        assert "templates/issues/default.yaml.j2" in result.output
 
     def test_show_by_path(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
@@ -610,7 +610,7 @@ class TestTemplates:
             [
                 "templates",
                 "show",
-                "issue_templates/default.yaml.j2",
+                "templates/issues/default.yaml.j2",
                 "--project-dir",
                 str(target),
             ],
@@ -625,7 +625,7 @@ class TestTemplates:
         target = tmp_path / "p"
         init_project(runner, target)
         # Add an unambiguous project-specific template.
-        tpl_dir = target / "issue_templates"
+        tpl_dir = target / "templates" / "issues"
         tpl_dir.mkdir(exist_ok=True)
         (tpl_dir / "bug.yaml.j2").write_text("BUG TEMPLATE BODY\n")
 
@@ -701,7 +701,7 @@ class TestEnums:
     def test_project_override(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         init_project(runner, target)
-        enums_dir = target / "enums"
+        enums_dir = target / "templates" / "enums"
         enums_dir.mkdir(exist_ok=True)
         # Overwrite the packaged issue_status with a custom one.
         (enums_dir / "issue_status.yaml").write_text(

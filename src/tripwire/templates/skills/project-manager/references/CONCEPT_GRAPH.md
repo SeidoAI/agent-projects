@@ -71,7 +71,7 @@ letter-first, hyphenated slugs, skips fenced code blocks (` ``` ` and
 
 ## Graph cache
 
-`graph/index.yaml` is a committed cache for O(1) reads. Validator
+`nodes/tripwire-graph-index.yaml` is a committed cache for O(1) reads. Validator
 rebuilds it as a side effect. Don't hand-edit — delete and re-validate
 if corrupt.
 

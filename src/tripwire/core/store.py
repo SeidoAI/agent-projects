@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 import yaml
+from pydantic import ValidationError
 
 from tripwire.core import paths
 from tripwire.core.parser import (
@@ -32,6 +33,48 @@ from tripwire.models.project import ProjectConfig
 ISSUES_DIRNAME = paths.ISSUES_DIR
 PROJECT_CONFIG_FILENAME = paths.PROJECT_CONFIG
 COMMENTS_DIRNAME = paths.COMMENTS_SUBDIR
+
+
+# Pre-v0.9.4 → canonical issue status rewrites. Used here purely to
+# decide whether a ValidationError on `status` was a legacy value (so
+# the wrapper can point users at `migrate status-values`) and to
+# document the mapping; the actual rewrite happens in the migrate
+# command.
+_LEGACY_ISSUE_STATUSES: frozenset[str] = frozenset(
+    {"backlog", "todo", "in_progress", "done", "canceled"}
+)
+
+
+class LegacyIssueStatusError(ValueError):
+    """Raised by :func:`load_issue` when a legacy ``status:`` value is
+    detected on disk.
+
+    Wraps the originating :class:`pydantic.ValidationError` and points
+    the user at ``tripwire migrate status-values``.
+    """
+
+    def __init__(self, path: Path, status: str) -> None:
+        self.path = path
+        self.status = status
+        super().__init__(
+            f"{path} carries a pre-v0.9.4 `status: {status}` value. "
+            f"Run `tripwire migrate status-values` to rewrite legacy "
+            f"issue and session statuses to the canonical taxonomy."
+        )
+
+
+def _legacy_issue_status(exc: ValidationError, frontmatter: dict) -> str | None:
+    """Return the legacy status string if *exc* is the enum-rejection
+    for `status`, else None.
+    """
+    status = frontmatter.get("status")
+    if not isinstance(status, str) or status not in _LEGACY_ISSUE_STATUSES:
+        return None
+    for err in exc.errors():
+        loc = err.get("loc") or ()
+        if loc and loc[0] == "status":
+            return status
+    return None
 
 
 # ============================================================================
@@ -87,7 +130,14 @@ def issue_path(project_dir: Path, key: str) -> Path:
 
 
 def load_issue(project_dir: Path, key: str) -> Issue:
-    """Load `<project_dir>/issues/<key>.yaml` into an Issue model."""
+    """Load `<project_dir>/issues/<key>.yaml` into an Issue model.
+
+    Raises :class:`LegacyIssueStatusError` (subclass of ``ValueError``)
+    if the on-disk ``status:`` field is a pre-v0.9.4 legacy value
+    (``backlog``/``todo``/``in_progress``/``done``/``canceled``).
+    Generic :class:`pydantic.ValidationError` is left to propagate
+    untouched for any other schema problem.
+    """
     path = issue_path(project_dir, key)
     if not path.exists():
         raise FileNotFoundError(f"Issue file not found: {path}")
@@ -96,7 +146,13 @@ def load_issue(project_dir: Path, key: str) -> Issue:
         frontmatter, body = parse_frontmatter_body(text)
     except ParseError as exc:
         raise ValueError(f"Could not parse {path}: {exc}") from exc
-    return Issue.model_validate({**frontmatter, "body": body})
+    try:
+        return Issue.model_validate({**frontmatter, "body": body})
+    except ValidationError as exc:
+        legacy = _legacy_issue_status(exc, frontmatter)
+        if legacy is not None:
+            raise LegacyIssueStatusError(path, legacy) from exc
+        raise
 
 
 def save_issue(project_dir: Path, issue: Issue, *, update_cache: bool = True) -> None:
@@ -132,6 +188,10 @@ def list_issues(project_dir: Path) -> list[Issue]:
     Files that fail to parse raise the parse error so callers can decide
     whether to skip them. The validator should be the gate that catches
     invalid files at scan time.
+
+    Raises :class:`LegacyIssueStatusError` (subclass of ``ValueError``)
+    if any issue file holds a pre-v0.9.4 ``status:`` value, pointing
+    the user at ``tripwire migrate status-values``.
     """
     issues_dir = paths.issues_dir(project_dir)
     if not issues_dir.is_dir():
@@ -145,7 +205,13 @@ def list_issues(project_dir: Path) -> list[Issue]:
             continue
         text = yaml_path.read_text(encoding="utf-8")
         frontmatter, body = parse_frontmatter_body(text)
-        issues.append(Issue.model_validate({**frontmatter, "body": body}))
+        try:
+            issues.append(Issue.model_validate({**frontmatter, "body": body}))
+        except ValidationError as exc:
+            legacy = _legacy_issue_status(exc, frontmatter)
+            if legacy is not None:
+                raise LegacyIssueStatusError(yaml_path, legacy) from exc
+            raise
     return issues
 
 

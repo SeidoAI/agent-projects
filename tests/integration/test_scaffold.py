@@ -142,7 +142,7 @@ class TestScaffoldText:
         # v0.9.4: artifact_phase canonical name is "executing".
         assert "task-checklist.md (executing, required)" in result.output
         # Template file paths visible
-        assert "issue_templates/default.yaml.j2" in result.output
+        assert "templates/issues/default.yaml.j2" in result.output
         # Step 10 skill examples visible
         assert "examples/issue-fully-formed.yaml" in result.output
         assert "examples/node-endpoint.yaml" in result.output
@@ -370,7 +370,7 @@ class TestScaffoldRicherProject:
         target = tmp_path / "p"
         _init_project(runner, target)
 
-        orch_dir = target / "orchestration"
+        orch_dir = target / "templates" / "orchestration"
         orch_dir.mkdir(exist_ok=True)
         (orch_dir / "default.yaml").write_text("name: default\nevents: {}\n")
 
@@ -383,7 +383,7 @@ class TestScaffoldRicherProject:
         # Step 9 already ships `issue_templates/default.yaml.j2`.
 
         result = runner.invoke(cli, ["brief", "--project-dir", str(target)])
-        assert "issue_templates/default.yaml.j2" in result.output
+        assert "templates/issues/default.yaml.j2" in result.output
 
     def test_skill_examples_listed(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"

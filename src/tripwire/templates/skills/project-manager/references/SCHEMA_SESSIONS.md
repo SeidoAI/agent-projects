@@ -40,7 +40,7 @@ The directory name must match the session's `id` field.
 | `blocked_by_sessions` | list[string] | no | Other session ids that must complete first. |
 | `key_files` | list[string] | no | Files the session is expected to touch. |
 | `grouping_rationale` | string | no | Why these issues are grouped. |
-| `status` | string | yes | Must be in `enums/session_status.yaml`. Default `planned`. See lifecycle below. |
+| `status` | string | yes | Must be in `templates/enums/session_status.yaml`. Default `planned`. See lifecycle below. |
 | `current_state` | string or null | no | Latest `AgentState` from a status message. |
 | `orchestration` | SessionOrchestration or null | no | Per-session orchestration override. |
 | `artifact_overrides` | list[ArtifactSpec] | no | Per-session artifact overrides. |

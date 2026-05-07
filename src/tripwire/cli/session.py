@@ -483,7 +483,7 @@ def session_derive_branch_cmd(session_id: str, project_dir: Path) -> None:
     default=False,
     help=(
         "Before queueing, flip every session issue currently in "
-        "`backlog` status to `todo`. Leaves other statuses alone."
+        "`planned` status to `queued`. Leaves other statuses alone."
     ),
 )
 def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) -> None:
@@ -502,7 +502,6 @@ def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) 
         )
 
     if promote_issues:
-        from tripwire.core.status_contract import normalize_issue_status
         from tripwire.core.store import load_issue, save_issue
 
         promoted = 0
@@ -512,13 +511,10 @@ def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) 
             except FileNotFoundError:
                 click.echo(f"  ! issue {issue_key} not found — skipping")
                 continue
-            # v0.9.4: accept both canonical "planned" and legacy "backlog"
-            # on the source side; emit canonical "queued" on the sink side.
-            if normalize_issue_status(str(issue.status)) == "planned":
-                old_status = issue.status
+            if str(issue.status) == "planned":
                 issue.status = "queued"
                 save_issue(resolved, issue)
-                click.echo(f"  {issue_key}: {old_status} → queued")
+                click.echo(f"  {issue_key}: planned → queued")
                 promoted += 1
         if promoted == 0:
             click.echo("  (no issues at 'planned' to promote)")
@@ -987,8 +983,8 @@ def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
 
     `abandoned` is the terminal-but-not-claimed-success path (v0.7.9
     §A4). Use it for sessions that can't legitimately reach `completed`.
-    Issues are NOT closed as `done` — they stay where they are; move
-    them to backlog/canceled separately if appropriate.
+    Issues are NOT closed as `completed` — they stay where they are; move
+    them back to `planned` or to `abandoned` separately if appropriate.
     """
     from tripwire.core.session_abandon import (
         AbandonError,

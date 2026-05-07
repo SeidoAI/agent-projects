@@ -181,7 +181,7 @@ class TestInitBasics:
         runner.invoke(cli, _init_args(target))
         gi = (target / ".gitignore").read_text()
         assert ".tripwire.lock" in gi
-        assert "graph/.index.lock" in gi
+        assert "nodes/.tripwire-graph-index.lock" in gi
 
     def test_non_interactive_missing_name_uses_target_basename(
         self, runner: CliRunner, tmp_path: Path
@@ -461,7 +461,7 @@ class TestInitThenValidate:
         assert report.warnings == []
         # Cache should have been built by the validator's side-effect.
         assert report.cache_rebuilt is True
-        assert (target / "graph" / "index.yaml").exists()
+        assert (target / "nodes" / "tripwire-graph-index.yaml").exists()
 
     def test_initd_project_with_repos_passes_validate(
         self, runner: CliRunner, tmp_path: Path

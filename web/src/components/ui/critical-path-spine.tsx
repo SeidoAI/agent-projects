@@ -61,7 +61,7 @@ export function CriticalPathSpine({
       className={className}
       subtitle={`${chain.length} sessions deep · ${fanout} downstream${tied ? " · ties exist" : ""}`}
     >
-      <ol className="flex flex-wrap items-end gap-x-2 gap-y-3 pt-14">
+      <ol className="flex flex-wrap items-end gap-x-2 gap-y-14 pt-14">
         {chain.map((session, idx) => {
           const color = sessionStageColor(session.status);
           const isHead = idx === 0;

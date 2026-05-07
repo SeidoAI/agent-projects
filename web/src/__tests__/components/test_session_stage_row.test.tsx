@@ -24,13 +24,14 @@ describe("sessionStageId", () => {
     expect(sessionStageId("completed")).toBe("completed");
   });
 
-  it("collapses richer enum states into the canonical 6", () => {
-    // The backend enum has 13 values; the dashboard groups them.
-    expect(sessionStageId("active")).toBe("executing");
-    expect(sessionStageId("waiting_for_ci")).toBe("executing");
-    expect(sessionStageId("waiting_for_review")).toBe("executing");
-    expect(sessionStageId("waiting_for_deploy")).toBe("executing");
-    expect(sessionStageId("re_engaged")).toBe("in_review");
+  it("returns null for legacy pre-v0.9.4 session statuses", () => {
+    // The backend dropped these values entirely; surfacing them as a
+    // canonical stage would mask data corruption upstream.
+    expect(sessionStageId("active")).toBeNull();
+    expect(sessionStageId("waiting_for_ci")).toBeNull();
+    expect(sessionStageId("waiting_for_review")).toBeNull();
+    expect(sessionStageId("waiting_for_deploy")).toBeNull();
+    expect(sessionStageId("re_engaged")).toBeNull();
   });
 
   it("collapses failed/paused/abandoned into the off_track stage", () => {
@@ -55,11 +56,11 @@ describe("sessionStageColor", () => {
     expect(sessionStageColor("verified")).toBe("#2d5a3d");
   });
 
-  it("returns the same color across the collapsed group", () => {
-    // Since `active` collapses to `executing`, both share the
-    // executing colour — keeps the right-column pill consistent
-    // with the top card's stripe.
-    expect(sessionStageColor("active")).toBe(sessionStageColor("executing"));
+  it("falls back to off-track color for legacy/unknown states", () => {
+    // Pre-v0.9.4 names no longer have a stage; the defensive default
+    // pins them to the off-track ochre rather than a misleading
+    // canonical stage.
+    expect(sessionStageColor("active")).toBe("#b8741a");
   });
 
   it("returns the off-track ochre for failed/paused/abandoned", () => {

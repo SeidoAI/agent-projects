@@ -63,7 +63,7 @@ def _write_issue_without_uuid(project_dir: Path, n: int) -> None:
         "---\n"
         f"id: TST-{n}\n"
         f"title: Concurrent-fix test {n}\n"
-        "status: todo\n"
+        "status: queued\n"
         "priority: medium\n"
         "executor: ai\n"
         "verifier: required\n"

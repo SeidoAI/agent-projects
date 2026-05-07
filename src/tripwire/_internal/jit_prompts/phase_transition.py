@@ -31,19 +31,13 @@ PREVIOUS_PHASE: dict[str, str] = {
 }
 
 # Issue statuses that count as "still open" — i.e. work the agent
-# hasn't finished yet. Mirrors the convention used by other validators
-# (verified, done, canceled are terminal; everything else is open).
+# hasn't finished yet. ``verified``, ``completed``, ``abandoned`` and
+# ``deferred`` are terminal/off-path; everything else is open.
 _OPEN_STATUSES = {
-    # Canonical (v0.9.4) — issue states that mean "still open / not done".
     "planned",
     "queued",
     "executing",
     "in_review",
-    # Legacy aliases — accepted on read for any pre-v0.9.4 PT data still
-    # in flight. Drop in v1.0 once the alias-on-read window closes.
-    "backlog",
-    "todo",
-    "in_progress",
 }
 
 # Label convention: issues are tagged with ``phase:<name>`` to scope
@@ -61,10 +55,10 @@ the actual work in the previous phase has crossed the finish line.
 
 Before declaring this session done, walk every issue tagged with the
 previous phase's `phase:<prev>` label. For each one that's still in a
-non-terminal status (`backlog` / `todo` / `in_progress` / `in_review`),
+non-terminal status (`planned` / `queued` / `executing` / `in_review`),
 either:
 
-  - Close it (move it to `done` / `verified` / `canceled` with a
+  - Close it (move it to `verified` / `completed` / `abandoned` with a
     rationale), OR
   - Roll the project's `phase:` back to the prior value, OR
   - Re-tag the issue with the current phase if the work has actually
@@ -79,8 +73,8 @@ Stop. The project is in `phase: <X>` but issues with
 work, not followed it.
 
 Walk the issues directory. For every issue whose labels contain
-`phase:<previous-phase>` and whose `status:` is one of `backlog`,
-`todo`, `in_progress`, or `in_review`:
+`phase:<previous-phase>` and whose `status:` is one of `planned`,
+`queued`, `executing`, or `in_review`:
 
   1. Decide: should this issue actually be done? If yes, close it
      and record the closing commit. If no, the phase bump was
@@ -101,8 +95,8 @@ project carries a later `phase:` value.
 Two recovery paths, pick exactly one:
 
   Path A — Finish the prev-phase work. Close every open
-  `phase:<prev>` issue (status → `done` / `verified` /
-  `canceled`) and reference the closing commit.
+  `phase:<prev>` issue (status → `verified` / `completed` /
+  `abandoned`) and reference the closing commit.
   Path B — Roll the phase back. Edit `project.yaml` to restore the
   prior `phase:` value, then re-evaluate when the prev-phase work
   has actually completed.

@@ -131,7 +131,7 @@ class TestSessionCheck:
         write_handoff_yaml,
     ):
         save_test_issue(
-            tmp_path_project, key="TMP-1", kind="feat", title="Blocker", status="todo"
+            tmp_path_project, key="TMP-1", kind="feat", title="Blocker", status="queued"
         )
         save_test_issue(
             tmp_path_project,

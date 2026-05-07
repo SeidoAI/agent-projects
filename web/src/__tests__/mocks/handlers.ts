@@ -33,6 +33,12 @@ export const defaultHandlers = [
     HttpResponse.json(makeProject({ id: String(params.pid) })),
   ),
 
+  // Workspaces (v0.10.0) — default to no workspaces so existing tests
+  // that don't care about the switcher's grouping degrade to the flat
+  // ungrouped path. Tests asserting workspace grouping override per-test
+  // with `server.use(http.get("/api/workspaces", ...))`.
+  http.get("/api/workspaces", () => HttpResponse.json([])),
+
   // Issues
   http.get("/api/projects/:pid/issues", () => HttpResponse.json([])),
   http.get("/api/projects/:pid/issues/:key", ({ params }) =>

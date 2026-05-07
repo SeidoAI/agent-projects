@@ -60,12 +60,13 @@ function radiusForType(nodeType: string): number {
 const NODE_LABEL_MAX_CHARS = 18;
 
 /** Edge relations rendered with a solid stroke. Everything else
- *  (e.g. `related`, `blocked_by`, `parent`) renders dashed.
- *  Explicit + exhaustive per PM #25 round 4 P2: the previous
- *  implicit `relation === "cites"` branch left `references` edges
- *  dashed even though the legend's solid swatch is meant to
- *  cover them. */
-const SOLID_EDGE_RELATIONS: ReadonlySet<string> = new Set(["cites", "references"]);
+ *  (e.g. `depends_on`, `parent`) renders dashed. Explicit + exhaustive
+ *  per PM #25 round 4 P2: the previous implicit `relation === "cites"`
+ *  branch left reference edges dashed even though the legend's solid
+ *  swatch is meant to cover them. The cache emits the canonical
+ *  `refs` kind since v0.10; `cites` is kept for any rendered overlay
+ *  that still uses the synonym. */
+const SOLID_EDGE_RELATIONS: ReadonlySet<string> = new Set(["cites", "refs"]);
 
 function isSolidRelation(relation: string): boolean {
   return SOLID_EDGE_RELATIONS.has(relation);

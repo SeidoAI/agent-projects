@@ -19,6 +19,24 @@ export interface ProjectSummary {
   issue_count: number;
   node_count: number;
   session_count: number;
+  /**
+   * v0.10.0 — opaque id of the workspace this project belongs to.
+   * `null` when the project's `project.yaml` has no `workspace.path`
+   * pointer or that pointer doesn't resolve to a registered workspace.
+   * Used by the project switcher to group projects under workspace
+   * headings.
+   */
+  workspace_id?: string | null;
+  /**
+   * v0.10.0 — `false` when project.yaml failed to load (schema
+   * mismatch, parse error). Defaults to `true` for callers that
+   * predate the field. Invalid projects are surfaced in the dropdown
+   * with an `[INVALID]` stamp + the load_error tooltip and disabled
+   * navigation, so the user can SEE the breakage instead of having
+   * the project silently disappear from discovery.
+   */
+  valid?: boolean;
+  load_error?: string | null;
 }
 
 /** Narrow view of `ProjectDetail` — extend as the UI needs more fields. */

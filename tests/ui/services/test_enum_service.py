@@ -16,7 +16,7 @@ from tripwire.ui.services.enum_service import (
 
 
 def _write_enum(project_dir: Path, name: str, content: str) -> None:
-    d = project_dir / "enums"
+    d = project_dir / "templates" / "enums"
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{name}.yaml").write_text(content, encoding="utf-8")
 
@@ -32,10 +32,10 @@ class TestListEnums:
             "issue_status",
             "name: issue_status\n"
             "values:\n"
-            "  - value: todo\n"
-            "    label: Todo\n"
-            "  - value: done\n"
-            "    label: Done\n"
+            "  - value: queued\n"
+            "    label: Queued\n"
+            "  - value: completed\n"
+            "    label: Completed\n"
             "    color: '#00ff00'\n",
         )
 
@@ -44,7 +44,7 @@ class TestListEnums:
         enum = result["issue_status"]
         assert isinstance(enum, EnumDescriptor)
         assert enum.name == "issue_status"
-        assert enum.values[0] == EnumValue(value="todo", label="Todo")
+        assert enum.values[0] == EnumValue(value="queued", label="Queued")
         assert enum.values[1].color == "#00ff00"
 
     def test_default_label_from_snake_case(self, tmp_path_project: Path):
@@ -98,10 +98,10 @@ class TestGetEnum:
         _write_enum(
             tmp_path_project,
             "issue_status",
-            "values:\n  - value: todo\n    label: Todo\n",
+            "values:\n  - value: queued\n    label: Queued\n",
         )
         enum = get_enum(tmp_path_project, "issue_status")
-        assert enum.values[0] == EnumValue(value="todo", label="Todo")
+        assert enum.values[0] == EnumValue(value="queued", label="Queued")
 
     def test_raises_file_not_found(self, tmp_path_project: Path):
         with pytest.raises(FileNotFoundError):

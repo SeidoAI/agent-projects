@@ -1,8 +1,10 @@
-import { ChevronDown, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import type { ReactNode } from "react";
-import { NavLink, useNavigate, useParams } from "react-router-dom";
+import { NavLink, useParams } from "react-router-dom";
 
-import { useProject } from "@/lib/api/endpoints/project";
+import { ProjectSwitcher } from "@/components/ProjectSwitcher";
+import { useProject, useProjects } from "@/lib/api/endpoints/project";
+import { useWorkspaces } from "@/lib/api/endpoints/workspace";
 import { cn } from "@/lib/utils";
 
 // Build-time constant injected by vite.config.ts from pyproject.toml.
@@ -75,7 +77,7 @@ function SideRail({ projectId }: { projectId: string }) {
             ink); larger height for visual weight. */}
         <img src="/img/mark-accent.svg" alt="tripwire" className="block h-[58px] w-auto" />
       </div>
-      <ProjectChip projectId={projectId} />
+      <ProjectSwitcherSlot projectId={projectId} />
       <nav className="relative mt-2 flex flex-1 flex-col">
         <span
           className="absolute top-1 bottom-12 left-[1.4rem] w-px bg-(--color-rule) opacity-50"
@@ -130,22 +132,14 @@ function VersionStamp() {
   );
 }
 
-function ProjectChip({ projectId }: { projectId: string }) {
+function ProjectSwitcherSlot({ projectId }: { projectId: string }) {
+  // Resolve the friendly label here (instead of inside ProjectSwitcher)
+  // so the dropdown stays purely UI; data-fetch lives where the chip
+  // already lived.
   const project = useProject(projectId);
-  const navigate = useNavigate();
   const rawName = project.data?.name?.trim();
   const label = rawName ? rawName.replace(/^project-/, "") : projectId;
-  return (
-    <button
-      type="button"
-      aria-label="Switch project"
-      onClick={() => navigate("/")}
-      className="mx-4 mb-2 flex items-center gap-2 rounded-(--radius-stamp) border border-(--color-edge) bg-(--color-paper) px-2 py-1.5 font-mono text-[11px] text-(--color-ink-2) transition-colors hover:border-(--color-ink-3)"
-    >
-      <span className="flex-1 truncate text-left font-semibold text-(--color-ink)">{label}</span>
-      <ChevronDown className="h-3 w-3 shrink-0 text-(--color-ink-3)" aria-hidden />
-    </button>
-  );
+  return <ProjectSwitcher projectId={projectId} currentLabel={label} />;
 }
 
 interface TopBarProps {
@@ -178,17 +172,33 @@ function Breadcrumbs({ projectId }: { projectId: string }) {
   // project.name with the "project-" prefix stripped, falling back
   // to the id while the project query is in flight.
   const project = useProject(projectId);
+  const projects = useProjects();
+  const workspaces = useWorkspaces();
   const rawName = project.data?.name?.trim();
   const label = rawName ? rawName.replace(/^project-/, "") : projectId;
+
+  // Resolve the workspace this project belongs to (if any). The
+  // ProjectDetail payload doesn't carry workspace_id; the
+  // ProjectSummary list does, and is already cached for the switcher.
+  const summary = projects.data?.find((p) => p.id === projectId);
+  const workspace = summary?.workspace_id
+    ? workspaces.data?.find((w) => w.id === summary.workspace_id)
+    : undefined;
+  const workspaceLabel = workspace?.name;
+
   return (
     <nav
       aria-label="Breadcrumb"
       className="flex items-center gap-2 font-sans text-[13px] text-(--color-ink-2)"
     >
-      <span className="text-(--color-ink-3)">Workspace</span>
-      <span aria-hidden className="text-(--color-edge)">
-        /
-      </span>
+      {workspaceLabel ? (
+        <>
+          <span className="text-(--color-ink-3)">{workspaceLabel}</span>
+          <span aria-hidden className="text-(--color-edge)">
+            /
+          </span>
+        </>
+      ) : null}
       <span className="font-medium text-(--color-ink)">{label}</span>
     </nav>
   );

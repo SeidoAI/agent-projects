@@ -30,7 +30,7 @@ key_files:
   - src/models/user.py
   - modules/secrets/main.tf
 grouping_rationale: "SEI-42 and SEI-47 together — the endpoint depends on the new secret being provisioned, so one agent owns both to avoid a handoff."
-status: waiting_for_ci
+status: executing
 current_state: implementing
 # Optional orchestration override — this session wants a plan approval gate
 # even though the project default has it off.

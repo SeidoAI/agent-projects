@@ -12,6 +12,9 @@ export const queryKeys = {
   projects: () => ["projects"] as const,
   project: (id: string) => ["projects", id] as const,
 
+  // Workspaces (v0.10.0)
+  workspaces: () => ["workspaces"] as const,
+
   // Issues
   issues: (pid: string) => ["issues", pid] as const,
   issuesFiltered: (pid: string, filters: IssueFilters) => ["issues", pid, filters] as const,

@@ -132,7 +132,7 @@ def _firings_for(project_dir: Path, session_id: str, prompt_id: str) -> list[dic
 def test_phase_transition_fires_on_open_prev_phase_issue(tmp_path: Path) -> None:
     _seed_project(tmp_path, phase="reviewing")
     _seed_session(tmp_path, "alpha")
-    _seed_issue(tmp_path, "DEV-1", status="in_progress", labels=["phase:executing"])
+    _seed_issue(tmp_path, "DEV-1", status="executing", labels=["phase:executing"])
 
     result = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
@@ -146,7 +146,7 @@ def test_phase_transition_fires_on_open_prev_phase_issue(tmp_path: Path) -> None
 def test_phase_transition_silent_when_clean(tmp_path: Path) -> None:
     _seed_project(tmp_path, phase="reviewing")
     _seed_session(tmp_path, "alpha")
-    _seed_issue(tmp_path, "DEV-1", status="done", labels=["phase:executing"])
+    _seed_issue(tmp_path, "DEV-1", status="completed", labels=["phase:executing"])
 
     result = fire_jit_prompt_event(
         project_dir=tmp_path, event="session.complete", session_id="alpha"
@@ -185,7 +185,7 @@ def test_followups_not_filed_fires_on_missing_issue(tmp_path: Path) -> None:
 def test_followups_not_filed_silent_when_issue_present(tmp_path: Path) -> None:
     _seed_project(tmp_path)
     _seed_session(tmp_path, "alpha")
-    _seed_issue(tmp_path, "DEV-100", status="todo")
+    _seed_issue(tmp_path, "DEV-100", status="queued")
     _seed_pm_response(
         tmp_path,
         "alpha",
@@ -257,7 +257,7 @@ def test_cost_ceiling_fires_above_default(tmp_path: Path) -> None:
 def test_ack_suppresses_re_fire(tmp_path: Path) -> None:
     _seed_project(tmp_path, phase="reviewing")
     _seed_session(tmp_path, "alpha")
-    _seed_issue(tmp_path, "DEV-1", status="in_progress", labels=["phase:executing"])
+    _seed_issue(tmp_path, "DEV-1", status="executing", labels=["phase:executing"])
 
     # First fire — phase-transition fires.
     result1 = fire_jit_prompt_event(

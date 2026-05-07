@@ -62,7 +62,7 @@ describe("SessionsView", () => {
     renderWithProviders(
       <SessionsView
         sessions={[
-          makeSession({ id: "active-x", status: "active" }),
+          makeSession({ id: "exec-x", status: "executing" }),
           makeSession({ id: "review-y", status: "in_review" }),
           makeSession({ id: "queued-z", status: "queued" }),
         ]}
@@ -72,9 +72,8 @@ describe("SessionsView", () => {
         activeStages={null}
       />,
     );
-    // `active` collapses to the executing stage per sessionStageId().
     const exec = screen.getByRole("region", { name: /executing/i });
-    expect(within(exec).getByText("active-x")).toBeInTheDocument();
+    expect(within(exec).getByText("exec-x")).toBeInTheDocument();
     const review = screen.getByRole("region", { name: /^review/i });
     expect(within(review).getByText("review-y")).toBeInTheDocument();
   });

@@ -7,14 +7,18 @@ depends_on, implements, produced-by, supersedes, addressed-by,
 tripwire-fired-on).
 
 It sits on top of :class:`tripwire.models.graph.GraphIndex` (the
-on-disk cache schema, which keeps using legacy edge type strings for
-backward compatibility) and exposes a per-kind / per-type query
-surface to the new `tripwire graph query` CLI, the validator, and the
-drift report.
+on-disk cache schema) and exposes a per-kind / per-type query surface
+to the new `tripwire graph query` CLI, the validator, and the drift
+report.
 
 The legacy `core.graph.concept` and `core.graph.dependency` modules
 keep their public APIs but read through this facade — there is no
 duplicate state.
+
+Edge types in the on-disk cache are canonical EdgeKind values. Caches
+written by tripwire < v0.9 used a pre-canonical vocabulary
+(``references``, ``blocked_by``, ``related``); run ``tripwire migrate
+graph-edges`` once to rewrite them in place.
 """
 
 from __future__ import annotations
@@ -25,48 +29,15 @@ from pathlib import Path
 
 from tripwire.core.graph import cache as graph_cache
 from tripwire.core.graph import edges as graph_edges
-from tripwire.models.graph import EdgeKind, GraphEdge, GraphIndex
-
-# ---------------------------------------------------------------------------
-# Legacy → canonical edge-kind mapping
-# ---------------------------------------------------------------------------
-
-# Keys are the legacy strings actually stored in `graph/index.yaml`.
-# Values are the canonical EdgeKind values (KUI-131's 7-kind taxonomy).
-_LEGACY_TO_CANONICAL: dict[str, str] = {
-    "references": EdgeKind.REFS.value,
-    "related": EdgeKind.REFS.value,
-    "refs": EdgeKind.REFS.value,
-    "blocked_by": EdgeKind.DEPENDS_ON.value,
-    "depends_on": EdgeKind.DEPENDS_ON.value,
-    "implements": EdgeKind.IMPLEMENTS.value,
-    "produced-by": EdgeKind.PRODUCED_BY.value,
-    "supersedes": EdgeKind.SUPERSEDES.value,
-    "addressed-by": EdgeKind.ADDRESSED_BY.value,
-    "tripwire-fired-on": EdgeKind.TRIPWIRE_FIRED_ON.value,
-}
-
-
-def canonical_kind(edge_type: str) -> str:
-    """Return the canonical :class:`EdgeKind` value for a legacy edge string.
-
-    Unknown strings are returned unchanged — this is forward-compat: a
-    stale agent that ships a new edge kind doesn't poison every read.
-    """
-    return _LEGACY_TO_CANONICAL.get(edge_type, edge_type)
-
-
-# ---------------------------------------------------------------------------
-# Unified index facade
-# ---------------------------------------------------------------------------
+from tripwire.models.graph import GraphEdge, GraphIndex
 
 
 class UnifiedIndex:
     """Read-only facade over a :class:`GraphIndex` for canonical queries.
 
     All edge-kind queries take the canonical name (e.g. ``"refs"``) and
-    match across every legacy edge type that maps to that kind (e.g.
-    both ``"references"`` and ``"related"`` count as ``"refs"``).
+    match it directly against the cached edge type. Caches must already
+    be canonical (see ``tripwire migrate graph-edges``).
 
     This class never mutates the underlying cache; mutation goes
     through `core.graph.cache.update_cache_for_file` /
@@ -80,8 +51,8 @@ class UnifiedIndex:
     # -- edge queries -----------------------------------------------------
 
     def edges_by_kind(self, kind: str) -> list[GraphEdge]:
-        """All edges whose canonical kind matches `kind`."""
-        return [e for e in self._cache.edges if canonical_kind(e.type) == kind]
+        """All edges of the given canonical kind."""
+        return [e for e in self._cache.edges if e.type == kind]
 
     def edges_into(self, node_id: str) -> list[GraphEdge]:
         """All edges whose target is `node_id` (incoming)."""
@@ -113,7 +84,7 @@ class UnifiedIndex:
         for e in self._cache.edges:
             if e.to_id != node_id:
                 continue
-            if canonical_kind(e.type) == canonical:
+            if e.type == canonical:
                 out.append((e.from_id, canonical))
         return out
 
@@ -158,7 +129,7 @@ class UnifiedIndex:
         adj: dict[str, list[str]] = defaultdict(list)
         wanted = set(kinds) if kinds else None
         for e in self._cache.edges:
-            if wanted is not None and canonical_kind(e.type) not in wanted:
+            if wanted is not None and e.type not in wanted:
                 continue
             adj[e.from_id].append(e.to_id)
         return adj
@@ -167,7 +138,7 @@ class UnifiedIndex:
         adj: dict[str, list[str]] = defaultdict(list)
         wanted = set(kinds) if kinds else None
         for e in self._cache.edges:
-            if wanted is not None and canonical_kind(e.type) not in wanted:
+            if wanted is not None and e.type not in wanted:
                 continue
             adj[e.to_id].append(e.from_id)
         return adj
@@ -204,7 +175,7 @@ class UnifiedIndex:
 def load(project_dir: Path) -> UnifiedIndex:
     """Load the unified index for `project_dir`.
 
-    Falls back to an empty cache if `graph/index.yaml` is missing — the
+    Falls back to an empty cache if `nodes/tripwire-graph-index.yaml` is missing — the
     facade is still usable but will return empty queries. The caller
     can run `core.graph.cache.ensure_fresh` first if it wants to be
     sure the index reflects the current filesystem.
@@ -217,6 +188,5 @@ def load(project_dir: Path) -> UnifiedIndex:
 
 __all__ = [
     "UnifiedIndex",
-    "canonical_kind",
     "load",
 ]

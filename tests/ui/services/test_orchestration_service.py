@@ -15,7 +15,7 @@ from tripwire.ui.services.orchestration_service import (
 
 
 def _write_pattern(project_dir: Path, name: str, content: str) -> None:
-    d = project_dir / "orchestration"
+    d = project_dir / "templates" / "orchestration"
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{name}.yaml").write_text(content, encoding="utf-8")
 
@@ -80,7 +80,7 @@ class TestGetActivePattern:
     def test_source_path_recorded(self, tmp_path_project: Path):
         _write_pattern(tmp_path_project, "default", "name: default\n")
         pattern = get_active_pattern(tmp_path_project)
-        assert pattern.source_path.endswith("orchestration/default.yaml")
+        assert pattern.source_path.endswith("templates/orchestration/default.yaml")
 
 
 # ---------------------------------------------------------------------------

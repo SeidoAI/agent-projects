@@ -50,21 +50,21 @@ describe("bucketByStage", () => {
     expect(buckets.queued?.sessionCount).toBe(0);
   });
 
-  it("collapses richer backend states (active, waiting_for_*) onto executing", () => {
-    // The backend session_status enum has 14 values; the 7-card row
-    // collapses the "still working" cluster into `executing`. Without
-    // the canonicalisation, these would scatter across raw-string
-    // buckets and the row would under-count.
+  it("counts only canonical session states", () => {
+    // v0.9.4 collapsed the dead values (active, waiting_for_*,
+    // re_engaged); the canonical 9-value enum is the single source.
     const buckets = bucketByStage(
       [
-        sess("s1", "active"),
-        sess("s2", "waiting_for_ci"),
-        sess("s3", "waiting_for_review"),
-        sess("s4", "executing"),
+        sess("s1", "executing"),
+        sess("s2", "executing"),
+        sess("s3", "in_review"),
+        sess("s4", "queued"),
       ],
       [],
     );
-    expect(buckets.executing?.sessionCount).toBe(4);
+    expect(buckets.executing?.sessionCount).toBe(2);
+    expect(buckets.in_review?.sessionCount).toBe(1);
+    expect(buckets.queued?.sessionCount).toBe(1);
   });
 
   it("counts off-track sessions (failed/paused/abandoned) under off_track", () => {

@@ -27,47 +27,6 @@ def _check_enum_field(
     if enums.is_valid(enum_name, raw):
         return None
 
-    # v0.9.4: alias-aware fallback for issue_status / session_status. A
-    # pre-v0.9.4 project still has its enum yaml at the legacy values
-    # (backlog/todo/etc.), but the loaded model normalizes them to
-    # canonical via StrEnum.__missing__. Without this fallback, every
-    # issue/session in a pre-backfill project fails enum validation.
-    # Compare BOTH directions: if the project enum accepts the legacy
-    # alias of the canonical value (or vice versa), pass.
-    if enum_name in ("issue_status", "session_status"):
-        from tripwire.core.status_contract import (
-            normalize_issue_status,
-            normalize_session_status,
-        )
-
-        normalize = (
-            normalize_issue_status
-            if enum_name == "issue_status"
-            else normalize_session_status
-        )
-        canonical = normalize(raw)
-
-        # Direction 1: model emitted canonical, project enum has legacy.
-        # Build the reverse alias map (canonical → legacy) from the
-        # forward map and test if any legacy spelling of `canonical` is
-        # in the project enum.
-        from tripwire.core.status_contract import (
-            ISSUE_ALIASES,
-            SESSION_ALIASES,
-        )
-
-        aliases = ISSUE_ALIASES if enum_name == "issue_status" else SESSION_ALIASES
-        legacy_for_canonical = {
-            legacy for legacy, canon in aliases.items() if canon == canonical
-        }
-        if any(enums.is_valid(enum_name, legacy) for legacy in legacy_for_canonical):
-            return None
-
-        # Direction 2: model emitted legacy (raw == legacy), project enum
-        # has canonical. enums.is_valid(canonical) handles this.
-        if canonical != raw and enums.is_valid(enum_name, canonical):
-            return None
-
     valid = ", ".join(enums.value_ids(enum_name)) or "(none)"
     return CheckResult(
         code=code,

@@ -101,7 +101,7 @@ def validate_cmd(
     """Run the validation gate.
 
     The gate the agent runs after every batch of file writes. Always
-    rebuilds `graph/index.yaml` as a side effect. Strict-by-default:
+    rebuilds `nodes/tripwire-graph-index.yaml` as a side effect. Strict-by-default:
     warnings are errors. Run with ``--fix`` to auto-repair trivial
     issues. (``--strict`` was hard-removed in stage 1 of the workflow
     codification.)

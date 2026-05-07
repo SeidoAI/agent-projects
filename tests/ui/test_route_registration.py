@@ -19,7 +19,13 @@ class TestRegisterRoutes:
         client = TestClient(app)
         r = client.get("/api/health")
         assert r.status_code == 200
-        assert r.json() == {"status": "ok"}
+        body = r.json()
+        # v0.10.0 added service identity so the cli/ui.py single-instance
+        # probe can distinguish a tripwire UI from any other service on
+        # the requested port.
+        assert body["status"] == "ok"
+        assert body["service"] == "tripwire"
+        assert "version" in body
 
     def test_openapi_has_project_routes(self):
         paths = self._get_openapi_paths()

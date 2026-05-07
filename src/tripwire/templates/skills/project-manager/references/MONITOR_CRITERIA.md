@@ -99,7 +99,7 @@ user reads to reconstruct overnight history.
 The values above are starting points, not calibrated. Edit
 `monitor:` in `project.yaml` when a signal fires too often (noise),
 too rarely (missed escalations), or dispatches wrong. Document the
-change in `orchestration/monitor-log.yaml`.
+change in `templates/orchestration/monitor-log.yaml`.
 
 Adding a new signal is a workflow.yaml change, not a threshold tweak.
 Required: (1) new entry in the table; (2) a route in `pm-monitor`

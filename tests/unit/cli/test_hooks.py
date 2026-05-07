@@ -72,7 +72,7 @@ def _hook_input(tool_input: dict | None, *, cwd: Path | str = ".") -> str:
         ("nodes/user-model.yaml", True),
         ("graph/nodes/user-model.yaml", True),
         ("project.yaml", True),
-        ("graph/index.yaml", True),
+        ("nodes/tripwire-graph-index.yaml", True),
         # not tripwire artifacts — must skip silently
         ("src/tripwire/cli/init.py", False),
         ("README.md", False),

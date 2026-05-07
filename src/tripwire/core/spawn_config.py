@@ -20,6 +20,7 @@ from typing import Any
 
 import yaml
 
+from tripwire.core import paths
 from tripwire.core.spawn_routing import RouteResolution, resolve_route
 from tripwire.core.store import load_project
 from tripwire.models.session import AgentSession
@@ -136,7 +137,7 @@ def _apply_agent_yaml_overrides(
     Mutates ``resolved`` in place. Tolerant of missing / malformed
     agent yamls — they're metadata, not load-bearing config.
     """
-    agent_yaml = project_dir / "agents" / f"{agent_id}.yaml"
+    agent_yaml = project_dir / paths.AGENTS_DIR / f"{agent_id}.yaml"
     if not agent_yaml.is_file():
         return
     try:

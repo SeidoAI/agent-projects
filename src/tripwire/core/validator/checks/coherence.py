@@ -30,9 +30,6 @@ from tripwire.models.session import AgentSession
 #   verified     → error on earlier
 #   done         → error on anything else
 
-# v0.9.4: keys here are canonical session-status values (post-rename).
-# Pre-v0.9.4 names ("active", "waiting_for_*", "re_engaged") normalise via
-# ``SessionStatus.__missing__`` before reaching this lookup.
 _SESSION_STATUS_TO_PHASE: dict[str, str] = {
     "planned": "planned",
     "queued": "executing",
@@ -44,10 +41,6 @@ _SESSION_STATUS_TO_PHASE: dict[str, str] = {
     # omitted — coherence is meaningless there.
 }
 
-# v0.9.4: phase keys + issue-state keys are canonical (planned, queued,
-# executing, in_review, verified, completed). Legacy issue names
-# (backlog, todo, in_progress, done) are accepted via ``_resolve_issue_state``
-# below so callers don't need to pre-normalise.
 _COHERENCE_MATRIX: dict[str, dict[str, str]] = {
     "planned": {
         "planned": "ok",
@@ -90,20 +83,6 @@ _COHERENCE_MATRIX: dict[str, dict[str, str]] = {
         "completed": "ok",
     },
 }
-
-
-def _resolve_issue_state(value: str) -> str:
-    """Map legacy / alias issue-status strings to canonical for matrix lookup."""
-    from tripwire.core.status_contract import normalize_issue_status
-
-    return normalize_issue_status(value)
-
-
-def _resolve_session_state(value: str) -> str:
-    """Map legacy / alias session-status strings to canonical for matrix lookup."""
-    from tripwire.core.status_contract import normalize_session_status
-
-    return normalize_session_status(value)
 
 
 def check_freshness(ctx: ValidationContext) -> list[CheckResult]:
@@ -193,7 +172,7 @@ def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
     issues_by_key = {entity.model.id: entity.model for entity in ctx.issues}
     for entity in ctx.sessions:
         session: AgentSession = entity.model
-        phase = _SESSION_STATUS_TO_PHASE.get(_resolve_session_state(session.status))
+        phase = _SESSION_STATUS_TO_PHASE.get(str(session.status))
         if phase is None:
             continue
         session_row = _COHERENCE_MATRIX[phase]
@@ -201,7 +180,7 @@ def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
             issue = issues_by_key.get(issue_key)
             if issue is None:
                 continue
-            verdict = session_row.get(_resolve_issue_state(issue.status), "ok")
+            verdict = session_row.get(str(issue.status), "ok")
             if verdict == "ok":
                 continue
             if verdict == "behind_error":
@@ -245,20 +224,19 @@ def check_session_issue_coherence(ctx: ValidationContext) -> list[CheckResult]:
 def check_issue_session_status_compatibility(
     ctx: ValidationContext,
 ) -> list[CheckResult]:
-    """v0.9.4 contract: every member issue's status must be in the set
-    allowed for its session's status. Catches contract violations on write.
+    """Contract: every member issue's status must be in the set allowed
+    for its session's status. Catches contract violations on write.
     """
     from tripwire.core.status_contract import (
         ALLOWED_ISSUE_STATES_BY_SESSION_STATE,
         is_issue_state_compatible_with_session_state,
-        normalize_session_status,
     )
 
     results: list[CheckResult] = []
     issues_by_key = {entity.model.id: entity for entity in ctx.issues}
     for session_entity in ctx.sessions:
         session = session_entity.model
-        s_state = normalize_session_status(str(session.status))
+        s_state = str(session.status)
         if s_state not in ALLOWED_ISSUE_STATES_BY_SESSION_STATE:
             # Unknown session state — not our problem here. Other checks
             # cover unknown enum values.
@@ -298,30 +276,24 @@ def check_issue_session_status_compatibility(
 def check_done_implies_session_completed(
     ctx: ValidationContext,
 ) -> list[CheckResult]:
-    """v0.9.4 warning: an issue at ``completed`` should belong to at
-    least one session that's also ``completed`` (or no session at all).
+    """An issue at ``completed`` should belong to at least one session
+    that's also ``completed`` (or no session at all).
 
     Catches "orphan completion" cases where an issue was flipped to
     completed manually without the session being walked through to its
     own terminal state.
     """
-    from tripwire.core.status_contract import (
-        normalize_issue_status,
-        normalize_session_status,
-    )
-
     results: list[CheckResult] = []
     sessions_by_issue: dict[str, list[str]] = {}
     for session_entity in ctx.sessions:
         session = session_entity.model
-        s_state = normalize_session_status(str(session.status))
+        s_state = str(session.status)
         for issue_key in session.issues:
             sessions_by_issue.setdefault(issue_key, []).append(s_state)
 
     for entity in ctx.issues:
         issue = entity.model
-        i_state = normalize_issue_status(str(issue.status))
-        if i_state != "completed":
+        if str(issue.status) != "completed":
             continue
         owning_states = sessions_by_issue.get(issue.id, [])
         if not owning_states:

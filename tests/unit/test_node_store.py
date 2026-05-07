@@ -79,6 +79,46 @@ class TestNodeStore:
         assert len(loaded) == 3
         assert {n.id for n in loaded} == {"user-model", "auth-endpoint", "config-jwt"}
 
+    def test_list_nodes_skips_graph_index_file(self, project_dir: Path) -> None:
+        """v0.10.0: the derived graph cache lives at
+        `nodes/tripwire-graph-index.yaml` alongside source nodes. It
+        is NOT a concept node and must not appear in `list_nodes()`.
+        """
+        save_node(project_dir, make_node("user-model"))
+        # Hand-write a fake cache file as it would appear after a
+        # graph rebuild.
+        (project_dir / "nodes" / "tripwire-graph-index.yaml").write_text(
+            "version: 2\nfiles: {}\n", encoding="utf-8"
+        )
+        loaded = list_nodes(project_dir)
+        ids = [n.id for n in loaded]
+        assert ids == ["user-model"]
+
+
+class TestReservedNodeId:
+    """The id `tripwire-graph-index` is reserved for the graph cache
+    file. Authoring a concept node with that id must be rejected.
+    """
+
+    def test_reserved_id_rejected_at_model(self) -> None:
+        from pydantic import ValidationError
+
+        from tripwire.models import ConceptNode
+
+        with pytest.raises(ValidationError) as exc:
+            ConceptNode(
+                id="tripwire-graph-index",
+                type="model",
+                name="Sneaky",
+                description="Trying to clobber the cache",
+                related=[],
+                tags=[],
+                body="",
+            )
+        assert "reserved" in str(exc.value)
+
+
+class TestNodeExists:
     def test_node_exists(self, project_dir: Path) -> None:
         assert not node_exists(project_dir, "user-model")
         save_node(project_dir, make_node())

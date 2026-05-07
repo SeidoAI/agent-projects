@@ -31,10 +31,9 @@ def test_session_status_invalid_string_raises() -> None:
 
 
 def test_session_status_legacy_done_rejected() -> None:
-    """`status: done` is the exact value that motivated Phase 2.1.
+    """`status: done` is the legacy spelling — must be rejected post-rip.
 
-    Should be rejected post-hardening (`completed` is the canonical
-    terminal-success).
+    `completed` is the canonical terminal-success.
     """
     with pytest.raises(ValidationError):
         AgentSession.model_validate({**_BASE, "status": "done"})

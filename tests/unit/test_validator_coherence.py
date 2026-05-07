@@ -53,8 +53,8 @@ def test_session_status_to_phase_maps_all_in_lifecycle_statuses():
 def test_issue_behind_session_is_error(
     tmp_path_project: Path, save_test_issue, save_test_session
 ):
-    """Session in_review + issue still todo → error (session is past the issue)."""
-    save_test_issue(tmp_path_project, "TMP-1", status="todo")
+    """Session in_review + issue still queued → error (session is past the issue)."""
+    save_test_issue(tmp_path_project, "TMP-1", status="queued")
     save_test_session(
         tmp_path_project,
         "session-one",
@@ -74,8 +74,8 @@ def test_issue_behind_session_is_error(
 def test_issue_ahead_of_session_is_warning(
     tmp_path_project: Path, save_test_issue, save_test_session
 ):
-    """Session in_progress + issue already done → warning (issue ran ahead)."""
-    save_test_issue(tmp_path_project, "TMP-1", status="done")
+    """Session executing + issue already completed → warning (issue ran ahead)."""
+    save_test_issue(tmp_path_project, "TMP-1", status="completed")
     save_test_session(
         tmp_path_project,
         "session-one",
@@ -97,8 +97,8 @@ def test_issue_ahead_of_session_is_warning(
 def test_coherence_passes_when_aligned(
     tmp_path_project: Path, save_test_issue, save_test_session
 ):
-    """Session executing + issue in_progress → no coherence finding."""
-    save_test_issue(tmp_path_project, "TMP-1", status="in_progress")
+    """Session executing + issue executing → no coherence finding."""
+    save_test_issue(tmp_path_project, "TMP-1", status="executing")
     save_test_session(
         tmp_path_project,
         "session-one",
@@ -116,7 +116,7 @@ def test_coherence_skips_off_lifecycle_statuses(
     tmp_path_project: Path, save_test_issue, save_test_session
 ):
     """Session.status == 'failed' is not in the matrix → no finding emitted."""
-    save_test_issue(tmp_path_project, "TMP-1", status="todo")
+    save_test_issue(tmp_path_project, "TMP-1", status="queued")
     save_test_session(
         tmp_path_project,
         "session-one",
@@ -141,7 +141,7 @@ def test_planned_session_with_in_progress_issue_warns_ahead(
     fires ``ahead_warn`` when an issue is past the session's planning
     phase.
     """
-    save_test_issue(tmp_path_project, "TMP-1", status="in_progress")
+    save_test_issue(tmp_path_project, "TMP-1", status="executing")
     save_test_session(
         tmp_path_project,
         "session-one",

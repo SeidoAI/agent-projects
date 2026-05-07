@@ -44,11 +44,11 @@ def populated_client(
         _project_svc._discovery_cache = (time.monotonic(), [summary])
 
     save_test_node(graph_project, "user-model", type="model", status="active")
-    save_test_issue(graph_project, "KUI-1", status="todo")
+    save_test_issue(graph_project, "KUI-1", status="queued")
     save_test_issue(
         graph_project,
         "KUI-2",
-        status="in_progress",
+        status="executing",
         blocked_by=["KUI-1"],
     )
     return TestClient(create_app(dev_mode=True))

@@ -503,7 +503,7 @@ class TestMissingTemplate:
             {
                 "id": "TMP-1",
                 "title": "Test",
-                "status": "todo",
+                "status": "queued",
                 "priority": "medium",
                 "executor": "ai",
                 "verifier": "required",

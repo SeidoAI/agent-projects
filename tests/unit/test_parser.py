@@ -85,7 +85,7 @@ class TestSerializeFrontmatterBody:
         assert body == original_body
 
     def test_preserves_key_order(self) -> None:
-        fm = {"uuid": "abc", "id": "SEI-1", "title": "T", "status": "todo"}
+        fm = {"uuid": "abc", "id": "SEI-1", "title": "T", "status": "queued"}
         text = serialize_frontmatter_body(fm, "")
         # Check that uuid appears before id, id before title, etc.
         assert text.find("uuid:") < text.find("id:") < text.find("title:")

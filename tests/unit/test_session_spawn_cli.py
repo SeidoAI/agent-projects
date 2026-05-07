@@ -165,8 +165,8 @@ class TestSpawnRuntimeDispatch:
         )
         write_handoff_yaml(tmp_path_project, "s1")
 
-        (tmp_path_project / "agents").mkdir(exist_ok=True)
-        (tmp_path_project / "agents" / "backend-coder.yaml").write_text(
+        (tmp_path_project / "templates" / "agents").mkdir(parents=True, exist_ok=True)
+        (tmp_path_project / "templates" / "agents" / "backend-coder.yaml").write_text(
             "id: backend-coder\ncontext:\n  skills: []\n"
         )
 
@@ -217,8 +217,8 @@ class TestSpawnRuntimeDispatch:
             repos=[{"repo": "SeidoAI/tripwire", "base_branch": "main"}],
         )
         write_handoff_yaml(tmp_path_project, "s1")
-        (tmp_path_project / "agents").mkdir(exist_ok=True)
-        (tmp_path_project / "agents" / "backend-coder.yaml").write_text(
+        (tmp_path_project / "templates" / "agents").mkdir(parents=True, exist_ok=True)
+        (tmp_path_project / "templates" / "agents" / "backend-coder.yaml").write_text(
             "id: backend-coder\ncontext:\n  skills: []\n"
         )
 

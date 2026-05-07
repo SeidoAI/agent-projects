@@ -38,16 +38,12 @@ _CLASS_DEFS: dict[str, str] = {
     "planned": "fill:#e0e0e0,stroke:#999,color:#333",
     "queued": "fill:#fff3b0,stroke:#cc9933,color:#333",
     "executing": "fill:#cfe9ff,stroke:#3399cc,color:#333",
-    "active": "fill:#cfe9ff,stroke:#3399cc,color:#333",
+    "in_review": "fill:#fff3b0,stroke:#cc9933,color:#333",
+    "verified": "fill:#d4ffd4,stroke:#33aa33,color:#333",
+    "completed": "fill:#9fdf9f,stroke:#005500,color:#000",
     "paused": "fill:#ffe0cc,stroke:#cc6633,color:#333",
     "failed": "fill:#ffcccc,stroke:#cc3333,color:#333",
     "abandoned": "fill:#ffcccc,stroke:#cc3333,color:#333",
-    "waiting_for_ci": "fill:#fff3b0,stroke:#cc9933,color:#333",
-    "waiting_for_review": "fill:#fff3b0,stroke:#cc9933,color:#333",
-    "waiting_for_deploy": "fill:#fff3b0,stroke:#cc9933,color:#333",
-    "re_engaged": "fill:#ffe0cc,stroke:#cc6633,color:#333",
-    "completed": "fill:#d4ffd4,stroke:#33aa33,color:#333",
-    "done": "fill:#9fdf9f,stroke:#005500,color:#000",
 }
 
 # Statuses we don't recognise fall back to this class. Better than crashing
@@ -236,9 +232,11 @@ def render_session_mermaid(
 
     if truncated and completed_count:
         # Single annotation node — not connected to anything to avoid edge
-        # density. The `done` class signals "this is finished work".
-        lines.append(f'  done-summary["✓ {completed_count} sessions complete"]:::done')
-        used_classes.add("done")
+        # density. The `completed` class signals "this is finished work".
+        lines.append(
+            f'  done-summary["✓ {completed_count} sessions complete"]:::completed'
+        )
+        used_classes.add("completed")
 
     # ClassDefs only for classes actually used. Sorted for diff stability.
     for cls in sorted(used_classes):

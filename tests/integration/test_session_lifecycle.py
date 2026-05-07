@@ -40,7 +40,7 @@ def test_full_session_lifecycle(save_test_issue, tmp_path_project):
         key="TMP-1",
         kind="feat",
         title="Ship v0.6a",
-        status="todo",
+        status="queued",
     )
 
     # Allocate a session key via the CLI.

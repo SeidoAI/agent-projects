@@ -1,4 +1,4 @@
-"""Unit tests for tripwire.core.status_contract (v0.9.4)."""
+"""Unit tests for tripwire.core.status_contract."""
 
 from __future__ import annotations
 
@@ -8,83 +8,19 @@ import yaml
 
 from tripwire.core.status_contract import (
     ALLOWED_ISSUE_STATES_BY_SESSION_STATE,
-    ISSUE_ALIASES,
     SWEEP_TARGETS,
     is_issue_state_compatible_with_session_state,
-    normalize_issue_status,
-    normalize_session_status,
     sweep_issues,
     sweep_target_for,
 )
-
-# --- Alias maps --------------------------------------------------------------
-
-
-def test_issue_aliases_cover_all_legacy_names() -> None:
-    assert ISSUE_ALIASES == {
-        "backlog": "planned",
-        "todo": "queued",
-        "in_progress": "executing",
-        "done": "completed",
-        "canceled": "abandoned",
-    }
-
-
-def test_normalize_issue_status_passes_canonical_through() -> None:
-    for canonical in (
-        "planned",
-        "queued",
-        "executing",
-        "in_review",
-        "verified",
-        "completed",
-        "abandoned",
-        "deferred",
-    ):
-        assert normalize_issue_status(canonical) == canonical
-
-
-def test_normalize_issue_status_rewrites_legacy() -> None:
-    assert normalize_issue_status("backlog") == "planned"
-    assert normalize_issue_status("todo") == "queued"
-    assert normalize_issue_status("in_progress") == "executing"
-    assert normalize_issue_status("done") == "completed"
-    assert normalize_issue_status("canceled") == "abandoned"
-
-
-def test_normalize_session_status_collapses_dead_states() -> None:
-    # Dead session states aspirationally added in v0.7 but never written
-    # into the transition table — collapse to executing/in_review on read.
-    assert normalize_session_status("active") == "executing"
-    assert normalize_session_status("waiting_for_ci") == "executing"
-    assert normalize_session_status("waiting_for_review") == "in_review"
-    assert normalize_session_status("waiting_for_deploy") == "executing"
-    assert normalize_session_status("re_engaged") == "executing"
-
-
-def test_normalize_session_status_passes_canonical_through() -> None:
-    for canonical in (
-        "planned",
-        "queued",
-        "executing",
-        "in_review",
-        "verified",
-        "completed",
-        "paused",
-        "failed",
-        "abandoned",
-    ):
-        assert normalize_session_status(canonical) == canonical
-
 
 # --- Contract: allowed issue-states-per-session-state -----------------------
 
 
 def test_planned_session_only_accepts_planned_or_deferred_issues() -> None:
     allowed = ALLOWED_ISSUE_STATES_BY_SESSION_STATE["planned"]
-    # v0.9.4 (codex P1 round-4): abandoned is always allowed too —
-    # mirrors the project.yaml transition table that lets users drop an
-    # issue at any time.
+    # `abandoned` is always allowed — mirrors the project.yaml transition
+    # table that lets users drop an issue at any time.
     assert allowed == frozenset({"planned", "deferred", "abandoned"})
 
 
@@ -110,9 +46,9 @@ def test_executing_session_accepts_through_in_review() -> None:
 
 
 def test_in_review_session_admits_in_review_verified_deferred_abandoned() -> None:
-    # v0.9.4 (codex P1 round-4): verified→in_review session rollback
-    # is a documented lifecycle path; the rolled-back session retains
-    # already-verified issues. Plus abandoned (always-allowed escape).
+    # ``verified``→``in_review`` session rollback is a documented
+    # lifecycle path; the rolled-back session retains already-verified
+    # issues. Plus abandoned (always-allowed escape).
     allowed = ALLOWED_ISSUE_STATES_BY_SESSION_STATE["in_review"]
     assert allowed == frozenset({"in_review", "verified", "deferred", "abandoned"})
 
@@ -140,13 +76,14 @@ def test_paused_failed_abandoned_are_permissive() -> None:
 # --- Compatibility checks ----------------------------------------------------
 
 
-def test_compatibility_uses_canonical_via_aliases() -> None:
-    # Old name on the issue side, canonical on the session side.
+def test_compatibility_canonical_pairs() -> None:
     assert (
-        is_issue_state_compatible_with_session_state("executing", "in_progress") is True
+        is_issue_state_compatible_with_session_state("executing", "executing") is True
     )
-    assert is_issue_state_compatible_with_session_state("completed", "done") is True
-    assert is_issue_state_compatible_with_session_state("planned", "backlog") is True
+    assert (
+        is_issue_state_compatible_with_session_state("completed", "completed") is True
+    )
+    assert is_issue_state_compatible_with_session_state("planned", "planned") is True
 
 
 def test_floor_violation_rejected() -> None:
@@ -162,7 +99,7 @@ def test_ceiling_violation_rejected() -> None:
     )
 
 
-def test_completed_session_rejects_in_progress_issue() -> None:
+def test_completed_session_rejects_executing_issue() -> None:
     assert (
         is_issue_state_compatible_with_session_state("completed", "executing") is False
     )
@@ -187,11 +124,6 @@ def test_sweep_target_for_each_session_state() -> None:
     assert sweep_target_for("paused") is None
     assert sweep_target_for("failed") is None
     assert sweep_target_for("abandoned") is None
-
-
-def test_sweep_target_for_alias_normalizes() -> None:
-    # Old session aliases route to a canonical bucket.
-    assert sweep_target_for("waiting_for_review") == "in_review"
 
 
 def test_sweep_targets_keys_match_contract_keys() -> None:
@@ -344,22 +276,6 @@ def test_sweep_issues_tolerates_missing_issue_files(tmp_path: Path) -> None:
     session = _make_fake_session(["T-100", "T-999-MISSING"])
     changed = sweep_issues(tmp_path, session, "in_review")
     assert changed == ["T-100"]
-
-
-def test_sweep_issues_with_legacy_status_normalizes_then_advances(
-    tmp_path: Path,
-) -> None:
-    _write_minimal_project(tmp_path)
-    # Issue saved with the v0.9.3-and-earlier name. The IssueStatus enum's
-    # _missing_ alias handler should normalize it on load to "queued".
-    # When sweep runs target=in_review, it should advance.
-    _make_issue(tmp_path, "T-100", "todo")
-    session = _make_fake_session(["T-100"])
-    changed = sweep_issues(tmp_path, session, "in_review")
-    assert changed == ["T-100"]
-    from tripwire.core.store import load_issue
-
-    assert load_issue(tmp_path, "T-100").status == "in_review"
 
 
 # Run a tiny integration check: ensure ALLOWED contract is consistent with

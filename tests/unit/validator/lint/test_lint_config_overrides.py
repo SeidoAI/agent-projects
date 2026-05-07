@@ -57,7 +57,7 @@ def test_semantic_coverage_threshold_override(
         "## Test plan\n```\nuv run pytest\n```\n\n"
         "## Dependencies\nnone\n\n## Definition of Done\n- [ ] done\n"
     )
-    save_test_issue(tmp_path_project, key="TMP-1", status="in_progress", body=body)
+    save_test_issue(tmp_path_project, key="TMP-1", status="executing", body=body)
     _set_lint_config(tmp_path_project, {"semantic_coverage": {"min_ac_node_refs": 1}})
 
     ctx = load_context(tmp_path_project)
@@ -82,7 +82,7 @@ def test_unknown_lint_key_ignored(
 ):
     """A lint_config block for a lint we don't ship is harmless."""
     save_test_node(tmp_path_project, node_id="auth-system", name="Auth System")
-    save_test_issue(tmp_path_project, key="TMP-1", status="in_progress")
+    save_test_issue(tmp_path_project, key="TMP-1", status="executing")
     _set_lint_config(tmp_path_project, {"some_future_lint": {"threshold": 99}})
 
     ctx = load_context(tmp_path_project)
@@ -116,7 +116,7 @@ def test_string_node_ratio_threshold_falls_back(
     from tripwire.core.validator.lint import node_ratio
 
     for n in range(10):
-        save_test_issue(tmp_path_project, key=f"TMP-{n + 1}", status="in_progress")
+        save_test_issue(tmp_path_project, key=f"TMP-{n + 1}", status="executing")
     _set_lint_config(
         tmp_path_project,
         {"node_ratio": {"min_ratio": "0.5", "max_ratio": "5.0"}},

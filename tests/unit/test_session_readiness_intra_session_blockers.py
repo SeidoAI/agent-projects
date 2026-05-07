@@ -25,9 +25,9 @@ class TestIntraSessionBlockersSkipped:
         must NOT report A as a blocker — it'll be done in this spawn."""
         from tripwire.core.session_readiness import check_readiness
 
-        save_test_issue(tmp_path_project, "TMP-1", status="backlog")
+        save_test_issue(tmp_path_project, "TMP-1", status="planned")
         save_test_issue(
-            tmp_path_project, "TMP-2", status="backlog", blocked_by=["TMP-1"]
+            tmp_path_project, "TMP-2", status="planned", blocked_by=["TMP-1"]
         )
         save_test_session(
             tmp_path_project,
@@ -52,9 +52,9 @@ class TestIntraSessionBlockersSkipped:
         correctness guarantee. Regression test."""
         from tripwire.core.session_readiness import check_readiness
 
-        save_test_issue(tmp_path_project, "TMP-1", status="backlog")
+        save_test_issue(tmp_path_project, "TMP-1", status="planned")
         save_test_issue(
-            tmp_path_project, "TMP-2", status="backlog", blocked_by=["TMP-1"]
+            tmp_path_project, "TMP-2", status="planned", blocked_by=["TMP-1"]
         )
         save_test_session(
             tmp_path_project,
@@ -77,9 +77,9 @@ class TestIntraSessionBlockersSkipped:
         item either way (filter applies before status check)."""
         from tripwire.core.session_readiness import check_readiness
 
-        save_test_issue(tmp_path_project, "TMP-1", status="done")
+        save_test_issue(tmp_path_project, "TMP-1", status="completed")
         save_test_issue(
-            tmp_path_project, "TMP-2", status="backlog", blocked_by=["TMP-1"]
+            tmp_path_project, "TMP-2", status="planned", blocked_by=["TMP-1"]
         )
         save_test_session(
             tmp_path_project,
@@ -99,12 +99,12 @@ class TestIntraSessionBlockersSkipped:
         backlog). Only X should show up as a blocker."""
         from tripwire.core.session_readiness import check_readiness
 
-        save_test_issue(tmp_path_project, "TMP-1", status="backlog")
-        save_test_issue(tmp_path_project, "TMP-99", status="backlog")
+        save_test_issue(tmp_path_project, "TMP-1", status="planned")
+        save_test_issue(tmp_path_project, "TMP-99", status="planned")
         save_test_issue(
             tmp_path_project,
             "TMP-2",
-            status="backlog",
+            status="planned",
             blocked_by=["TMP-1", "TMP-99"],
         )
         save_test_session(

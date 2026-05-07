@@ -22,7 +22,7 @@ Manual entries drift. Leave it empty.
 
 **Invalid enum values.** `status: in-progress` (should be underscore),
 `priority: very-high` (not in enum). Run `tripwire enums show <name>`
-or read `enums/<name>.yaml`.
+or read `templates/enums/<name>.yaml`.
 
 **Bad timestamp format.** ISO 8601 only:
 `created_at: "2026-04-07T10:00:00"`. Validator uses

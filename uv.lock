@@ -912,7 +912,7 @@ wheels = [
 
 [[package]]
 name = "tripwire-pm"
-version = "0.9.7"
+version = "0.10.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

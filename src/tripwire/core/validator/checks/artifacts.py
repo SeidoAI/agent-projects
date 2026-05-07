@@ -63,10 +63,8 @@ def check_manifest_phase_ownership_consistent(
         return []
     results: list[CheckResult] = []
     for entry in manifest.artifacts:
-        # v0.9.4: canonical "executing" + legacy "in_progress" alias.
         if entry.owned_by == "pm" and entry.produced_at in (
             "executing",
-            "in_progress",
             "in_review",
         ):
             results.append(

@@ -66,7 +66,7 @@ def _seed(tmp_path: Path) -> Path:
             Issue(
                 id=key,
                 title=key,
-                status="todo",
+                status="queued",
                 priority="medium",
                 executor="ai",
                 verifier="required",
@@ -176,7 +176,7 @@ def test_pin_staleness_fires_when_target_contract_advances(tmp_path: Path) -> No
         Issue(
             id="TST-3",
             title="pinned",
-            status="todo",
+            status="queued",
             priority="medium",
             executor="ai",
             verifier="required",

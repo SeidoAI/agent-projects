@@ -33,7 +33,7 @@ def _seed(tmp_path: Path) -> None:
         issue = Issue(
             id=key,
             title=key,
-            status="todo",
+            status="queued",
             priority="medium",
             executor="ai",
             verifier="required",

@@ -1,6 +1,6 @@
 """Incremental graph index cache (v2 schema).
 
-`graph/index.yaml` is committed to git as a derived view of the underlying
+`nodes/tripwire-graph-index.yaml` is committed to git as a derived view of the underlying
 issue and node files. It is never the source of truth — deleting it always
 rebuilds correctly from the files. The cache exists purely so UI and CLI
 reads are O(1) instead of rescanning N files every time.
@@ -60,6 +60,44 @@ NODES_PREFIX = f"{paths.NODES_DIR}/"
 SESSIONS_PREFIX = f"{paths.SESSIONS_DIR}/"
 COMMENTS_SUBDIR = paths.COMMENTS_SUBDIR
 
+# Pre-v0.9 edge ``type:`` strings. The canonical taxonomy is ``refs`` /
+# ``depends_on`` / ``parent`` / ``implements``; everything below was
+# rewritten in the 0.9 cutover by `tripwire migrate graph-edges`. If
+# `load_index` ever sees one of these strings on disk, the cache predates
+# the rewrite — refuse to load and ask the user to run the migration.
+# Silently filtering would cause `_REFERENCING_EDGE_TYPES` (now collapsed
+# to ``("refs", "depends_on")``) to drop edges whose `referenced_by`
+# entries the UI and CLI rely on.
+_LEGACY_EDGE_TYPE_STRINGS: frozenset[str] = frozenset(
+    {
+        "references",
+        "related",
+        "blocked_by",
+        "produced-by",
+        "addressed-by",
+        "tripwire-fired-on",
+    }
+)
+
+
+class LegacyCacheError(RuntimeError):
+    """Raised by :func:`load_index` when the cache holds pre-v0.9 edge types.
+
+    Carries the offending file path and the legacy strings encountered
+    so callers can produce a user-facing message that points the user
+    at ``tripwire migrate graph-edges``.
+    """
+
+    def __init__(self, cache_path: Path, legacy_types: list[str]) -> None:
+        self.cache_path = cache_path
+        self.legacy_types = legacy_types
+        joined = ", ".join(sorted(set(legacy_types)))
+        super().__init__(
+            f"{cache_path} contains pre-v0.9 edge type(s): {joined}. "
+            f"Run `tripwire migrate graph-edges` to rewrite them, or "
+            f"delete {cache_path} to force a fresh rebuild."
+        )
+
 
 # ============================================================================
 # Locking
@@ -83,8 +121,8 @@ def _index_lock(
 ) -> Iterator[None]:
     """Acquire an exclusive `flock` on the graph index lock file.
 
-    Creates `graph/.index.lock` if it doesn't exist. Same polling pattern as
-    `core/key_allocator.py`.
+    Creates ``nodes/.tripwire-graph-index.lock`` if it doesn't exist.
+    Same polling pattern as ``core/key_allocator.py``.
     """
     lock_path = project_dir / LOCK_REL_PATH
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -114,11 +152,18 @@ def _index_lock(
 
 
 def load_index(project_dir: Path) -> GraphIndex | None:
-    """Load `graph/index.yaml`, or return None if the file is missing.
+    """Load ``nodes/tripwire-graph-index.yaml``, or return None if missing.
 
     Version mismatch and parse errors also return None — the caller (usually
     `ensure_fresh`) will then trigger a full rebuild. This is intentional:
     a corrupt cache is trivially recoverable by rebuilding from the files.
+
+    Pre-v0.9 caches that still carry legacy edge ``type:`` strings raise
+    :class:`LegacyCacheError` instead of returning None. Silently treating
+    them as missing would mask under-reported `referenced_by` tables —
+    the v0.9 collapse of `_REFERENCING_EDGE_TYPES` to
+    ``("refs", "depends_on")`` would simply drop legacy-typed edges. The
+    user must run ``tripwire migrate graph-edges`` to rewrite the cache.
     """
     path = project_dir / INDEX_REL_PATH
     if not path.exists():
@@ -131,6 +176,22 @@ def load_index(project_dir: Path) -> GraphIndex | None:
         return None
     if raw.get("version") != CACHE_VERSION:
         return None
+
+    # Refuse to load legacy-typed edges. Detected before pydantic
+    # validation so the clearer message wins even if the legacy edges
+    # also fail schema validation on a future EdgeKind tightening.
+    legacy_found: list[str] = []
+    edges = raw.get("edges") or []
+    if isinstance(edges, list):
+        for edge in edges:
+            if not isinstance(edge, dict):
+                continue
+            etype = edge.get("type")
+            if isinstance(etype, str) and etype in _LEGACY_EDGE_TYPE_STRINGS:
+                legacy_found.append(etype)
+    if legacy_found:
+        raise LegacyCacheError(path, legacy_found)
+
     try:
         return GraphIndex.model_validate(raw)
     except ValueError:
@@ -138,7 +199,7 @@ def load_index(project_dir: Path) -> GraphIndex | None:
 
 
 def save_index(project_dir: Path, cache: GraphIndex) -> None:
-    """Write the cache to `graph/index.yaml` atomically.
+    """Write the cache to ``nodes/tripwire-graph-index.yaml`` atomically.
 
     Uses a tmp-file + rename so partial writes never leave a corrupt cache
     on disk.
@@ -323,7 +384,7 @@ def _issue_edges(issue: Issue, rel_path: str, body: str) -> list[GraphEdge]:
     """Emit every edge sourced from a single issue file."""
     edges: list[GraphEdge] = []
 
-    # [[node-id]] in body → references
+    # [[node-id]] in body → refs
     seen_refs: set[str] = set()
     for ref in extract_references(body):
         if ref in seen_refs:
@@ -333,18 +394,18 @@ def _issue_edges(issue: Issue, rel_path: str, body: str) -> list[GraphEdge]:
             GraphEdge(
                 from_id=issue.id,
                 to_id=ref,
-                type="references",
+                type="refs",
                 source_file=rel_path,
             )
         )
 
-    # blocked_by → blocked_by edges
+    # blocked_by → depends_on edges
     for blocker in issue.blocked_by:
         edges.append(
             GraphEdge(
                 from_id=issue.id,
                 to_id=blocker,
-                type="blocked_by",
+                type="depends_on",
                 source_file=rel_path,
             )
         )
@@ -465,13 +526,13 @@ def _node_edges(node: ConceptNode, rel_path: str, body: str) -> list[GraphEdge]:
     """Emit every edge sourced from a single node file."""
     edges: list[GraphEdge] = []
 
-    # related → related edges
+    # related → refs edges (bidirectional reference between concept nodes)
     for related_id in node.related:
         edges.append(
             GraphEdge(
                 from_id=node.id,
                 to_id=related_id,
-                type="related",
+                type="refs",
                 source_file=rel_path,
             )
         )
@@ -486,7 +547,7 @@ def _node_edges(node: ConceptNode, rel_path: str, body: str) -> list[GraphEdge]:
             GraphEdge(
                 from_id=node.id,
                 to_id=ref,
-                type="references",
+                type="refs",
                 source_file=rel_path,
             )
         )
@@ -620,20 +681,12 @@ def _rebuild_derived_tables(cache: GraphIndex, project_dir: Path) -> None:
     for entries in by_type.values():
         entries.sort()
 
-    # `referenced_by` is the inverse of every "this references that" edge —
-    # legacy on-disk strings ("references", "blocked_by", "related") AND the
-    # canonical v0.9 EdgeKind values ("refs", "depends_on") emitted by
-    # session/comment resolvers. Without "refs"/"depends_on" here, sessions
-    # or comments that reference an issue or node would be invisible to
-    # consumers that read `cache.referenced_by` (reverse-ref counts, "is
-    # this node referenced anywhere?" lookups).
-    _REFERENCING_EDGE_TYPES = (
-        "references",
-        "blocked_by",
-        "related",
-        "refs",
-        "depends_on",
-    )
+    # `referenced_by` is the inverse of every "this references that" edge.
+    # Both `refs` (body / related) and `depends_on` (blockers) count — a
+    # session or comment that references an issue, or an issue that lists
+    # a blocker, must be reachable via reverse-ref counts and "is this
+    # node referenced anywhere?" lookups.
+    _REFERENCING_EDGE_TYPES = ("refs", "depends_on")
     for edge in cache.edges:
         if edge.type in _REFERENCING_EDGE_TYPES:
             referenced_by.setdefault(edge.to_id, []).append(edge.from_id)
@@ -656,7 +709,7 @@ def full_rebuild(project_dir: Path) -> GraphIndex:
 
     Called when the cache is missing, version-mismatched, or corrupt. Also
     a handy forcing function if you ever suspect the cache is wrong —
-    delete `graph/index.yaml` and run `validate`.
+    delete `nodes/tripwire-graph-index.yaml` and run `validate`.
     """
     logger.info("graph_cache: full rebuild starting (project=%s)", project_dir)
     started = time.monotonic()
@@ -684,6 +737,10 @@ def full_rebuild(project_dir: Path) -> GraphIndex:
         nodes_root = paths.nodes_dir(project_dir)
         if nodes_root.is_dir():
             for abs_path in sorted(nodes_root.glob("*.yaml")):
+                # Skip the cache file itself — it lives in `nodes/`
+                # since v0.10.0 but is not a concept node.
+                if abs_path.name == paths.GRAPH_INDEX_FILENAME:
+                    continue
                 rel_path = str(abs_path.relative_to(project_dir))
                 parsed = _load_node_file(project_dir, rel_path)
                 if parsed is None:
@@ -831,7 +888,7 @@ def ensure_fresh(project_dir: Path) -> bool:
     """Make sure the cache reflects the current state of the filesystem.
 
     Decision tree:
-    1. If `graph/index.yaml` is missing or version-mismatched → full rebuild
+    1. If `nodes/tripwire-graph-index.yaml` is missing or version-mismatched → full rebuild
     2. Otherwise walk `issues/` and `nodes/` and compare file mtimes
        against the stored fingerprints:
        - For every file on disk whose mtime or sha is newer than the cache,
@@ -863,6 +920,13 @@ def ensure_fresh(project_dir: Path) -> bool:
     nodes_root = paths.nodes_dir(project_dir)
     if nodes_root.is_dir():
         for abs_path in nodes_root.glob("*.yaml"):
+            # The cache file itself lives in `nodes/` since v0.10.0;
+            # don't track it as a source — that would re-trigger a
+            # rebuild on every `ensure_fresh` call (the rebuild writes
+            # the cache, the next call sees a "new" mtime, infinite
+            # loop on `last_incremental_update`).
+            if abs_path.name == paths.GRAPH_INDEX_FILENAME:
+                continue
             current_files.add(str(abs_path.relative_to(project_dir)))
 
     # KUI-132 / A7: also track session and comment files.
@@ -965,6 +1029,7 @@ __all__ = [
     "CACHE_VERSION",
     "INDEX_REL_PATH",
     "LOCK_REL_PATH",
+    "LegacyCacheError",
     "ensure_fresh",
     "full_rebuild",
     "issue_key_from_rel_path",

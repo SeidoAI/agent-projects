@@ -124,7 +124,7 @@ def test_yaml_runtime_field_resolves_to_codex_runtime(tmp_path_project: Path):
     is the integration point KUI-94 §C4 introduced; KUI-95's agent
     yaml is its first user-visible consumer."""
     src = get_templates_dir() / AGENT_TEMPLATE_REL
-    agents_dir = tmp_path_project / "agents"
+    agents_dir = tmp_path_project / "templates" / "agents"
     agents_dir.mkdir(exist_ok=True)
     dest = agents_dir / "codex-reviewer.yaml"
     shutil.copy2(src, dest)

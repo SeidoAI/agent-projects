@@ -65,9 +65,9 @@ function seed(data: Seed) {
 const ENUM: EnumDescriptor = {
   name: "issue_status",
   values: [
-    { value: "todo", label: "To do", color: "#888", description: null },
-    { value: "doing", label: "Doing", color: "#0af", description: null },
-    { value: "done", label: "Done", color: "#0f0", description: null },
+    { value: "planned", label: "Planned", color: "#888", description: null },
+    { value: "queued", label: "Queued", color: "#0af", description: null },
+    { value: "completed", label: "Completed", color: "#0f0", description: null },
   ],
 };
 
@@ -76,7 +76,7 @@ function session(id: string, current_state: string | null = null): SessionSummar
     id,
     name: `Session ${id}`,
     agent: "frontend-coder",
-    status: "active",
+    status: "executing",
     issues: [],
     estimated_size: null,
     blocked_by_sessions: [],

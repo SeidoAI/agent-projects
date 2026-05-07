@@ -151,7 +151,7 @@ def check_reference_integrity(ctx: ValidationContext) -> list[CheckResult]:
                     file=entity.rel_path,
                     field="agent",
                     message=(
-                        f"session.agent {session.agent!r} has no matching definition in agents/."
+                        f"session.agent {session.agent!r} has no matching definition in templates/agents/."
                     ),
                 )
             )
@@ -186,7 +186,7 @@ def check_reference_integrity(ctx: ValidationContext) -> list[CheckResult]:
 
 
 def _discover_agent_ids(project_dir: Path) -> set[str]:
-    """Read `<project>/agents/*.yaml` and return the set of declared agent ids."""
+    """Read `<project>/templates/agents/*.yaml` and return the set of declared agent ids."""
     agents_dir = project_dir / paths.AGENTS_DIR
     if not agents_dir.is_dir():
         return set()

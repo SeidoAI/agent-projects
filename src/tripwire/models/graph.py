@@ -1,6 +1,6 @@
 """Graph models — the cache schema and computed graph results.
 
-The cache (`<project>/graph/index.yaml`) is committed to git and incrementally
+The cache (`<project>/nodes/tripwire-graph-index.yaml`) is committed to git and incrementally
 updated by `tripwire validate`. Reads of the graph (UI, CLI, agent) go
 through the cache for O(1) lookups instead of rescanning every file.
 
@@ -14,34 +14,22 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class EdgeType(StrEnum):
-    """Legacy edge type strings preserved for on-disk YAML compatibility.
-
-    These are the strings actually written into `graph/index.yaml`. v0.9's
-    canonical taxonomy lives on :class:`EdgeKind`; the unified-index facade
-    in `core.graph.index` translates between them.
-    """
-
-    REFERENCES = "references"  # issue body [[node-id]] → node
-    BLOCKED_BY = "blocked_by"  # issue → issue (frontmatter)
-    BLOCKS = "blocks"  # inverse of blocked_by, computed
-    IMPLEMENTS = "implements"  # issue → requirement (frontmatter)
-    PARENT = "parent"  # issue → parent epic (frontmatter)
-    RELATED = "related"  # node → node (frontmatter)
-    SOURCE = "source"  # node → file location (frontmatter)
-
-
 class EdgeKind(StrEnum):
-    """The 7 canonical edge kinds in the v0.9 unified entity graph.
+    """Canonical edge kinds in the unified entity graph.
 
-    Each maps to one or more legacy :class:`EdgeType` strings via
-    `core.graph.index.canonical_kind`. New edge writers should emit
-    canonical kinds; legacy on-disk strings keep loading via the mapping.
+    These are the strings written into ``nodes/tripwire-graph-index.yaml``.
+    Edge writers (issue/node/session/comment resolvers in
+    :mod:`tripwire.core.graph.cache`) emit these names directly.
+
+    Caches written by tripwire < v0.9 used a different vocabulary
+    (``references``, ``blocked_by``, ``related``); run ``tripwire
+    migrate graph-edges`` once to rewrite them in place.
     """
 
     REFS = "refs"  # body or related references (bidir)
     DEPENDS_ON = "depends_on"  # blockers, prerequisites
     IMPLEMENTS = "implements"  # issue → requirement
+    PARENT = "parent"  # issue → parent epic (frontmatter)
     PRODUCED_BY = "produced-by"  # entity → its author/producer
     SUPERSEDES = "supersedes"  # versioned replacement
     ADDRESSED_BY = "addressed-by"  # need / want → solution
@@ -134,7 +122,7 @@ class GraphNode(BaseModel):
 
 
 class GraphIndex(BaseModel):
-    """The cache committed to `<project>/graph/index.yaml`.
+    """The cache committed to `<project>/nodes/tripwire-graph-index.yaml`.
 
     This is a derived view of the underlying files. Deleting it and running
     `tripwire validate` always rebuilds it correctly. The cache is

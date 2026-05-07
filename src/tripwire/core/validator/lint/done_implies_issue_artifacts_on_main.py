@@ -35,8 +35,7 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
     if ctx.project_config is None:
         return []
 
-    # v0.9.4: canonical "completed" plus legacy "done" alias.
-    done_issues = [e for e in ctx.issues if e.model.status in ("completed", "done")]
+    done_issues = [e for e in ctx.issues if e.model.status == "completed"]
     if not done_issues:
         return []
 

@@ -80,20 +80,20 @@ def check_readiness(
                 )
             )
             continue
-        # Flag backlog-status issues as a warning — they'll fail
-        # downstream work if not promoted to `todo`. Severity=warning
+        # Flag planned-status issues as a warning — they'll fail
+        # downstream work if not promoted to `queued`. Severity=warning
         # so this doesn't block `session queue`; the fix hint points at
         # the --promote-issues flag that flips them in one shot.
-        if issue.status in ("planned", "backlog"):  # v0.9.4 alias-aware
+        if issue.status == "planned":
             items.append(
                 ReadinessItem(
-                    label=f"issue {issue_key} status=backlog",
+                    label=f"issue {issue_key} status=planned",
                     passing=False,
                     severity="warning",
                     fix_hint=(
                         "Promote with `tripwire session queue "
                         f"{session.id} --promote-issues` "
-                        "or edit the issue's status to todo."
+                        "or edit the issue's status to queued."
                     ),
                 )
             )
@@ -113,7 +113,7 @@ def check_readiness(
                     )
                 )
                 continue
-            if blocker.status not in ("completed", "done"):  # v0.9.4 alias-aware
+            if blocker.status != "completed":
                 items.append(
                     ReadinessItem(
                         label=f"blocker: {blocker_key} ({blocker.status})",

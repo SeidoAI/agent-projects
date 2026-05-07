@@ -174,7 +174,7 @@ def _scan_reverse_refs(project_dir: Path, node_id: str) -> list[str]:
 def _load_cache_ensuring_fresh(project_dir: Path):  # type: ignore[no-untyped-def]
     """Load the graph cache, building it once if absent.
 
-    Per the KUI-16 execution constraint: *"If ``graph/index.yaml`` is
+    Per the KUI-16 execution constraint: *"If ``nodes/tripwire-graph-index.yaml`` is
     missing, call ``tripwire.core.graph.cache.ensure_fresh(project_dir)``
     once per request — avoid infinite rebuild loops."*
 
@@ -367,7 +367,7 @@ def check_all_freshness(project_dir: Path) -> FreshnessReport:
 def reverse_refs(project_dir: Path, node_id: str) -> ReverseRefsResult:
     """Return every entity that references *node_id*.
 
-    Reads ``graph/index.yaml``'s ``referenced_by`` when available. If
+    Reads ``nodes/tripwire-graph-index.yaml``'s ``referenced_by`` when available. If
     the cache is missing we rebuild it once (per KUI-16 execution
     constraint); if the rebuild fails we fall back to a full
     filesystem scan.

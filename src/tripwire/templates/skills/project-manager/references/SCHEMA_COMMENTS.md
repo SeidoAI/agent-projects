@@ -14,12 +14,12 @@ Canonical example: `examples/comment-status-change.yaml`.
 | `uuid` | UUID4 | yes | Agent-generated canonical identity. |
 | `issue_key` | string | yes | The issue this comment is on. Must match an existing issue. |
 | `author` | string | yes | Free-form handle (e.g. `claude`, `maia`, `pm-agent`). |
-| `type` | string | yes | Must be in `enums/comment_type.yaml`. |
+| `type` | string | yes | Must be in `templates/enums/comment_type.yaml`. |
 | `created_at` | ISO datetime | yes | |
 
 ## Comment types
 
-From `enums/comment_type.yaml`:
+From `templates/enums/comment_type.yaml`:
 
 - `status_change` — noting a change in issue state (e.g. "started
   work", "blocked by X", "marked done")

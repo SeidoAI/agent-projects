@@ -1,6 +1,6 @@
 """Orchestration read service — resolve active orchestration pattern.
 
-Reads ``<project>/orchestration/<default_pattern>.yaml`` and exposes the
+Reads ``<project>/templates/orchestration/<default_pattern>.yaml`` and exposes the
 resolved pattern (plus optional session-level overrides) to the UI for
 read-only display. This service does NOT interpret rule semantics —
 rule execution belongs in ``tripwire.containers``.

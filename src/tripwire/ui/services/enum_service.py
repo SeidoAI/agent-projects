@@ -156,7 +156,7 @@ def _enums_dir(project_dir: Path) -> Path:
 
 
 def list_enums(project_dir: Path) -> dict[str, EnumDescriptor]:
-    """Load every ``<project>/enums/*.yaml`` into a name → descriptor map.
+    """Load every ``<project>/templates/enums/*.yaml`` into a name → descriptor map.
 
     The map key is the filename stem (``issue_status.yaml`` → ``issue_status``).
     Files that fail to load are skipped with a warning log.

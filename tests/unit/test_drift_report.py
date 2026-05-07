@@ -38,7 +38,7 @@ def _save_clean_issue(project_dir: Path, key: str) -> None:
         Issue(
             id=key,
             title=key,
-            status="todo",
+            status="queued",
             priority="medium",
             executor="ai",
             verifier="required",
@@ -95,7 +95,7 @@ def test_unresolved_refs_drop_the_score(tmp_path: Path) -> None:
         Issue(
             id="TST-1",
             title="t",
-            status="todo",
+            status="queued",
             priority="medium",
             executor="ai",
             verifier="required",

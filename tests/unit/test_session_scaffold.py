@@ -49,7 +49,7 @@ def _seed_manifest_with_verification(project_dir: Path) -> None:
                 "name": "task-checklist",
                 "file": "task-checklist.md",
                 "template": "task-checklist.md.j2",
-                "produced_at": "in_progress",
+                "produced_at": "executing",
                 "produced_by": "execution-agent",
                 "owned_by": "execution-agent",
                 "required": True,

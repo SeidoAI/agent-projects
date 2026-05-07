@@ -25,8 +25,7 @@ if TYPE_CHECKING:
     from tripwire.core.validator import CheckResult, ValidationContext
 
 
-# v0.9.4: canonical names + legacy aliases.
-_INACTIVE_ISSUE = {"completed", "abandoned", "done", "canceled"}
+_INACTIVE_ISSUE = {"completed", "abandoned"}
 
 # Match the AC heading and capture text up to the next `## ` heading
 # at the same level (or end of body).

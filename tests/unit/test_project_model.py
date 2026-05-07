@@ -15,7 +15,7 @@ def test_project_supports_artifact_overrides():
                 "name": "extra-doc",
                 "file": "extra.md",
                 "template": "extra.md.j2",
-                "produced_at": "in_progress",
+                "produced_at": "executing",
                 "produced_by": "execution-agent",
             }
         ],

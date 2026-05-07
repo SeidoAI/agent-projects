@@ -11,13 +11,13 @@ coherence in an agent-driven project. The canonical examples are under
 |---|---|---|---|
 | `uuid` | UUID4 | yes | Canonical identity. Agent-generated. |
 | `id` | string | yes | Lowercase slug, letter-first, hyphenated. Must match filename. |
-| `type` | string | yes | Must be in `enums/node_type.yaml`. |
+| `type` | string | yes | Must be in `templates/enums/node_type.yaml`. |
 | `name` | string | yes | Short label for the concept graph (3–5 words, ≤40 chars). See **Naming the node** below. |
 | `description` | string | no | One-line summary. |
 | `source` | NodeSource | no | Where the concept lives in code. Optional for `planned` nodes. |
 | `related` | list[string] | no | Other node ids this connects to. **Bi-directional**. |
 | `tags` | list[string] | no | Free-form tags. |
-| `status` | string | yes | Must be in `enums/node_status.yaml`. Default `active`. |
+| `status` | string | yes | Must be in `templates/enums/node_status.yaml`. Default `active`. |
 | `created_at` | ISO datetime | yes | |
 | `updated_at` | ISO datetime | yes | |
 | `created_by` | string | no | |
@@ -67,7 +67,7 @@ source:
 - `source.lines` is optional — omit for whole-file references.
 - `source.content_hash` is what the freshness check compares against.
 
-## Node types (`enums/node_type.yaml`)
+## Node types (`templates/enums/node_type.yaml`)
 
 **Code-anchored types** (point at a concrete artifact in a repo):
 

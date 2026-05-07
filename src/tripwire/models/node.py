@@ -118,6 +118,16 @@ class ConceptNode(BaseModel):
                 f"Node id {v!r} must be a lowercase slug "
                 f"(letters, digits, hyphens). Pattern: {NODE_ID_PATTERN.pattern}"
             )
+        # v0.10.0: ``tripwire-graph-index`` is reserved for the derived
+        # graph cache that lives at ``nodes/tripwire-graph-index.yaml``.
+        # It is not a concept node and must not be authored as one.
+        from tripwire.core.paths import GRAPH_INDEX_NODE_ID
+
+        if v == GRAPH_INDEX_NODE_ID:
+            raise ValueError(
+                f"Node id {v!r} is reserved for the graph cache "
+                f"(`nodes/tripwire-graph-index.yaml`). Pick a different id."
+            )
         return v
 
     @model_validator(mode="after")

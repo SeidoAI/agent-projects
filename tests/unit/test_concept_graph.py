@@ -38,7 +38,7 @@ def make_issue_file(project_dir: Path, key: str, body: str = "", **kw: object) -
         Issue(
             id=key,
             title=f"Test {key}",
-            status="todo",
+            status="queued",
             priority="medium",
             executor="ai",
             verifier="required",
@@ -85,7 +85,7 @@ class TestBuildFullGraph:
         assert kinds["user-model"] == "node"
 
         # Edge from TST-1 to user-model
-        ref_edges = [e for e in result.edges if e.type == "references"]
+        ref_edges = [e for e in result.edges if e.type == "refs"]
         assert any(e.from_id == "TST-1" and e.to_id == "user-model" for e in ref_edges)
 
     def test_orphan_detection(self, tmp_path: Path) -> None:

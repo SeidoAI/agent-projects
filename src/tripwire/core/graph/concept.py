@@ -1,7 +1,7 @@
 """Full unified concept graph: issues + nodes + all edges.
 
 This module builds a `FullGraphResult` for UI rendering and reporting. In
-v0 it reads directly from the graph cache (`graph/index.yaml`) for speed
+v0 it reads directly from the graph cache (`nodes/tripwire-graph-index.yaml`) for speed
 and falls back to scanning the project if the cache is missing.
 
 The UI's `/api/projects/:id/graph/concept` endpoint sits directly on top of
@@ -92,7 +92,7 @@ def _from_scan(project_dir: Path) -> FullGraphResult:
     """Fallback: scan issues + nodes directly when no cache is available.
 
     Emits the same set of edges the cache would produce, but does so with a
-    full filesystem walk. Only used when `graph/index.yaml` is missing and
+    full filesystem walk. Only used when `nodes/tripwire-graph-index.yaml` is missing and
     the caller hasn't (yet) run `ensure_fresh` to create it.
     """
     issues = list_issues(project_dir) if paths.issues_dir(project_dir).is_dir() else []

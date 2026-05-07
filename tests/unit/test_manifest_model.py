@@ -66,7 +66,7 @@ class TestArtifactManifest:
                     name="task-checklist",
                     file="task-checklist.md",
                     template="task-checklist.md.j2",
-                    produced_at="in_progress",
+                    produced_at="executing",
                     produced_by="execution-agent",
                     owned_by="execution-agent",
                     required=True,
@@ -75,4 +75,4 @@ class TestArtifactManifest:
         )
         assert len(manifest.artifacts) == 2
         assert manifest.artifacts[0].owned_by == "pm"
-        assert manifest.artifacts[1].produced_at == "in_progress"
+        assert manifest.artifacts[1].produced_at == "executing"

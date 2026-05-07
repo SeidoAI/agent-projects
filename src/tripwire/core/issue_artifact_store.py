@@ -19,10 +19,8 @@ import yaml
 from tripwire.core.enum_loader import load_enum
 from tripwire.models.issue_artifacts import IssueArtifactEntry, IssueArtifactManifest
 
-# v0.9.4 canonical lifecycle order. The list represents progression
-# through the issue lifecycle for artifact-staging logic; legacy values
-# (backlog/todo/in_progress/done) are normalised on load by
-# ``IssueStatus.__missing__`` so callers never see them here.
+# Canonical lifecycle order for artifact-staging logic. The list
+# represents progression through the issue lifecycle.
 _DEFAULT_STATUS_ORDER: list[str] = [
     "planned",
     "queued",

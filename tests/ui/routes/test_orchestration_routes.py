@@ -15,8 +15,8 @@ from tripwire.ui.services import project_service as _project_svc
 
 
 def _write_pattern(project_dir: Path, name: str, data: dict) -> None:
-    d = project_dir / "orchestration"
-    d.mkdir(exist_ok=True)
+    d = project_dir / "templates" / "orchestration"
+    d.mkdir(parents=True, exist_ok=True)
     (d / f"{name}.yaml").write_text(yaml.safe_dump(data), encoding="utf-8")
 
 
@@ -60,8 +60,8 @@ def orch_project_without_pattern(tmp_path: Path) -> Path:
 @pytest.fixture
 def orch_project_malformed(tmp_path: Path) -> Path:
     proj = make_project(tmp_path / "proj-c")
-    d = proj / "orchestration"
-    d.mkdir()
+    d = proj / "templates" / "orchestration"
+    d.mkdir(parents=True)
     (d / "default.yaml").write_text("not: [a, valid, mapping", encoding="utf-8")
     return proj
 

@@ -75,6 +75,9 @@ def write_project_yaml(project_dir: Path, **overrides: Any) -> None:
         "next_issue_number": 1,
         "next_session_number": 1,
         "repos": {
+            # PT-repo entry — slug ends with '/test' (matches project.name)
+            # so the v0.10.0 `project/repos_required` check passes by default.
+            "SeidoAI/test": {"local": None},
             "SeidoAI/web-app-backend": {"local": None},
             "SeidoAI/web-app-infrastructure": {"local": None},
         },
@@ -101,7 +104,7 @@ def write_issue(
         "uuid": str(_uuid.uuid4()),
         "id": key,
         "title": f"Test {key}",
-        "status": "queued",  # v0.9.4 canonical (was "todo")
+        "status": "queued",  # v0.9.4 canonical (was "queued")
         "priority": "medium",
         "executor": "ai",
         "verifier": "required",
@@ -217,7 +220,7 @@ def save_test_issue(
     fm: dict[str, Any] = {
         "id": key,
         "title": f"Test {key}",
-        "status": "todo",
+        "status": "queued",
         "priority": "medium",
         "executor": "ai",
         "verifier": "required",
@@ -369,7 +372,7 @@ class TestUuidPresence:
             {
                 "id": "TST-1",
                 "title": "x",
-                "status": "todo",
+                "status": "queued",
                 "priority": "medium",
                 "executor": "ai",
                 "verifier": "required",
@@ -599,18 +602,103 @@ class TestStatusTransitions:
         # reachable from backlog (dropped from every transitions list).
         write_project_yaml(
             tmp_path,
-            statuses=["backlog", "todo", "done", "canceled"],
+            statuses=["planned", "queued", "done", "abandoned"],
             status_transitions={
-                "backlog": ["todo"],
-                "todo": ["done"],
+                "planned": ["queued"],
+                "queued": ["done"],
                 "done": [],
-                "canceled": [],
+                "abandoned": [],
             },
         )
         write_node(tmp_path, "user-model")
         write_issue(tmp_path, "TST-1", status="abandoned")
         report = validate_project(tmp_path)
         assert "status/unreachable" in codes(report)
+
+
+# ============================================================================
+# project.yaml.repos required (v0.10.0+)
+# ============================================================================
+
+
+class TestProjectReposRequired:
+    def test_empty_repos_errors(self, tmp_path: Path) -> None:
+        write_project_yaml(tmp_path, repos={})
+        report = validate_project(tmp_path)
+        assert "project/repos_required" in codes(report)
+        finding = next(f for f in report.errors if f.code == "project/repos_required")
+        assert finding.file == "project.yaml"
+        assert finding.field == "repos"
+        assert "project repo" in finding.message
+
+    def test_populated_with_pt_repo_passes(self, tmp_path: Path) -> None:
+        # write_project_yaml's default includes `SeidoAI/test` whose
+        # slug ends with `/test` (the project's name).
+        write_project_yaml(tmp_path)
+        report = validate_project(tmp_path)
+        assert "project/repos_required" not in codes(report)
+
+    def test_only_code_repos_errors(self, tmp_path: Path) -> None:
+        # Code-output repos are not enough — the project still needs
+        # an entry that identifies its own meta-repo.
+        write_project_yaml(
+            tmp_path,
+            repos={
+                "SeidoAI/web-app-backend": {"local": None},
+                "SeidoAI/web-app-frontend": {"local": None},
+            },
+        )
+        report = validate_project(tmp_path)
+        assert "project/repos_required" in codes(report)
+
+    def test_pt_repo_matched_by_local_path_passes(self, tmp_path: Path) -> None:
+        # Slug doesn't end with the project name but `local` matches
+        # the project dir — this is the second arm of the predicate
+        # (mirrors ProjectDashboard.tsx::isPtRepo).
+        write_project_yaml(
+            tmp_path,
+            repos={
+                "some-org/some-other-name": {"local": str(tmp_path)},
+            },
+        )
+        report = validate_project(tmp_path)
+        assert "project/repos_required" not in codes(report)
+
+    def test_missing_repos_field_errors(self, tmp_path: Path) -> None:
+        # Write a project.yaml that omits `repos:` entirely. Pydantic will
+        # default it to {}, so the validator should flag it.
+        config: dict[str, Any] = {
+            "name": "test",
+            "key_prefix": "TST",
+            "base_branch": "main",
+            "statuses": [
+                "planned",
+                "queued",
+                "executing",
+                "in_review",
+                "verified",
+                "completed",
+                "abandoned",
+                "deferred",
+            ],
+            "status_transitions": {
+                "planned": ["queued", "abandoned"],
+                "queued": ["executing", "planned", "abandoned"],
+                "executing": ["in_review", "queued", "abandoned"],
+                "in_review": ["verified", "executing"],
+                "verified": ["completed", "in_review"],
+                "completed": [],
+                "abandoned": ["planned"],
+                "deferred": ["planned", "queued", "abandoned"],
+            },
+            "next_issue_number": 1,
+            "next_session_number": 1,
+        }
+        (tmp_path / "project.yaml").write_text(
+            yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
+        )
+        report = validate_project(tmp_path)
+        assert "project/repos_required" in codes(report)
 
 
 # ============================================================================
@@ -733,7 +821,7 @@ class TestAutoFix:
             {
                 "id": "TST-1",
                 "title": "x",
-                "status": "todo",
+                "status": "queued",
                 "priority": "medium",
                 "executor": "ai",
                 "verifier": "required",
@@ -1258,9 +1346,19 @@ class TestPhaseRequirements:
 
 
 def _file_snapshots(project_dir: Path) -> dict[str, str]:
-    """Read every YAML file in the project tree into a path→content dict."""
+    """Read every authored YAML file in the project tree into a path→content dict.
+
+    Skips ``nodes/tripwire-graph-index.yaml`` — the derived graph cache
+    carries a ``last_incremental_update`` timestamp that changes on
+    every rebuild, so it can never be byte-identical across two runs
+    even when the source files are.
+    """
+    from tripwire.core.paths import GRAPH_INDEX_FILENAME
+
     out: dict[str, str] = {}
     for path in sorted(project_dir.rglob("*.yaml")):
+        if path.name == GRAPH_INDEX_FILENAME:
+            continue
         rel = str(path.relative_to(project_dir))
         out[rel] = path.read_text(encoding="utf-8")
     return out
@@ -1287,7 +1385,7 @@ class TestAutoFixIdempotency:
             {
                 "id": "TST-1",
                 "title": "x",
-                "status": "todo",
+                "status": "queued",
                 "priority": "medium",
                 "executor": "ai",
                 "verifier": "required",

@@ -25,8 +25,8 @@ def test_load_enum_falls_back_to_packaged_template(tmp_path):
 
 def test_load_enum_project_override_wins(tmp_path):
     """Project override supersedes packaged template."""
-    (tmp_path / "enums").mkdir()
-    (tmp_path / "enums" / "artifact_phase.yaml").write_text(
+    (tmp_path / "templates" / "enums").mkdir(parents=True)
+    (tmp_path / "templates" / "enums" / "artifact_phase.yaml").write_text(
         "name: ArtifactPhase\nvalues:\n  - id: only_this_phase\n",
         encoding="utf-8",
     )

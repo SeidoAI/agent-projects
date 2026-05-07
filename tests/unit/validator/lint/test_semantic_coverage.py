@@ -47,7 +47,7 @@ def test_active_issue_with_no_ac_refs_warns(
     save_test_issue(
         tmp_path_project,
         key="TMP-1",
-        status="in_progress",
+        status="executing",
         body=_body(context_refs="[[auth-system]]", ac_refs=""),
     )
     _enable_lint(tmp_path_project, min_refs=1)
@@ -67,7 +67,7 @@ def test_active_issue_with_one_ac_ref_passes(
     save_test_issue(
         tmp_path_project,
         key="TMP-1",
-        status="in_progress",
+        status="executing",
         body=_body(ac_refs="against [[auth-system]]"),
     )
     _enable_lint(tmp_path_project, min_refs=1)
@@ -81,7 +81,7 @@ def test_done_issue_skipped(tmp_path_project: Path, save_test_issue, save_test_n
     save_test_issue(
         tmp_path_project,
         key="TMP-1",
-        status="done",
+        status="completed",
         body=_body(),
     )
     _enable_lint(tmp_path_project, min_refs=1)
@@ -97,7 +97,7 @@ def test_canceled_issue_skipped(
     save_test_issue(
         tmp_path_project,
         key="TMP-1",
-        status="canceled",
+        status="abandoned",
         body=_body(),
     )
     _enable_lint(tmp_path_project, min_refs=1)
@@ -113,7 +113,7 @@ def test_default_off(tmp_path_project: Path, save_test_issue, save_test_node):
     save_test_issue(
         tmp_path_project,
         key="TMP-1",
-        status="in_progress",
+        status="executing",
         body=_body(context_refs="[[auth-system]]", ac_refs=""),
     )
 

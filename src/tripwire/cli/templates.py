@@ -24,8 +24,7 @@ from tripwire.core import paths
 console = Console()
 
 # Directories in a project repo that hold project-owned templates.
-# `templates/artifacts` is the one exception that stays under `templates/`;
-# everything else lives at the project root.
+# v0.10.0 consolidates every template kind under `templates/`.
 TEMPLATE_SUBDIRS = (
     paths.ISSUE_TEMPLATES_DIR,
     paths.COMMENT_TEMPLATES_DIR,

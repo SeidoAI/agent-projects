@@ -181,8 +181,8 @@ class TestDryRunPure:
         clone = tmp_path / "clone"
         clone.mkdir()
         _init_repo(clone)
-        (tmp_path_project / "agents").mkdir(exist_ok=True)
-        (tmp_path_project / "agents" / "backend-coder.yaml").write_text(
+        (tmp_path_project / "templates" / "agents").mkdir(parents=True, exist_ok=True)
+        (tmp_path_project / "templates" / "agents" / "backend-coder.yaml").write_text(
             "id: backend-coder\ncontext:\n  skills: []\n"
         )
         save_test_issue(tmp_path_project, key="TMP-1")

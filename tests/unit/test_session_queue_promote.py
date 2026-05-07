@@ -155,12 +155,12 @@ class TestReadinessBacklogWarning:
 
         report = check_readiness(tmp_path_project, "s1")
 
-        backlog_items = [i for i in report.items if "status=backlog" in i.label]
-        assert len(backlog_items) == 1
-        assert backlog_items[0].severity == "warning"
-        assert "--promote-issues" in (backlog_items[0].fix_hint or "")
+        planned_items = [i for i in report.items if "status=planned" in i.label]
+        assert len(planned_items) == 1
+        assert planned_items[0].severity == "warning"
+        assert "--promote-issues" in (planned_items[0].fix_hint or "")
         # Warning-severity items don't block readiness (ready=True even
-        # though the backlog item is `passing=False` — ready tracks only
+        # though the planned item is `passing=False` — ready tracks only
         # error severities).
         assert report.ready is True
 

@@ -78,7 +78,7 @@ class ReactFlowEdge(BaseModel):
     id: str
     source: str
     target: str
-    relation: str  # "blocked_by" | "references" | "related" | "parent" | ...
+    relation: str  # canonical EdgeKind: "refs" | "depends_on" | "parent" | ...
     data: dict[str, Any] = Field(default_factory=dict)
 
 

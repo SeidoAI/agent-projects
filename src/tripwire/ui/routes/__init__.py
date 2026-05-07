@@ -37,6 +37,7 @@ def register_routes(app: FastAPI) -> None:
         sessions,
         source,
         workflow,
+        workspaces,
         ws,
     )
 
@@ -45,6 +46,7 @@ def register_routes(app: FastAPI) -> None:
     modules: list[ModuleType] = [
         health,
         projects,
+        workspaces,
         issues,
         nodes,
         graph,

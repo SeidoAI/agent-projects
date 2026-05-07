@@ -33,7 +33,7 @@ def test_validator_warns_on_phase_ownership_inconsistent(tmp_project_manifest):
                 "name": "plan",
                 "file": "plan.md",
                 "template": "plan.md.j2",
-                "produced_at": "in_progress",
+                "produced_at": "executing",
                 "produced_by": "pm",
                 "owned_by": "pm",
                 "required": True,

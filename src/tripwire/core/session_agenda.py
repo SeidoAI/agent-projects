@@ -40,9 +40,6 @@ class AgendaReport:
     all_completed: bool = False
 
 
-# v0.9.4: canonical SessionStatus values. Pre-v0.9.4 dead values
-# (`active`, `waiting_for_*`, `re_engaged`) normalise via
-# SessionStatus.__missing__ on read and never reach this set.
 LAUNCHABLE_STATUSES = {"planned", "queued"}
 IN_FLIGHT_STATUSES = {"executing", "paused"}
 TERMINAL_STATUSES = {"completed", "abandoned"}

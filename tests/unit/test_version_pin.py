@@ -31,7 +31,7 @@ def test_issue_version_defaults_to_one():
     issue = Issue(
         id="TST-1",
         title="t",
-        status="todo",
+        status="queued",
         priority="medium",
         executor="ai",
         verifier="required",
@@ -43,7 +43,7 @@ def test_issue_version_explicit():
     issue = Issue(
         id="TST-1",
         title="t",
-        status="todo",
+        status="queued",
         priority="medium",
         executor="ai",
         verifier="required",

@@ -74,8 +74,8 @@ def test_in_flight_project_lists_active_sessions(
         tmp_path_project, "bravo", status="planned", blocked_by_sessions=["alpha"]
     )
     save_test_session(tmp_path_project, "delta", status="completed")
-    save_test_issue(tmp_path_project, "TMP-1", status="todo")
-    save_test_issue(tmp_path_project, "TMP-2", status="in_progress")
+    save_test_issue(tmp_path_project, "TMP-1", status="queued")
+    save_test_issue(tmp_path_project, "TMP-2", status="executing")
 
     out = render(tmp_path_project, now=FIXED_NOW)
     # Active sessions section names the executing session.

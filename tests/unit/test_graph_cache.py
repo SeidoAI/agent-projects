@@ -20,6 +20,7 @@ import yaml
 from tripwire.core.graph.cache import (
     CACHE_VERSION,
     INDEX_REL_PATH,
+    LegacyCacheError,
     ensure_fresh,
     full_rebuild,
     load_index,
@@ -67,7 +68,7 @@ def make_issue(
     issue = Issue(
         id=key,
         title=f"Test {key}",
-        status="todo",
+        status="queued",
         priority="medium",
         executor="ai",
         verifier="required",
@@ -140,7 +141,7 @@ class TestLoadSave:
     def test_version_mismatch_treated_as_missing(self, tmp_path: Path) -> None:
         make_project(tmp_path)
         # Write a v1 cache
-        (tmp_path / "graph").mkdir(exist_ok=True)
+        (tmp_path / "nodes").mkdir(exist_ok=True)
         (tmp_path / INDEX_REL_PATH).write_text(
             yaml.safe_dump({"version": 1, "files": {}})
         )
@@ -148,9 +149,40 @@ class TestLoadSave:
 
     def test_corrupt_yaml_treated_as_missing(self, tmp_path: Path) -> None:
         make_project(tmp_path)
-        (tmp_path / "graph").mkdir(exist_ok=True)
+        (tmp_path / "nodes").mkdir(exist_ok=True)
         (tmp_path / INDEX_REL_PATH).write_text("not: : : valid:\n")
         assert load_index(tmp_path) is None
+
+    def test_legacy_edge_type_raises(self, tmp_path: Path) -> None:
+        """Pre-v0.9 edge `type:` strings must raise LegacyCacheError, not
+        silently get under-reported by the v0.9 `_REFERENCING_EDGE_TYPES`
+        collapse. The error must point the user at `migrate graph-edges`.
+        """
+        import pytest
+
+        make_project(tmp_path)
+        (tmp_path / "nodes").mkdir(exist_ok=True)
+        (tmp_path / INDEX_REL_PATH).write_text(
+            yaml.safe_dump(
+                {
+                    "version": CACHE_VERSION,
+                    "files": {},
+                    "edges": [
+                        # Mix of legacy + canonical types.
+                        {"from": "TST-1", "to": "TST-2", "type": "blocked_by"},
+                        {"from": "TST-1", "to": "n", "type": "references"},
+                        {"from": "TST-1", "to": "TST-3", "type": "depends_on"},
+                    ],
+                }
+            )
+        )
+        with pytest.raises(LegacyCacheError) as exc_info:
+            load_index(tmp_path)
+        message = str(exc_info.value)
+        assert "blocked_by" in message
+        assert "references" in message
+        assert "tripwire migrate graph-edges" in message
+        assert exc_info.value.cache_path == tmp_path / INDEX_REL_PATH
 
 
 # ============================================================================
@@ -183,8 +215,8 @@ class TestFullRebuild:
         assert "nodes/user-model.yaml" in cache.files
         assert "nodes/auth-endpoint.yaml" in cache.files
 
-        # Edges: TST-1 → user-model, TST-1 → auth-endpoint (both `references`)
-        ref_edges = [e for e in cache.edges if e.type == "references"]
+        # Edges: TST-1 → user-model, TST-1 → auth-endpoint (both `refs`)
+        ref_edges = [e for e in cache.edges if e.type == "refs"]
         assert len(ref_edges) == 2
         targets = {e.to_id for e in ref_edges}
         assert targets == {"user-model", "auth-endpoint"}
@@ -227,7 +259,13 @@ class TestFullRebuild:
         make_node(tmp_path, "node-a", related=["node-b"])
         make_node(tmp_path, "node-b", related=["node-a"])
         cache = full_rebuild(tmp_path)
-        related_edges = [e for e in cache.edges if e.type == "related"]
+        # Concept-node `related` edges are emitted under the canonical
+        # `refs` kind (bidirectional reference).
+        related_edges = [
+            e
+            for e in cache.edges
+            if e.type == "refs" and e.from_id in {"node-a", "node-b"}
+        ]
         assert len(related_edges) == 2  # a→b and b→a
 
 
@@ -251,7 +289,7 @@ class TestIncrementalUpdate:
         assert cache is not None
         assert "issues/TST-1/issue.yaml" in cache.files
         assert "nodes/user-model.yaml" in cache.files
-        ref_edges = [e for e in cache.edges if e.type == "references"]
+        ref_edges = [e for e in cache.edges if e.type == "refs"]
         assert len(ref_edges) == 1
 
     def test_modify_issue_removes_old_edges(self, tmp_path: Path) -> None:
@@ -268,9 +306,7 @@ class TestIncrementalUpdate:
         cache = load_index(tmp_path)
         assert cache is not None
         ref_targets = {
-            e.to_id
-            for e in cache.edges
-            if e.type == "references" and e.from_id == "TST-1"
+            e.to_id for e in cache.edges if e.type == "refs" and e.from_id == "TST-1"
         }
         assert ref_targets == {"node-b"}
 
@@ -377,9 +413,7 @@ class TestEnsureFresh:
         cache = load_index(tmp_path)
         assert cache is not None
         ref_targets = {
-            e.to_id
-            for e in cache.edges
-            if e.from_id == "TST-1" and e.type == "references"
+            e.to_id for e in cache.edges if e.from_id == "TST-1" and e.type == "refs"
         }
         assert ref_targets == {"other-model"}
 

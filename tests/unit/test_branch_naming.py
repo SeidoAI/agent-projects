@@ -107,16 +107,16 @@ class TestProjectOverrides:
         """Project `enums/branch_type.yaml` can extend the allowed types."""
         assert is_valid_branch_name("wip/api", project_dir=tmp_path) is False
 
-        (tmp_path / "enums").mkdir()
-        (tmp_path / "enums" / "branch_type.yaml").write_text(
+        (tmp_path / "templates" / "enums").mkdir(parents=True)
+        (tmp_path / "templates" / "enums" / "branch_type.yaml").write_text(
             "name: BranchType\nvalues:\n  - id: feat\n  - id: fix\n  - id: wip\n"
         )
         assert is_valid_branch_name("wip/api", project_dir=tmp_path) is True
         assert is_valid_branch_name("refactor/x", project_dir=tmp_path) is False
 
     def test_derive_respects_override(self, tmp_path):
-        (tmp_path / "enums").mkdir()
-        (tmp_path / "enums" / "branch_type.yaml").write_text(
+        (tmp_path / "templates" / "enums").mkdir(parents=True)
+        (tmp_path / "templates" / "enums" / "branch_type.yaml").write_text(
             "name: BranchType\nvalues:\n  - id: feat\n  - id: wip\n"
         )
         assert derive_branch_name("s1", "wip", project_dir=tmp_path) == "wip/s1"

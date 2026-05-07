@@ -32,7 +32,7 @@ def test_parse_command_execution_in_progress_yields_tool_use():
     line = (
         '{"type":"item.started","item":{"id":"item_0",'
         '"type":"command_execution","command":"/bin/zsh -lc \'echo hi\'",'
-        '"aggregated_output":"","exit_code":null,"status":"in_progress"}}'
+        '"aggregated_output":"","exit_code":null,"status":"executing"}}'
     )
     ev = parse_event(line)
     assert ev is not None

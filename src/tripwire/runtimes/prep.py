@@ -437,7 +437,7 @@ def copy_skills(*, worktree: Path, skill_names: list[str]) -> None:
             if not skill_src.is_file():
                 raise RuntimeError(
                     f"Skill '{name}' not found in tripwire.templates.skills. "
-                    f"Check agents/<id>.yaml.context.skills."
+                    f"Check templates/agents/<id>.yaml.context.skills."
                 )
 
         dest_root = worktree / ".claude" / "skills"
@@ -868,8 +868,10 @@ def run(
         install_claude_settings(worktree=Path(wt.worktree_path))
 
     # Look up the agent's declared skills
+    from tripwire.core import paths as _paths
+
     skill_names: list[str] = []
-    agent_yaml = project_dir / "agents" / f"{session.agent}.yaml"
+    agent_yaml = project_dir / _paths.AGENTS_DIR / f"{session.agent}.yaml"
     if agent_yaml.is_file():
         try:
             agent_data = _yaml.safe_load(agent_yaml.read_text(encoding="utf-8")) or {}

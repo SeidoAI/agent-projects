@@ -56,7 +56,7 @@ tripwire validate --format json  # structured; parse the errors[]
 
 Warnings (heuristics) surface in output by default. (Stage 2's
 `--heuristics-as-tripwires` will fail on heuristic hits — currently a
-no-op.) Validate always rebuilds `graph/index.yaml` as a side effect.
+no-op.) Validate always rebuilds `nodes/tripwire-graph-index.yaml` as a side effect.
 
 **Exit codes:** 0 = clean · 1 = warnings only (reserved for stage 2) ·
 2 = errors. Loop: write → validate → fix → validate → 0 → commit.
@@ -92,7 +92,7 @@ The table above is exhaustive; this section only adds notes for codes
 that need them.
 
 - `enum/*` — value not in the active enum. Check
-  `enums/<name>.yaml` for the allowed set.
+  `templates/enums/<name>.yaml` for the allowed set.
 - `ref/dangling` — `[[ref]]` doesn't resolve to a node or issue.
   `fix_hint` may suggest a typo correction.
 - `body/no_references` — issue has zero `[[node-id]]` references; usually

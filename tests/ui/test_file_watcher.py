@@ -85,14 +85,14 @@ class TestClassify:
         assert ev.entity_id == "ws-scoping"
 
     def test_agent_def(self, tmp_path: Path):
-        path = tmp_path / "agents" / "backend-coder.yaml"
+        path = tmp_path / "templates" / "agents" / "backend-coder.yaml"
         ev = classify("p", tmp_path, path, "modified")
         assert ev is not None
         assert ev.entity_type == "agent_def"
         assert ev.entity_id == "backend-coder"
 
     def test_enum(self, tmp_path: Path):
-        path = tmp_path / "enums" / "agent_state.yaml"
+        path = tmp_path / "templates" / "enums" / "agent_state.yaml"
         ev = classify("p", tmp_path, path, "modified")
         assert ev is not None
         assert ev.entity_type == "enum"
@@ -148,7 +148,9 @@ class TestShouldIgnore:
         assert _should_ignore(tmp_path / ".tripwire.lock", tmp_path)
 
     def test_graph_index_self_write(self, tmp_path: Path):
-        assert _should_ignore(tmp_path / "graph" / "index.yaml", tmp_path)
+        assert _should_ignore(
+            tmp_path / "nodes" / "tripwire-graph-index.yaml", tmp_path
+        )
 
     def test_concept_layout_sidecar_ignored(self, tmp_path: Path):
         # The Concept Graph layout sidecar lives at
@@ -283,7 +285,9 @@ class TestProjectFileHandler:
             "p", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
         handler.on_any_event(FileModifiedEvent(str(project / ".git" / "HEAD")))
-        handler.on_any_event(FileModifiedEvent(str(project / "graph" / "index.yaml")))
+        handler.on_any_event(
+            FileModifiedEvent(str(project / "nodes" / "tripwire-graph-index.yaml"))
+        )
         time.sleep(0.05)
         assert q.qsize() == 0
 

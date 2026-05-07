@@ -105,8 +105,8 @@ def test_should_fire_clean_transition(tmp_path: Path) -> None:
         tmp_path,
         phase="reviewing",
         issues=[
-            ("DEM-1", "done", ["phase:executing"]),
-            ("DEM-2", "done", ["phase:executing"]),
+            ("DEM-1", "completed", ["phase:executing"]),
+            ("DEM-2", "completed", ["phase:executing"]),
             ("DEM-3", "verified", ["phase:executing"]),
         ],
     )
@@ -120,8 +120,8 @@ def test_should_fire_open_prev_phase_issue(tmp_path: Path) -> None:
         tmp_path,
         phase="reviewing",
         issues=[
-            ("DEM-1", "done", ["phase:executing"]),
-            ("DEM-2", "in_progress", ["phase:executing"]),
+            ("DEM-1", "completed", ["phase:executing"]),
+            ("DEM-2", "executing", ["phase:executing"]),
         ],
     )
     tw = PhaseTransitionJitPrompt()
@@ -134,7 +134,7 @@ def test_should_fire_silent_at_scoping(tmp_path: Path) -> None:
         tmp_path,
         phase="scoping",
         issues=[
-            ("DEM-1", "in_progress", ["phase:scoping"]),
+            ("DEM-1", "executing", ["phase:scoping"]),
         ],
     )
     tw = PhaseTransitionJitPrompt()
@@ -147,8 +147,8 @@ def test_should_fire_ignores_unrelated_phase_label(tmp_path: Path) -> None:
         tmp_path,
         phase="reviewing",
         issues=[
-            ("DEM-1", "in_progress", ["phase:reviewing"]),  # current phase, not prev
-            ("DEM-2", "in_progress", []),  # no phase label
+            ("DEM-1", "executing", ["phase:reviewing"]),  # current phase, not prev
+            ("DEM-2", "executing", []),  # no phase label
         ],
     )
     tw = PhaseTransitionJitPrompt()

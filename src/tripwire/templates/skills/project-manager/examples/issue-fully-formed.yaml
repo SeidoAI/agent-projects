@@ -2,7 +2,7 @@
 uuid: 7c3a4b1d-9f2e-4a8c-b5d6-1e2f3a4b5c6d
 id: SEI-42
 title: Implement JWT authentication endpoint
-status: todo
+status: queued
 priority: high
 executor: ai
 verifier: required

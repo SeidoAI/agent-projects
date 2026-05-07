@@ -21,7 +21,7 @@ def make_issue(key: str, blocked_by: list[str] | None = None, **kw: object) -> I
     return Issue(
         id=key,
         title=kw.get("title", f"Test {key}"),  # type: ignore[arg-type]
-        status=kw.get("status", "todo"),  # type: ignore[arg-type]
+        status=kw.get("status", "queued"),  # type: ignore[arg-type]
         priority="medium",
         executor="ai",
         verifier="required",
@@ -152,7 +152,7 @@ class TestMermaidRendering:
         ]
         result = build_dependency_graph(issues)
         output = to_mermaid(result)
-        # v0.9.4: canonical names replace legacy ("in_progress" → "executing",
+        # v0.9.4: canonical names replace legacy ("executing" → "executing",
         # "done" → "completed").
         assert "classDef status_executing" in output
         assert "classDef status_completed" in output

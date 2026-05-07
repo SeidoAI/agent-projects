@@ -111,8 +111,7 @@ _TEN_MINUTES = timedelta(minutes=10)
 # red CI on main means a regression that needs PM follow-up. Sessions
 # in ``executing`` belong to the in-flight CI-aware-exit (§B1) instead.
 _POST_MERGE_INACTIVE_STATUSES = frozenset(
-    # v0.9.4: "done" kept as legacy alias for any pre-migration data.
-    {"paused", "in_review", "verified", "completed", "done"}
+    {"paused", "in_review", "verified", "completed"}
 )
 
 

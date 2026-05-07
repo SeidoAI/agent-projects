@@ -5,9 +5,9 @@ nodes, edges, cycles, and critical path. The inputs are the raw model
 objects, not the cache — this module is usable independently of the graph
 cache and is the computational layer the UI and CLI both sit on top of.
 
-The only edge type considered here is `blocked_by` — "A is blocked by B"
-produces an edge A → B. Concept-graph edges (references, related) are not
-included because they are not dependencies.
+The only edge type considered here is `depends_on` — "A is blocked by B"
+produces an edge A → B. Concept-graph edges (refs) are not included
+because they are not dependencies.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def build_dependency_graph(issues: list[Issue]) -> DependencyGraphResult:
                 GraphEdge(
                     from_id=issue.id,
                     to_id=blocker,
-                    type="blocked_by",
+                    type="depends_on",
                 )
             )
 
@@ -217,7 +217,6 @@ def _compute_critical_path(ids: set[str], edges: list[GraphEdge]) -> list[str]:
 # so dep-graph rendering stays consistent regardless of which name a
 # project's data is at.
 _STATUS_COLORS = {
-    # Canonical (v0.9.4)
     "planned": "#cccccc",
     "queued": "#9cb3ff",
     "executing": "#ffd866",
@@ -226,13 +225,6 @@ _STATUS_COLORS = {
     "completed": "#7bed9f",
     "abandoned": "#777777",
     "deferred": "#bbbbbb",
-    # Legacy aliases — kept until v1.0 so projects that haven't backfilled
-    # their PT data render with the right palette.
-    "backlog": "#cccccc",
-    "todo": "#9cb3ff",
-    "in_progress": "#ffd866",
-    "done": "#7bed9f",
-    "canceled": "#777777",
 }
 
 

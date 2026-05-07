@@ -246,13 +246,7 @@ function filterSessionsByStages(
  *  was every `done` issue showing under "unassigned" once Wave-N
  *  closeout flipped the issue to terminal but didn't keep the session
  *  membership tight. */
-const TERMINAL_ISSUE_STATUSES = new Set([
-  "completed",
-  "abandoned",
-  // Legacy aliases — accept on read until v1.0.
-  "done",
-  "canceled",
-]);
+const TERMINAL_ISSUE_STATUSES = new Set(["completed", "abandoned"]);
 
 function unassignedIssuesOf(sessions: SessionSummary[], issues: IssueSummary[]): IssueSummary[] {
   const assigned = new Set<string>();

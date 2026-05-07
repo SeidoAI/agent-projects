@@ -46,18 +46,13 @@ export const SESSION_STAGES: SessionStage[] = [
     id: "executing",
     label: "executing",
     color: "#c83d2e",
-    matches: (s) =>
-      s === "executing" ||
-      s === "active" ||
-      s === "waiting_for_ci" ||
-      s === "waiting_for_review" ||
-      s === "waiting_for_deploy",
+    matches: (s) => s === "executing",
   },
   {
     id: "in_review",
     label: "review",
     color: "#2d3a7c",
-    matches: (s) => s === "in_review" || s === "re_engaged",
+    matches: (s) => s === "in_review",
   },
   {
     id: "verified",

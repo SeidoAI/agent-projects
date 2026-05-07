@@ -32,11 +32,13 @@ export function makeProject(overrides: Partial<ProjectDetail> = {}): ProjectDeta
     dir: "/tmp/demo",
     repos: { "SeidoAI/tripwire": { local: null, github: null } },
     status_transitions: {
-      todo: ["in_progress"],
-      in_progress: ["in_review", "blocked"],
-      in_review: ["done", "in_progress"],
-      blocked: ["in_progress"],
-      done: [],
+      planned: ["queued", "abandoned"],
+      queued: ["executing", "abandoned"],
+      executing: ["in_review", "abandoned"],
+      in_review: ["verified", "executing"],
+      verified: ["completed", "in_review"],
+      completed: [],
+      abandoned: [],
     },
     ...overrides,
   };
@@ -46,7 +48,7 @@ export function makeIssueSummary(overrides: Partial<IssueSummary> = {}): IssueSu
   return {
     id: "DEMO-1",
     title: "Sample issue",
-    status: "todo",
+    status: "queued",
     priority: "medium",
     executor: "ai",
     verifier: "required",
@@ -77,9 +79,9 @@ export function makeIssueStatusEnum(): EnumDescriptor {
   return {
     name: "issue_status",
     values: [
-      { value: "todo", label: "To do", color: "#888", description: null },
-      { value: "doing", label: "Doing", color: "#0af", description: null },
-      { value: "done", label: "Done", color: "#0f0", description: null },
+      { value: "planned", label: "Planned", color: "#888", description: null },
+      { value: "queued", label: "Queued", color: "#0af", description: null },
+      { value: "completed", label: "Completed", color: "#0f0", description: null },
     ],
   };
 }

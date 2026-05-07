@@ -187,10 +187,13 @@ def start_server(
     project_dirs: list[Path],
     dev_mode: bool = False,
     open_browser: bool = True,
+    pin: bool = True,
 ) -> None:
     """Create the app and run it under uvicorn.
 
-    Called by the ``tripwire ui`` CLI command.
+    Called by the ``tripwire ui`` CLI command. *pin* controls whether
+    *project_dirs* should restrict discovery (``--project-dir`` semantics)
+    or merely augment it (cwd / wide-discovery semantics).
     """
     import uvicorn
 
@@ -201,7 +204,7 @@ def start_server(
 
     # Ensure the project index is populated even when discover_projects()
     # was not called (e.g. the --project-dir CLI path).
-    seed_project_index(project_dirs)
+    seed_project_index(project_dirs, pin=pin)
 
     url = f"http://{host}:{port}"
 

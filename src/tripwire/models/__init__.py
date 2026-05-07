@@ -25,7 +25,7 @@ from tripwire.models.enums import (
     Verifier,
 )
 from tripwire.models.graph import (
-    EdgeType,
+    EdgeKind,
     FreshnessResult,
     FreshnessStatus,
     FullGraphResult,
@@ -61,7 +61,7 @@ __all__ = [
     "CommentType",
     "ConceptNode",
     # graph
-    "EdgeType",
+    "EdgeKind",
     "EngagementEntry",
     "Executor",
     "FreshnessResult",

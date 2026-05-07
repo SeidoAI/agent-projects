@@ -58,7 +58,7 @@ def _seed_issue(project_dir: Path, issue_id: str) -> None:
         "priority": "medium",
         "executor": "ai",
         "verifier": "required",
-        "status": "todo",
+        "status": "queued",
         "labels": [],
     }
     (idir / "issue.yaml").write_text(

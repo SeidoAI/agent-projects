@@ -427,7 +427,7 @@ class TestPrepRun:
         )
         write_handoff_yaml(tmp_path_project, "s1")
 
-        agents_dir = tmp_path_project / "agents"
+        agents_dir = tmp_path_project / "templates" / "agents"
         agents_dir.mkdir(exist_ok=True)
         (agents_dir / "backend-coder.yaml").write_text(
             _yaml.safe_dump(
@@ -510,7 +510,7 @@ class TestPrepRun:
         )
         write_handoff_yaml(tmp_path_project, "s1")
 
-        agents_dir = tmp_path_project / "agents"
+        agents_dir = tmp_path_project / "templates" / "agents"
         agents_dir.mkdir(exist_ok=True)
         (agents_dir / "backend-coder.yaml").write_text(
             _yaml.safe_dump(
@@ -717,8 +717,8 @@ class TestPrepRunResume:
         )
         write_handoff_yaml(tmp_path_project, "s1")
 
-        (tmp_path_project / "agents").mkdir(exist_ok=True)
-        (tmp_path_project / "agents" / "backend-coder.yaml").write_text(
+        (tmp_path_project / "templates" / "agents").mkdir(parents=True, exist_ok=True)
+        (tmp_path_project / "templates" / "agents" / "backend-coder.yaml").write_text(
             "id: backend-coder\ncontext:\n  skills: []\n"
         )
 

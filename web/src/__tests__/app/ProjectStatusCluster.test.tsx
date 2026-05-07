@@ -19,26 +19,23 @@ async function loadCluster() {
 }
 
 describe("ProjectStatusCluster — SessionStatusCluster top-bar counts", () => {
-  it("collapses multi-state backend statuses onto the canonical executing stage", async () => {
-    // Three sessions, three different "executing-ish" raw statuses
-    // that the backend distinguishes (active, waiting_for_ci,
-    // waiting_for_review). All three should land under canonical
-    // `executing` once routed through `sessionStageId()`. Without
-    // the mapping the top-bar exec counter would read 1 (only the
-    // session whose raw state is literally "executing").
+  it("counts sessions by canonical session_status", async () => {
+    // The cluster preferentially keys on `current_state` (the
+    // structured agent-state) but falls back to `status` (the
+    // session lifecycle state) when current_state is null. With
+    // the v0.9.4 collapse there are no aliases — every counter
+    // tracks a canonical SessionStatus directly.
     const ProjectStatusCluster = await loadCluster();
     const qc = makeTestQueryClient();
     qc.setQueryData(queryKeys.sessions("p1"), [
       makeSessionSummary({ id: "s1", status: "executing", current_state: null }),
-      makeSessionSummary({ id: "s2", status: "executing", current_state: "active" }),
-      makeSessionSummary({ id: "s3", status: "executing", current_state: "waiting_for_ci" }),
+      makeSessionSummary({ id: "s2", status: "executing", current_state: null }),
+      makeSessionSummary({ id: "s3", status: "executing", current_state: null }),
       makeSessionSummary({ id: "s4", status: "queued", current_state: null }),
     ]);
 
     renderWithProviders(<ProjectStatusCluster wsStatus="open" />, { queryClient: qc });
 
-    // Three sessions are in canonical `executing`; one in `queued`.
-    // Counters render as `<n> exec` and `<n> queued`.
     expect(screen.getByText("3").className).toContain("color-rule");
     expect(screen.getByText(/exec/)).toBeInTheDocument();
     expect(screen.getByText("1").className).toContain("color-ink");

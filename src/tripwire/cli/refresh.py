@@ -27,11 +27,11 @@ def refresh_cmd(ctx: click.Context, project_dir: Path) -> None:
     """Rebuild the graph cache from the filesystem.
 
     This is a best-effort incremental rebuild — it compares file
-    fingerprints in `graph/index.yaml` against what's on disk and only
+    fingerprints in `nodes/tripwire-graph-index.yaml` against what's on disk and only
     re-reads changed files. If the cache is up-to-date, this is a no-op.
 
     If you suspect the cache is wrong (e.g. after a hand-edit you didn't
-    save through the CLI), delete `graph/index.yaml` and run
+    save through the CLI), delete `nodes/tripwire-graph-index.yaml` and run
     `tripwire validate` — that forces a full rebuild from scratch.
     """
     resolved = project_dir.expanduser().resolve()

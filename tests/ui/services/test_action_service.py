@@ -86,7 +86,7 @@ class TestRebuildIndex:
         assert result.cache_rebuilt is True
         assert result.duration_ms >= 0
         # Cache file exists after the rebuild.
-        assert (tmp_path_project / "graph" / "index.yaml").is_file()
+        assert (tmp_path_project / "nodes" / "tripwire-graph-index.yaml").is_file()
 
     def test_returns_false_when_cache_already_fresh(
         self, tmp_path_project: Path, save_test_issue

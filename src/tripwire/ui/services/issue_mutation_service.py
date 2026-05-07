@@ -81,46 +81,18 @@ def _validate_transition(
     Looks up the allowed next-states in ``project.yaml.status_transitions``.
     An empty allowlist for the current state means "no transitions out of
     this state" and blocks every change.
-
-    v0.9.4: alias-aware on both sides. The transition table in project.yaml
-    may use either the canonical names or the legacy ones, and callers may
-    pass either form (the issue model normalises to canonical, but UI
-    request bodies may still come in with legacy literals). Resolve via
-    ``status_contract`` before looking up.
     """
-    from tripwire.core.status_contract import (
-        ISSUE_ALIASES,
-        normalize_issue_status,
-    )
-
-    # Reverse map: canonical → legacy. Used for alternate-key lookup so a
-    # canonical-named ``current_status`` can find a transition row that
-    # was authored with the legacy name (or vice versa).
-    _CANONICAL_TO_LEGACY = {v: k for k, v in ISSUE_ALIASES.items()}
-
     config = load_project(project_dir)
     transitions = config.status_transitions
+    allowed = set(transitions.get(current_status, []))
 
-    cur_canon = normalize_issue_status(str(current_status))
-    new_canon = normalize_issue_status(str(new_status))
-
-    # Try canonical first, then the legacy alias for the same concept.
-    allowed_raw: list[str] = list(
-        transitions.get(
-            cur_canon, transitions.get(_CANONICAL_TO_LEGACY.get(cur_canon, ""), [])
-        )
-    )
-    # Normalise allowed values too — so a row with `["todo", "canceled"]`
-    # resolves the same as `["queued", "abandoned"]`.
-    allowed_canon = {normalize_issue_status(s) for s in allowed_raw}
-
-    if new_canon == cur_canon:
+    if new_status == current_status:
         # No-op transition: skip allowlist.
         return
-    if new_canon not in allowed_canon:
+    if new_status not in allowed:
         raise ValueError(
             f"Invalid transition from {current_status!r} to {new_status!r}. "
-            f"Allowed next statuses: {sorted(allowed_canon)}"
+            f"Allowed next statuses: {sorted(allowed)}"
         )
 
 

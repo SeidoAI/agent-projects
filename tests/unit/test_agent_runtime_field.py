@@ -27,7 +27,7 @@ from tripwire.runtimes.codex import CodexRuntime
 
 
 def _write_agent_yaml(project_dir: Path, agent_id: str, body: dict) -> None:
-    agents_dir = project_dir / "agents"
+    agents_dir = project_dir / "templates" / "agents"
     agents_dir.mkdir(exist_ok=True)
     (agents_dir / f"{agent_id}.yaml").write_text(yaml.safe_dump(body), encoding="utf-8")
 

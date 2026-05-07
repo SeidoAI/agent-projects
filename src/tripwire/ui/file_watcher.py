@@ -107,7 +107,7 @@ def _should_ignore(path: Path, project_dir: Path | None = None) -> bool:
         rel_parts = path.parts
 
     # Self-written graph cache — must be skipped or we get infinite event loops.
-    if rel_parts == ("graph", "index.yaml"):
+    if rel_parts == ("nodes", "tripwire-graph-index.yaml"):
         return True
 
     # Whitelist `.tripwire/events/` so FileEmitter writes survive the
@@ -160,8 +160,14 @@ def classify(
     if len(parts) == 3 and parts[0] == "issues" and parts[2] == "issue.yaml":
         return _event(project_id, "issue", parts[1], action, rel_posix)
 
-    # nodes/<id>.yaml
-    if len(parts) == 2 and parts[0] == "nodes" and suffix == ".yaml":
+    # nodes/<id>.yaml — concept node. Skip the derived graph cache that
+    # also lives in this dir under a reserved filename.
+    if (
+        len(parts) == 2
+        and parts[0] == "nodes"
+        and suffix == ".yaml"
+        and parts[1] != "tripwire-graph-index.yaml"
+    ):
         return _event(project_id, "node", stem, action, rel_posix)
 
     # inbox/<id>.md — PM-agent escalation entries (KUI-? phase D).
@@ -198,12 +204,22 @@ def classify(
     ):
         return _event(project_id, "scoping-artifact", stem, action, rel_posix)
 
-    # agents/<id>.yaml
-    if len(parts) == 2 and parts[0] == "agents" and suffix == ".yaml":
+    # templates/agents/<id>.yaml
+    if (
+        len(parts) == 3
+        and parts[0] == "templates"
+        and parts[1] == "agents"
+        and suffix == ".yaml"
+    ):
         return _event(project_id, "agent_def", stem, action, rel_posix)
 
-    # enums/<id>.yaml
-    if len(parts) == 2 and parts[0] == "enums" and suffix == ".yaml":
+    # templates/enums/<id>.yaml
+    if (
+        len(parts) == 3
+        and parts[0] == "templates"
+        and parts[1] == "enums"
+        and suffix == ".yaml"
+    ):
         return _event(project_id, "enum", stem, action, rel_posix)
 
     return None

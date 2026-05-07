@@ -293,7 +293,7 @@ def collect_scaffold(project_dir: Path) -> ScaffoldData:
                 "1": "warnings only",
                 "2": "errors",
             },
-            "side_effect": "rebuilds graph/index.yaml",
+            "side_effect": "rebuilds nodes/tripwire-graph-index.yaml",
         },
         id_allocation={
             "sequential_keys": "tripwire next-key --type issue --count N",
@@ -366,7 +366,7 @@ def _render_text(data: ScaffoldData) -> str:
         lines.append("")
 
     # Enums
-    lines.append("ACTIVE ENUMS (from enums/):")
+    lines.append("ACTIVE ENUMS (from templates/enums/):")
     for name in sorted(data.enums.keys()):
         values = ", ".join(data.enums[name])
         lines.append(f"  {name}: {values}")
@@ -426,7 +426,7 @@ def _render_text(data: ScaffoldData) -> str:
     lines.append("  Formats: --format text (default) | summary | compact | json")
     lines.append("  --count for just the error count")
     lines.append("  Exit 0 = clean, 1 = warnings, 2 = errors")
-    lines.append("  Always rebuilds graph/index.yaml as a side effect.")
+    lines.append("  Always rebuilds nodes/tripwire-graph-index.yaml as a side effect.")
     lines.append("")
 
     # ID allocation

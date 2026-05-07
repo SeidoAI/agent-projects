@@ -13,10 +13,9 @@ from collections import deque
 from tripwire.models.project import ProjectConfig
 
 # The implicit starting state for every issue. Projects can rename
-# `backlog` in their enums but the transition graph still must have a node
-# that all issues are reachable from. We use the first declared status as
-# the starting state if `backlog` isn't present.
-# v0.9.4 canonical name; "backlog" still accepted on the legacy alias path.
+# `planned` in their enums but the transition graph still must have a
+# node that all issues are reachable from. We use the first declared
+# status as the starting state if `planned` isn't present.
 DEFAULT_START_STATE = "planned"
 
 

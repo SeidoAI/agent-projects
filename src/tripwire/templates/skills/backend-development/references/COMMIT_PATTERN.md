@@ -73,7 +73,7 @@ Refs: SEI-51
 - `claude/SEI-51-refresh-fix`
 - `codex/SEI-60-migration-script`
 
-Use your actual agent id as the prefix (from the `agents/<id>.yaml`
+Use your actual agent id as the prefix (from the `templates/agents/<id>.yaml`
 definition).
 
 ## PR titles

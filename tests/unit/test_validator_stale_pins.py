@@ -60,7 +60,7 @@ class TestStalePinValidator:
         return Issue(
             id="TST-1",
             title="t",
-            status="todo",
+            status="queued",
             priority="medium",
             executor="ai",
             verifier="required",
@@ -134,7 +134,7 @@ class TestStalePinValidator:
         issue = Issue(
             id="TST-1",
             title="t",
-            status="todo",
+            status="queued",
             priority="medium",
             executor="ai",
             verifier="required",

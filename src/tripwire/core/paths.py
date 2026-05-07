@@ -34,13 +34,19 @@ CLAUDE_MD = "CLAUDE.md"
 ISSUES_DIR = "issues"
 
 # Concept nodes are source entities — peers of issues and sessions.
-# The derived graph cache lives separately at `graph/index.yaml`.
+# The derived graph cache lives separately at `nodes/tripwire-graph-index.yaml`.
 NODES_DIR = "nodes"
 
 INBOX_DIR = "inbox"
 SESSIONS_DIR = "sessions"
-AGENTS_DIR = "agents"
-ENUMS_DIR = "enums"
+
+# v0.10.0 — agents and enums are template/config, not state. Both moved
+# under `templates/` to consolidate the project-root layout.
+# ``tripwire migrate templates`` moves an existing project from the
+# pre-v0.10.0 flat layout to this one in a single commit; there is
+# no dual-read fallback.
+AGENTS_DIR = "templates/agents"
+ENUMS_DIR = "templates/enums"
 
 # ---------------------------------------------------------------------------
 # Plans (PM working directory)
@@ -66,17 +72,38 @@ DOCS_DIR = "docs"
 TEMPLATES_DIR = "templates"
 TEMPLATES_ARTIFACTS_DIR = "templates/artifacts"
 TEMPLATES_ARTIFACTS_MANIFEST = "templates/artifacts/manifest.yaml"
-ISSUE_TEMPLATES_DIR = "issue_templates"
-SESSION_TEMPLATES_DIR = "session_templates"
-COMMENT_TEMPLATES_DIR = "comment_templates"
-ORCHESTRATION_DIR = "orchestration"
+
+# v0.10.0 — consolidated under `templates/` so the project root has one
+# canonical home for all template/config dirs. Pre-v0.10.0 projects must
+# run ``tripwire migrate templates`` before upgrading; there is no
+# dual-read fallback.
+ISSUE_TEMPLATES_DIR = "templates/issues"
+SESSION_TEMPLATES_DIR = "templates/sessions"
+COMMENT_TEMPLATES_DIR = "templates/comments"
+ORCHESTRATION_DIR = "templates/orchestration"
 
 # ---------------------------------------------------------------------------
 # Derived graph cache (regenerable from source files)
 # ---------------------------------------------------------------------------
+#
+# v0.10.0 moves the cache and lock from a separate ``graph/`` directory
+# into ``nodes/`` to eliminate one redundant top-level dir. The filename
+# is namespaced (``tripwire-graph-index``) so it can't collide with a
+# user-authored node id; the id is reserved by the validator and the
+# node-store glob filters it out before iteration.
 
-GRAPH_CACHE = "graph/index.yaml"
-GRAPH_LOCK = "graph/.index.lock"
+GRAPH_INDEX_FILENAME = "tripwire-graph-index.yaml"
+GRAPH_INDEX_LOCK_FILENAME = ".tripwire-graph-index.lock"
+
+GRAPH_CACHE = f"{NODES_DIR}/{GRAPH_INDEX_FILENAME}"
+GRAPH_LOCK = f"{NODES_DIR}/{GRAPH_INDEX_LOCK_FILENAME}"
+
+# Reserved node id — refuses to be loaded as a concept node by the
+# validator and the node store, even though the file lives under
+# ``nodes/``. Pre-v0.10.0 projects must run ``tripwire migrate graph``
+# to move ``nodes/tripwire-graph-index.yaml`` and ``nodes/.tripwire-graph-index.lock`` into ``nodes/``
+# under their new canonical names.
+GRAPH_INDEX_NODE_ID = "tripwire-graph-index"
 
 # ---------------------------------------------------------------------------
 # Per-entity sub-paths and filenames

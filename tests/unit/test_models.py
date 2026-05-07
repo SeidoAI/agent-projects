@@ -37,7 +37,7 @@ class TestIssue:
         issue = Issue(
             id="SEI-1",
             title="Test",
-            status="todo",
+            status="queued",
             priority="medium",
             executor="ai",
             verifier="required",
@@ -50,7 +50,7 @@ class TestIssue:
         a = Issue(
             id="SEI-1",
             title="A",
-            status="todo",
+            status="queued",
             priority="low",
             executor="ai",
             verifier="none",
@@ -58,7 +58,7 @@ class TestIssue:
         b = Issue(
             id="SEI-2",
             title="B",
-            status="todo",
+            status="queued",
             priority="low",
             executor="ai",
             verifier="none",
@@ -70,7 +70,7 @@ class TestIssue:
             Issue(
                 id=valid,
                 title="t",
-                status="todo",
+                status="queued",
                 priority="low",
                 executor="ai",
                 verifier="none",
@@ -82,7 +82,7 @@ class TestIssue:
                 Issue(
                     id=invalid,
                     title="t",
-                    status="todo",
+                    status="queued",
                     priority="low",
                     executor="ai",
                     verifier="none",
@@ -92,7 +92,7 @@ class TestIssue:
         issue = Issue(
             id="SEI-42",
             title="Round-trip",
-            status="in_progress",
+            status="executing",
             priority="high",
             executor="ai",
             verifier="required",
@@ -116,7 +116,7 @@ class TestIssue:
             Issue(
                 id="SEI-1",
                 title="t",
-                status="todo",
+                status="queued",
                 priority="low",
                 executor="ai",
                 verifier="none",
@@ -246,12 +246,12 @@ class TestAgentSession:
                     base_branch="test",
                 ),
             ],
-            current_state="in_progress",
+            current_state="executing",
         )
         assert len(s.repos) == 2
         assert s.repos[0].pr_number == 42
         assert s.repos[1].branch is None
-        assert s.current_state == "in_progress"
+        assert s.current_state == "executing"
 
     def test_session_orchestration_override(self) -> None:
         s = AgentSession(
@@ -377,32 +377,32 @@ class TestProjectConfig:
         p = ProjectConfig(
             name="x",
             key_prefix="X",
-            statuses=["backlog", "todo", "done"],
+            statuses=["planned", "queued", "done"],
             status_transitions={
-                "backlog": ["todo"],
-                "todo": ["done"],
+                "planned": ["queued"],
+                "queued": ["done"],
                 "done": [],
             },
         )
-        assert p.status_transitions["todo"] == ["done"]
+        assert p.status_transitions["queued"] == ["done"]
 
 
 class TestGraphEdge:
     def test_alias_population_from(self) -> None:
         # Edges in the YAML cache use `from`/`to` (Python keywords).
         e = GraphEdge.model_validate(
-            {"from": "SEI-1", "to": "user-model", "type": "references"}
+            {"from": "SEI-1", "to": "user-model", "type": "refs"}
         )
         assert e.from_id == "SEI-1"
         assert e.to_id == "user-model"
 
     def test_alias_population_field_name(self) -> None:
-        e = GraphEdge(from_id="SEI-1", to_id="SEI-2", type="blocked_by")
+        e = GraphEdge(from_id="SEI-1", to_id="SEI-2", type="depends_on")
         assert e.from_id == "SEI-1"
         assert e.to_id == "SEI-2"
 
     def test_dump_by_alias(self) -> None:
-        e = GraphEdge(from_id="SEI-1", to_id="user-model", type="references")
+        e = GraphEdge(from_id="SEI-1", to_id="user-model", type="refs")
         dumped = e.model_dump(by_alias=True)
         assert "from" in dumped
         assert "to" in dumped

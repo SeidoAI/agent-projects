@@ -126,7 +126,7 @@ def validate_all(project_dir: Path, *, strict: bool = True) -> ValidationReport:
 
 
 def rebuild_index(project_dir: Path) -> RebuildResult:
-    """Refresh ``graph/index.yaml`` and report whether anything changed.
+    """Refresh ``nodes/tripwire-graph-index.yaml`` and report whether anything changed.
 
     ``ensure_fresh`` decides between a full rebuild (missing / corrupt
     cache) and an incremental update (mtime drift). We measure wall time

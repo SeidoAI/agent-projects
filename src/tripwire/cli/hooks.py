@@ -186,6 +186,8 @@ def _is_tripwire_artifact(path: str) -> bool:
         return True
 
     # nodes/**/*.yaml — anywhere a `nodes` dir appears in the path.
+    # This also covers `nodes/tripwire-graph-index.yaml`, the derived
+    # graph cache that lives alongside source nodes since v0.10.0.
     if p.suffix == ".yaml":
         for parent in p.parents:
             if parent.name == "nodes":
@@ -193,10 +195,6 @@ def _is_tripwire_artifact(path: str) -> bool:
 
     # project.yaml
     if name == "project.yaml":
-        return True
-
-    # graph/index.yaml
-    if name == "index.yaml" and p.parent.name == "graph":
         return True
 
     return False

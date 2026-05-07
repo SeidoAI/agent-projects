@@ -21,19 +21,19 @@ def make_project(transitions: dict[str, list[str]]) -> ProjectConfig:
 
 class TestIsTransitionAllowed:
     def test_allowed(self) -> None:
-        p = make_project({"todo": ["in_progress"], "in_progress": ["done"]})
-        assert is_transition_allowed(p, "todo", "in_progress")
+        p = make_project({"queued": ["executing"], "executing": ["done"]})
+        assert is_transition_allowed(p, "queued", "executing")
 
     def test_disallowed(self) -> None:
-        p = make_project({"todo": ["in_progress"], "in_progress": ["done"]})
-        assert not is_transition_allowed(p, "todo", "done")
+        p = make_project({"queued": ["executing"], "executing": ["done"]})
+        assert not is_transition_allowed(p, "queued", "done")
 
     def test_self_transition_always_allowed(self) -> None:
-        p = make_project({"todo": ["in_progress"]})
-        assert is_transition_allowed(p, "todo", "todo")
+        p = make_project({"queued": ["executing"]})
+        assert is_transition_allowed(p, "queued", "queued")
 
     def test_unknown_source(self) -> None:
-        p = make_project({"todo": ["in_progress"]})
+        p = make_project({"queued": ["executing"]})
         assert not is_transition_allowed(p, "qa", "done")
 
 
@@ -41,13 +41,13 @@ class TestReachableStatuses:
     def test_full_seido_default_flow(self) -> None:
         p = make_project(
             {
-                "backlog": ["todo", "canceled"],
-                "todo": ["in_progress", "backlog", "canceled"],
-                "in_progress": ["in_review", "todo", "canceled"],
-                "in_review": ["verified", "in_progress"],
+                "planned": ["queued", "abandoned"],
+                "queued": ["executing", "planned", "abandoned"],
+                "executing": ["in_review", "queued", "abandoned"],
+                "in_review": ["verified", "executing"],
                 "verified": ["done", "in_review"],
                 "done": [],
-                "canceled": ["backlog"],
+                "abandoned": ["planned"],
             }
         )
         reachable = reachable_statuses(p)
@@ -57,8 +57,8 @@ class TestReachableStatuses:
     def test_isolated_status_not_reachable(self) -> None:
         p = make_project(
             {
-                "backlog": ["todo"],
-                "todo": ["done"],
+                "planned": ["queued"],
+                "queued": ["done"],
                 "done": [],
                 "orphan": [],
             }
@@ -75,11 +75,11 @@ class TestReachableStatuses:
 
 class TestIsStatusReachable:
     def test_reachable(self) -> None:
-        p = make_project({"backlog": ["todo"], "todo": ["done"], "done": []})
+        p = make_project({"planned": ["queued"], "queued": ["done"], "done": []})
         assert is_status_reachable(p, "done")
 
     def test_unreachable(self) -> None:
         p = make_project(
-            {"backlog": ["todo"], "todo": ["done"], "done": [], "orphan": []}
+            {"planned": ["queued"], "queued": ["done"], "done": [], "orphan": []}
         )
         assert not is_status_reachable(p, "orphan")

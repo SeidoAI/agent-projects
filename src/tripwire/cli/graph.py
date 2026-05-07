@@ -15,7 +15,7 @@ The command is a Click group with three operating modes:
 Both query subcommands take canonical edge-kind filters
 (``--kind refs,depends_on``) and a transitive-closure depth
 (``--distance N``). They read from `core.graph.index.UnifiedIndex`,
-which is a thin facade over the cache (`graph/index.yaml`).
+which is a thin facade over the cache (`nodes/tripwire-graph-index.yaml`).
 """
 
 from __future__ import annotations

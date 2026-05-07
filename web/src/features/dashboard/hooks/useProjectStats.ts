@@ -41,20 +41,13 @@ export function useSessionsList(pid: string) {
  * `off_track` stage and surface in the SessionStageRow's off-track
  * card with alert chrome — they are NOT skipped.
  *
- * v0.9.4: terminal-status issues (completed, abandoned + legacy
- * done/canceled aliases) are excluded from BOTH the unassigned bucket
- * and the per-stage `issueCount`. They've already shipped; counting
- * them as in-flight work inflates the stage cards. This matches the
- * filter in ProjectDashboard.unassignedIssuesOf so the headline
- * counters and the rendered list agree.
+ * Terminal-status issues (completed, abandoned) are excluded from BOTH
+ * the unassigned bucket and the per-stage `issueCount`. They've already
+ * shipped; counting them as in-flight work inflates the stage cards.
+ * This matches the filter in ProjectDashboard.unassignedIssuesOf so the
+ * headline counters and the rendered list agree.
  */
-const TERMINAL_ISSUE_STATUSES = new Set([
-  "completed",
-  "abandoned",
-  // Legacy aliases — accept on read until v1.0.
-  "done",
-  "canceled",
-]);
+const TERMINAL_ISSUE_STATUSES = new Set(["completed", "abandoned"]);
 
 export function bucketByStage(
   sessions: SessionSummary[],

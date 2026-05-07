@@ -3,9 +3,8 @@
  * per-status visual treatment.
  *
  * Keys mirror `tripwire.models.enums.SessionStatus`:
- *   PLANNED, QUEUED, EXECUTING, ACTIVE, WAITING_FOR_CI,
- *   WAITING_FOR_REVIEW, WAITING_FOR_DEPLOY, RE_ENGAGED, IN_REVIEW,
- *   VERIFIED, COMPLETED.
+ *   PLANNED, QUEUED, EXECUTING, IN_REVIEW, VERIFIED, COMPLETED,
+ *   PAUSED, FAILED, ABANDONED.
  *
  * Hierarchy reflects PM attention: what's *running now* tops the list,
  * then what's *waiting on review*, then what's *ready next*, then *held*,
@@ -33,48 +32,13 @@ const STATUS_STYLES: Record<string, StatusStyle> = {
     fillOpacity: 1,
     textOnFill: "paper",
   },
-  active: {
-    color: "var(--color-rule)",
-    label: "active",
-    order: 0,
-    fillOpacity: 1,
-    textOnFill: "paper",
-  },
-  re_engaged: {
-    color: "var(--color-rule)",
-    label: "re-engaged",
-    order: 0,
-    fillOpacity: 0.9,
-    textOnFill: "paper",
-  },
 
-  // Awaiting review / CI — gating, can't make progress without action.
-  waiting_for_review: {
-    color: "var(--color-gate)",
-    label: "awaiting review",
-    order: 1,
-    fillOpacity: 0.85,
-    textOnFill: "paper",
-  },
+  // Awaiting review — gating, can't make progress without action.
   in_review: {
     color: "var(--color-gate)",
     label: "in review",
     order: 1,
     fillOpacity: 0.85,
-    textOnFill: "paper",
-  },
-  waiting_for_ci: {
-    color: "var(--color-gate)",
-    label: "waiting CI",
-    order: 1,
-    fillOpacity: 0.7,
-    textOnFill: "paper",
-  },
-  waiting_for_deploy: {
-    color: "var(--color-gate)",
-    label: "waiting deploy",
-    order: 1,
-    fillOpacity: 0.7,
     textOnFill: "paper",
   },
 
@@ -111,6 +75,29 @@ const STATUS_STYLES: Record<string, StatusStyle> = {
     fillOpacity: 0.18,
     textOnFill: "ink",
   },
+
+  // Off-track — paused/failed/abandoned. Displayed but de-prioritised.
+  paused: {
+    color: "var(--color-ink-3)",
+    label: "paused",
+    order: 5,
+    fillOpacity: 0.3,
+    textOnFill: "ink",
+  },
+  failed: {
+    color: "var(--color-rule)",
+    label: "failed",
+    order: 5,
+    fillOpacity: 0.3,
+    textOnFill: "paper",
+  },
+  abandoned: {
+    color: "var(--color-ink-3)",
+    label: "abandoned",
+    order: 5,
+    fillOpacity: 0.18,
+    textOnFill: "ink",
+  },
 };
 
 const FALLBACK: StatusStyle = {
@@ -136,12 +123,7 @@ export function statusOrder(status: string): number {
 /** Statuses treated as "live/active work" for the flow's culling rule. */
 export const LIVE_STATUSES = new Set([
   "executing",
-  "active",
-  "re_engaged",
-  "waiting_for_review",
   "in_review",
-  "waiting_for_ci",
-  "waiting_for_deploy",
   "planned",
   "queued",
 ]);

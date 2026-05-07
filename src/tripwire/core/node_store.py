@@ -70,12 +70,19 @@ def save_node(
 
 
 def list_nodes(project_dir: Path) -> list[ConceptNode]:
-    """Load every node file under `<project_dir>/nodes/`."""
+    """Load every concept-node file under `<project_dir>/nodes/`.
+
+    Skips ``nodes/tripwire-graph-index.yaml`` — the derived graph cache
+    that lives alongside source nodes since v0.10.0 but is not itself
+    a concept node.
+    """
     nodes_dir = paths.nodes_dir(project_dir)
     if not nodes_dir.is_dir():
         return []
     nodes: list[ConceptNode] = []
     for path in sorted(nodes_dir.glob("*.yaml")):
+        if path.name == paths.GRAPH_INDEX_FILENAME:
+            continue
         text = path.read_text(encoding="utf-8")
         frontmatter, body = parse_frontmatter_body(text)
         nodes.append(ConceptNode.model_validate({**frontmatter, "body": body}))

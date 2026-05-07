@@ -113,13 +113,13 @@ def _all_sections_summary() -> PrSummary:
             base_errors=2, head_errors=5, base_warnings=1, head_warnings=3
         ),
         issues=IssuesSection(
-            base_counts={"todo": 5, "in_progress": 3, "done": 1},
-            head_counts={"todo": 4, "in_progress": 1, "done": 4},
+            base_counts={"queued": 5, "executing": 3, "done": 1},
+            head_counts={"queued": 4, "executing": 1, "done": 4},
             changes=[
-                IssueStatusChange("KUI-1", "todo", "in_progress"),
-                IssueStatusChange("KUI-2", "in_progress", "done"),
-                IssueStatusChange("KUI-3", "in_progress", "done"),
-                IssueStatusChange("KUI-4", "in_progress", "done"),
+                IssueStatusChange("KUI-1", "queued", "executing"),
+                IssueStatusChange("KUI-2", "executing", "done"),
+                IssueStatusChange("KUI-3", "executing", "done"),
+                IssueStatusChange("KUI-4", "executing", "done"),
             ],
         ),
         sessions=SessionsSection(
@@ -172,8 +172,8 @@ def test_all_sections_validation_shows_error_delta():
 
 def test_all_sections_issues_lists_changes():
     out = render(_all_sections_summary())
-    assert "`KUI-1`: todo → in_progress" in out
-    assert "`KUI-2`: in_progress → done" in out
+    assert "`KUI-1`: queued → executing" in out
+    assert "`KUI-2`: executing → done" in out
 
 
 def test_all_sections_concept_graph_shows_added_removed_promoted():
@@ -203,9 +203,9 @@ def _partial_summary() -> PrSummary:
         # Validation flat → closed
         validation=ValidationSection(),
         issues=IssuesSection(
-            base_counts={"todo": 3},
-            head_counts={"todo": 2, "done": 1},
-            changes=[IssueStatusChange("KUI-9", "todo", "done")],
+            base_counts={"queued": 3},
+            head_counts={"queued": 2, "done": 1},
+            changes=[IssueStatusChange("KUI-9", "queued", "done")],
         ),
         # Sessions, concept graph, critical path, workspace, lint all flat
     )
@@ -245,7 +245,9 @@ def test_over_cap_truncates_to_max_chars():
         PrSummary(
             base_sha="aaaaaaa",
             head_sha="bbbbbbb",
-            issues=IssuesSection(changes=[IssueStatusChange(huge_id, "todo", "done")]),
+            issues=IssuesSection(
+                changes=[IssueStatusChange(huge_id, "queued", "done")]
+            ),
         )
     )
     assert len(out) <= MAX_CHARS
@@ -256,7 +258,7 @@ def test_id_list_caps_at_constant():
     """The ID list inside one section caps at ``ID_LIST_CAP`` even before
     the global truncation kicks in."""
     changes = [
-        IssueStatusChange(f"X-{i}", "todo", "done") for i in range(ID_LIST_CAP + 5)
+        IssueStatusChange(f"X-{i}", "queued", "done") for i in range(ID_LIST_CAP + 5)
     ]
     out = render(PrSummary(issues=IssuesSection(changes=changes)))
     assert "…+5 more" in out

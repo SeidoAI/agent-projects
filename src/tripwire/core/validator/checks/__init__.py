@@ -49,9 +49,11 @@ from tripwire.core.validator.checks.references import (
 from tripwire.core.validator.checks.structure import (
     check_handoff_artifact,
     check_issue_body_structure,
+    check_project_repos_present,
     check_status_transitions,
 )
 from tripwire.core.validator.checks.workflow import check_workflow_well_formed
+from tripwire.core.validator.checks.workspace_link import check_workspace_link
 
 # Identity: every entity has a uuid, the right id format, no collisions,
 # the next-id counter is consistent, timestamps are parseable.
@@ -74,11 +76,12 @@ REFERENCE_CHECKS = [
 ]
 
 # Structure: required Markdown sections in issue bodies, status transitions,
-# handoff.yaml schema.
+# handoff.yaml schema, project.yaml.repos presence.
 STRUCTURE_CHECKS = [
     check_issue_body_structure,
     check_status_transitions,
     check_handoff_artifact,
+    check_project_repos_present,
 ]
 
 # Artifacts: manifest schema valid, completed sessions ship required artifacts.
@@ -114,6 +117,9 @@ QUALITY_CHECKS = [
 # Workflow: well-formedness of `<project>/workflow.yaml` (KUI-119).
 WORKFLOW_CHECKS = [check_workflow_well_formed]
 
+# Workspace: bidirectional project<->workspace link consistency.
+WORKSPACE_CHECKS = [check_workspace_link]
+
 # Canonical run order: matches the pre-split ALL_CHECKS literal so finding
 # output ordering stays byte-stable. The workflow check is appended at
 # the END so it doesn't perturb the byte-stable position of any
@@ -148,6 +154,8 @@ ALL_CHECKS = [
     check_pm_response_covers_self_review,
     check_pm_response_followups_resolve,
     check_workflow_well_formed,
+    check_workspace_link,
+    check_project_repos_present,
 ]
 
 
@@ -161,4 +169,5 @@ __all__ = [
     "REFERENCE_CHECKS",
     "STRUCTURE_CHECKS",
     "WORKFLOW_CHECKS",
+    "WORKSPACE_CHECKS",
 ]
