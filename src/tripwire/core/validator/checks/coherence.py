@@ -324,20 +324,15 @@ def check_done_implies_session_completed(
 
 
 def _pm_response_produced_at(ctx: ValidationContext) -> str | None:
-    """Look up `pm-response`'s `produced_at` threshold from the manifest.
+    """Thin wrapper over the shared `artifact_entry` helper for the
+    `pm-response` manifest entry's `produced_at`.
 
-    Returns the threshold string (e.g. ``"completed"``) or ``None`` if the
-    manifest is missing, fails to load, or doesn't declare a `pm-response`
-    entry. Callers should treat ``None`` as "skip this check entirely" —
-    same fallback as ``check_artifact_presence`` uses for a missing
-    manifest.
+    Kept as a named helper for readability at call sites; new artifact-
+    shaped rules should use `artifact_entry(ctx, name)` directly.
     """
-    from tripwire.core.validator.checks.artifacts import _load_manifest
+    from tripwire.core.validator._manifest_lookup import artifact_entry
 
-    manifest, _ = _load_manifest(ctx)
-    if manifest is None:
-        return None
-    entry = next((e for e in manifest.artifacts if e.name == "pm-response"), None)
+    entry = artifact_entry(ctx, "pm-response")
     return entry.produced_at if entry is not None else None
 
 
