@@ -323,6 +323,24 @@ def check_done_implies_session_completed(
     return results
 
 
+def _pm_response_produced_at(ctx: ValidationContext) -> str | None:
+    """Look up `pm-response`'s `produced_at` threshold from the manifest.
+
+    Returns the threshold string (e.g. ``"completed"``) or ``None`` if the
+    manifest is missing, fails to load, or doesn't declare a `pm-response`
+    entry. Callers should treat ``None`` as "skip this check entirely" —
+    same fallback as ``check_artifact_presence`` uses for a missing
+    manifest.
+    """
+    from tripwire.core.validator.checks.artifacts import _load_manifest
+
+    manifest, _ = _load_manifest(ctx)
+    if manifest is None:
+        return None
+    entry = next((e for e in manifest.artifacts if e.name == "pm-response"), None)
+    return entry.produced_at if entry is not None else None
+
+
 def check_pm_response_covers_self_review(
     ctx: ValidationContext,
 ) -> list[CheckResult]:
@@ -333,19 +351,38 @@ def check_pm_response_covers_self_review(
     enough to catch "PM skipped read entirely," loose enough to not
     be a transcription chore.
 
+    v0.11.1: gated on the manifest's `pm-response.produced_at` — only
+    fires once a session reaches that lifecycle threshold. Default
+    manifest declares `produced_at: completed`, so agents at executing
+    or in_review never see these findings (`pm-response.yaml` is PM-side
+    output). Missing-file enforcement is delegated to `check_artifact_presence`.
+
     Codes:
-      - ``pm_response/missing_file`` — self-review present, pm-response absent
-      - ``pm_response/parse_error``  — pm-response.yaml unparseable
-      - ``pm_response/incomplete_coverage`` — bullet has no matching quote_excerpt
+      - ``pm_response/io_error``           — self-review.md unreadable
+      - ``pm_response/parse_error``        — pm-response.yaml unparseable
+      - ``pm_response/incomplete_coverage``— bullet has no matching quote_excerpt
     """
+    from tripwire.core.issue_artifact_store import status_at_or_past
     from tripwire.core.session_review_artifacts import (
         parse_pm_response_items,
         parse_self_review_items,
     )
 
+    threshold = _pm_response_produced_at(ctx)
+    if threshold is None:
+        return []
+
     results: list[CheckResult] = []
 
     for entity in ctx.sessions:
+        if not status_at_or_past(
+            str(entity.model.status),
+            threshold,
+            ctx.project_dir,
+            enum_name="session_status",
+        ):
+            continue
+
         sid = entity.model.id
         sdir = ctx.project_dir / "sessions" / sid
         sr_path = sdir / "self-review.md"
@@ -362,6 +399,11 @@ def check_pm_response_covers_self_review(
                     severity="error",
                     file=f"sessions/{sid}/self-review.md",
                     message=f"Could not read self-review.md: {exc}",
+                    fix_hint=(
+                        "PM action — investigate the read failure on "
+                        "self-review.md (permissions, encoding, missing "
+                        "file). Agent-side artifact authoring is unrelated."
+                    ),
                 )
             )
             continue
@@ -370,23 +412,8 @@ def check_pm_response_covers_self_review(
 
         pr_path = sdir / "pm-response.yaml"
         if not pr_path.is_file():
-            results.append(
-                CheckResult(
-                    code="pm_response/missing_file",
-                    severity="error",
-                    file=f"sessions/{sid}/pm-response.yaml",
-                    message=(
-                        f"Session {sid!r} has self-review.md but no "
-                        "pm-response.yaml; PM has not recorded a response."
-                    ),
-                    fix_hint=(
-                        "Author sessions/<sid>/pm-response.yaml from "
-                        "templates/artifacts/pm-response.yaml.j2 "
-                        "(`tripwire session scaffold <sid> "
-                        "--artifact pm-response.yaml`)."
-                    ),
-                )
-            )
+            # Missing file is reported by check_artifact_presence (which
+            # honours the same produced_at gate). No need to duplicate.
             continue
 
         try:
@@ -398,7 +425,10 @@ def check_pm_response_covers_self_review(
                     severity="error",
                     file=f"sessions/{sid}/pm-response.yaml",
                     message=f"pm-response.yaml could not be parsed: {exc}",
-                    fix_hint="Check YAML syntax against the template.",
+                    fix_hint=(
+                        "PM action — fix YAML syntax in pm-response.yaml "
+                        "(check against templates/artifacts/pm-response.yaml.j2)."
+                    ),
                 )
             )
             continue
@@ -422,9 +452,9 @@ def check_pm_response_covers_self_review(
                         f"{sr.text!r}"
                     ),
                     fix_hint=(
-                        "Add an items[] entry to pm-response.yaml with a "
-                        "quote_excerpt that contains a substring of this "
-                        "self-review bullet."
+                        "PM action — add an items[] entry to "
+                        "pm-response.yaml with a quote_excerpt that contains "
+                        "a substring of this self-review bullet."
                     ),
                 )
             )
@@ -438,14 +468,32 @@ def check_pm_response_followups_resolve(
     """v0.7.9 §A3 — every ``items[].follow_up: KUI-XX`` in pm-response.yaml
     must reference an existing issue.
 
+    v0.11.1: gated on the manifest's `pm-response.produced_at` — fires
+    only once a session has reached that lifecycle threshold. pm-response
+    is PM-side output; agents at executing or in_review should not see
+    this code.
+
     Code: ``pm_response/missing_followup``.
     """
+    from tripwire.core.issue_artifact_store import status_at_or_past
     from tripwire.core.session_review_artifacts import parse_pm_response_items
+
+    threshold = _pm_response_produced_at(ctx)
+    if threshold is None:
+        return []
 
     known_issue_ids = {entity.model.id for entity in ctx.issues}
 
     results: list[CheckResult] = []
     for entity in ctx.sessions:
+        if not status_at_or_past(
+            str(entity.model.status),
+            threshold,
+            ctx.project_dir,
+            enum_name="session_status",
+        ):
+            continue
+
         sid = entity.model.id
         pr_path = ctx.project_dir / "sessions" / sid / "pm-response.yaml"
         if not pr_path.is_file():
@@ -471,9 +519,9 @@ def check_pm_response_followups_resolve(
                         f"{item.follow_up!r}, but no such issue exists."
                     ),
                     fix_hint=(
-                        "Either create the follow-up issue (`tripwire "
-                        "next-key --type issue`) or change follow_up to "
-                        "an existing issue id."
+                        "PM action — either create the follow-up issue "
+                        "(`tripwire next-key --type issue`) or change "
+                        "follow_up to an existing issue id."
                     ),
                 )
             )
