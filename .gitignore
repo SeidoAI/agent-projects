@@ -71,3 +71,4 @@ CLAUDE.md
 # want that churn in the code-repo history. Root-anchored so it
 # doesn't accidentally match the FE feature directory at `web/src/features/events/`.
 /events/
+src/tripwire/ui/frontend/node_modules/
