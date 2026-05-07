@@ -108,6 +108,38 @@ class TestSessionScaffold:
             tmp_path_project / "sessions" / "s1" / "verification-checklist.md"
         ).is_file()
 
+
+class TestVerificationChecklistTemplateContent:
+    """v0.12.2: the shipped verification-checklist template carries the
+    Schema parity section. This is a regression guard — the section is
+    load-bearing for catching silent schema-substitution incidents
+    (graph-ui-v2 case study), and a casual edit could remove it."""
+
+    def test_shipped_template_has_schema_parity_section(self):
+        from importlib.resources import files
+
+        template_path = (
+            files("tripwire.templates.artifacts") / "verification-checklist.md.j2"
+        )
+        content = template_path.read_text(encoding="utf-8")
+        assert "## Schema parity" in content, (
+            "Shipped verification-checklist.md.j2 is missing the '## Schema "
+            "parity' section. See SKILL.md § The six mortal sins #6 for why "
+            "this section is load-bearing."
+        )
+        # Spot-check a couple of the load-bearing checklist items so a
+        # rename doesn't slip through unnoticed.
+        assert "BYTE-EQUIVALENT match" in content
+        assert "STOPPED AND ASKED" in content
+
+    def test_shipped_pm_skill_has_six_mortal_sins(self):
+        from importlib.resources import files
+
+        skill_md = files("tripwire.templates.skills.project-manager") / "SKILL.md"
+        content = skill_md.read_text(encoding="utf-8")
+        assert "## The six mortal sins" in content
+        assert "Shipping a schema variant" in content
+
     def test_scaffold_skips_in_progress_phase_artifacts(
         self, tmp_path_project, save_test_session
     ):

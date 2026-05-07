@@ -94,6 +94,21 @@ See `examples/issue-epic.yaml` for the canonical epic format.
   there must be at least one `- [ ]` or `- [x]` item. Applies to both
   concrete issues and epics.
 
+### Schemas in issue bodies
+
+When an issue body quotes a schema/type/contract literally, executing
+agents MUST ship that exact shape. The verification-checklist's
+**Schema parity** section is the gate. Silent substitution — even when
+tests pass against the substituted shape — is a contract violation
+that warrants `REQUEST_CHANGES` at PM review.
+
+Issue authors: when a schema fragment is load-bearing for downstream
+work, quote it inside a fenced code block (e.g. ` ```ts `, ` ```yaml `,
+` ```proto `) so the executing agent has an unambiguous canonical
+reference. Schemas worth fencing include TypeScript types, OpenAPI
+fragments, GraphQL SDL, protobuf messages, JSON Schema, and Pydantic
+models.
+
 ## File path
 
 `<project>/issues/<KEY>/issue.yaml`. The filename (minus `.yaml`) must exactly

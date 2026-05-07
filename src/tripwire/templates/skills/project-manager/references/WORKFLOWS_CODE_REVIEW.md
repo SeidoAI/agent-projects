@@ -109,6 +109,18 @@ existing PR pair, and posts a per-finding summary comment. When
 and `code-review` runs from `received` — every iteration is
 attributable.
 
+## Review heuristics
+
+When synthesising the multi-reviewer findings (self / superpowers /
+codex), apply these decision rules:
+
+- **Schema divergences from the spec** — `REQUEST_CHANGES` blocker, not
+  `APPROVE_WITH_NOTES`. Do not defer schema fixes to downstream issues.
+  The foundation that ships the schema must ship the canonical shape.
+  See the verification-checklist's Schema parity section for the
+  agent-side gate; if it's marked N/A but the diff contains a shipped
+  schema, that's a `REQUEST_CHANGES` signal too.
+
 ## @codex trigger
 
 PM comments `@codex` on the **project-pr** (not the tripwire-pr).
