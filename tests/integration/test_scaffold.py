@@ -314,12 +314,14 @@ class TestScaffoldJson:
         assert data["artifact_manifest"]["exists"] is True
         # Default manifest ships every artifact a session produces.
         # v0.7.9 §A2/§A3 added self-review.md and pm-response.yaml.
+        # v0.12 added pr-review.yaml (PM-review enforcement, handoff #3).
         files = {a["file"] for a in data["artifact_manifest"]["artifacts"]}
         assert "plan.md" in files
         assert "post-completion-comments.md" in files
         assert "self-review.md" in files
         assert "pm-response.yaml" in files
-        assert len(data["artifact_manifest"]["artifacts"]) == 7
+        assert "pr-review.yaml" in files
+        assert len(data["artifact_manifest"]["artifacts"]) == 8
 
 
 # ============================================================================
