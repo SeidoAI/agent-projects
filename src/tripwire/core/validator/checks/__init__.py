@@ -49,6 +49,7 @@ from tripwire.core.validator.checks.references import (
 from tripwire.core.validator.checks.structure import (
     check_handoff_artifact,
     check_issue_body_structure,
+    check_project_repos_present,
     check_status_transitions,
 )
 from tripwire.core.validator.checks.workflow import check_workflow_well_formed
@@ -75,11 +76,12 @@ REFERENCE_CHECKS = [
 ]
 
 # Structure: required Markdown sections in issue bodies, status transitions,
-# handoff.yaml schema.
+# handoff.yaml schema, project.yaml.repos presence.
 STRUCTURE_CHECKS = [
     check_issue_body_structure,
     check_status_transitions,
     check_handoff_artifact,
+    check_project_repos_present,
 ]
 
 # Artifacts: manifest schema valid, completed sessions ship required artifacts.
@@ -153,6 +155,7 @@ ALL_CHECKS = [
     check_pm_response_followups_resolve,
     check_workflow_well_formed,
     check_workspace_link,
+    check_project_repos_present,
 ]
 
 

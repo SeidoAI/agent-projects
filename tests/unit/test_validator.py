@@ -614,6 +614,66 @@ class TestStatusTransitions:
 
 
 # ============================================================================
+# project.yaml.repos required (v0.10.0+)
+# ============================================================================
+
+
+class TestProjectReposRequired:
+    def test_empty_repos_errors(self, tmp_path: Path) -> None:
+        write_project_yaml(tmp_path, repos={})
+        report = validate_project(tmp_path)
+        assert "project/repos_required" in codes(report)
+        finding = next(
+            f for f in report.errors if f.code == "project/repos_required"
+        )
+        assert finding.file == "project.yaml"
+        assert finding.field == "repos"
+        assert "v0.10.0+" in finding.message
+
+    def test_populated_repos_passes(self, tmp_path: Path) -> None:
+        # write_project_yaml's default already includes two repos.
+        write_project_yaml(tmp_path)
+        report = validate_project(tmp_path)
+        assert "project/repos_required" not in codes(report)
+
+    def test_missing_repos_field_errors(self, tmp_path: Path) -> None:
+        # Write a project.yaml that omits `repos:` entirely. Pydantic will
+        # default it to {}, so the validator should flag it.
+        config: dict[str, Any] = {
+            "name": "test",
+            "key_prefix": "TST",
+            "base_branch": "main",
+            "statuses": [
+                "planned",
+                "queued",
+                "executing",
+                "in_review",
+                "verified",
+                "completed",
+                "abandoned",
+                "deferred",
+            ],
+            "status_transitions": {
+                "planned": ["queued", "abandoned"],
+                "queued": ["executing", "planned", "abandoned"],
+                "executing": ["in_review", "queued", "abandoned"],
+                "in_review": ["verified", "executing"],
+                "verified": ["completed", "in_review"],
+                "completed": [],
+                "abandoned": ["planned"],
+                "deferred": ["planned", "queued", "abandoned"],
+            },
+            "next_issue_number": 1,
+            "next_session_number": 1,
+        }
+        (tmp_path / "project.yaml").write_text(
+            yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
+        )
+        report = validate_project(tmp_path)
+        assert "project/repos_required" in codes(report)
+
+
+# ============================================================================
 # ID collisions
 # ============================================================================
 

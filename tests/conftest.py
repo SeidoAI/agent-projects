@@ -48,6 +48,9 @@ def tmp_path_project(tmp_path: Path) -> Path:
                     "abandoned": ["planned"],
                     "deferred": ["planned", "queued", "abandoned"],
                 },
+                # v0.10.0+ requires at least one repo. Stable owner/name
+                # so tests that match against repo URLs can rely on it.
+                "repos": {"SeidoAI/web-app-backend": {"local": None}},
             }
         )
     )

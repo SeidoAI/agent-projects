@@ -158,6 +158,39 @@ def check_status_transitions(ctx: ValidationContext) -> list[CheckResult]:
     return results
 
 
+def check_project_repos_present(ctx: ValidationContext) -> list[CheckResult]:
+    """``project.yaml.repos`` must declare at least one repo (v0.10.0+).
+
+    Empty / missing ``repos:`` blocks are blocked at validate-time rather
+    than at schema-load time so projects that *load* but happen to have
+    no repos surface as a structured finding instead of crashing the
+    whole validator with a Pydantic exception.
+    """
+    if ctx.project_config is None:
+        return []
+    if ctx.project_config.repos:
+        return []
+    return [
+        CheckResult(
+            code="project/repos_required",
+            severity="error",
+            file=paths.PROJECT_CONFIG,
+            field="repos",
+            message=(
+                "project.yaml has no repos: block — at least one repo is "
+                "required for v0.10.0+."
+            ),
+            fix_hint=(
+                "Add a `repos:` block keyed by `<owner>/<name>` with a "
+                "`local:` path:\n"
+                "  repos:\n"
+                "    <owner>/<name>:\n"
+                "      local: <path>"
+            ),
+        )
+    ]
+
+
 def check_handoff_artifact(ctx: ValidationContext) -> list[CheckResult]:
     """v0.6a: sessions in ``queued`` state require a valid handoff.yaml.
 
