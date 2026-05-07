@@ -160,6 +160,11 @@ class TestSessionReopen:
         )
         assert "## PM follow-up" in plan_text
         assert "https://github.com/test/code/pull/10" in plan_text
+        # v0.12.1: stub mentions worktree-recreation behaviour so the
+        # resumed agent + PM know what to expect on the next spawn.
+        assert "Worktrees were cleaned at completion" in plan_text
+        assert "tripwire session spawn" in plan_text
+        assert "do NOT push to the merged branch" in plan_text
 
     def test_skips_pm_followup_when_section_already_present(
         self, tmp_path_project, save_test_session, monkeypatch, tmp_path
