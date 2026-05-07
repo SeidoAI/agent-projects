@@ -89,8 +89,19 @@ def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
     manifest entry rather than gating every artifact at a single status.
     A session that has reached the threshold for one artifact but not for
     another is checked only against the first.
+
+    v0.12: applies the artifact_phase → session_status mapping (so
+    `produced_at: planning` correctly gates at session.status >= queued)
+    and checks both legacy `sessions/<sid>/<file>` and nested
+    `sessions/<sid>/artifacts/<file>` layouts before reporting missing.
+    Fix-hints prefix with the responsible-actor label from `owned_by`.
     """
     from tripwire.core.issue_artifact_store import status_at_or_past
+    from tripwire.core.validator._manifest_lookup import (
+        actor_prefix,
+        find_artifact_on_disk,
+        phase_to_session_status,
+    )
 
     manifest, _ = _load_manifest(ctx)
     if manifest is None:
@@ -99,19 +110,21 @@ def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
     results: list[CheckResult] = []
     for entity in ctx.sessions:
         session: AgentSession = entity.model
-        artifacts_dir = paths.session_artifacts_dir(ctx.project_dir, session.id)
+        session_dir = ctx.project_dir / paths.SESSIONS_DIR / session.id
         for entry in manifest.artifacts:
             if not entry.required:
                 continue
+            threshold = phase_to_session_status(entry.produced_at)
             if not status_at_or_past(
                 str(session.status),
-                entry.produced_at,
+                threshold,
                 ctx.project_dir,
                 enum_name="session_status",
             ):
                 continue
-            if (artifacts_dir / entry.file).exists():
+            if find_artifact_on_disk(session_dir, entry.file) is not None:
                 continue
+            prefix = actor_prefix(entry)
             results.append(
                 CheckResult(
                     code="artifact/missing",
@@ -124,8 +137,7 @@ def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
                         f"{entry.file!r}."
                     ),
                     fix_hint=(
-                        f"Write {paths.SESSIONS_DIR}/{session.id}/"
-                        f"{paths.SESSION_ARTIFACTS_SUBDIR}/{entry.file}."
+                        f"{prefix}write {paths.SESSIONS_DIR}/{session.id}/{entry.file}."
                     ),
                 )
             )
