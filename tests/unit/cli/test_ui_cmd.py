@@ -78,16 +78,30 @@ class TestGracefulDegradation:
 
 
 class TestNoProjects:
-    def test_no_projects_found_prints_hint(self, tmp_path: Path, monkeypatch):
+    def test_no_projects_found_prints_hint_and_continues(
+        self, tmp_path: Path, monkeypatch
+    ):
+        # The UI launches even with zero projects so the user sees the
+        # empty state in the browser and can act from there. Exiting at
+        # the CLI would leave them with nothing actionable in the
+        # terminal. We patch start_server to short-circuit the actual
+        # uvicorn run; the assertion is "we got past the empty-list
+        # gate and reached server launch."
         monkeypatch.chdir(tmp_path)
-        with patch(
-            "tripwire.ui.services.project_service.discover_projects",
-            return_value=[],
+        with (
+            patch(
+                "tripwire.ui.services.project_service.discover_projects",
+                return_value=[],
+            ),
+            patch("tripwire.ui.server.start_server") as start_server,
         ):
-            result = runner.invoke(cli, ["ui"])
-        assert result.exit_code == 1
-        assert "No projects found" in result.output
-        assert "tripwire init" in result.output
+            result = runner.invoke(cli, ["ui", "--no-browser"])
+        assert result.exit_code == 0, result.output
+        assert "No projects discovered" in result.output
+        # Server still launched, with an empty project list.
+        assert start_server.called
+        kwargs = start_server.call_args.kwargs
+        assert kwargs["project_dirs"] == []
 
 
 class TestCwdAutodetect:

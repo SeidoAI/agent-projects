@@ -5,11 +5,12 @@ import { describe, expect, test } from "vitest";
 
 import {
   ProjectSwitcher,
+  groupProjectsByWorkspace,
   phaseTone,
-  sortProjects,
   swapProjectIdInPath,
 } from "@/components/ProjectSwitcher";
 import type { ProjectSummary } from "@/lib/api/endpoints/project";
+import type { WorkspaceSummary } from "@/lib/api/endpoints/workspace";
 
 import { server } from "../mocks/server";
 import { renderWithProviders } from "../test-utils";
@@ -36,30 +37,17 @@ function projectSummary(p: Partial<ProjectSummary>): ProjectSummary {
   };
 }
 
-describe("sortProjects", () => {
-  test("sorts by friendly name (project- prefix stripped)", () => {
-    const result = sortProjects([
-      projectSummary({ id: "1", name: "project-zebra" }),
-      projectSummary({ id: "2", name: "project-aardvark" }),
-      projectSummary({ id: "3", name: "middle" }),
-    ]);
-    expect(result.map((p) => p.name)).toEqual([
-      "project-aardvark",
-      "middle",
-      "project-zebra",
-    ]);
-  });
-
-  test("returns a new array (does not mutate input)", () => {
-    const input = [
-      projectSummary({ id: "1", name: "b" }),
-      projectSummary({ id: "2", name: "a" }),
-    ];
-    const result = sortProjects(input);
-    expect(input.map((p) => p.id)).toEqual(["1", "2"]);
-    expect(result.map((p) => p.id)).toEqual(["2", "1"]);
-  });
-});
+function workspaceSummary(w: Partial<WorkspaceSummary>): WorkspaceSummary {
+  return {
+    id: w.id ?? "ws-1",
+    name: w.name ?? "Workspace",
+    slug: w.slug ?? "ws",
+    dir: w.dir ?? "/tmp",
+    description: "",
+    project_slugs: [],
+    ...w,
+  };
+}
 
 describe("phaseTone", () => {
   test("maps each canonical phase to a distinct tone", () => {
@@ -75,37 +63,175 @@ describe("phaseTone", () => {
   });
 });
 
+describe("groupProjectsByWorkspace", () => {
+  test("flat list when no workspaces are configured", () => {
+    const projects = [
+      projectSummary({ id: "a", name: "alpha" }),
+      projectSummary({ id: "b", name: "beta" }),
+    ];
+    const groups = groupProjectsByWorkspace(projects, []);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.workspaceId).toBe("__none__");
+    expect(groups[0]?.projects.map((p) => p.id)).toEqual(["a", "b"]);
+  });
+
+  test("groups by workspace_id and orders workspaces by name", () => {
+    const wsA = workspaceSummary({ id: "wsa", name: "Alpha workspace" });
+    const wsB = workspaceSummary({ id: "wsb", name: "Bravo workspace" });
+    const projects = [
+      projectSummary({ id: "1", name: "in-bravo", workspace_id: "wsb" }),
+      projectSummary({ id: "2", name: "in-alpha", workspace_id: "wsa" }),
+      projectSummary({ id: "3", name: "no-ws" }),
+    ];
+    const groups = groupProjectsByWorkspace(projects, [wsA, wsB]);
+    expect(groups.map((g) => g.workspaceName)).toEqual([
+      "Alpha workspace",
+      "Bravo workspace",
+      "Unworkspaced",
+    ]);
+  });
+
+  test("Unworkspaced group is always last", () => {
+    const ws = workspaceSummary({ id: "z", name: "Zulu" });
+    const groups = groupProjectsByWorkspace(
+      [
+        projectSummary({ id: "u", name: "u" }),
+        projectSummary({ id: "z", name: "z", workspace_id: "z" }),
+      ],
+      [ws],
+    );
+    const last = groups[groups.length - 1];
+    expect(last?.workspaceName).toBe("Unworkspaced");
+  });
+
+  test("projects within a group are sorted by friendly name", () => {
+    const ws = workspaceSummary({ id: "ws", name: "WS" });
+    const projects = [
+      projectSummary({ id: "1", name: "project-zebra", workspace_id: "ws" }),
+      projectSummary({ id: "2", name: "project-aardvark", workspace_id: "ws" }),
+    ];
+    const groups = groupProjectsByWorkspace(projects, [ws]);
+    expect(groups[0]?.projects.map((p) => p.name)).toEqual([
+      "project-aardvark",
+      "project-zebra",
+    ]);
+  });
+
+  test("project with workspace_id not in discovered list collapses into Unworkspaced", () => {
+    // Realistic cause: cache race where /api/projects ships ahead of
+    // /api/workspaces, or a stale workspace_id from before the user
+    // removed a workspace_root from config. Either way, surfacing an
+    // "Unknown workspace" group has no useful UI affordance — the
+    // project lands in Unworkspaced, which is recoverable.
+    const projects = [
+      projectSummary({ id: "x", name: "x", workspace_id: "ghost-ws" }),
+    ];
+    const groups = groupProjectsByWorkspace(projects, []);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.workspaceId).toBe("__none__");
+    expect(groups[0]?.workspaceName).toBe("Unworkspaced");
+    expect(groups[0]?.projects.map((p) => p.id)).toEqual(["x"]);
+  });
+});
+
+describe("swapProjectIdInPath", () => {
+  test("preserves sub-path", () => {
+    expect(swapProjectIdInPath("/p/A/board", "A", "B")).toBe("/p/B/board");
+  });
+
+  test("preserves deep nested path", () => {
+    expect(swapProjectIdInPath("/p/A/issues/KUI-1", "A", "B")).toBe(
+      "/p/B/issues/KUI-1",
+    );
+  });
+
+  test("handles bare project root", () => {
+    expect(swapProjectIdInPath("/p/A", "A", "B")).toBe("/p/B");
+  });
+
+  test("falls back to bare /p/{newId} when path doesn't match", () => {
+    expect(swapProjectIdInPath("/something-else", "A", "B")).toBe("/p/B");
+  });
+
+  test("doesn't replace substrings of other ids", () => {
+    // `/p/AB/x` shouldn't be touched by an A→C swap.
+    expect(swapProjectIdInPath("/p/AB/x", "A", "C")).toBe("/p/C");
+  });
+});
+
 describe("<ProjectSwitcher />", () => {
-  test("renders projects in a flat alphabetical list", async () => {
+  test("renders flat list when no workspaces are configured", async () => {
     server.use(
       http.get("/api/projects", () =>
         HttpResponse.json([
-          projectSummary({ id: "p1", name: "zebra" }),
-          projectSummary({ id: "p2", name: "alpha" }),
-          projectSummary({ id: "p3", name: "middle" }),
+          projectSummary({ id: "p1", name: "alpha", key_prefix: "ALP" }),
+          projectSummary({ id: "p2", name: "beta", key_prefix: "BET" }),
         ]),
       ),
     );
 
     renderWithProviders(
-      <ProjectSwitcher projectId="p2" currentLabel="alpha" />,
-      { initialPath: "/p/p2/board" },
+      <ProjectSwitcher projectId="p1" currentLabel="alpha" />,
+      { initialPath: "/p/p1/board" },
     );
 
     openDropdown(screen.getByRole("button", { name: /switch project/i }));
     await waitFor(() => {
-      expect(screen.getByRole("menuitem", { name: /alpha/ })).toBeInTheDocument();
+      expect(
+        screen.getByRole("menuitem", { name: /alpha/ }),
+      ).toBeInTheDocument();
     });
-    // No workspace headings — flat list only.
+    expect(screen.getByRole("menuitem", { name: /beta/ })).toBeInTheDocument();
+    // No workspace heading rendered when there's only one (Unworkspaced) group.
     expect(screen.queryByText(/Unworkspaced/i)).not.toBeInTheDocument();
-    // Order: alpha, middle, zebra (alphabetical, project- prefix stripped).
-    const items = screen.getAllByRole("menuitem").map((el) => el.textContent);
-    const projectItems = items.filter((t) =>
-      /alpha|middle|zebra/.test(t ?? ""),
+  });
+
+  test("groups projects under workspace headings", async () => {
+    server.use(
+      http.get("/api/projects", () =>
+        HttpResponse.json([
+          projectSummary({
+            id: "p1",
+            name: "kb-pivot",
+            key_prefix: "KBP",
+            workspace_id: "ws-seido",
+          }),
+          projectSummary({
+            id: "p2",
+            name: "graph-ui-v2",
+            key_prefix: "GUI",
+            workspace_id: "ws-seido",
+          }),
+          projectSummary({ id: "p3", name: "loose", key_prefix: "LSE" }),
+        ]),
+      ),
+      http.get("/api/workspaces", () =>
+        HttpResponse.json([
+          workspaceSummary({ id: "ws-seido", name: "Seido", slug: "seido" }),
+        ]),
+      ),
     );
-    expect(projectItems[0]).toMatch(/alpha/);
-    expect(projectItems[1]).toMatch(/middle/);
-    expect(projectItems[2]).toMatch(/zebra/);
+
+    renderWithProviders(
+      <ProjectSwitcher projectId="p1" currentLabel="kb-pivot" />,
+      { initialPath: "/p/p1" },
+    );
+
+    openDropdown(screen.getByRole("button", { name: /switch project/i }));
+    await waitFor(() => {
+      expect(screen.getByText("Seido")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Unworkspaced")).toBeInTheDocument();
+    // Scope to menu items so we don't double-match the trigger label.
+    expect(
+      screen.getByRole("menuitem", { name: /kb-pivot/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: /graph-ui-v2/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: /loose/ }),
+    ).toBeInTheDocument();
   });
 
   test("clicking a project navigates while preserving sub-path", async () => {
@@ -142,7 +268,7 @@ describe("<ProjectSwitcher />", () => {
     await waitFor(() => expect(observedPath).toBe("/p/p2/board"));
   });
 
-  test("renders project phase as the dropdown badge", async () => {
+  test("renders project phase as the dropdown badge (replaces issue key)", async () => {
     server.use(
       http.get("/api/projects", () =>
         HttpResponse.json([
@@ -163,6 +289,7 @@ describe("<ProjectSwitcher />", () => {
 
     openDropdown(screen.getByRole("button", { name: /switch project/i }));
     const item = await screen.findByRole("menuitem", { name: /alpha/ });
+    // The phase appears as the right-side badge.
     expect(item.textContent).toContain("executing");
     // The pre-v0.11 issue-key badge is gone.
     expect(item.textContent).not.toContain("ALP");
@@ -210,30 +337,5 @@ describe("<ProjectSwitcher />", () => {
     });
     fireEvent.click(screen.getByText(/open another project/i));
     await waitFor(() => expect(observedPath).toBe("/"));
-  });
-});
-
-describe("swapProjectIdInPath", () => {
-  test("preserves sub-path", () => {
-    expect(swapProjectIdInPath("/p/A/board", "A", "B")).toBe("/p/B/board");
-  });
-
-  test("preserves deep nested path", () => {
-    expect(swapProjectIdInPath("/p/A/issues/KUI-1", "A", "B")).toBe(
-      "/p/B/issues/KUI-1",
-    );
-  });
-
-  test("handles bare project root", () => {
-    expect(swapProjectIdInPath("/p/A", "A", "B")).toBe("/p/B");
-  });
-
-  test("falls back to bare /p/{newId} when path doesn't match", () => {
-    expect(swapProjectIdInPath("/something-else", "A", "B")).toBe("/p/B");
-  });
-
-  test("doesn't replace substrings of other ids", () => {
-    // `/p/AB/x` shouldn't be touched by an A→C swap.
-    expect(swapProjectIdInPath("/p/AB/x", "A", "C")).toBe("/p/C");
   });
 });

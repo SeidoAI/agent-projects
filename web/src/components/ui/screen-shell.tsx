@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import { NavLink, useParams } from "react-router-dom";
 
 import { ProjectSwitcher } from "@/components/ProjectSwitcher";
-import { useProject } from "@/lib/api/endpoints/project";
+import { useProject, useProjects } from "@/lib/api/endpoints/project";
+import { useWorkspaces } from "@/lib/api/endpoints/workspace";
 import { cn } from "@/lib/utils";
 
 // Build-time constant injected by vite.config.ts from pyproject.toml.
@@ -171,17 +172,33 @@ function Breadcrumbs({ projectId }: { projectId: string }) {
   // project.name with the "project-" prefix stripped, falling back
   // to the id while the project query is in flight.
   const project = useProject(projectId);
+  const projects = useProjects();
+  const workspaces = useWorkspaces();
   const rawName = project.data?.name?.trim();
   const label = rawName ? rawName.replace(/^project-/, "") : projectId;
+
+  // Resolve the workspace this project belongs to (if any). The
+  // ProjectDetail payload doesn't carry workspace_id; the
+  // ProjectSummary list does, and is already cached for the switcher.
+  const summary = projects.data?.find((p) => p.id === projectId);
+  const workspace = summary?.workspace_id
+    ? workspaces.data?.find((w) => w.id === summary.workspace_id)
+    : undefined;
+  const workspaceLabel = workspace?.name;
+
   return (
     <nav
       aria-label="Breadcrumb"
       className="flex items-center gap-2 font-sans text-[13px] text-(--color-ink-2)"
     >
-      <span className="text-(--color-ink-3)">Workspace</span>
-      <span aria-hidden className="text-(--color-edge)">
-        /
-      </span>
+      {workspaceLabel ? (
+        <>
+          <span className="text-(--color-ink-3)">{workspaceLabel}</span>
+          <span aria-hidden className="text-(--color-edge)">
+            /
+          </span>
+        </>
+      ) : null}
       <span className="font-medium text-(--color-ink)">{label}</span>
     </nav>
   );

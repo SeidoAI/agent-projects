@@ -153,13 +153,16 @@ def ui_cmd(
                 project_dirs.append(cwd_resolved)
 
         if not project_dirs:
+            # No projects found anywhere — still launch the UI so the
+            # user can see the empty state and take action (e.g. open
+            # another project from the picker route, or add a project
+            # root via `tripwire config add`). Killing the launch here
+            # would leave them with nothing actionable in the terminal.
             click.echo(
-                "No projects found.\n"
-                "Hint: run `tripwire init` in a project directory, or add paths\n"
-                "to ~/.tripwire/config.yaml under `project_roots`\n"
-                "(see `tripwire config --help`)."
+                "No projects discovered. Launching UI anyway —\n"
+                "use the picker or `tripwire config add project-root <path>`\n"
+                "to register one."
             )
-            sys.exit(1)
         pin = False
 
     # 4. Single-instance probe: if a tripwire UI is already on this port,

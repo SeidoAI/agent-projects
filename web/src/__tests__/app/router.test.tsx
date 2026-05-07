@@ -48,8 +48,9 @@ function renderRoute(path: string) {
 describe("Router", () => {
   it("renders ProjectShell with breadcrumb project id at /p/:projectId/board", () => {
     renderRoute("/p/proj-1/board");
-    // ScreenShell breadcrumb + project chip both render the project id
-    // ("Workspace / proj-1" + the chip in the side rail).
+    // ScreenShell breadcrumb + project chip both render the project id.
+    // Workspace prefix on the breadcrumb is omitted when the project has
+    // no workspace assignment (which is the case for this stub fixture).
     expect(screen.getAllByText("proj-1").length).toBeGreaterThan(0);
     // Board stub renders inside the outlet
     expect(screen.getByText("Board")).toBeDefined();
