@@ -225,9 +225,7 @@ class TestPinBehavior:
         assert result.exit_code == 0
         assert mock_start.call_args.kwargs["pin"] is True
 
-    def test_bare_ui_from_project_dir_does_not_pin(
-        self, tmp_path: Path, monkeypatch
-    ):
+    def test_bare_ui_from_project_dir_does_not_pin(self, tmp_path: Path, monkeypatch):
         proj = tmp_path / "proj"
         proj.mkdir()
         (proj / "project.yaml").write_text(
@@ -239,9 +237,7 @@ class TestPinBehavior:
         assert result.exit_code == 0
         assert mock_start.call_args.kwargs["pin"] is False
 
-    def test_bare_ui_from_subdir_does_not_pin(
-        self, tmp_path: Path, monkeypatch
-    ):
+    def test_bare_ui_from_subdir_does_not_pin(self, tmp_path: Path, monkeypatch):
         proj = tmp_path / "proj"
         (proj / "issues" / "KUI-1").mkdir(parents=True)
         (proj / "project.yaml").write_text(
@@ -355,12 +351,14 @@ class TestSingleInstanceProbe:
         (proj / "project.yaml").write_text(
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        with patch(
-            "tripwire.cli.ui._check_port",
-            return_value=("reuse", "http://127.0.0.1:8000"),
-        ), patch("tripwire.cli.ui.webbrowser.open") as mock_open, patch(
-            "tripwire.ui.server.start_server"
-        ) as mock_start:
+        with (
+            patch(
+                "tripwire.cli.ui._check_port",
+                return_value=("reuse", "http://127.0.0.1:8000"),
+            ),
+            patch("tripwire.cli.ui.webbrowser.open") as mock_open,
+            patch("tripwire.ui.server.start_server") as mock_start,
+        ):
             result = runner.invoke(cli, ["ui", "--project-dir", str(proj)])
         assert result.exit_code == 0
         assert "already running" in result.output
@@ -374,11 +372,13 @@ class TestSingleInstanceProbe:
         (proj / "project.yaml").write_text(
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        with patch(
-            "tripwire.cli.ui._check_port",
-            return_value=("reuse", "http://127.0.0.1:8000"),
-        ), patch("tripwire.cli.ui.webbrowser.open") as mock_open, patch(
-            "tripwire.ui.server.start_server"
+        with (
+            patch(
+                "tripwire.cli.ui._check_port",
+                return_value=("reuse", "http://127.0.0.1:8000"),
+            ),
+            patch("tripwire.cli.ui.webbrowser.open") as mock_open,
+            patch("tripwire.ui.server.start_server"),
         ):
             result = runner.invoke(
                 cli, ["ui", "--project-dir", str(proj), "--no-browser"]
@@ -392,10 +392,13 @@ class TestSingleInstanceProbe:
         (proj / "project.yaml").write_text(
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        with patch(
-            "tripwire.cli.ui._check_port",
-            return_value=("conflict", "http://127.0.0.1:8000"),
-        ), patch("tripwire.ui.server.start_server") as mock_start:
+        with (
+            patch(
+                "tripwire.cli.ui._check_port",
+                return_value=("conflict", "http://127.0.0.1:8000"),
+            ),
+            patch("tripwire.ui.server.start_server") as mock_start,
+        ):
             result = runner.invoke(cli, ["ui", "--project-dir", str(proj)])
         assert result.exit_code == 1
         assert "in use by another service" in result.output
@@ -407,10 +410,13 @@ class TestSingleInstanceProbe:
         (proj / "project.yaml").write_text(
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        with patch(
-            "tripwire.cli.ui._check_port",
-            return_value=("free", "http://127.0.0.1:8000"),
-        ), patch("tripwire.ui.server.start_server") as mock_start:
+        with (
+            patch(
+                "tripwire.cli.ui._check_port",
+                return_value=("free", "http://127.0.0.1:8000"),
+            ),
+            patch("tripwire.ui.server.start_server") as mock_start,
+        ):
             result = runner.invoke(cli, ["ui", "--project-dir", str(proj)])
         assert result.exit_code == 0
         mock_start.assert_called_once()
@@ -421,12 +427,11 @@ class TestSingleInstanceProbe:
         (proj / "project.yaml").write_text(
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        with patch("tripwire.cli.ui._check_port") as mock_probe, patch(
-            "tripwire.ui.server.start_server"
-        ) as mock_start:
-            result = runner.invoke(
-                cli, ["ui", "--project-dir", str(proj), "--dev"]
-            )
+        with (
+            patch("tripwire.cli.ui._check_port") as mock_probe,
+            patch("tripwire.ui.server.start_server") as mock_start,
+        ):
+            result = runner.invoke(cli, ["ui", "--project-dir", str(proj), "--dev"])
         assert result.exit_code == 0
         mock_probe.assert_not_called()
         mock_start.assert_called_once()

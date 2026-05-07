@@ -91,10 +91,7 @@ def _blocked_issues(issues: list[Issue]) -> list[str]:
     blocked: list[str] = []
     for issue in issues:
         for blocker in issue.blocked_by:
-            if (
-                id_to_status.get(blocker)
-                and id_to_status[blocker] != "completed"
-            ):
+            if id_to_status.get(blocker) and id_to_status[blocker] != "completed":
                 blocked.append(issue.id)
                 break
     return sorted(blocked)

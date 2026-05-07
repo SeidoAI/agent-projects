@@ -54,9 +54,7 @@ class TestDiscoverWorkspaces:
 
     def test_finds_workspace_at_depth_1(self, tmp_path: Path):
         ws_dir = _make_workspace(tmp_path / "ws-a")
-        results = discover_workspaces(
-            UserConfig(workspace_roots=[ws_dir.parent])
-        )
+        results = discover_workspaces(UserConfig(workspace_roots=[ws_dir.parent]))
         slugs = [s.slug for s in results]
         assert slugs == ["seido"]
         assert results[0].dir == str(ws_dir.resolve())
@@ -120,9 +118,7 @@ class TestDiscoverWorkspaces:
 
 
 class TestListAndGetDir:
-    def test_get_workspace_dir_returns_known(
-        self, tmp_path: Path, monkeypatch
-    ):
+    def test_get_workspace_dir_returns_known(self, tmp_path: Path, monkeypatch):
         ws_dir = _make_workspace(tmp_path / "ws")
         config = UserConfig(workspace_roots=[ws_dir])
         # Populate the index via discovery.
@@ -154,9 +150,7 @@ class TestGetWorkspaceIdForProject:
         from tripwire.ui.services import workspace_service as ws_svc
 
         monkeypatch.setattr(ws_svc, "load_user_config", lambda: cfg)
-        ws_id = get_workspace_id_for_project(
-            proj_dir, "../../workspaces/seido"
-        )
+        ws_id = get_workspace_id_for_project(proj_dir, "../../workspaces/seido")
         assert ws_id is not None
         assert len(ws_id) == 12  # blake2s-6 hex
 
@@ -168,9 +162,7 @@ class TestGetWorkspaceIdForProject:
         from tripwire.ui.services import workspace_service as ws_svc
 
         monkeypatch.setattr(ws_svc, "load_user_config", lambda: cfg)
-        from_pointer = get_workspace_id_for_project(
-            proj_dir, "../../workspaces/seido"
-        )
+        from_pointer = get_workspace_id_for_project(proj_dir, "../../workspaces/seido")
         from_discovery = discover_workspaces(cfg)[0].id
         assert from_pointer == from_discovery
 
@@ -207,7 +199,5 @@ class TestGetWorkspaceIdForProject:
         from tripwire.ui.services import workspace_service as ws_svc
 
         monkeypatch.setattr(ws_svc, "load_user_config", lambda: empty_cfg)
-        ws_id = get_workspace_id_for_project(
-            proj_dir, "../../elsewhere/seido"
-        )
+        ws_id = get_workspace_id_for_project(proj_dir, "../../elsewhere/seido")
         assert ws_id is None

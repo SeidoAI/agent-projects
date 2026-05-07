@@ -53,9 +53,7 @@ class LoadedEnum:
     name: str
     description: str | None
     values: tuple[EnumValue, ...]
-    source: (
-        str  # "project" if from <project>/templates/enums/, "default" if from packaged defaults
-    )
+    source: str  # "project" if from <project>/templates/enums/, "default" if from packaged defaults
 
     def value_ids(self) -> tuple[str, ...]:
         return tuple(v.id for v in self.values)

@@ -285,7 +285,9 @@ class TestProjectFileHandler:
             "p", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
         handler.on_any_event(FileModifiedEvent(str(project / ".git" / "HEAD")))
-        handler.on_any_event(FileModifiedEvent(str(project / "nodes" / "tripwire-graph-index.yaml")))
+        handler.on_any_event(
+            FileModifiedEvent(str(project / "nodes" / "tripwire-graph-index.yaml"))
+        )
         time.sleep(0.05)
         assert q.qsize() == 0
 

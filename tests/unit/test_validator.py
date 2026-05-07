@@ -626,9 +626,7 @@ class TestProjectReposRequired:
         write_project_yaml(tmp_path, repos={})
         report = validate_project(tmp_path)
         assert "project/repos_required" in codes(report)
-        finding = next(
-            f for f in report.errors if f.code == "project/repos_required"
-        )
+        finding = next(f for f in report.errors if f.code == "project/repos_required")
         assert finding.file == "project.yaml"
         assert finding.field == "repos"
         assert "project repo" in finding.message

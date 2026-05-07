@@ -130,11 +130,7 @@ def _count_nodes(project_dir: Path) -> int:
     nodes = project_dir / "nodes"
     if not nodes.is_dir():
         return 0
-    return sum(
-        1
-        for p in nodes.glob("*.yaml")
-        if p.name != GRAPH_INDEX_FILENAME
-    )
+    return sum(1 for p in nodes.glob("*.yaml") if p.name != GRAPH_INDEX_FILENAME)
 
 
 def _count_sessions(project_dir: Path) -> int:
@@ -197,9 +193,7 @@ def _try_load_summary(abs_dir: Path) -> ProjectSummary | None:
         try:
             workspace_id = get_workspace_id_for_project(abs_dir, config.workspace.path)
         except Exception as exc:  # pragma: no cover — defensive
-            logger.warning(
-                "Could not resolve workspace for %s: %s", abs_dir, exc
-            )
+            logger.warning("Could not resolve workspace for %s: %s", abs_dir, exc)
 
     return ProjectSummary(
         id=_project_id(abs_dir),
@@ -482,9 +476,7 @@ def get_project(project_id: str) -> ProjectDetail:
                 project_dir, config.workspace.path
             )
         except Exception as exc:  # pragma: no cover — defensive
-            logger.warning(
-                "Could not resolve workspace for %s: %s", project_dir, exc
-            )
+            logger.warning("Could not resolve workspace for %s: %s", project_dir, exc)
 
     return ProjectDetail(
         id=_project_id(project_dir),

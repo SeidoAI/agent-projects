@@ -90,10 +90,7 @@ def _collect_agenda(
     blocked_ids: set[str] = set()
     for issue in issues:
         for blocker in issue.blocked_by:
-            if (
-                id_to_status.get(blocker)
-                and id_to_status[blocker] != "completed"
-            ):
+            if id_to_status.get(blocker) and id_to_status[blocker] != "completed":
                 blocked_ids.add(issue.id)
                 break
 

@@ -53,7 +53,13 @@ class SessionLoadError(ValueError):
 # can raise :class:`LegacySessionStatusError` and point the user at
 # ``tripwire migrate status-values``.
 _LEGACY_SESSION_STATUSES: frozenset[str] = frozenset(
-    {"active", "waiting_for_ci", "waiting_for_review", "waiting_for_deploy", "re_engaged"}
+    {
+        "active",
+        "waiting_for_ci",
+        "waiting_for_review",
+        "waiting_for_deploy",
+        "re_engaged",
+    }
 )
 
 

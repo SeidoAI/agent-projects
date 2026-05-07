@@ -306,9 +306,7 @@ class TestIncrementalUpdate:
         cache = load_index(tmp_path)
         assert cache is not None
         ref_targets = {
-            e.to_id
-            for e in cache.edges
-            if e.type == "refs" and e.from_id == "TST-1"
+            e.to_id for e in cache.edges if e.type == "refs" and e.from_id == "TST-1"
         }
         assert ref_targets == {"node-b"}
 
@@ -415,9 +413,7 @@ class TestEnsureFresh:
         cache = load_index(tmp_path)
         assert cache is not None
         ref_targets = {
-            e.to_id
-            for e in cache.edges
-            if e.from_id == "TST-1" and e.type == "refs"
+            e.to_id for e in cache.edges if e.from_id == "TST-1" and e.type == "refs"
         }
         assert ref_targets == {"other-model"}
 

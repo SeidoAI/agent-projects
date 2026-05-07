@@ -344,7 +344,9 @@ class TestDiscoverProjects:
         augmentation case in `tripwire ui` doesn't leave the picker
         dropdown showing a stale list for the 60s TTL.
         """
-        existing = _make_project(tmp_path / "existing", name="existing", key_prefix="EXI")
+        existing = _make_project(
+            tmp_path / "existing", name="existing", key_prefix="EXI"
+        )
         latecomer = _make_project(tmp_path / "latecomer", name="late", key_prefix="LAT")
 
         # Pre-warm the cache via a config that only sees the existing project.

@@ -53,14 +53,14 @@ JINJA_RENDERED_SUBDIRS: tuple[str, ...] = (PROJECT_TEMPLATE_SUBDIR,)
 #
 # Keep destinations in sync with ``core/paths.py``'s ``*_DIR`` constants.
 VERBATIM_TEMPLATE_MAPPINGS: tuple[tuple[str, str], ...] = (
-    ("enums", paths.ENUMS_DIR),                       # templates/enums
-    ("issue_templates", paths.ISSUE_TEMPLATES_DIR),   # templates/issues
+    ("enums", paths.ENUMS_DIR),  # templates/enums
+    ("issue_templates", paths.ISSUE_TEMPLATES_DIR),  # templates/issues
     ("comment_templates", paths.COMMENT_TEMPLATES_DIR),  # templates/comments
-    ("artifacts", paths.TEMPLATES_ARTIFACTS_DIR),     # templates/artifacts
-    ("scoping-artifacts", paths.PLANS_ARTIFACTS_DIR), # plans/artifacts
-    ("agent_templates", paths.AGENTS_DIR),            # templates/agents
+    ("artifacts", paths.TEMPLATES_ARTIFACTS_DIR),  # templates/artifacts
+    ("scoping-artifacts", paths.PLANS_ARTIFACTS_DIR),  # plans/artifacts
+    ("agent_templates", paths.AGENTS_DIR),  # templates/agents
     ("session_templates", paths.SESSION_TEMPLATES_DIR),  # templates/sessions
-    ("orchestration", paths.ORCHESTRATION_DIR),       # templates/orchestration
+    ("orchestration", paths.ORCHESTRATION_DIR),  # templates/orchestration
     ("skills", ".claude/skills"),
     ("commands", ".claude/commands"),
 )

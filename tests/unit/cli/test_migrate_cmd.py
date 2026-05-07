@@ -16,8 +16,7 @@ def _make_legacy_project(root: Path) -> Path:
     """Build a pre-v0.10.0 flat-layout project at *root*."""
     root.mkdir(parents=True, exist_ok=True)
     (root / "project.yaml").write_text(
-        "name: legacy\nkey_prefix: LEG\n"
-        "next_issue_number: 1\nnext_session_number: 1\n",
+        "name: legacy\nkey_prefix: LEG\nnext_issue_number: 1\nnext_session_number: 1\n",
         encoding="utf-8",
     )
     for d in (
@@ -40,9 +39,7 @@ def _git_init(project: Path) -> None:
         cwd=project,
         check=True,
     )
-    subprocess.run(
-        ["git", "config", "user.name", "Test"], cwd=project, check=True
-    )
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=project, check=True)
     subprocess.run(["git", "add", "."], cwd=project, check=True)
     subprocess.run(
         ["git", "commit", "-q", "-m", "initial flat layout"],

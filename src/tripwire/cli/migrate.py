@@ -38,12 +38,12 @@ from tripwire.core.parser import (
 # (defined as constants on ``core/paths.py``); the legacy source names
 # are inlined here because this command is the only consumer.
 _TEMPLATE_RENAMES: tuple[tuple[str, str], ...] = (
-    ("agents", paths.AGENTS_DIR),                       # → templates/agents
-    ("enums", paths.ENUMS_DIR),                          # → templates/enums
-    ("issue_templates", paths.ISSUE_TEMPLATES_DIR),     # → templates/issues
-    ("session_templates", paths.SESSION_TEMPLATES_DIR), # → templates/sessions
-    ("comment_templates", paths.COMMENT_TEMPLATES_DIR), # → templates/comments
-    ("orchestration", paths.ORCHESTRATION_DIR),         # → templates/orchestration
+    ("agents", paths.AGENTS_DIR),  # → templates/agents
+    ("enums", paths.ENUMS_DIR),  # → templates/enums
+    ("issue_templates", paths.ISSUE_TEMPLATES_DIR),  # → templates/issues
+    ("session_templates", paths.SESSION_TEMPLATES_DIR),  # → templates/sessions
+    ("comment_templates", paths.COMMENT_TEMPLATES_DIR),  # → templates/comments
+    ("orchestration", paths.ORCHESTRATION_DIR),  # → templates/orchestration
 )
 
 
@@ -99,7 +99,9 @@ def migrate_templates_cmd(project_dir: Path, dry_run: bool) -> None:
         dest = project_dir / dest_rel
 
         if not src.exists():
-            skipped.append(f"{src_rel} (not present — already migrated or never created)")
+            skipped.append(
+                f"{src_rel} (not present — already migrated or never created)"
+            )
             continue
 
         if dest.exists():
@@ -220,7 +222,9 @@ def migrate_graph_cmd(project_dir: Path, dry_run: bool) -> None:
         dest = project_dir / dest_rel
 
         if not src.exists():
-            skipped.append(f"{src_rel} (not present — already migrated or never created)")
+            skipped.append(
+                f"{src_rel} (not present — already migrated or never created)"
+            )
             continue
 
         if dest.exists():
@@ -451,9 +455,7 @@ def _rewrite_status_in_place(
         return True, status, canonical
 
     frontmatter["status"] = canonical
-    path.write_text(
-        serialize_frontmatter_body(frontmatter, body), encoding="utf-8"
-    )
+    path.write_text(serialize_frontmatter_body(frontmatter, body), encoding="utf-8")
     return True, status, canonical
 
 
@@ -535,8 +537,7 @@ def migrate_status_values_cmd(project_dir: Path, dry_run: bool) -> None:
 
     if not rewritten:
         click.echo(
-            f"All {scanned} file(s) already on canonical statuses — "
-            "nothing to migrate."
+            f"All {scanned} file(s) already on canonical statuses — nothing to migrate."
         )
         return
 

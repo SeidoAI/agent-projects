@@ -55,9 +55,7 @@ def _workspace_id(abs_dir: Path) -> str:
     Mirrors ``_project_id`` so the front-end can treat workspace + project
     ids interchangeably as opaque strings.
     """
-    return hashlib.blake2s(
-        f"workspace:{abs_dir}".encode(), digest_size=6
-    ).hexdigest()
+    return hashlib.blake2s(f"workspace:{abs_dir}".encode(), digest_size=6).hexdigest()
 
 
 def _try_load_workspace_summary(abs_dir: Path) -> WorkspaceSummary | None:

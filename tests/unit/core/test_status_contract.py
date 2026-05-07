@@ -77,8 +77,12 @@ def test_paused_failed_abandoned_are_permissive() -> None:
 
 
 def test_compatibility_canonical_pairs() -> None:
-    assert is_issue_state_compatible_with_session_state("executing", "executing") is True
-    assert is_issue_state_compatible_with_session_state("completed", "completed") is True
+    assert (
+        is_issue_state_compatible_with_session_state("executing", "executing") is True
+    )
+    assert (
+        is_issue_state_compatible_with_session_state("completed", "completed") is True
+    )
     assert is_issue_state_compatible_with_session_state("planned", "planned") is True
 
 

@@ -50,9 +50,7 @@ class TestListWorkspacesRoute:
         assert r.status_code == 200
         assert r.json() == []
 
-    def test_returns_discovered_workspaces(
-        self, tmp_path: Path, monkeypatch
-    ):
+    def test_returns_discovered_workspaces(self, tmp_path: Path, monkeypatch):
         _make_workspace(tmp_path / "ws-a", slug="alpha", name="Alpha")
         _make_workspace(tmp_path / "ws-b", slug="beta", name="Beta")
         config = UserConfig(workspace_roots=[tmp_path])
@@ -64,13 +62,9 @@ class TestListWorkspacesRoute:
         assert {w["slug"] for w in data} == {"alpha", "beta"}
         # Each summary carries the fields the UI needs to render groups.
         for w in data:
-            assert {"id", "name", "slug", "dir", "project_slugs"}.issubset(
-                w.keys()
-            )
+            assert {"id", "name", "slug", "dir", "project_slugs"}.issubset(w.keys())
 
-    def test_summary_dirs_are_resolved_paths(
-        self, tmp_path: Path, monkeypatch
-    ):
+    def test_summary_dirs_are_resolved_paths(self, tmp_path: Path, monkeypatch):
         ws = _make_workspace(tmp_path / "ws", slug="x", name="X")
         config = UserConfig(workspace_roots=[tmp_path])
         monkeypatch.setattr(_ws_svc, "load_user_config", lambda: config)

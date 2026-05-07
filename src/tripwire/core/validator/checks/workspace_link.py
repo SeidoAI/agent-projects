@@ -46,9 +46,7 @@ def check_workspace_link(ctx: ValidationContext) -> list[CheckResult]:
                 severity="error",
                 file="project.yaml",
                 field="workspace.path",
-                message=(
-                    f"workspace.path={pointer!r} could not be resolved: {exc}"
-                ),
+                message=(f"workspace.path={pointer!r} could not be resolved: {exc}"),
                 fix_hint=(
                     "Update project.yaml.workspace.path to a real workspace "
                     "directory, or remove the pointer to mark the project "

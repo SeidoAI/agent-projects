@@ -245,7 +245,9 @@ def test_over_cap_truncates_to_max_chars():
         PrSummary(
             base_sha="aaaaaaa",
             head_sha="bbbbbbb",
-            issues=IssuesSection(changes=[IssueStatusChange(huge_id, "queued", "done")]),
+            issues=IssuesSection(
+                changes=[IssueStatusChange(huge_id, "queued", "done")]
+            ),
         )
     )
     assert len(out) <= MAX_CHARS

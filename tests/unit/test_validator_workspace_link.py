@@ -107,16 +107,12 @@ def test_workspace_does_not_list_back_reference(
     assert "list this project" in findings[0].message
 
 
-def test_happy_path_relative_back_reference(
-    project_dir: Path, tmp_path: Path
-) -> None:
+def test_happy_path_relative_back_reference(project_dir: Path, tmp_path: Path) -> None:
     ws = tmp_path / "ws-y"
     _save_workspace(
         ws,
         slug="wsy",
-        projects=[
-            WorkspaceProjectEntry(slug="alp", name="alpha", path="../alpha")
-        ],
+        projects=[WorkspaceProjectEntry(slug="alp", name="alpha", path="../alpha")],
     )
     ctx = ValidationContext(
         project_dir=project_dir,
@@ -125,9 +121,7 @@ def test_happy_path_relative_back_reference(
     assert check_workspace_link(ctx) == []
 
 
-def test_happy_path_absolute_back_reference(
-    project_dir: Path, tmp_path: Path
-) -> None:
+def test_happy_path_absolute_back_reference(project_dir: Path, tmp_path: Path) -> None:
     ws = tmp_path / "ws-z"
     _save_workspace(
         ws,
@@ -172,7 +166,9 @@ def test_check_is_registered_in_all_checks() -> None:
     assert WORKSPACE_CHECKS == [check_workspace_link]
 
 
-def test_pointer_object_form_pydantic_construct(project_dir: Path, tmp_path: Path) -> None:
+def test_pointer_object_form_pydantic_construct(
+    project_dir: Path, tmp_path: Path
+) -> None:
     """Sanity: ProjectConfig.workspace accepts the v0.6b object form."""
     ws = tmp_path / "ws-q"
     _save_workspace(
