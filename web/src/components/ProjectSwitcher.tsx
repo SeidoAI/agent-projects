@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Stamp } from "@/components/ui/stamp";
 import { type ProjectSummary, useProjects } from "@/lib/api/endpoints/project";
 import {
   type WorkspaceSummary,
@@ -137,9 +138,7 @@ function SwitcherGroup({
           <span className="truncate text-(--color-ink)">
             {p.name.replace(/^project-/, "")}
           </span>
-          <span className="text-[10px] uppercase tracking-[0.12em] text-(--color-ink-3)">
-            {p.phase}
-          </span>
+          {p.phase ? <Stamp tone="rule">{p.phase}</Stamp> : null}
         </DropdownMenuItem>
       ))}
     </>
