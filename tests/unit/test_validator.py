@@ -75,6 +75,9 @@ def write_project_yaml(project_dir: Path, **overrides: Any) -> None:
         "next_issue_number": 1,
         "next_session_number": 1,
         "repos": {
+            # PT-repo entry — slug ends with '/test' (matches project.name)
+            # so the v0.10.0 `project/repos_required` check passes by default.
+            "SeidoAI/test": {"local": None},
             "SeidoAI/web-app-backend": {"local": None},
             "SeidoAI/web-app-infrastructure": {"local": None},
         },
@@ -628,11 +631,38 @@ class TestProjectReposRequired:
         )
         assert finding.file == "project.yaml"
         assert finding.field == "repos"
-        assert "v0.10.0+" in finding.message
+        assert "project repo" in finding.message
 
-    def test_populated_repos_passes(self, tmp_path: Path) -> None:
-        # write_project_yaml's default already includes two repos.
+    def test_populated_with_pt_repo_passes(self, tmp_path: Path) -> None:
+        # write_project_yaml's default includes `SeidoAI/test` whose
+        # slug ends with `/test` (the project's name).
         write_project_yaml(tmp_path)
+        report = validate_project(tmp_path)
+        assert "project/repos_required" not in codes(report)
+
+    def test_only_code_repos_errors(self, tmp_path: Path) -> None:
+        # Code-output repos are not enough — the project still needs
+        # an entry that identifies its own meta-repo.
+        write_project_yaml(
+            tmp_path,
+            repos={
+                "SeidoAI/web-app-backend": {"local": None},
+                "SeidoAI/web-app-frontend": {"local": None},
+            },
+        )
+        report = validate_project(tmp_path)
+        assert "project/repos_required" in codes(report)
+
+    def test_pt_repo_matched_by_local_path_passes(self, tmp_path: Path) -> None:
+        # Slug doesn't end with the project name but `local` matches
+        # the project dir — this is the second arm of the predicate
+        # (mirrors ProjectDashboard.tsx::isPtRepo).
+        write_project_yaml(
+            tmp_path,
+            repos={
+                "some-org/some-other-name": {"local": str(tmp_path)},
+            },
+        )
         report = validate_project(tmp_path)
         assert "project/repos_required" not in codes(report)
 

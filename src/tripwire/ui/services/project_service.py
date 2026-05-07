@@ -45,7 +45,15 @@ _FALLBACK_ROOTS: tuple[str, ...] = ("Code", "code", "dev", "projects")
 
 
 class ProjectSummary(BaseModel):
-    """Lightweight project descriptor returned by discovery."""
+    """Lightweight project descriptor returned by discovery.
+
+    Both valid and invalid projects appear in this list — silently
+    skipping a project whose ``project.yaml`` failed to load would
+    leave the user with no way to discover the breakage from the UI.
+    Invalid entries set ``valid=False`` and carry the error message in
+    ``load_error``; their numeric/enum fields fall back to safe defaults
+    (``phase=""``, counts=0).
+    """
 
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
@@ -61,6 +69,12 @@ class ProjectSummary(BaseModel):
     # ``None`` if the project's ``project.yaml`` has no ``workspace.path``
     # pointer, or that pointer doesn't resolve to a known workspace).
     workspace_id: str | None = None
+    # v0.10.0 — false when the project's ``project.yaml`` failed to load
+    # (schema mismatch, parse error, etc.). The UI surfaces these as
+    # `[INVALID]` rows so the user can SEE the breakage instead of having
+    # the project silently disappear from the dropdown.
+    valid: bool = True
+    load_error: str | None = None
 
 
 class ProjectDetail(ProjectSummary):
@@ -130,18 +144,49 @@ def _count_sessions(project_dir: Path) -> int:
     return sum(1 for p in sessions.iterdir() if p.is_dir())
 
 
+def _invalid_summary(abs_dir: Path, error: Exception) -> ProjectSummary:
+    """Build an `[INVALID]` placeholder summary for a project that
+    couldn't be loaded.
+
+    The directory still gets surfaced so the user can see the breakage
+    in the UI dropdown and act on it (run a migration, fix the
+    project.yaml by hand, etc.). Numeric fields default to 0; the
+    friendly name is the directory basename so the row is identifiable.
+    """
+    return ProjectSummary(
+        id=_project_id(abs_dir),
+        name=abs_dir.name,
+        key_prefix="",
+        dir=str(abs_dir),
+        phase="",
+        issue_count=0,
+        node_count=0,
+        session_count=0,
+        workspace_id=None,
+        valid=False,
+        load_error=str(error),
+    )
+
+
 def _try_load_summary(abs_dir: Path) -> ProjectSummary | None:
     """Attempt to load a project summary from *abs_dir*.
 
-    Returns ``None`` and logs a warning on any failure.
+    Returns an invalid-flagged summary (with ``valid=False`` and
+    ``load_error`` populated) when ``project.yaml`` fails to parse or
+    validate, so the UI can surface the breakage instead of the
+    project silently disappearing. Returns ``None`` only when there's
+    no ``project.yaml`` at all (i.e. this dir isn't a tripwire project).
     """
     from tripwire.core.store import load_project
+
+    if not (abs_dir / "project.yaml").is_file():
+        return None
 
     try:
         config = load_project(abs_dir)
     except Exception as exc:
-        logger.warning("Skipping %s: %s", abs_dir, exc)
-        return None
+        logger.warning("Surfacing invalid project at %s: %s", abs_dir, exc)
+        return _invalid_summary(abs_dir, exc)
 
     workspace_id: str | None = None
     if config.workspace and config.workspace.path:

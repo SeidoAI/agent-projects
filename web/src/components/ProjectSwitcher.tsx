@@ -128,19 +128,37 @@ function SwitcherGroup({
           {group.workspaceName}
         </DropdownMenuLabel>
       ) : null}
-      {group.projects.map((p) => (
-        <DropdownMenuItem
-          key={p.id}
-          onSelect={() => onSelect(p.id)}
-          className="flex items-center justify-between gap-3"
-          data-active={p.id === currentProjectId ? "true" : undefined}
-        >
-          <span className="truncate text-(--color-ink)">
-            {p.name.replace(/^project-/, "")}
-          </span>
-          {p.phase ? <Stamp tone={phaseTone(p.phase)}>{p.phase}</Stamp> : null}
-        </DropdownMenuItem>
-      ))}
+      {group.projects.map((p) => {
+        const invalid = p.valid === false;
+        return (
+          <DropdownMenuItem
+            key={p.id}
+            // Disable navigation for invalid projects — the project's
+            // route would 500 on load. Still render the row so the
+            // user sees the entry + error reason.
+            disabled={invalid}
+            onSelect={invalid ? undefined : () => onSelect(p.id)}
+            className="flex items-center justify-between gap-3"
+            data-active={p.id === currentProjectId ? "true" : undefined}
+            title={invalid ? (p.load_error ?? undefined) : undefined}
+          >
+            <span
+              className={
+                invalid
+                  ? "truncate text-(--color-ink-3)"
+                  : "truncate text-(--color-ink)"
+              }
+            >
+              {p.name.replace(/^project-/, "")}
+            </span>
+            {invalid ? (
+              <Stamp tone="rule">INVALID</Stamp>
+            ) : p.phase ? (
+              <Stamp tone={phaseTone(p.phase)}>{p.phase}</Stamp>
+            ) : null}
+          </DropdownMenuItem>
+        );
+      })}
     </>
   );
 }

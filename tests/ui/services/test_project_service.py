@@ -154,6 +154,60 @@ class TestDiscoverProjects:
 
         assert len(result) == 1
 
+    def test_surfaces_invalid_project_with_load_error(self, tmp_path: Path):
+        """A project.yaml that fails Pydantic validation must still
+        appear in the discovery list, flagged ``valid=False`` with a
+        ``load_error`` message — silently skipping leaves the user
+        with no UI signal that the project is broken.
+        """
+        root = tmp_path / "projects"
+        # Hand-write a project.yaml that violates schema (extra_forbidden).
+        proj = root / "broken-project"
+        proj.mkdir(parents=True)
+        (proj / "project.yaml").write_text(
+            "name: broken\n"
+            "key_prefix: BRK\n"
+            "next_issue_number: 1\n"
+            "next_session_number: 1\n"
+            "tripwires:\n"  # legacy v0.7.4 field — rejected post-rename
+            "  enabled: true\n",
+            encoding="utf-8",
+        )
+
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
+            mock_path_cls.cwd.return_value = tmp_path / "empty"
+            mock_path_cls.home.return_value = tmp_path / "fakehome"
+            mock_path_cls.side_effect = Path
+            result = discover_projects(UserConfig(project_roots=[root]))
+
+        assert len(result) == 1
+        summary = result[0]
+        assert summary.valid is False
+        assert summary.load_error is not None
+        assert "tripwires" in summary.load_error
+        # Friendly fallback fields when load fails:
+        assert summary.name == "broken-project"
+        assert summary.key_prefix == ""
+        assert summary.phase == ""
+        assert summary.workspace_id is None
+
+    def test_skips_dirs_without_project_yaml(self, tmp_path: Path):
+        """Plain directories without project.yaml are not tripwire
+        projects — they're skipped silently (this is different from
+        a malformed project.yaml, which is surfaced)."""
+        root = tmp_path / "projects"
+        bare = root / "not-a-project"
+        bare.mkdir(parents=True)
+        # No project.yaml.
+
+        with patch("tripwire.ui.services.project_service.Path") as mock_path_cls:
+            mock_path_cls.cwd.return_value = tmp_path / "empty"
+            mock_path_cls.home.return_value = tmp_path / "fakehome"
+            mock_path_cls.side_effect = Path
+            result = discover_projects(UserConfig(project_roots=[root]))
+
+        assert result == []
+
     def test_deduplicates_worktree_copies_by_project_identity(self, tmp_path: Path):
         root = tmp_path / "projects"
         canonical = _make_project(
@@ -203,9 +257,11 @@ class TestDiscoverProjects:
         assert len(result) == 1
         assert Path(result[0].dir) == worktree.resolve()
 
-    def test_unreadable_project_yaml_skipped(
+    def test_unreadable_project_yaml_surfaced_as_invalid(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ):
+        """Even YAML parse errors get surfaced — silently dropping
+        projects whose YAML is broken hides problems from the user."""
         proj = tmp_path / "bad"
         proj.mkdir()
         (proj / "project.yaml").write_text("not: valid: yaml: [", encoding="utf-8")
@@ -220,8 +276,11 @@ class TestDiscoverProjects:
                 cfg = UserConfig(project_roots=[tmp_path])
                 result = discover_projects(cfg)
 
-        assert len(result) == 0
-        assert "Skipping" in caplog.text
+        assert len(result) == 1
+        assert result[0].valid is False
+        assert result[0].load_error is not None
+        assert result[0].name == "bad"
+        assert "Surfacing invalid" in caplog.text
 
     def test_deterministic_ids(self, tmp_path: Path):
         proj = _make_project(tmp_path / "proj")

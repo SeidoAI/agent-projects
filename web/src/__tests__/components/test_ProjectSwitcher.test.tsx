@@ -309,6 +309,36 @@ describe("<ProjectSwitcher />", () => {
     });
   });
 
+  test("renders [INVALID] stamp for projects with valid=false", async () => {
+    server.use(
+      http.get("/api/projects", () =>
+        HttpResponse.json([
+          projectSummary({ id: "p1", name: "alpha", phase: "executing" }),
+          {
+            ...projectSummary({ id: "p2", name: "broken-project" }),
+            valid: false,
+            load_error: "Pydantic: extra_forbidden tripwires",
+          },
+        ]),
+      ),
+    );
+
+    renderWithProviders(
+      <ProjectSwitcher projectId="p1" currentLabel="alpha" />,
+      { initialPath: "/p/p1/board" },
+    );
+
+    openDropdown(screen.getByRole("button", { name: /switch project/i }));
+    const invalid = await screen.findByRole("menuitem", {
+      name: /broken-project/,
+    });
+    expect(invalid.textContent).toContain("INVALID");
+    // Disabled-state Radix attribute prevents navigation.
+    expect(invalid.getAttribute("data-disabled")).toBe("");
+    // Tooltip carries the load_error so the user can see what's wrong.
+    expect(invalid.getAttribute("title")).toContain("extra_forbidden");
+  });
+
   test("Open another project link navigates to picker", async () => {
     server.use(
       http.get("/api/projects", () =>

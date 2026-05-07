@@ -27,6 +27,16 @@ export interface ProjectSummary {
    * headings.
    */
   workspace_id?: string | null;
+  /**
+   * v0.10.0 — `false` when project.yaml failed to load (schema
+   * mismatch, parse error). Defaults to `true` for callers that
+   * predate the field. Invalid projects are surfaced in the dropdown
+   * with an `[INVALID]` stamp + the load_error tooltip and disabled
+   * navigation, so the user can SEE the breakage instead of having
+   * the project silently disappear from discovery.
+   */
+  valid?: boolean;
+  load_error?: string | null;
 }
 
 /** Narrow view of `ProjectDetail` — extend as the UI needs more fields. */

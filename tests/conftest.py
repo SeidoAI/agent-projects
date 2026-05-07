@@ -48,9 +48,15 @@ def tmp_path_project(tmp_path: Path) -> Path:
                     "abandoned": ["planned"],
                     "deferred": ["planned", "queued", "abandoned"],
                 },
-                # v0.10.0+ requires at least one repo. Stable owner/name
-                # so tests that match against repo URLs can rely on it.
-                "repos": {"SeidoAI/web-app-backend": {"local": None}},
+                # v0.10.0+ requires the project's own meta-repo (PT
+                # repo) to appear in `repos:` — slug must end with
+                # '/<project.name>' or `local` must equal the project
+                # dir. Slug-suffix is the easier match here since the
+                # tmp_path is unstable.
+                "repos": {
+                    "SeidoAI/tmp": {"local": None},
+                    "SeidoAI/web-app-backend": {"local": None},
+                },
             }
         )
     )

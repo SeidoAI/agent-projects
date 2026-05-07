@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import ValidationError
 
 from tripwire.core import paths
@@ -159,17 +161,44 @@ def check_status_transitions(ctx: ValidationContext) -> list[CheckResult]:
 
 
 def check_project_repos_present(ctx: ValidationContext) -> list[CheckResult]:
-    """``project.yaml.repos`` must declare at least one repo (v0.10.0+).
+    """``project.yaml.repos`` must declare the project's own meta-repo
+    (the "PT repo") as at least one entry (v0.10.0+).
 
-    Empty / missing ``repos:`` blocks are blocked at validate-time rather
-    than at schema-load time so projects that *load* but happen to have
-    no repos surface as a structured finding instead of crashing the
-    whole validator with a Pydantic exception.
+    The dashboard distinguishes the PT repo (slug ending in
+    ``/<project.name>`` OR with ``local`` matching the project dir)
+    from generic code-output repos. Without a PT-repo entry the
+    "project repo · …" affordance can't render. Mirror the JS predicate
+    in ``web/src/features/dashboard/ProjectDashboard.tsx::isPtRepo``
+    so the two surfaces agree.
+
+    Validate-time check (not schema-time) — projects that load but
+    lack a PT repo surface as a structured finding instead of
+    crashing the whole validator with a Pydantic exception.
     """
-    if ctx.project_config is None:
+    config = ctx.project_config
+    if config is None:
         return []
-    if ctx.project_config.repos:
-        return []
+    project_dir = ctx.project_dir.resolve()
+    name = config.name
+    repos = config.repos or {}
+
+    for slug, entry in repos.items():
+        # Match by local-path equality (entry.local == project.dir)
+        # OR by slug suffix (slug.endswith('/' + name)). Either is
+        # enough, mirroring the dashboard's `isPtRepo` predicate.
+        local = entry.local if entry is not None else None
+        if local is not None:
+            try:
+                if Path(local).expanduser().resolve() == project_dir:
+                    return []
+            except OSError:
+                # An unresolvable path doesn't match — fall through
+                # to the slug-suffix test. A separate check could
+                # surface the dangling path; out of scope here.
+                pass
+        if slug.endswith("/" + name):
+            return []
+
     return [
         CheckResult(
             code="project/repos_required",
@@ -177,15 +206,17 @@ def check_project_repos_present(ctx: ValidationContext) -> list[CheckResult]:
             file=paths.PROJECT_CONFIG,
             field="repos",
             message=(
-                "project.yaml has no repos: block — at least one repo is "
-                "required for v0.10.0+."
+                f"project.yaml.repos has no entry for the project's own "
+                f"repo (slug ending in /{name}, or local matching the "
+                "project dir); the v0.10.0 dashboard can't render the "
+                "'project repo' affordance without it."
             ),
             fix_hint=(
-                "Add a `repos:` block keyed by `<owner>/<name>` with a "
-                "`local:` path:\n"
-                "  repos:\n"
-                "    <owner>/<name>:\n"
-                "      local: <path>"
+                "Add an entry to project.yaml.repos that identifies the "
+                "project's own meta-repo:\n"
+                f"  repos:\n"
+                f"    SeidoAI/project-{name}:\n"
+                f"      local: <project-dir>"
             ),
         )
     ]
