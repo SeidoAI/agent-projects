@@ -40,14 +40,18 @@ Schemas: PM skill's `SCHEMA_ARTIFACTS.md` and `SCHEMA_NODES.md`.
 
 ## Validation gate
 
-Before committing any project-repo changes:
+v0.12: **`tripwire session transition` is the validate gate.** It runs
+`tripwire validate` post-state-write atomically and rolls back on any
+error — you don't run validate yourself as a separate exit-protocol
+step. Just transition; if it fails, the cited errors tell you exactly
+what to fix, and the session stays at the old status until you do.
 
-```bash
-tripwire validate
-```
-
-Fix every error. Re-run until exit 0. Separate from the target repo's
-own test suite; both must pass.
+If validate fires errors whose `owned_by` is `pm` (look for "PM action —"
+in the fix-hint), do NOT try to author the named files yourself —
+they're PM-owned artifacts. Send a `stuck` message describing the
+state; the PM will pick it up. Earlier tripwire releases shipped this
+trap (the `pm_response/missing_file` agent-trap from v0.11.0); the
+fix-hints since v0.12 self-identify the actor.
 
 ## Workflow: picking up an issue
 
@@ -117,10 +121,10 @@ own test suite; both must pass.
 
 19. Walk `verification-checklist.md` to ✓ or ✗ on every item; fix
     and re-run on any ✗.
-20. `tripwire validate` — exit 0.
-21. Target-repo checks: `make lint`, `make test`, plus any
-    build/Docker/package-specific.
-22. `tripwire refs check` — no dangling or stale refs in anything
+20. Target-repo checks: `make lint`, `make test`, plus any
+    build/Docker/package-specific. (Project-side validate is the
+    `tripwire session transition` gate — see Phase 6.)
+21. `tripwire refs check` — no dangling or stale refs in anything
     you wrote.
 
 ### Phase 6: Delivery
@@ -140,7 +144,24 @@ own test suite; both must pass.
 29. `gh pr create` against the base branch. Title `[<KEY>] <short
     description>`. Body: summary + testing + node notes.
 30. Send a `progress` message with the PR URL.
-31. Final `status` message: state `done`.
+31. **Transition** — this is the v0.12 atomic validate gate:
+    ```bash
+    tripwire session transition <session-id> in_review
+    ```
+    The CLI runs `tripwire validate` post-state-write and rolls back
+    atomically if any error fires. On `executing → in_review` it also
+    rebases the PT worktree onto `origin/main` (so your PT PR doesn't
+    revert main's intervening commits when merged).
+
+    If validate fires errors whose hint starts "PM action —", do NOT
+    try to author those files yourself. Send a `stuck` message
+    describing what you saw; the PM owns those artifacts.
+
+    If the rebase fails with conflicts, the transition is rolled back
+    and the worktree is restored to its pre-rebase tip. Send a `stuck`
+    message describing the conflict; the PM resolves manually before
+    you re-attempt.
+32. Final `status` message: state `done`.
 
 ## Operating rules
 

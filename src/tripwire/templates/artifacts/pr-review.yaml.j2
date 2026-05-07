@@ -1,0 +1,63 @@
+# v0.12 — PM-review record. Authored during `/pm-session-review`.
+#
+# Validator rules (`core/validator/checks/pr_review.py`) gate the
+# transition to `verified`/`completed` on the substance of this file:
+# real evidence in `verified_by` arrays (no placeholders), every
+# threshold finding addressed, external-reviewer URL recorded if
+# configured, code-review skill invocation recorded if configured.
+#
+# The `tripwire session prepare-review` CLI scaffolds this file from
+# the session's member-issue ACs; the PM fills `verified_by` and the
+# four-lens / external-review sections.
+
+read_at: {{ read_at | default("<set on author>") }}
+read_by: pm
+
+pr:
+  code:
+    repo: {{ code_pr.repo | default("") }}
+    number: {{ code_pr.number | default(0) }}
+    head_sha: {{ code_pr.head_sha | default("") }}
+  pt:
+    repo: {{ pt_pr.repo | default("") }}
+    number: {{ pt_pr.number | default(0) }}
+    head_sha: {{ pt_pr.head_sha | default("") }}
+
+# Per-issue AC verification. Replace empty `verified_by` arrays with
+# concrete file:line citations or short evidence strings BEFORE
+# transitioning to verified.
+issues:
+{% for issue in issues -%}
+  - key: {{ issue.key }}
+    acs:
+{% for ac in issue.acs -%}
+      - text: {{ ac.text | tojson }}
+        verified_by: []
+        decision: verified
+{% endfor -%}
+{% endfor %}
+
+# Four-lens scrutiny — populate after reading the diff.
+four_lens:
+  ac_met_but_not_really:
+    findings: []
+  unilateral_decisions:
+    findings: []
+  skipped_workflow:
+    findings: []
+  quality_degradation:
+    findings: []
+
+# External-reviewer signals — required if project.yaml.review configures them.
+external_reviews: {}
+
+# Threshold-finding aggregate — populated after applying decisions to
+# four-lens + code-review-skill findings. `unaddressed` MUST be empty
+# before transitioning to verified.
+threshold_findings:
+  threshold: 65
+  count_above: 0
+  count_addressed: 0
+  unaddressed: []
+
+verdict: approved

@@ -49,22 +49,29 @@ def check_manifest_schema(ctx: ValidationContext) -> list[CheckResult]:
 def check_manifest_phase_ownership_consistent(
     ctx: ValidationContext,
 ) -> list[CheckResult]:
-    """Warn if pm owns an artifact produced during in_progress/in_review.
+    """Warn if PM owns an executing/in_review artifact authored by an agent.
 
     The PM agent steers scoping and planning; once a session is in
-    `in_progress` or `in_review`, the execution/verification agent owns
-    what gets written. A manifest that assigns `owned_by: pm` to such
-    artifacts likely encodes the v0.5 bug where the PM wrote files the
-    execution agent should have written.
+    `executing` or `in_review`, the execution/verification agent
+    typically authors the artifacts. A manifest that says PM *owns*
+    something an agent *produced* likely encodes the v0.5 bug where
+    the PM was charged with writing files the execution agent should
+    have written.
+
+    v0.12: only fires when ``owned_by != produced_by``. PM-owned-and-
+    PM-produced artifacts (e.g. ``pr-review.yaml``: produced_at=in_review,
+    produced_by=pm, owned_by=pm) are deliberately PM work during the
+    review window and shouldn't trip the heuristic.
     """
     manifest, _ = _load_manifest(ctx)
     if manifest is None:
         return []
     results: list[CheckResult] = []
     for entry in manifest.artifacts:
-        if entry.owned_by == "pm" and entry.produced_at in (
-            "executing",
-            "in_review",
+        if (
+            entry.owned_by == "pm"
+            and entry.produced_at in ("executing", "in_review")
+            and entry.produced_by != "pm"
         ):
             results.append(
                 CheckResult(
@@ -74,8 +81,8 @@ def check_manifest_phase_ownership_consistent(
                     field="owned_by",
                     message=(
                         f"artifact '{entry.name}' owned by pm but produced at "
-                        f"{entry.produced_at} — consider ownership by "
-                        "execution-agent or verification-agent"
+                        f"{entry.produced_at} by {entry.produced_by} — "
+                        "consider aligning ownership with the producing agent"
                     ),
                 )
             )
@@ -89,8 +96,19 @@ def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
     manifest entry rather than gating every artifact at a single status.
     A session that has reached the threshold for one artifact but not for
     another is checked only against the first.
+
+    v0.12: applies the artifact_phase → session_status mapping (so
+    `produced_at: planning` correctly gates at session.status >= queued)
+    and checks both legacy `sessions/<sid>/<file>` and nested
+    `sessions/<sid>/artifacts/<file>` layouts before reporting missing.
+    Fix-hints prefix with the responsible-actor label from `owned_by`.
     """
     from tripwire.core.issue_artifact_store import status_at_or_past
+    from tripwire.core.validator._manifest_lookup import (
+        actor_prefix,
+        find_artifact_on_disk,
+        phase_to_session_status,
+    )
 
     manifest, _ = _load_manifest(ctx)
     if manifest is None:
@@ -99,19 +117,21 @@ def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
     results: list[CheckResult] = []
     for entity in ctx.sessions:
         session: AgentSession = entity.model
-        artifacts_dir = paths.session_artifacts_dir(ctx.project_dir, session.id)
+        session_dir = ctx.project_dir / paths.SESSIONS_DIR / session.id
         for entry in manifest.artifacts:
             if not entry.required:
                 continue
+            threshold = phase_to_session_status(entry.produced_at)
             if not status_at_or_past(
                 str(session.status),
-                entry.produced_at,
+                threshold,
                 ctx.project_dir,
                 enum_name="session_status",
             ):
                 continue
-            if (artifacts_dir / entry.file).exists():
+            if find_artifact_on_disk(session_dir, entry.file) is not None:
                 continue
+            prefix = actor_prefix(entry)
             results.append(
                 CheckResult(
                     code="artifact/missing",
@@ -124,8 +144,7 @@ def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
                         f"{entry.file!r}."
                     ),
                     fix_hint=(
-                        f"Write {paths.SESSIONS_DIR}/{session.id}/"
-                        f"{paths.SESSION_ARTIFACTS_SUBDIR}/{entry.file}."
+                        f"{prefix}write {paths.SESSIONS_DIR}/{session.id}/{entry.file}."
                     ),
                 )
             )

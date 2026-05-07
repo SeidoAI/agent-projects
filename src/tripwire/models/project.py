@@ -211,6 +211,37 @@ class MonitorConfig(BaseModel):
     )
 
 
+class ProjectReview(BaseModel):
+    """`project.yaml.review` — PM-review enforcement config (v0.12).
+
+    Three knobs that the `pr_review/*` validator rules read:
+
+    - ``external_reviewer_mention`` — if set (e.g. ``"@codex"``), the
+      `/pm-session-review` slash command must post that mention on the
+      PR and record the comment URL in `pr-review.yaml.external_reviews
+      .codex.comment_url`. Validator: `pr_review/external_reviewer_missing`.
+    - ``code_review_skill`` — if set (e.g.
+      ``"superpowers:code-review:code-review"``), the slash command must
+      invoke that skill and capture findings + invocation time.
+      Validator: `pr_review/code_review_skill_missing`.
+    - ``severity_threshold`` — findings (from the four-lens audit OR the
+      code-review skill) at-or-above this severity must be addressed
+      (decision = fixed / deferred / rejected with matching evidence)
+      before the session can transition to `verified`. Default 65.
+      Validator: `pr_review/threshold_findings_unaddressed`.
+
+    All three default to "off" so existing projects keep their pre-v0.12
+    behaviour unchanged. Projects opt in by populating these fields in
+    `project.yaml`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    external_reviewer_mention: str | None = None
+    code_review_skill: str | None = None
+    severity_threshold: int = 65
+
+
 class ProjectConfig(BaseModel):
     """The project's root config, parsed from `<project>/project.yaml`."""
 
@@ -238,6 +269,10 @@ class ProjectConfig(BaseModel):
     graph: GraphSettings = Field(default_factory=GraphSettings)
 
     orchestration: OrchestrationConfig = Field(default_factory=OrchestrationConfig)
+
+    # v0.12 (handoff #3): PM-review enforcement knobs. All optional;
+    # defaults preserve pre-v0.12 behaviour. See `ProjectReview` doc.
+    review: ProjectReview = Field(default_factory=ProjectReview)
 
     next_issue_number: int = 1
     next_session_number: int = 1

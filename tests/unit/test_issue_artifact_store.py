@@ -51,6 +51,36 @@ def test_status_at_or_past_session_status_default_order():
     assert status_at_or_past("verified", "verified", enum_name="session_status") is True
 
 
+def test_status_at_or_past_side_states_short_circuit():
+    """v0.12: side states (paused/abandoned/failed/deferred) are off-lifecycle.
+
+    Real-world bug: a project whose session_status.yaml lists `paused` after
+    `completed` would have `status_at_or_past("paused", "completed")` return
+    True (because index-of-paused > index-of-completed) — incorrectly
+    demanding completed-state artifacts from a paused session. The
+    short-circuit fixes this regardless of enum ordering.
+    """
+    thresholds = (
+        "planned",
+        "queued",
+        "executing",
+        "in_review",
+        "verified",
+        "completed",
+    )
+    for side in ("paused", "abandoned", "failed", "deferred"):
+        for threshold in thresholds:
+            assert status_at_or_past(side, threshold) is False, (
+                f"side state {side!r} unexpectedly past threshold {threshold!r}"
+            )
+            assert (
+                status_at_or_past(side, threshold, enum_name="session_status") is False
+            ), (
+                f"side state {side!r} unexpectedly past threshold {threshold!r} "
+                "(session_status)"
+            )
+
+
 def test_project_override_appends(tmp_path_project: Path):
     project_yaml = tmp_path_project / "project.yaml"
     data = yaml.safe_load(project_yaml.read_text(encoding="utf-8"))

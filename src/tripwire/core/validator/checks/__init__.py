@@ -35,6 +35,12 @@ from tripwire.core.validator.checks.identity import (
     check_timestamps,
     check_uuid_present,
 )
+from tripwire.core.validator.checks.pr_review import (
+    check_pr_review_code_review_skill,
+    check_pr_review_evidence,
+    check_pr_review_external_reviewer,
+    check_pr_review_threshold_findings,
+)
 from tripwire.core.validator.checks.quality import (
     check_coverage_heuristics,
     check_phase_requirements,
@@ -105,6 +111,17 @@ COHERENCE_CHECKS = [
     check_pm_response_followups_resolve,
 ]
 
+# PR-review (v0.12 — handoff #3): pr-review.yaml content gates that
+# block transitions to verified/completed without substantive review.
+# Missing-file enforcement is handled by check_artifact_presence via
+# the manifest entry's `produced_at: in_review`.
+PR_REVIEW_CHECKS = [
+    check_pr_review_evidence,
+    check_pr_review_threshold_findings,
+    check_pr_review_external_reviewer,
+    check_pr_review_code_review_skill,
+]
+
 # Quality: project-standards, coverage heuristics, phase requirements,
 # anti-fatigue degradation detection.
 QUALITY_CHECKS = [
@@ -156,6 +173,10 @@ ALL_CHECKS = [
     check_workflow_well_formed,
     check_workspace_link,
     check_project_repos_present,
+    check_pr_review_evidence,
+    check_pr_review_threshold_findings,
+    check_pr_review_external_reviewer,
+    check_pr_review_code_review_skill,
 ]
 
 
@@ -165,6 +186,7 @@ __all__ = [
     "COHERENCE_CHECKS",
     "ENUM_CHECKS",
     "IDENTITY_CHECKS",
+    "PR_REVIEW_CHECKS",
     "QUALITY_CHECKS",
     "REFERENCE_CHECKS",
     "STRUCTURE_CHECKS",

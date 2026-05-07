@@ -50,28 +50,53 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
             )
         ]
 
+    # v0.12: consult the manifest for both filenames so project overrides
+    # (e.g. renamed `self-review` artifact, custom PM response file) are
+    # respected. Fall back to canonical defaults when an entry isn't
+    # manifested — keeps the rule meaningful for projects with sparse
+    # manifests, while still picking up manifest renames when present.
+    from tripwire.core.validator._manifest_lookup import artifact_entry
+
+    self_review_entry = artifact_entry(ctx, "self-review")
+    pm_response_entry = artifact_entry(ctx, "pm-response")
+    self_review_file = (
+        self_review_entry.file if self_review_entry is not None else "self-review.md"
+    )
+    pm_response_file = (
+        pm_response_entry.file if pm_response_entry is not None else "pm-response.yaml"
+    )
+
     results: list[CheckResult] = []
     for entity in ctx.sessions:
         sid = entity.model.id
-        self_review = f"sessions/{sid}/self-review.md"
-        pm_response = f"sessions/{sid}/pm-response.yaml"
-        if self_review not in on_main:
+        # Two layouts coexist in the wild; check both before reporting.
+        sr_candidates = (
+            f"sessions/{sid}/{self_review_file}",
+            f"sessions/{sid}/artifacts/{self_review_file}",
+        )
+        pr_candidates = (
+            f"sessions/{sid}/{pm_response_file}",
+            f"sessions/{sid}/artifacts/{pm_response_file}",
+        )
+        if not any(p in on_main for p in sr_candidates):
             continue
-        if pm_response in on_main:
+        if any(p in on_main for p in pr_candidates):
             continue
+        # Quote the canonical (non-nested) path in user-facing messages.
+        pm_response = pr_candidates[0]
         results.append(
             CheckResult(
                 code="self_review_implies_pm_response/missing_pm_response",
                 severity="error",
                 file=entity.rel_path,
                 message=(
-                    f"Session {sid!r} has self-review.md on origin/main "
+                    f"Session {sid!r} has {self_review_file} on origin/main "
                     f"but {pm_response!r} is missing — the PM has not "
                     f"closed the loop."
                 ),
                 fix_hint=(
-                    f"Author and commit {pm_response} on the project "
-                    f"tracking branch, then merge to main."
+                    f"PM action — author and commit {pm_response} on the "
+                    f"project tracking branch, then merge to main."
                 ),
             )
         )

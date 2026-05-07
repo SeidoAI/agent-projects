@@ -138,3 +138,63 @@ def list_paths_on_main(repo_dir: Path) -> set[str]:
             (result.stderr or "git ls-tree origin/main failed").strip()
         )
     return {line for line in result.stdout.splitlines() if line}
+
+
+class RebaseConflict(RuntimeError):
+    """Raised when a rebase produces conflicts that the helper can't auto-resolve.
+
+    The caller is expected to surface the message to the user (PM or
+    agent) and roll back any in-progress state mutation. The conflicting
+    rebase is left aborted (`git rebase --abort` is run before raising)
+    so the worktree returns to a clean state on the original branch tip.
+    """
+
+
+def fetch_origin(repo_path: Path) -> None:
+    """`git fetch origin` for the repo at `repo_path`.
+
+    Quiet, no-prune. Used before a rebase to ensure the remote-tracking
+    branch is current. Raises ``subprocess.CalledProcessError`` if the
+    fetch itself fails (network, auth, no remote, etc.) — callers
+    should treat that as a transition-blocking error.
+    """
+    subprocess.run(
+        ["git", "-C", str(repo_path), "fetch", "origin", "--quiet"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def rebase_branch_onto(worktree_path: Path, upstream: str) -> None:
+    """Rebase the current branch in ``worktree_path`` onto ``upstream``.
+
+    On success: the worktree's HEAD now sits on top of ``upstream``.
+    On conflict: the rebase is aborted (so the worktree is restored to
+    its pre-rebase HEAD) and ``RebaseConflict`` is raised, carrying the
+    conflict summary in its message. Callers should surface this to the
+    user and roll back any pre-rebase state mutations.
+
+    Used by ``session_transition_cmd`` on transitions to ``in_review`` to
+    keep PT branches up-to-date with main, closing the multi-session-
+    wave staleness trap (kb-pivot wave 1 incident).
+    """
+    result = subprocess.run(
+        ["git", "-C", str(worktree_path), "rebase", upstream],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return
+    # Conflict or other rebase failure — abort cleanly and surface.
+    subprocess.run(
+        ["git", "-C", str(worktree_path), "rebase", "--abort"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    detail = (result.stderr or result.stdout or "rebase failed").strip()
+    raise RebaseConflict(
+        f"`git rebase {upstream}` failed in {worktree_path}:\n{detail}"
+    )

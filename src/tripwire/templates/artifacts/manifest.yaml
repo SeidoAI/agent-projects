@@ -88,3 +88,19 @@ artifacts:
     owned_by: pm
     required: true
     approval_gate: false
+
+  # v0.12 — PM's substantive PR-review record. YAML so the validator
+  # can enforce per-issue AC evidence + four-lens scrutiny + external-
+  # reviewer signals + severity-threshold resolution. The handoff #3
+  # bug (PMs running the thin `tripwire session review` CLI and
+  # skipping the substantive `/pm-session-review` slash command)
+  # is closed by making this artifact required at in_review and
+  # gating its content via `core/validator/checks/pr_review.py`.
+  - name: pr-review
+    file: pr-review.yaml
+    template: pr-review.yaml.j2
+    produced_at: in_review
+    produced_by: pm
+    owned_by: pm
+    required: true
+    approval_gate: false
