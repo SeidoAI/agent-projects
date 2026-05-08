@@ -30,7 +30,7 @@ from tripwire.cli._utils import require_project as _require_project
 from tripwire.core.validator import validate_project
 from tripwire.core.workflow.transitions import (
     TransitionError,
-    request_transition,
+    execute_transition,
 )
 
 
@@ -53,7 +53,7 @@ def transition_cmd(session_id: str, target_status: str, project_dir: Path) -> No
     _require_project(resolved)
 
     try:
-        result = request_transition(
+        result = execute_transition(
             resolved,
             session_id=session_id,
             target_status=target_status,
