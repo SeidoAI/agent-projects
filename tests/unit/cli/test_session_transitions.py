@@ -12,10 +12,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 from tripwire.core.workflow.loader import parse_workflow_spec
 from tripwire.models.enums import SessionStatus
-
-import yaml
 
 
 def _shipped_coding_session():
@@ -54,8 +54,7 @@ def test_verified_can_transition_to_completed_in_template() -> None:
     """Regression: verified→completed must be a declared route."""
     workflow = _shipped_coding_session()
     assert any(
-        r.from_ref == "verified" and r.to_ref == "completed"
-        for r in workflow.routes
+        r.from_ref == "verified" and r.to_ref == "completed" for r in workflow.routes
     )
 
 
