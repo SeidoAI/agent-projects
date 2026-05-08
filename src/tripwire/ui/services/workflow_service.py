@@ -49,6 +49,9 @@ def build_workflow(
         project_id=project_id,
         is_pm_role=is_pm_role,
     )
+    from tripwire.core.workflow.side_effects import known_ids as _known_side_effects
+    from tripwire.models.session import AgentSession
+
     definition_findings = validate_workflow_spec(
         spec,
         known_tripwires={entry["id"] for entry in registry["tripwires"]},
@@ -57,6 +60,8 @@ def build_workflow(
         known_prompt_checks={entry["id"] for entry in registry["prompt_checks"]},
         known_commands={entry["id"] for entry in registry["commands"]},
         known_skills={entry["id"] for entry in registry["skills"]},
+        known_side_effects=_known_side_effects(),
+        known_status_field_paths=set(AgentSession.model_fields),
     )
     runtime_findings = detect_drift(project_dir)
     drift_findings = [
