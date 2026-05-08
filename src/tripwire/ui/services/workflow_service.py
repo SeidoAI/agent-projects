@@ -86,7 +86,7 @@ def _workflow_to_dict(workflow: Workflow) -> dict[str, Any]:
             {
                 "id": status.id,
                 "label": status.id.replace("_", " "),
-                "next": _next_spec_to_dict(status.next),
+                "terminal": status.terminal,
                 "tripwires": list(status.tripwires),
                 "heuristics": list(status.heuristics),
                 "jit_prompts": list(status.jit_prompts),
@@ -157,25 +157,12 @@ def _route_to_dict(workflow_id: str, route: WorkflowRoute) -> dict[str, Any]:
             "comments": list(route.emits.comments),
             "status_changes": list(route.emits.status_changes),
         },
+        "preconditions": list(route.preconditions),
+        "preserve_fields": list(route.preserve_fields),
+        "clear_fields": list(route.clear_fields),
+        "side_effects": list(route.side_effects),
+        "rollback": route.rollback,
     }
-
-
-def _next_spec_to_dict(next_spec: Any) -> dict[str, Any]:
-    kind = next_spec.kind
-    if kind == "single":
-        return {"kind": "single", "single": next_spec.single}
-    if kind == "conditional":
-        branches: list[dict[str, Any]] = []
-        for branch in next_spec.conditional or []:
-            if branch.predicate is None:
-                branches.append({"else": branch.then})
-            else:
-                pred = branch.predicate
-                branches.append(
-                    {"if": f"{pred.field} {pred.op} {pred.value}", "then": branch.then}
-                )
-        return {"kind": "conditional", "branches": branches}
-    return {"kind": "terminal"}
 
 
 def _build_registry(

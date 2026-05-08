@@ -38,7 +38,7 @@ from typing import Literal
 
 from tripwire.core.events.log import read_events
 from tripwire.core.workflow.loader import load_workflows
-from tripwire.core.workflow.schema import NextSpec, Workflow, WorkflowRouteControls
+from tripwire.core.workflow.schema import Workflow, WorkflowRouteControls
 
 
 @dataclass(frozen=True)
@@ -224,9 +224,7 @@ def _scan_unexpected_transitions(
         last_status = workflow.statuses_by_id.get(last_to)
         if last_status is None:
             continue
-        if _is_reachable(
-            workflow, last_status.next, from_status=last_to, target=actual
-        ):
+        if _is_reachable(workflow, from_status=last_to, target=actual):
             continue  # legitimate single-step move; the gate just hasn't
             # logged a `transition.completed` for it yet.
         out.append(
@@ -247,19 +245,11 @@ def _scan_unexpected_transitions(
     return out
 
 
-def _is_reachable(
-    workflow: Workflow, spec: NextSpec, *, from_status: str, target: str
-) -> bool:
-    if workflow.routes:
-        return any(
-            route.from_ref == from_status and route.to_ref == target
-            for route in workflow.routes
-        )
-    if spec.kind == "single":
-        return spec.single == target
-    if spec.kind == "conditional" and spec.conditional is not None:
-        return any(b.then == target for b in spec.conditional)
-    return False
+def _is_reachable(workflow: Workflow, *, from_status: str, target: str) -> bool:
+    return any(
+        route.from_ref == from_status and route.to_ref == target
+        for route in workflow.routes
+    )
 
 
 def _read_session_status(project_dir: Path, instance: str) -> str | None:

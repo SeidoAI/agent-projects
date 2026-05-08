@@ -44,7 +44,6 @@ from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.session_store import load_session, save_session
 from tripwire.core.workflow.loader import load_workflows
 from tripwire.core.workflow.schema import (
-    NextSpec,
     Workflow,
     WorkflowRoute,
     WorkflowRouteControls,
@@ -87,21 +86,6 @@ def _resolve_workflow(spec: WorkflowSpec) -> Workflow:
             f"workflow {WORKFLOW_ID!r} is not declared in workflow.yaml"
         )
     return wf
-
-
-def _is_reachable(current: str, target: str, next_spec: NextSpec) -> bool:
-    """True iff ``target`` is reachable from ``current`` via ``next_spec``."""
-    if next_spec.kind == "single":
-        return next_spec.single == target
-    if next_spec.kind == "conditional":
-        if next_spec.conditional is None:
-            return False
-        # Equality predicates are evaluated against an empty context
-        # for now — the runtime context is built by the gate runner
-        # later. We accept any branch whose `then` matches the target
-        # since reachability ≠ what-actually-happens-at-runtime.
-        return any(branch.then == target for branch in next_spec.conditional)
-    return False  # terminal — nothing reachable
 
 
 def _next_status_instance_n(
@@ -233,11 +217,7 @@ def _run_gate(
             f"{current_status!r} is not declared in workflow.yaml",
         )
     route = _route_between(workflow, current_status, target_status)
-    if workflow.routes:
-        reachable = route is not None
-    else:
-        reachable = _is_reachable(current_status, target_status, current.next)
-    if not reachable:
+    if route is None:
         return _reject(
             project_dir,
             session_id,
