@@ -201,5 +201,3 @@ def test_known_registered_side_effect_does_not_fire_lint(tmp_path: Path) -> None
     findings = check_workflow_well_formed(ctx)
     codes = [f.code for f in findings]
     assert "workflow/unknown_side_effect" not in codes
-
-

@@ -118,11 +118,13 @@ def clear() -> None:
 
 
 def _sweep_issues_forward_apply(ctx: SideEffectContext) -> SideEffectResult:
-    """Advance member issues to match the session's new status.
+    """Advance member issues to match the route's target status.
 
+    Reads ``ctx.route.to_ref`` (not ``ctx.session.status``) so the sweep
+    fires correctly whether it runs before or after the status flip.
     Forward-only: an issue already past the target stays put; off-path
     issues (deferred, abandoned) are left alone. Pre-state captured into
-    ``result.data["pre_state"]`` so a WS3 rollback can restore.
+    ``result.data["pre_state"]`` for rollback.
     """
     from tripwire.core.status_contract import sweep_issues
     from tripwire.core.store import load_issue
@@ -134,7 +136,7 @@ def _sweep_issues_forward_apply(ctx: SideEffectContext) -> SideEffectResult:
         except FileNotFoundError:
             continue
         pre_state[issue_key] = issue.status
-    target = ctx.session.status.value
+    target = ctx.route.to_ref
     swept = sweep_issues(ctx.project_dir, ctx.session, target) or []
     return SideEffectResult(data={"swept": list(swept), "pre_state": pre_state})
 

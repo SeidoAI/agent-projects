@@ -141,64 +141,24 @@ class TestSessionTransition:
 
 
 class TestAtomicValidateGate:
-    """v0.12: transition runs validate post-write and rolls back the
-    entire transition (status flip + issue sweeps) if validate errors."""
+    """v0.13: transition gates are scoped to the route's
+    ``controls.tripwires``, not full ``validate_project``. Full project
+    validation is now a separate command (``tripwire validate``). The
+    bare-project assumptions of these v0.12-era tests no longer apply
+    — see ``tests/unit/core/test_transitions_executor.py`` for the
+    v0.13 atomic-rollback contract.
 
-    def test_validate_failure_rolls_back_status(
+    Two tests removed in v0.13:
+    - ``test_validate_failure_rolls_back_status`` (bare project no longer
+      auto-fails the transition)
+    - ``test_validate_failure_rolls_back_swept_issues`` (same)
+    """
+
+    def test_no_validate_flag_is_accepted_for_bw_compat(
         self, tmp_path_project, save_test_session
     ):
-        """A failing validate aborts the transition and restores the
-        prior session status. Bare project has plan.md as required at
-        planning, so transitioning a session with no plan.md → in_review
-        triggers `artifact/missing` and rolls back."""
-        save_test_session(tmp_path_project, "s1", status="executing")
-        runner = CliRunner()
-        result = runner.invoke(
-            session_cmd,
-            [
-                "transition",
-                "s1",
-                "in_review",
-                "--project-dir",
-                str(tmp_path_project),
-            ],
-        )
-        # Transition aborted with non-zero exit and clear error.
-        assert result.exit_code != 0
-        assert "aborted by validate" in result.output
-        assert "artifact/missing" in result.output
-        # Session status MUST be restored.
-        assert load_session(tmp_path_project, "s1").status == "executing"
-
-    def test_validate_failure_rolls_back_swept_issues(
-        self, tmp_path_project, save_test_session, save_test_issue
-    ):
-        """When sweep advances issues alongside the transition, a
-        failing validate must restore both the session AND the issues."""
-        from tripwire.core.store import load_issue
-
-        save_test_issue(tmp_path_project, "TMP-1", status="executing")
-        save_test_session(tmp_path_project, "s1", status="executing", issues=["TMP-1"])
-
-        runner = CliRunner()
-        result = runner.invoke(
-            session_cmd,
-            [
-                "transition",
-                "s1",
-                "in_review",
-                "--project-dir",
-                str(tmp_path_project),
-            ],
-        )
-        assert result.exit_code != 0
-        # Both session and issue should be back at executing.
-        assert load_session(tmp_path_project, "s1").status == "executing"
-        assert load_issue(tmp_path_project, "TMP-1").status == "executing"
-
-    def test_no_validate_flag_bypasses_gate(self, tmp_path_project, save_test_session):
-        """--no-validate skips the gate entirely; transition succeeds
-        even when validate would fail."""
+        """``--no-validate`` is preserved for backwards compatibility but
+        is now a no-op; v0.13 gate is route-scoped, not project-wide."""
         save_test_session(tmp_path_project, "s1", status="executing")
         runner = CliRunner()
         result = runner.invoke(
