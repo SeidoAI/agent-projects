@@ -517,10 +517,12 @@ def _check_reachability(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
         return out
     declared = {s.id for s in wf.statuses}
     has_inbound: dict[str, bool] = dict.fromkeys(declared, False)
+    # An inbound route counts unless it's a self-loop on the same status
+    # (which would never let an external session enter the status fresh).
+    # Source-port origins (`from: source:foo`) and any cross-status route
+    # are valid entry points.
     for route in wf.routes:
         if route.to_ref in declared and route.from_ref != route.to_ref:
-            has_inbound[route.to_ref] = True
-        elif route.to_ref in declared and route.from_ref.startswith("source:"):
             has_inbound[route.to_ref] = True
     initial = wf.statuses[0].id
     has_inbound[initial] = True  # the canonical entry point

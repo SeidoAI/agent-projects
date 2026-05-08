@@ -601,7 +601,10 @@ def migrate_workflow_cmd(project_dir: Path, dry_run: bool, yes: bool) -> None:
         return
 
     existing = workflow_path.read_text(encoding="utf-8")
-    if "workflow_schema_version: 1" in existing.splitlines()[0:5]:
+    # Substring search across the file's first 1KB — robust against
+    # leading comments, indentation, and trailing whitespace that an
+    # exact-line match would miss.
+    if "workflow_schema_version: 1" in existing[:1024]:
         click.echo("workflow.yaml already on v0.13 schema — nothing to migrate.")
         return
 

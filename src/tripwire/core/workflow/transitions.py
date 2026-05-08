@@ -16,16 +16,21 @@ executor:
    d. **Artifacts** — every required consumed artifact must exist.
 5. Captures pre-values for ``route.preserve_fields``; applies
    ``route.clear_fields`` (sets to default).
-6. Flips ``session.status``, bumps ``current_status_instance``, saves.
-7. Runs ``route.side_effects`` in declared order. On any failure:
+6. Runs ``route.side_effects`` in declared order — BEFORE the status
+   flip — so gate-shaped effects (``verify_*``) can reject without
+   mutating ``session.status``. On any failure:
    - For each completed side-effect with ``idempotent=False``, calls
      ``inverse(ctx, result)`` in reverse order.
    - Restores session from the pre-state snapshot.
-   - Saves session.
-   - Emits ``transition.rejected``.
-8. After all side-effects succeed, re-asserts preserved field values
-   (defends against accidental clearing by handlers).
-9. Saves session, emits ``transition.completed``, returns.
+   - Saves session and emits ``transition.rejected``.
+7. Flips ``session.status``, bumps ``current_status_instance``.
+8. Re-asserts preserved field values (defends against accidental
+   clearing by handlers), saves session.
+9. Emits ``transition.completed``, returns.
+
+Side-effects observing the target status should read
+``ctx.route.to_ref`` rather than ``ctx.session.status`` since the flip
+happens after they run.
 
 Concurrency: per-session lockfile under
 ``.tripwire/locks/transition-<sid>.lock`` serialises concurrent
@@ -305,11 +310,15 @@ def _run_gate(
             reason=f"artifacts_missing: {missing_artifacts}",
         )
 
-    # 6. Capture pre-state for atomic rollback.
+    # 6. Capture pre-state for atomic rollback. Apply clear_fields BEFORE
+    #    side-effects so handlers see the cleared state (matches the
+    #    pipeline contract documented at the top of this module).
     snapshot = session.model_copy(deep=True)
     preserved: dict[str, object] = {
         path: _read_path(session, path) for path in route.preserve_fields
     }
+    for path in route.clear_fields:
+        _write_path(session, path, None)
 
     # 7. Run side-effects in declared order, BEFORE status flip. Gate-shaped
     #    side-effects (verify_*) raise SideEffectFailure; rollback walks
@@ -347,6 +356,18 @@ def _run_gate(
             if isinstance(exc, SideEffectFailure)
             else f"side_effect_error: {exc}"
         )
+        if route.rollback == "none":
+            # Opt-out: leave applied side-effects in place; persist any
+            # mutations they made; emit rejected with a partial-state note.
+            # Used for last-resort manual recovery edges that prefer
+            # forward-progress to atomicity.
+            save_session(project_dir, session)
+            return _reject(
+                project_dir,
+                session_id,
+                target_status,
+                reason=f"{reason_code} (rollback=none, partial state retained)",
+            )
         _rollback_side_effects(
             project_dir, session_id, completed_effects, route=route, session=session
         )
@@ -360,18 +381,14 @@ def _run_gate(
             reason=reason_code,
         )
 
-    # 8. Apply clear_fields (set declared paths to None).
-    for path in route.clear_fields:
-        _write_path(session, path, None)
-
-    # 9. Flip status, assign status-instance id, save.
+    # 8. Flip status, assign status-instance id, save.
     n = _next_status_instance_n(project_dir, WORKFLOW_ID, session_id, target_status)
     status_instance = f"{WORKFLOW_ID}:{session_id}:{target_status}:{n}"
     session.status = SessionStatus(target_status)
     session.current_status_instance = status_instance
     session.updated_at = when
 
-    # 10. Re-assert preserved fields against accidental clearing.
+    # 9. Re-assert preserved fields against accidental clearing.
     for path, prior_value in preserved.items():
         current_value = _read_path(session, path)
         if current_value != prior_value:

@@ -308,9 +308,15 @@ def parse_workflow_spec(raw: Any) -> WorkflowSpec:
         )
 
     schema_version_raw = raw.get("workflow_schema_version")
-    schema_version = (
-        int(schema_version_raw) if isinstance(schema_version_raw, int) else 0
-    )
+    # Accept both bare-int (`workflow_schema_version: 1`) and
+    # quoted-string (`workflow_schema_version: "1"`) shapes — YAML
+    # serializers can produce either depending on quoting.
+    if isinstance(schema_version_raw, int):
+        schema_version = schema_version_raw
+    elif isinstance(schema_version_raw, str) and schema_version_raw.strip().isdigit():
+        schema_version = int(schema_version_raw.strip())
+    else:
+        schema_version = 0
 
     workflows_block = raw.get("workflows") or {}
     if not isinstance(workflows_block, dict):

@@ -851,15 +851,13 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
     save_session(resolved, session)
 
 
-# Allowed session-status transitions. Tight by design: agents shouldn't
-# v0.13: the legacy `_ALLOWED_TRANSITIONS` map, `_DEFAULT_SWEEP_ON_TRANSITION`,
-# `_capture_issue_pre_state`, `_rollback_transition`, and `_maybe_rebase_pt_branch`
-# helpers were deleted in WS7. Their behavior moved into the workflow
-# executor — `tripwire.core.workflow.transitions.execute_transition` — which
-# resolves routes from `workflow.yaml`, captures pre-state snapshots, runs
-# side-effects in declared order, and rolls back atomically on failure.
-# Side-effect handlers (`sweep_issues_forward`, `rebase_pt_branch`, etc.)
-# live in `tripwire.core.workflow.side_effects`.
+# Session-status transitions are now declared in `workflow.yaml` and
+# executed by `tripwire.core.workflow.transitions.execute_transition`,
+# which resolves the matching route, captures pre-state snapshots,
+# runs side-effects in declared order, and rolls back atomically on
+# failure. Side-effect handlers (`sweep_issues_forward`,
+# `rebase_pt_branch`, etc.) live in
+# `tripwire.core.workflow.side_effects`.
 
 
 @session_cmd.command("transition")
@@ -875,9 +873,10 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
     "--sweep-issues/--no-sweep-issues",
     default=None,
     help=(
-        "Sweep member issues to the implied issue state for the target "
-        "session state (v0.9.4 status contract). Defaults to ON for "
-        "transitions into in_review / verified / completed; OFF otherwise."
+        "DEPRECATED in v0.13: no-op. Sweep behavior is now declared on "
+        "each route via `side_effects: [sweep_issues_forward, ...]` in "
+        "`workflow.yaml`. Flag retained for backwards-compat; will be "
+        "removed in v0.14."
     ),
 )
 @click.option(
@@ -886,9 +885,11 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
     is_flag=True,
     default=False,
     help=(
-        "Skip the post-write validate gate and the PT-branch rebase "
-        "(transition→in_review). Use only for emergency state recovery; "
-        "the gate exists to keep transitions atomic."
+        "DEPRECATED in v0.13: no-op. The transition gate is now "
+        "route-scoped (`controls.tripwires` in `workflow.yaml`) and "
+        "always runs. Full project validation is a separate command "
+        "(`tripwire validate`). Flag retained for backwards-compat; "
+        "will be removed in v0.14."
     ),
 )
 def session_transition_cmd(

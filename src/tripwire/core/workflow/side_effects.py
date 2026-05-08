@@ -185,6 +185,11 @@ def _rebase_pt_branch_apply(ctx: SideEffectContext) -> SideEffectResult:
     if pt is None:
         return SideEffectResult()
     wt_path = Path(pt.worktree_path)
+    # Mirror the v0.12 `_maybe_rebase_pt_branch` guard: if the PT worktree
+    # was cleaned up by `complete` and not yet recreated by `spawn --resume`,
+    # the path is gone. Skip the rebase rather than hard-fail the transition.
+    if not wt_path.is_dir():
+        return SideEffectResult()
     try:
         fetch_origin(wt_path)
         rebase_branch_onto(wt_path, "origin/main")
@@ -340,25 +345,31 @@ def _append_audit_log_entry_apply(ctx: SideEffectContext) -> SideEffectResult:
 
     The action defaults to ``transition`` but ``ctx.flags["action"]`` can
     override (e.g. ``session_reopen`` writes ``action: session_reopen``).
+
+    ``to_status`` reads from ``ctx.route.to_ref`` (the target declared by
+    the route) — NOT from ``ctx.session.status`` which still holds the
+    source status when this side-effect fires (side-effects run BEFORE
+    the status flip, see ``transitions._run_gate``).
     """
-    import json
     from datetime import datetime, timezone
 
     from tripwire.core.session_reopen import _audit_path
+    from tripwire.ui.services._atomic_write import append_jsonl
 
     audit = _audit_path(ctx.project_dir)
     audit.parent.mkdir(parents=True, exist_ok=True)
-    record = {
-        "timestamp": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "action": ctx.flags.get("action", "transition"),
-        "session_id": ctx.session.id,
-        "route_id": ctx.route.id,
-        "from_status": ctx.flags.get("from_status"),
-        "to_status": ctx.session.status.value,
-        "reason": ctx.flags.get("reason"),
-    }
-    with audit.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(record) + "\n")
+    append_jsonl(
+        audit,
+        {
+            "timestamp": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "action": ctx.flags.get("action", "transition"),
+            "session_id": ctx.session.id,
+            "route_id": ctx.route.id,
+            "from_status": ctx.flags.get("from_status"),
+            "to_status": ctx.route.to_ref,
+            "reason": ctx.flags.get("reason"),
+        },
+    )
     return SideEffectResult()
 
 
