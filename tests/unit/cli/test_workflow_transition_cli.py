@@ -218,6 +218,10 @@ def test_transition_uses_target_status_validators(
 def test_transition_uses_route_controls_when_routes_declared(
     tmp_path: Path, clean_validator
 ) -> None:
+    """Route controls are forwarded to validate_project. v0.13: the
+    referenced ids must be registered in the validator catalog (the
+    fail-loud unknown-tripwire check rejects otherwise), so this test
+    uses real shipped validator ids rather than fake placeholders."""
     from tripwire.cli.transition import transition_cmd
 
     pd = _project_dir(tmp_path)
@@ -233,7 +237,7 @@ def test_transition_uses_route_controls_when_routes_declared(
                   - id: planned
                   - id: queued
                     terminal: true
-                    tripwires: [v_status_only]
+                    tripwires: [v_uuid_present]
                 routes:
                   - id: planned-to-queued
                     actor: pm-agent
@@ -241,7 +245,7 @@ def test_transition_uses_route_controls_when_routes_declared(
                     to: queued
                     kind: forward
                     controls:
-                      tripwires: [v_route_only]
+                      tripwires: [v_id_format]
             """
         ),
         encoding="utf-8",
@@ -254,7 +258,7 @@ def test_transition_uses_route_controls_when_routes_declared(
 
     assert result.exit_code == 0, result.output
     call = clean_validator.calls[-1]
-    assert call["kwargs"]["validator_ids"] == ["v_route_only"]
+    assert call["kwargs"]["validator_ids"] == ["v_id_format"]
 
 
 def test_transition_prompt_check_gate_accepts_recorded_invocation(
@@ -695,3 +699,47 @@ def test_missing_consumed_artifacts_handles_session_without_issues(
         tmp_path, session_id="test-session", target=target, session=session
     )
     assert missing == []
+
+
+def test_transition_rejects_route_with_unknown_tripwire(
+    tmp_path: Path, clean_validator
+) -> None:
+    """If a route declares a tripwire id that isn't in the registered
+    validator catalog, the gate must fail loud rather than silently
+    skip the missing check (the v0.9 deferred-from-PR-#73 silent-skip
+    fix). This is the runtime defense-in-depth complement to the
+    load-time `workflow/unknown_tripwire` lint."""
+    from tripwire.cli.transition import transition_cmd
+
+    pd = _project_dir(tmp_path)
+    (pd / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                  - id: queued
+                    terminal: true
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    kind: forward
+                    controls:
+                      tripwires: [v_does_not_exist_xyz]
+            """
+        ),
+        encoding="utf-8",
+    )
+    result = CliRunner().invoke(
+        transition_cmd,
+        ["test-session", "queued", "--project-dir", str(pd)],
+    )
+    assert result.exit_code != 0
+    assert "unknown_tripwire" in result.output
+    assert "v_does_not_exist_xyz" in result.output

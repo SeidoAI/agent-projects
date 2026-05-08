@@ -243,7 +243,33 @@ def _run_gate(
     controls = _controls_for_transition(route, target)
 
     # 2. Tripwires — target-status entry gate from workflow.yaml.
+    #
+    # Fail-loud on unknown validator ids: the load-time
+    # `workflow/unknown_tripwire` lint already catches typos at load,
+    # but if the catalog drifts from the workflow.yaml between load and
+    # transition (e.g. a validator was deleted in code while the YAML
+    # still references it), `validate_project` would silently skip the
+    # missing id and the gate would pass against fewer checks than the
+    # route declared. Surface that as a structured rejection here so
+    # the gate is honest about which tripwires actually ran.
     from tripwire.cli.transition import validate_project
+    from tripwire.core.workflow.registry import validator_catalog
+
+    catalog_ids = set(validator_catalog())
+    unknown_tripwires = [
+        tid for tid in controls.tripwires if tid not in catalog_ids
+    ]
+    if unknown_tripwires:
+        return _reject(
+            project_dir,
+            session_id,
+            target_status,
+            reason=(
+                f"unknown_tripwire: route declares validator id(s) "
+                f"{sorted(unknown_tripwires)} that are not registered in "
+                f"the validator catalog — refusing to run a partial gate"
+            ),
+        )
 
     report = validate_project(
         project_dir,
