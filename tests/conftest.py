@@ -62,6 +62,128 @@ def tmp_path_project(tmp_path: Path) -> Path:
     )
     for sub in ("issues", "nodes", "sessions", "docs", "plans"):
         (project_dir / sub).mkdir()
+    # v0.13: workflow.yaml is required for execute_transition to resolve
+    # routes. Provide a minimal coding-session covering all SessionStatus
+    # values + the transitions the test suite exercises.
+    # Reference every implemented validator on the planned-to-queued
+    # route so `declared_validator_ids` returns the full catalog when
+    # tests call `validate_project` without `validator_ids=`. Otherwise
+    # only `v_workflow_well_formed` would run.
+    _all_validators = [
+        "v_artifact_presence",
+        "v_bidirectional_related",
+        "v_comment_provenance",
+        "v_done_implies_issue_artifacts_on_main",
+        "v_done_implies_session_completed",
+        "v_enum_values",
+        "v_freshness",
+        "v_handoff_artifact",
+        "v_id_collisions",
+        "v_id_format",
+        "v_issue_artifact_presence",
+        "v_issue_body_structure",
+        "v_issue_session_status_compatibility",
+        "v_manifest_phase_ownership_consistent",
+        "v_manifest_schema",
+        "v_no_orphan_proj_branches",
+        "v_no_stale_pins",
+        "v_phase_requirements",
+        "v_pm_response_covers_self_review",
+        "v_pm_response_followups_resolve",
+        "v_pr_review_code_review_skill",
+        "v_pr_review_evidence",
+        "v_pr_review_external_reviewer",
+        "v_pr_review_threshold_findings",
+        "v_project_repos_present",
+        "v_project_standards",
+        "v_reference_integrity",
+        "v_self_review_implies_pm_response",
+        "v_session_issue_coherence",
+        "v_status_transitions",
+        "v_timestamps",
+        "v_uuid_present",
+        "v_workflow_well_formed",
+        "v_workspace_link",
+        "v_worktree_paths_unique",
+    ]
+    _route_lines = []
+    for idx, (f, t, kind) in enumerate(
+        [
+            ("planned", "queued", "forward"),
+            ("queued", "executing", "forward"),
+            ("executing", "in_review", "forward"),
+            ("in_review", "verified", "forward"),
+            ("verified", "completed", "forward"),
+            ("in_review", "executing", "revert"),
+            ("verified", "in_review", "revert"),
+            ("executing", "paused", "side"),
+            ("executing", "failed", "side"),
+            ("paused", "executing", "forward"),
+            ("failed", "executing", "forward"),
+            ("paused", "queued", "revert"),
+            ("paused", "completed", "revert"),
+            ("completed", "paused", "revert"),
+            ("planned", "abandoned", "side"),
+            ("queued", "abandoned", "side"),
+            ("executing", "abandoned", "side"),
+            ("paused", "abandoned", "side"),
+            ("failed", "abandoned", "side"),
+            ("in_review", "abandoned", "side"),
+            ("verified", "abandoned", "side"),
+        ]
+    ):
+        _route_lines.append(
+            f"      - id: {f}-to-{t}\n"
+            f"        actor: pm-agent\n"
+            f"        from: {f}\n"
+            f"        to: {t}\n"
+            f"        kind: {kind}\n"
+        )
+        if kind == "revert":
+            _route_lines.append(
+                "        preserve_fields:\n"
+                "          - runtime_state.claude_session_id\n"
+                "          - runtime_state.worktrees\n"
+            )
+        # Reference every implemented validator on the first route so
+        # `declared_validator_ids` (which feeds full-project validation
+        # when callers pass no `validator_ids=`) returns the full set.
+        if idx == 0:
+            _route_lines.append("        controls:\n          tripwires:\n")
+            for vid in _all_validators:
+                _route_lines.append(f"            - {vid}\n")
+        # The in_review → verified route runs the PR-review tripwires
+        # at gate time so test_transition_to_verified_blocked_by_missing_evidence
+        # exercises the right surface.
+        if (f, t) == ("in_review", "verified"):
+            _route_lines.append(
+                "        controls:\n"
+                "          tripwires:\n"
+                "            - v_pr_review_evidence\n"
+                "            - v_pr_review_threshold_findings\n"
+                "            - v_pr_review_external_reviewer\n"
+                "            - v_pr_review_code_review_skill\n"
+            )
+    (project_dir / "workflow.yaml").write_text(
+        "workflow_schema_version: 1\n"
+        "workflows:\n"
+        "  coding-session:\n"
+        "    actor: coding-agent\n"
+        "    trigger: session.spawn\n"
+        "    statuses:\n"
+        "      - id: planned\n"
+        "      - id: queued\n"
+        "      - id: executing\n"
+        "      - id: in_review\n"
+        "      - id: verified\n"
+        "      - id: completed\n"
+        "        terminal: true\n"
+        "      - id: paused\n"
+        "      - id: failed\n"
+        "      - id: abandoned\n"
+        "        terminal: true\n"
+        "    routes:\n" + "".join(_route_lines)
+    )
     templates = project_dir / "templates" / "artifacts"
     templates.mkdir(parents=True)
     # Minimal manifest — real one is tested separately. Matches v0.6a shape.

@@ -1,35 +1,36 @@
-"""Transition-token runtime — the workflow gate runner (KUI-159).
+"""Workflow executor — the SOLE writer of session.status in v0.13.
 
 A transition is a request to move a session from its current status
-to a target status. The runtime:
+to a target status via a declared route in ``workflow.yaml``. The
+executor:
 
-1. Loads ``<project>/workflow.yaml``, finds the workflow the session
-   belongs to (``coding-session`` for v0.9; future workflows look up
-   by ``trigger:`` against the spawn event).
-2. Verifies the target status is reachable from the current status
-   (single-id ``next:`` matches, or one of the conditional branches
-   resolves to it).
-3. Runs the target-status entry gate from ``workflow.yaml``:
-
-   a. **Validators** — run only the validators listed on the target
-      status with ``strict=True``. Any error fails the gate.
-   b. **JIT prompts** — for every JIT prompt listed on the target
-      status, confirm :meth:`JitPrompt.is_acknowledged` returns True.
-      An unack'd blocking JIT prompt fails the gate.
-   c. **Prompt-checks** — for every prompt-check listed on the target
-      status, query the events log to verify it was invoked before
-      entering that status.
-   d. **Artifacts** — required consumed artifacts with concrete paths
-      must exist before entering the target status.
-
-4. On pass: session.status = target, ``current_status_instance``
-   bumped, ``transition.completed`` emitted.
-5. On fail: ``transition.rejected`` emitted with a structured
-   ``reason``; session stays put.
+1. Loads ``<project>/workflow.yaml``, finds the workflow.
+2. Resolves the route from (current_status, target_status). No route
+   declared = transition is rejected as ``transition_not_reachable``.
+3. Captures a pre-state snapshot of the session (deep copy) for
+   atomic rollback.
+4. Runs the route's entry gate:
+   a. **Tripwires** — validators listed on the route's controls.
+   b. **JIT prompts** — every controls.jit_prompts must be acked.
+   c. **Prompt-checks** — every controls.prompt_checks must be invoked.
+   d. **Artifacts** — every required consumed artifact must exist.
+5. Captures pre-values for ``route.preserve_fields``; applies
+   ``route.clear_fields`` (sets to default).
+6. Flips ``session.status``, bumps ``current_status_instance``, saves.
+7. Runs ``route.side_effects`` in declared order. On any failure:
+   - For each completed side-effect with ``idempotent=False``, calls
+     ``inverse(ctx, result)`` in reverse order.
+   - Restores session from the pre-state snapshot.
+   - Saves session.
+   - Emits ``transition.rejected``.
+8. After all side-effects succeed, re-asserts preserved field values
+   (defends against accidental clearing by handlers).
+9. Saves session, emits ``transition.completed``, returns.
 
 Concurrency: per-session lockfile under
 ``.tripwire/locks/transition-<sid>.lock`` serialises concurrent
-transitions on the same session.
+transitions on the same session — the execute path is the single
+serialization point for ``session.status`` mutations.
 """
 
 from __future__ import annotations
@@ -44,7 +45,6 @@ from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.session_store import load_session, save_session
 from tripwire.core.workflow.loader import load_workflows
 from tripwire.core.workflow.schema import (
-    NextSpec,
     Workflow,
     WorkflowRoute,
     WorkflowRouteControls,
@@ -89,21 +89,6 @@ def _resolve_workflow(spec: WorkflowSpec) -> Workflow:
     return wf
 
 
-def _is_reachable(current: str, target: str, next_spec: NextSpec) -> bool:
-    """True iff ``target`` is reachable from ``current`` via ``next_spec``."""
-    if next_spec.kind == "single":
-        return next_spec.single == target
-    if next_spec.kind == "conditional":
-        if next_spec.conditional is None:
-            return False
-        # Equality predicates are evaluated against an empty context
-        # for now — the runtime context is built by the gate runner
-        # later. We accept any branch whose `then` matches the target
-        # since reachability ≠ what-actually-happens-at-runtime.
-        return any(branch.then == target for branch in next_spec.conditional)
-    return False  # terminal — nothing reachable
-
-
 def _next_status_instance_n(
     project_dir: Path, workflow: str, instance: str, status: str
 ) -> int:
@@ -122,19 +107,24 @@ def _next_status_instance_n(
     return n + 1
 
 
-def request_transition(
+def execute_transition(
     project_dir: Path,
     *,
     session_id: str,
     target_status: str,
+    flags: dict | None = None,
     now: datetime | None = None,
 ) -> TransitionResult:
-    """Run the gate and apply the transition.
+    """Run the gate, apply the transition, fire side-effects.
 
     Always emits ``transition.requested`` first, then either
     ``transition.completed`` (pass) or ``transition.rejected`` (fail).
     Raises :class:`TransitionError` for input errors that don't
     correspond to a gate verdict (unknown session / status).
+
+    ``flags`` carries caller-local options (e.g. ``reset_acks: True``
+    for the reopen route, ``reason: "..."`` for audit log entries).
+    Handed to every side-effect via :class:`SideEffectContext`.
     """
     when = now or datetime.now(tz=timezone.utc)
 
@@ -190,6 +180,7 @@ def request_transition(
                 target_status=target_status,
                 statuses_by_id=statuses_by_id,
                 when=when,
+                flags=dict(flags or {}),
             )
     except LockTimeout as exc:
         result = TransitionResult(
@@ -220,6 +211,7 @@ def _run_gate(
     target_status: str,
     statuses_by_id: dict[str, WorkflowStatus],
     when: datetime,
+    flags: dict,
 ) -> TransitionResult:
     """The gate body. Caller holds the per-session transition lock."""
     session_id = session.id
@@ -233,11 +225,7 @@ def _run_gate(
             f"{current_status!r} is not declared in workflow.yaml",
         )
     route = _route_between(workflow, current_status, target_status)
-    if workflow.routes:
-        reachable = route is not None
-    else:
-        reachable = _is_reachable(current_status, target_status, current.next)
-    if not reachable:
+    if route is None:
         return _reject(
             project_dir,
             session_id,
@@ -317,12 +305,77 @@ def _run_gate(
             reason=f"artifacts_missing: {missing_artifacts}",
         )
 
-    # 6. Pass — assign status-instance id, save session, emit completed.
+    # 6. Capture pre-state for atomic rollback.
+    snapshot = session.model_copy(deep=True)
+    preserved: dict[str, object] = {
+        path: _read_path(session, path) for path in route.preserve_fields
+    }
+
+    # 7. Run side-effects in declared order, BEFORE status flip. Gate-shaped
+    #    side-effects (verify_*) raise SideEffectFailure; rollback walks
+    #    completed effects' inverses and aborts the transition.
+    completed_effects: list[tuple[object, object]] = []
+    try:
+        for effect_id in route.side_effects:
+            from tripwire.core.workflow.side_effects import (
+                SideEffectContext,
+                SideEffectFailure,
+            )
+            from tripwire.core.workflow.side_effects import (
+                get as _get_effect,
+            )
+
+            effect = _get_effect(effect_id)
+            if effect is None:
+                # Unknown side-effect at runtime — should have been caught
+                # by `workflow/unknown_side_effect` lint at load. Treat as
+                # a hard failure rather than skip.
+                raise SideEffectFailure(f"unregistered_side_effect: {effect_id!r}")
+            ctx = SideEffectContext(
+                project_dir=project_dir,
+                session=session,
+                route=route,
+                flags={"from_status": current_status, **flags},
+            )
+            result = effect.apply(ctx)
+            completed_effects.append((effect, result))
+    except Exception as exc:
+        from tripwire.core.workflow.side_effects import SideEffectFailure
+
+        reason_code = (
+            str(exc)
+            if isinstance(exc, SideEffectFailure)
+            else f"side_effect_error: {exc}"
+        )
+        _rollback_side_effects(
+            project_dir, session_id, completed_effects, route=route, session=session
+        )
+        # Restore session to pre-state snapshot and persist (status was
+        # never flipped, so the snapshot is the correct restore target).
+        save_session(project_dir, snapshot)
+        return _reject(
+            project_dir,
+            session_id,
+            target_status,
+            reason=reason_code,
+        )
+
+    # 8. Apply clear_fields (set declared paths to None).
+    for path in route.clear_fields:
+        _write_path(session, path, None)
+
+    # 9. Flip status, assign status-instance id, save.
     n = _next_status_instance_n(project_dir, WORKFLOW_ID, session_id, target_status)
     status_instance = f"{WORKFLOW_ID}:{session_id}:{target_status}:{n}"
     session.status = SessionStatus(target_status)
     session.current_status_instance = status_instance
     session.updated_at = when
+
+    # 10. Re-assert preserved fields against accidental clearing.
+    for path, prior_value in preserved.items():
+        current_value = _read_path(session, path)
+        if current_value != prior_value:
+            _write_path(session, path, prior_value)
     save_session(project_dir, session)
 
     emit_event(
@@ -344,6 +397,69 @@ def _run_gate(
         message=None,
         status_instance=status_instance,
     )
+
+
+def _rollback_side_effects(
+    project_dir: Path,
+    session_id: str,
+    completed_effects: list[tuple[object, object]],
+    *,
+    route,
+    session,
+) -> None:
+    """Walk completed side-effects in reverse, calling each non-idempotent
+    handler's inverse. Idempotent handlers (best-effort, gh-bound, fs
+    deletion) are skipped — their effects can't be cleanly undone.
+    """
+    from tripwire.core.workflow.side_effects import SideEffectContext
+
+    for effect, result in reversed(completed_effects):
+        if effect.idempotent or effect.inverse is None:
+            continue
+        ctx = SideEffectContext(
+            project_dir=project_dir,
+            session=session,
+            route=route,
+            flags={},
+        )
+        try:
+            effect.inverse(ctx, result)
+        except Exception:
+            logger.exception(
+                "rollback inverse failed for side-effect %r in session %s; "
+                "continuing to roll back others",
+                effect.id,
+                session_id,
+            )
+
+
+def _read_path(obj: object, path: str) -> object | None:
+    """Walk a dot-path on a Pydantic-or-attribute object. ``None`` if
+    any segment is missing."""
+    cur: object | None = obj
+    for part in path.split("."):
+        if cur is None:
+            return None
+        cur = getattr(cur, part, None)
+    return cur
+
+
+def _write_path(obj: object, path: str, value: object) -> bool:
+    """Write a value to the leaf of a dot-path. Returns False if any
+    intermediate segment is missing (no-op then)."""
+    parts = path.split(".")
+    cur: object | None = obj
+    for part in parts[:-1]:
+        if cur is None:
+            return False
+        cur = getattr(cur, part, None)
+    if cur is None:
+        return False
+    try:
+        setattr(cur, parts[-1], value)
+    except (AttributeError, TypeError):
+        return False
+    return True
 
 
 def _reject(
@@ -500,5 +616,5 @@ __all__ = [
     "WORKFLOW_ID",
     "TransitionError",
     "TransitionResult",
-    "request_transition",
+    "execute_transition",
 ]
