@@ -51,8 +51,6 @@ def check_workflow_well_formed(ctx: ValidationContext) -> list[CheckResult]:
         known_prompt_checks=_known_prompt_checks(ctx.project_dir),
         known_commands=_known_commands(ctx.project_dir),
         known_skills=_known_skills(ctx.project_dir),
-        known_side_effects=_known_side_effects(),
-        known_status_field_paths=_known_status_field_paths(),
     )
     for finding in findings:
         out.append(
@@ -111,24 +109,3 @@ def _known_skills(project_dir):  # type: ignore[no-untyped-def]
     from tripwire.core.workflow.registry import known_skill_ids
 
     return known_skill_ids(project_dir)
-
-
-def _known_side_effects() -> set[str]:
-    """Return registered side-effect ids (v0.13)."""
-    from tripwire.core.workflow.side_effects import known_ids
-
-    return known_ids()
-
-
-def _known_status_field_paths() -> set[str]:
-    """Return top-level field names on ``AgentSession``.
-
-    Used by the v0.13 ``workflow/unknown_status_field`` lint to validate
-    ``preserve_fields:``/``clear_fields:`` paths. Only the head of each
-    dot-path is checked — deep validation against nested Pydantic
-    models is left for a future workstream once a real workflow needs
-    it.
-    """
-    from tripwire.models.session import AgentSession
-
-    return set(AgentSession.model_fields)

@@ -1,4 +1,3 @@
-workflow_schema_version: 1
 workflows:
   coding-session:
     actor: coding-agent
@@ -6,9 +5,12 @@ workflows:
     brief-description: "one session: plan, execute, review, ship."
     statuses:
       - id: planned
+        next: queued
       - id: queued
+        next: executing
       - id: executing
         tripwires: [v_uuid_present]
+        next: in_review
         work_steps:
           - id: implement
             actor: coding-agent
@@ -17,15 +19,17 @@ workflows:
       - id: in_review
         tripwires: [v_reference_integrity]
         heuristics: [v_stale_concept]
+        next: verified
         work_steps:
           - id: review
             actor: pm-agent
             label: review session
             skills: [project-manager, verification]
       - id: verified
+        next: completed
       - id: completed
-        terminal: true
         jit_prompts: [self-review]
+        terminal: true
     routes:
       - id: planned-to-queued
         actor: pm-agent
@@ -42,7 +46,7 @@ workflows:
         label: spawn coding agent
         controls:
           tripwires: [v_uuid_present]
-      - id: executing-to-in_review
+      - id: executing-to-review
         actor: coding-agent
         from: executing
         to: in_review
@@ -60,7 +64,7 @@ workflows:
         command: pm-session-review
         from: in_review
         to: executing
-        kind: revert
+        kind: return
         label: request changes
       - id: verified-to-completed
         actor: pm-agent

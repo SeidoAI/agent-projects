@@ -1,37 +1,44 @@
-"""Typed schema for ``workflow.yaml`` (v0.13).
+"""Typed schema for ``workflow.yaml``.
 
 The shape:
 
 .. code-block:: yaml
 
-    workflow_schema_version: 1
     workflows:
       <workflow-id>:
         actor: <actor-name>
         trigger: <event-name>
         statuses:
           - id: <status-id>
-            terminal: true | false       # default false
+            next: <status-id>          # single
+            # or
+            next:                        # conditional
+              - if: <predicate>
+                then: <status-id>
+              - else: <status-id>      # default branch
+            # or
+            terminal: true               # terminal status
             prompt_checks: [<id>, ...]
             tripwires: [<id>, ...]       # hard pass/fail gates
             heuristics: [<id>, ...]      # soft warn-once checks
             jit_prompts: [<id>, ...]     # hidden + ack
             artifacts:
-              produces: [...]
-              consumes: [...]
+              produces:
+                - id: <artifact-id>
+                  label: <display-label>
+                  path: <optional-path-template>
+              consumes:
+                - id: <artifact-id>
+                  label: <display-label>
         routes:
           - id: <route-id>
             actor: pm-agent | coding-agent | code
             from: <status-id> | source:<name>
             to: <status-id> | sink:<name>
-            kind: forward | return | loop | side | revert | terminal
+            kind: forward | return | loop | side | terminal
             command: <optional-command-id>
             trigger: <optional-event-or-condition>
-            preconditions: [<predicate-id>, ...]   # gate-time checks
-            preserve_fields: [<dot-path>, ...]      # survive transition
-            clear_fields: [<dot-path>, ...]         # cleared on transition
-            side_effects: [<registered-id>, ...]    # ordered apply
-            rollback: atomic | none                 # default atomic
+            signals: [signal.<name>, ...]   # pm-monitor signal vocabulary
             controls:
               tripwires: [<id>, ...]
               heuristics: [<id>, ...]
@@ -39,9 +46,9 @@ The shape:
               jit_prompts: [<id>, ...]
             skills: [<skill-id>, ...]
             emits:
-              artifacts: [...]
-              events: [...]
-              status_changes: [...]
+              artifacts:
+                - id: <artifact-id>
+                  label: <display-label>
 
 Four-primitive control model (locked):
 
@@ -50,12 +57,15 @@ Four-primitive control model (locked):
 - ``jit_prompt`` — hidden ack-required prompt
 - ``prompt_check`` — required slash-command invocation
 
-Routes are the SINGLE source of structural arrows; ``statuses[].next:``
-is removed in v0.13. Terminal-ness is an explicit boolean on the status.
+Conditional predicates are equality-only for v0.9 (locked decision in
+``backlog-architecture.md``): ``<dot-path> (==|!=) <bare-value>``.
 
 The schema lives here as plain dataclasses (not Pydantic) — the loader
-parses raw YAML into these structures so we control coercion and
-error messages directly.
+parses the raw YAML into these structures so we control coercion and
+error messages directly. Pydantic was considered but the file shape
+involves three distinct ``next:`` shapes that are awkward to express
+as a discriminated-union BaseModel; the dataclass tree keeps the
+runtime contract readable.
 """
 
 from __future__ import annotations
@@ -64,10 +74,103 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 KNOWN_ROUTE_ACTORS = frozenset({"pm-agent", "coding-agent", "code"})
-ROUTE_KINDS = frozenset({"forward", "return", "loop", "side", "revert", "terminal"})
-ROLLBACK_MODES = frozenset({"atomic", "none"})
+ROUTE_KINDS = frozenset({"forward", "return", "loop", "side", "terminal"})
 
-WORKFLOW_SCHEMA_VERSION = 1
+# ----------------------------------------------------------------------
+# Predicate — equality-only for v0.9
+# ----------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Predicate:
+    """Equality predicate of the form ``<dot-path> <op> <value>``.
+
+    ``field`` is a dot-path into the workflow context (e.g.
+    ``agent.role``). ``op`` is ``==`` or ``!=``. ``value`` is the
+    right-hand bare token, treated as a string literal.
+
+    Numerical thresholds and conjunctions are deliberately excluded —
+    add operators only when a real workflow needs them. See
+    ``backlog-architecture.md`` decision #2.
+    """
+
+    field: str
+    op: Literal["==", "!="]
+    value: str
+
+    @classmethod
+    def parse(cls, expr: str) -> Predicate:
+        """Parse ``"<lhs> <op> <rhs>"`` into a :class:`Predicate`.
+
+        Raises :class:`ValueError` if the operator is unsupported or
+        the expression is malformed.
+        """
+        if "==" in expr:
+            op: Literal["==", "!="] = "=="
+            lhs, _, rhs = expr.partition("==")
+        elif "!=" in expr:
+            op = "!="
+            lhs, _, rhs = expr.partition("!=")
+        else:
+            raise ValueError(
+                f"predicate {expr!r} must contain `==` or `!=` "
+                f"(equality-only per workflow.yaml v0.9 spec)"
+            )
+        lhs = lhs.strip()
+        rhs = rhs.strip()
+        if not lhs or not rhs:
+            raise ValueError(
+                f"predicate {expr!r} must have non-empty operands on both sides"
+            )
+        return cls(field=lhs, op=op, value=rhs)
+
+    def evaluate(self, ctx: dict) -> bool:
+        """Resolve ``self.field`` against ``ctx`` and apply ``self.op``.
+
+        A missing field resolves to ``None``. ``None`` never equals a
+        non-empty string literal, so a missing field on an ``==`` check
+        is False.
+        """
+        cur: object = ctx
+        for part in self.field.split("."):
+            if isinstance(cur, dict) and part in cur:
+                cur = cur[part]
+            else:
+                cur = None
+                break
+        if self.op == "==":
+            return cur == self.value
+        return cur != self.value
+
+
+# ----------------------------------------------------------------------
+# Next-spec — single id | conditional branches | terminal
+# ----------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ConditionalBranch:
+    """One branch of a conditional ``next:`` list.
+
+    ``predicate=None`` marks the default (``else``) branch.
+    """
+
+    predicate: Predicate | None
+    then: str
+
+
+@dataclass(frozen=True)
+class NextSpec:
+    """Discriminated union over the three ``next:`` shapes.
+
+    ``kind`` is the discriminator. ``single`` is set when ``kind ==
+    "single"``; ``conditional`` is set when ``kind == "conditional"``.
+    Both stay ``None`` when the status is terminal.
+    """
+
+    kind: Literal["single", "conditional", "terminal"]
+    single: str | None = None
+    conditional: list[ConditionalBranch] | None = None
 
 
 # ----------------------------------------------------------------------
@@ -138,16 +241,8 @@ class WorkflowCrossLink:
 
 @dataclass(frozen=True)
 class WorkflowStatus:
-    """A node in the lifecycle.
-
-    ``terminal`` is the explicit terminal-ness flag (replaces the
-    synthetic ``next.kind == "terminal"`` discriminator from v0.12).
-    Terminal statuses must have no outbound routes (other than to
-    boundary ports).
-    """
-
     id: str
-    terminal: bool = False
+    next: NextSpec
     prompt_checks: list[str] = field(default_factory=list)
     tripwires: list[str] = field(default_factory=list)
     heuristics: list[str] = field(default_factory=list)
@@ -174,22 +269,6 @@ class WorkflowRouteEmits:
 
 
 @dataclass(frozen=True)
-class WorkflowRouteTrigger:
-    """Typed trigger for a route (v0.13).
-
-    ``type`` is one of ``command``, ``event``, ``runtime_event``, or
-    ``condition``. ``name`` is the typed handle (e.g. command id or
-    event name). ``raw`` preserves the original string for diagnostic
-    rendering; if the YAML provided a bare string we record it both
-    in ``raw`` and as ``type='condition'``.
-    """
-
-    type: Literal["command", "event", "runtime_event", "condition"]
-    name: str
-    raw: str | None = None
-
-
-@dataclass(frozen=True)
 class WorkflowRoute:
     """One routed process segment in a workflow map.
 
@@ -200,30 +279,20 @@ class WorkflowRoute:
     ``signals`` lists the pm-monitor signal predicates that fire this
     route (e.g. ``signal.session_unblocked``). Used by the overseer
     loop to wire dispatch routes back to their source signals.
-
-    ``preconditions`` / ``preserve_fields`` / ``clear_fields`` /
-    ``side_effects`` / ``rollback`` are the v0.13 executor contract:
-    the dispatcher reads them to drive the transition.
     """
 
     id: str
     actor: str
     from_ref: str
     to_ref: str
-    kind: Literal["forward", "return", "loop", "side", "revert", "terminal"]
+    kind: Literal["forward", "return", "loop", "side", "terminal"]
     label: str
     trigger: str | None = None
-    trigger_typed: WorkflowRouteTrigger | None = None
     command: str | None = None
     controls: WorkflowRouteControls = field(default_factory=WorkflowRouteControls)
     signals: list[str] = field(default_factory=list)
     skills: list[str] = field(default_factory=list)
     emits: WorkflowRouteEmits = field(default_factory=WorkflowRouteEmits)
-    preconditions: list[str] = field(default_factory=list)
-    preserve_fields: list[str] = field(default_factory=list)
-    clear_fields: list[str] = field(default_factory=list)
-    side_effects: list[str] = field(default_factory=list)
-    rollback: Literal["atomic", "none"] = "atomic"
 
 
 @dataclass(frozen=True)
@@ -263,21 +332,19 @@ class WorkflowFinding:
 
 @dataclass(frozen=True)
 class WorkflowSpec:
-    """The parsed contents of ``workflow.yaml`` (v0.13).
+    """The parsed contents of ``workflow.yaml``.
 
     Empty (``workflows == {}``) when the file is missing or absent.
 
-    ``schema_version`` is the declared ``workflow_schema_version`` at
-    the top of the file. ``0`` means absent or non-integer; the loader
-    surfaces this as a ``workflow/missing_schema_version`` finding.
-
     ``load_findings`` carries any structural anomalies the loader
-    detected before constructing the typed tree. :func:`validate_workflow_spec`
+    detected before constructing the typed tree (e.g. a status that
+    had both ``terminal: true`` and a ``next:`` key — a coherent
+    :class:`NextSpec` can't represent that, so the loader records it
+    as a finding and discards one side). :func:`validate_workflow_spec`
     surfaces these alongside its own checks.
     """
 
     workflows: dict[str, Workflow] = field(default_factory=dict)
-    schema_version: int = 0
     load_findings: list[WorkflowFinding] = field(default_factory=list)
 
 
@@ -295,25 +362,25 @@ def validate_workflow_spec(
     known_prompt_checks: set[str],
     known_commands: set[str] | None = None,
     known_skills: set[str] | None = None,
-    known_side_effects: set[str] | None = None,
-    known_status_field_paths: set[str] | None = None,
 ) -> list[WorkflowFinding]:
     """Run well-formedness checks against a parsed :class:`WorkflowSpec`.
 
     Returns a list of findings. The caller routes findings into the
     main validator report (or rejects the load entirely for fatal
-    cases).
+    cases). Detected failure modes:
 
-    ``known_side_effects`` is the set of registered side-effect handler
-    ids; if ``None``, the ``unknown_side_effect`` lint is a no-op (used
-    during WS1 before the registry exists).
-
-    ``known_status_field_paths`` is the set of valid dot-paths on the
-    ``AgentSession`` model; if ``None``, the ``unknown_status_field``
-    lint is a no-op.
+    - ``workflow/duplicate_status_id`` — two statuses share an id
+    - ``workflow/unknown_next_status`` — ``next:`` refers to a status
+      id not declared in the same workflow
+    - ``workflow/terminal_with_next`` — a status marks ``terminal: true``
+      AND declares ``next``
+    - ``workflow/no_terminal_status`` — the workflow has no terminal
+      status (every workflow must converge)
+    - ``workflow/unknown_tripwire`` / ``workflow/unknown_heuristic`` /
+      ``workflow/unknown_jit_prompt`` / ``workflow/unknown_prompt_check``
+      — a status or route references a primitive id that does not exist
     """
     findings: list[WorkflowFinding] = list(spec.load_findings)
-    findings.extend(_check_schema_version(spec))
     for wf_id, wf in spec.workflows.items():
         findings.extend(_check_workflow(wf_id, wf))
         findings.extend(
@@ -326,52 +393,10 @@ def validate_workflow_spec(
                 known_prompt_checks=known_prompt_checks,
                 known_commands=known_commands,
                 known_skills=known_skills,
-                known_side_effects=known_side_effects,
-                known_status_field_paths=known_status_field_paths,
             )
         )
-        findings.extend(_check_route_kinds(wf_id, wf))
-        findings.extend(_check_reachability(wf_id, wf))
-        findings.extend(_check_trap_statuses(wf_id, wf))
-        findings.extend(_check_recovery_paths(wf_id, wf))
-        findings.extend(_check_lossy_reverts(wf_id, wf))
     findings.extend(_check_cross_links(spec))
     return findings
-
-
-def _check_schema_version(spec: WorkflowSpec) -> list[WorkflowFinding]:
-    if not spec.workflows:
-        # Empty spec: no file or empty file — schema_version finding
-        # would be noisy.
-        return []
-    if spec.schema_version == WORKFLOW_SCHEMA_VERSION:
-        return []
-    if spec.schema_version == 0:
-        return [
-            WorkflowFinding(
-                code="workflow/missing_schema_version",
-                workflow="<root>",
-                status=None,
-                message=(
-                    "workflow.yaml is missing top-level "
-                    f"`workflow_schema_version: {WORKFLOW_SCHEMA_VERSION}`. "
-                    "Run `tripwire migrate workflow` to upgrade."
-                ),
-            )
-        ]
-    return [
-        WorkflowFinding(
-            code="workflow/missing_schema_version",
-            workflow="<root>",
-            status=None,
-            message=(
-                f"workflow.yaml declares `workflow_schema_version: "
-                f"{spec.schema_version}` but this build only understands "
-                f"version {WORKFLOW_SCHEMA_VERSION}. Run `tripwire migrate "
-                f"workflow` or upgrade tripwire."
-            ),
-        )
-    ]
 
 
 def _check_cross_links(spec: WorkflowSpec) -> list[WorkflowFinding]:
@@ -460,7 +485,7 @@ def _check_workflow(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
                 )
             )
         seen.add(status.id)
-        if status.terminal:
+        if status.next.kind == "terminal":
             has_terminal = True
     if not has_terminal and wf.statuses:
         out.append(
@@ -475,181 +500,47 @@ def _check_workflow(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
                 ),
             )
         )
+    out.extend(_check_next_refs(wf_id, wf, declared_ids=seen))
     return out
 
 
-def _check_route_kinds(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
+def _check_next_refs(
+    wf_id: str, wf: Workflow, *, declared_ids: set[str]
+) -> list[WorkflowFinding]:
     out: list[WorkflowFinding] = []
-    for route in wf.routes:
-        if route.kind not in ROUTE_KINDS:
-            out.append(
-                WorkflowFinding(
-                    code="workflow/unknown_route_kind",
-                    workflow=wf_id,
-                    status=None,
-                    message=(
-                        f"route {route.id!r} kind {route.kind!r} is not in "
-                        f"{sorted(ROUTE_KINDS)}"
-                    ),
-                )
-            )
-        if route.rollback not in ROLLBACK_MODES:
-            out.append(
-                WorkflowFinding(
-                    code="workflow/unknown_rollback_mode",
-                    workflow=wf_id,
-                    status=None,
-                    message=(
-                        f"route {route.id!r} rollback {route.rollback!r} is "
-                        f"not in {sorted(ROLLBACK_MODES)}"
-                    ),
-                )
-            )
-    return out
-
-
-def _check_reachability(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
-    """Every non-source-port status must be reachable from at least one
-    inbound route originating outside itself or from a boundary source.
-    """
-    out: list[WorkflowFinding] = []
-    if not wf.statuses:
-        return out
-    declared = {s.id for s in wf.statuses}
-    has_inbound: dict[str, bool] = dict.fromkeys(declared, False)
-    for route in wf.routes:
-        if route.to_ref in declared and route.from_ref != route.to_ref:
-            has_inbound[route.to_ref] = True
-        elif route.to_ref in declared and route.from_ref.startswith("source:"):
-            has_inbound[route.to_ref] = True
-    initial = wf.statuses[0].id
-    has_inbound[initial] = True  # the canonical entry point
-    for sid, reached in has_inbound.items():
-        if not reached:
-            out.append(
-                WorkflowFinding(
-                    code="workflow/unreachable_status",
-                    workflow=wf_id,
-                    status=sid,
-                    message=(
-                        f"status {sid!r} has no inbound route from another "
-                        f"status or a source: port — it cannot be entered"
-                    ),
-                )
-            )
-    return out
-
-
-def _check_trap_statuses(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
-    """Every non-terminal status must have at least one outbound route.
-
-    A terminal status with outbound routes is also surfaced (it's
-    semantically inconsistent — terminal statuses are sinks).
-    """
-    out: list[WorkflowFinding] = []
-    declared = {s.id for s in wf.statuses}
-    # Track outbound routes by kind. Revert-kind exits from a terminal
-    # status are the documented v0.13 reopen pattern (completed → paused)
-    # — they do not violate terminal-ness.
-    has_outbound: dict[str, bool] = dict.fromkeys(declared, False)
-    has_non_revert_outbound: dict[str, bool] = dict.fromkeys(declared, False)
-    for route in wf.routes:
-        if route.from_ref in declared:
-            has_outbound[route.from_ref] = True
-            if route.kind != "revert":
-                has_non_revert_outbound[route.from_ref] = True
     for status in wf.statuses:
-        if status.terminal:
-            if has_non_revert_outbound[status.id]:
+        nxt = status.next
+        if nxt.kind == "single":
+            assert nxt.single is not None
+            if nxt.single not in declared_ids:
                 out.append(
                     WorkflowFinding(
-                        code="workflow/terminal_with_outbound_route",
+                        code="workflow/unknown_next_status",
                         workflow=wf_id,
                         status=status.id,
                         message=(
-                            f"status {status.id!r} declares `terminal: true` "
-                            f"but has non-revert outbound routes — terminal "
-                            f"statuses are sinks (revert-kind reopen edges "
-                            f"are allowed)"
+                            f"status {status.id!r} `next:` references "
+                            f"{nxt.single!r} which is not declared in "
+                            f"workflow {wf_id!r}"
                         ),
                     )
                 )
-        elif not has_outbound[status.id]:
-            out.append(
-                WorkflowFinding(
-                    code="workflow/trap_status",
-                    workflow=wf_id,
-                    status=status.id,
-                    message=(
-                        f"status {status.id!r} is non-terminal but has no "
-                        f"outbound route — sessions entering this status "
-                        f"have no way out"
-                    ),
-                )
-            )
-    return out
-
-
-_OFF_PATH_STATUS_NAMES = frozenset({"paused", "failed"})
-
-
-def _check_recovery_paths(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
-    """An off-path non-terminal status (paused, failed) must have at
-    least one route back to an on-path status. Off-path statuses that
-    can only escape into ``abandoned`` produce dead ends like Gap C/D
-    in PM handoff #5.
-    """
-    out: list[WorkflowFinding] = []
-    on_path: set[str] = set()
-    for status in wf.statuses:
-        if status.id in _OFF_PATH_STATUS_NAMES:
-            continue
-        if status.id == "abandoned":
-            continue
-        on_path.add(status.id)
-    for status in wf.statuses:
-        if status.id not in _OFF_PATH_STATUS_NAMES:
-            continue
-        if status.terminal:
-            continue
-        recovery_exists = any(
-            r.from_ref == status.id and r.to_ref in on_path for r in wf.routes
-        )
-        if not recovery_exists:
-            out.append(
-                WorkflowFinding(
-                    code="workflow/no_recovery_path",
-                    workflow=wf_id,
-                    status=status.id,
-                    message=(
-                        f"off-path status {status.id!r} has no route back to "
-                        f"an on-path status — recovery hints in error "
-                        f"messages would lead to dead ends"
-                    ),
-                )
-            )
-    return out
-
-
-def _check_lossy_reverts(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
-    out: list[WorkflowFinding] = []
-    for route in wf.routes:
-        if route.kind != "revert":
-            continue
-        if not route.preserve_fields:
-            out.append(
-                WorkflowFinding(
-                    code="workflow/lossy_revert",
-                    workflow=wf_id,
-                    status=None,
-                    severity="warning",
-                    message=(
-                        f"revert route {route.id!r} declares no "
-                        f"`preserve_fields:` — the transition will lose all "
-                        f"runtime state on rollback (e.g. claude_session_id)"
-                    ),
-                )
-            )
+        elif nxt.kind == "conditional":
+            assert nxt.conditional is not None
+            for branch in nxt.conditional:
+                if branch.then not in declared_ids:
+                    out.append(
+                        WorkflowFinding(
+                            code="workflow/unknown_next_status",
+                            workflow=wf_id,
+                            status=status.id,
+                            message=(
+                                f"status {status.id!r} conditional branch "
+                                f"`then: {branch.then!r}` is not declared "
+                                f"in workflow {wf_id!r}"
+                            ),
+                        )
+                    )
     return out
 
 
@@ -663,8 +554,6 @@ def _check_refs(
     known_prompt_checks: set[str],
     known_commands: set[str] | None,
     known_skills: set[str] | None,
-    known_side_effects: set[str] | None,
-    known_status_field_paths: set[str] | None,
 ) -> list[WorkflowFinding]:
     out: list[WorkflowFinding] = []
     for status in wf.statuses:
@@ -730,8 +619,6 @@ def _check_refs(
             known_prompt_checks=known_prompt_checks,
             known_commands=known_commands,
             known_skills=known_skills,
-            known_side_effects=known_side_effects,
-            known_status_field_paths=known_status_field_paths,
         )
     )
     return out
@@ -747,8 +634,6 @@ def _check_route_refs(
     known_prompt_checks: set[str],
     known_commands: set[str] | None,
     known_skills: set[str] | None,
-    known_side_effects: set[str] | None,
-    known_status_field_paths: set[str] | None,
 ) -> list[WorkflowFinding]:
     out: list[WorkflowFinding] = []
     declared_statuses = set(wf.statuses_by_id)
@@ -880,45 +765,7 @@ def _check_route_refs(
                         ),
                     )
                 )
-        for ref in route.side_effects:
-            if known_side_effects is not None and ref not in known_side_effects:
-                out.append(
-                    WorkflowFinding(
-                        code="workflow/unknown_side_effect",
-                        workflow=wf_id,
-                        status=status,
-                        message=(
-                            f"route {route.id!r} references side-effect "
-                            f"{ref!r} which is not registered"
-                        ),
-                    )
-                )
-        for path in (*route.preserve_fields, *route.clear_fields):
-            if known_status_field_paths is not None and not _path_is_known(
-                path, known_status_field_paths
-            ):
-                out.append(
-                    WorkflowFinding(
-                        code="workflow/unknown_status_field",
-                        workflow=wf_id,
-                        status=status,
-                        message=(
-                            f"route {route.id!r} preserve/clear path {path!r} "
-                            f"is not a recognized AgentSession field"
-                        ),
-                    )
-                )
     return out
-
-
-def _path_is_known(path: str, known: set[str]) -> bool:
-    """Return True iff ``path`` (a dot-path) is a prefix-match against
-    any registered field path. Allows both ``runtime_state`` and
-    ``runtime_state.claude_session_id`` to validate."""
-    if path in known:
-        return True
-    head = path.split(".", 1)[0]
-    return head in known
 
 
 def _finding_status_for_route(route: WorkflowRoute, statuses: set[str]) -> str | None:
@@ -934,18 +781,15 @@ def _is_boundary_ref(ref: str) -> bool:
 
 
 __all__ = [
-    "KNOWN_ROUTE_ACTORS",
-    "ROLLBACK_MODES",
-    "ROUTE_KINDS",
-    "WORKFLOW_SCHEMA_VERSION",
+    "ConditionalBranch",
+    "NextSpec",
+    "Predicate",
     "Workflow",
     "WorkflowArtifactRef",
-    "WorkflowCrossLink",
     "WorkflowFinding",
     "WorkflowRoute",
     "WorkflowRouteControls",
     "WorkflowRouteEmits",
-    "WorkflowRouteTrigger",
     "WorkflowSpec",
     "WorkflowStatus",
     "WorkflowStatusArtifacts",

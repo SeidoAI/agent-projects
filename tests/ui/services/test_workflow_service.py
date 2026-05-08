@@ -32,32 +32,39 @@ def _write_workflow(project_dir: Path) -> None:
     (project_dir / "workflow.yaml").write_text(
         dedent(
             """\
-            workflow_schema_version: 1
             workflows:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
                   - id: planned
+                    next: queued
                     artifacts:
                       consumes:
                         - id: issue-brief
                           label: issue brief
                   - id: queued
+                    next: executing
                     artifacts:
                       produces:
                         - id: plan
                           label: plan.md
                           path: sessions/{session_id}/plan.md
                   - id: executing
+                    next: in_review
                     tripwires: [v_uuid_present, v_reference_integrity]
                     prompt_checks: [pm-session-queue]
                   - id: in_review
+                    next:
+                      - if: review.outcome == approved
+                        then: verified
+                      - else: executing
                     artifacts:
                       produces:
                         - id: review-notes
                           label: review notes
                   - id: verified
+                    next: completed
                   - id: completed
                     jit_prompts: [self-review]
                     terminal: true
@@ -68,7 +75,6 @@ def _write_workflow(project_dir: Path) -> None:
                     trigger: command.pm-session-queue
                     from: planned
                     to: queued
-                    kind: forward
                     controls:
                       tripwires: [v_reference_integrity]
                       prompt_checks: [pm-session-queue]
@@ -85,32 +91,9 @@ def _write_workflow(project_dir: Path) -> None:
                     trigger: command.pm-session-spawn
                     from: queued
                     to: executing
-                    kind: forward
                     skills: [project-manager, backend-development]
                     emits:
                       events: [session.spawn]
-                  - id: executing-to-in_review
-                    actor: pm-agent
-                    from: executing
-                    to: in_review
-                    kind: forward
-                  - id: in_review-to-verified
-                    actor: pm-agent
-                    from: in_review
-                    to: verified
-                    kind: forward
-                  - id: in_review-to-executing
-                    actor: pm-agent
-                    from: in_review
-                    to: executing
-                    kind: revert
-                    preserve_fields:
-                      - runtime_state.claude_session_id
-                  - id: verified-to-completed
-                    actor: pm-agent
-                    from: verified
-                    to: completed
-                    kind: forward
             """
         ),
         encoding="utf-8",
@@ -154,9 +137,8 @@ def test_build_workflow_surfaces_statuses_from_workflow_yaml(tmp_path: Path) -> 
     assert executing["tripwires"] == ["v_uuid_present", "v_reference_integrity"]
     assert executing["prompt_checks"] == ["pm-session-queue"]
     in_review = workflow["statuses"][3]
-    assert in_review["terminal"] is False
-    completed = workflow["statuses"][5]
-    assert completed["terminal"] is True
+    assert in_review["next"]["kind"] == "conditional"
+    assert {"else": "executing"} in in_review["next"]["branches"]
 
 
 def test_build_workflow_surfaces_routes_from_workflow_yaml(tmp_path: Path) -> None:
@@ -276,10 +258,7 @@ def test_build_workflow_reports_definition_drift(tmp_path: Path) -> None:
         for finding in payload["drift"]["findings"]
         if finding["source"] == "definition"
     ]
-    # v0.13: legacy `next:` blocks surface as `workflow/legacy_next_field`
-    # (the v0.12 `unknown_next_status` shape was removed when `next:` was
-    # deleted from the schema).
-    assert definition_findings[0]["code"] == "workflow/legacy_next_field"
+    assert definition_findings[0]["code"] == "workflow/unknown_next_status"
 
 
 def test_build_workflow_workflows_empty_when_yaml_missing(tmp_path: Path) -> None:

@@ -31,45 +31,23 @@ def _project_dir(tmp_path: Path) -> Path:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
-            workflow_schema_version: 1
             workflows:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
                   - id: planned
+                    next: queued
                   - id: queued
+                    next: executing
                   - id: executing
+                    next: in_review
                   - id: in_review
+                    next: verified
                   - id: verified
+                    next: completed
                   - id: completed
                     terminal: true
-                routes:
-                  - id: planned-to-queued
-                    actor: pm-agent
-                    from: planned
-                    to: queued
-                    kind: forward
-                  - id: queued-to-executing
-                    actor: pm-agent
-                    from: queued
-                    to: executing
-                    kind: forward
-                  - id: executing-to-in_review
-                    actor: pm-agent
-                    from: executing
-                    to: in_review
-                    kind: forward
-                  - id: in_review-to-verified
-                    actor: pm-agent
-                    from: in_review
-                    to: verified
-                    kind: forward
-                  - id: verified-to-completed
-                    actor: pm-agent
-                    from: verified
-                    to: completed
-                    kind: forward
             """
         ),
         encoding="utf-8",
@@ -175,29 +153,19 @@ def test_transition_uses_target_status_validators(
     (pd / "workflow.yaml").write_text(
         dedent(
             """\
-            workflow_schema_version: 1
             workflows:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
                   - id: planned
+                    next: queued
+                    tripwires: [v_id_format]
                   - id: queued
+                    next: executing
+                    tripwires: [v_uuid_present]
                   - id: executing
                     terminal: true
-                routes:
-                  - id: planned-to-queued
-                    actor: pm-agent
-                    from: planned
-                    to: queued
-                    kind: forward
-                    controls:
-                      tripwires: [v_uuid_present]
-                  - id: queued-to-executing
-                    actor: pm-agent
-                    from: queued
-                    to: executing
-                    kind: forward
             """
         ),
         encoding="utf-8",
@@ -224,13 +192,13 @@ def test_transition_uses_route_controls_when_routes_declared(
     (pd / "workflow.yaml").write_text(
         dedent(
             """\
-            workflow_schema_version: 1
             workflows:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
                   - id: planned
+                    next: queued
                   - id: queued
                     terminal: true
                     tripwires: [v_status_only]
@@ -239,7 +207,6 @@ def test_transition_uses_route_controls_when_routes_declared(
                     actor: pm-agent
                     from: planned
                     to: queued
-                    kind: forward
                     controls:
                       tripwires: [v_route_only]
             """
@@ -267,29 +234,18 @@ def test_transition_prompt_check_gate_accepts_recorded_invocation(
     (pd / "workflow.yaml").write_text(
         dedent(
             """\
-            workflow_schema_version: 1
             workflows:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
                   - id: planned
+                    next: queued
                   - id: queued
+                    next: executing
+                    prompt_checks: [pm-session-queue]
                   - id: executing
                     terminal: true
-                routes:
-                  - id: planned-to-queued
-                    actor: pm-agent
-                    from: planned
-                    to: queued
-                    kind: forward
-                    controls:
-                      prompt_checks: [pm-session-queue]
-                  - id: queued-to-executing
-                    actor: pm-agent
-                    from: queued
-                    to: executing
-                    kind: forward
             """
         ),
         encoding="utf-8",
@@ -573,6 +529,7 @@ def test_missing_consumed_artifacts_resolves_issue_key_from_session(
     from datetime import datetime, timezone
 
     from tripwire.core.workflow.schema import (
+        NextSpec,
         WorkflowArtifactRef,
         WorkflowStatus,
         WorkflowStatusArtifacts,
@@ -582,7 +539,7 @@ def test_missing_consumed_artifacts_resolves_issue_key_from_session(
 
     target = WorkflowStatus(
         id="executing",
-        terminal=True,
+        next=NextSpec(kind="terminal"),
         artifacts=WorkflowStatusArtifacts(
             consumes=[
                 WorkflowArtifactRef(
@@ -620,6 +577,7 @@ def test_missing_consumed_artifacts_skips_unresolved_placeholders(
     must skip such paths rather than raise.
     """
     from tripwire.core.workflow.schema import (
+        NextSpec,
         WorkflowArtifactRef,
         WorkflowStatus,
         WorkflowStatusArtifacts,
@@ -628,7 +586,7 @@ def test_missing_consumed_artifacts_skips_unresolved_placeholders(
 
     target = WorkflowStatus(
         id="verified",
-        terminal=True,
+        next=NextSpec(kind="terminal"),
         artifacts=WorkflowStatusArtifacts(
             consumes=[
                 WorkflowArtifactRef(
@@ -660,6 +618,7 @@ def test_missing_consumed_artifacts_handles_session_without_issues(
     from datetime import datetime, timezone
 
     from tripwire.core.workflow.schema import (
+        NextSpec,
         WorkflowArtifactRef,
         WorkflowStatus,
         WorkflowStatusArtifacts,
@@ -669,7 +628,7 @@ def test_missing_consumed_artifacts_handles_session_without_issues(
 
     target = WorkflowStatus(
         id="executing",
-        terminal=True,
+        next=NextSpec(kind="terminal"),
         artifacts=WorkflowStatusArtifacts(
             consumes=[
                 WorkflowArtifactRef(
