@@ -852,111 +852,14 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
 
 
 # Allowed session-status transitions. Tight by design: agents shouldn't
-# be able to skip review (`executing → done`) or jump arbitrary terminal
-# states. PMs that need a manual override can edit session.yaml directly.
-# v0.8 candidate to extract to a configurable matrix if it grows.
-_ALLOWED_TRANSITIONS: dict[str, set[str]] = {
-    "planned": {"queued", "abandoned"},
-    "queued": {"executing", "abandoned"},
-    "executing": {"in_review", "paused", "failed", "abandoned"},
-    "paused": {"executing", "abandoned"},
-    "failed": {"executing", "abandoned"},
-    "in_review": {"verified", "executing", "abandoned"},
-    "verified": {"completed", "in_review", "abandoned"},
-}
-
-
-# Default-on sweep: when transitioning into one of these states, also
-# advance member issues to the matching issue state via the v0.9.4
-# status contract (sweep_issues). User can override with --no-sweep-issues.
-_DEFAULT_SWEEP_ON_TRANSITION = frozenset({"in_review", "verified", "completed"})
-
-
-def _rollback_transition(
-    project_dir: Path,
-    session,
-    prior_status,
-    prior_updated_at,
-    swept_issues: list[str],
-    issue_pre_state: dict[str, str],
-) -> None:
-    """Restore a session and its swept issues to their pre-transition state.
-
-    Used when a post-state-write check (validate, PT-rebase) fails and
-    the entire transition needs to be reverted atomically. Restores
-    session.yaml first, then walks `swept_issues` and restores each
-    issue's status from `issue_pre_state`.
-    """
-    from tripwire.core.store import load_issue, save_issue
-
-    session.status = prior_status
-    session.updated_at = prior_updated_at
-    save_session(project_dir, session)
-
-    for issue_key in swept_issues:
-        if issue_key not in issue_pre_state:
-            continue
-        try:
-            issue = load_issue(project_dir, issue_key)
-        except FileNotFoundError:
-            continue
-        issue.status = issue_pre_state[issue_key]
-        save_issue(project_dir, issue)
-
-
-def _capture_issue_pre_state(
-    project_dir: Path, session, target_status: str
-) -> dict[str, str]:
-    """Snapshot member-issue statuses for any issue the upcoming sweep
-    would touch. Used to roll back swept issues on validate/rebase failure.
-
-    Replicates the filter logic in `sweep_issues` so we capture exactly
-    the issues that may change.
-    """
-    from tripwire.core.status_contract import sweep_target_for
-    from tripwire.core.store import load_issue
-
-    target = sweep_target_for(target_status)
-    if target is None:
-        return {}
-    pre_state: dict[str, str] = {}
-    for issue_key in session.issues:
-        try:
-            issue = load_issue(project_dir, issue_key)
-        except FileNotFoundError:
-            continue
-        pre_state[issue_key] = issue.status
-    return pre_state
-
-
-def _maybe_rebase_pt_branch(session, project_dir: Path) -> str | None:
-    """If the session has a PT worktree (branch starts with `proj/`),
-    fetch origin and rebase that worktree onto `origin/main`.
-
-    Returns a one-line summary on success, or raises
-    `tripwire.core.git_helpers.RebaseConflict` on conflict (after the
-    rebase has been aborted). Returns `None` if the session has no PT
-    worktree (e.g. session created pre-v0.7).
-    """
-    pt_entry = next(
-        (
-            w
-            for w in (session.runtime_state.worktrees or [])
-            if (w.branch or "").startswith("proj/")
-        ),
-        None,
-    )
-    if pt_entry is None or not pt_entry.worktree_path:
-        return None
-
-    from tripwire.core.git_helpers import fetch_origin, rebase_branch_onto
-
-    pt_path = Path(pt_entry.worktree_path)
-    if not pt_path.is_dir():
-        return None
-    fetch_origin(pt_path)
-    rebase_branch_onto(pt_path, "origin/main")
-    return f"PT worktree {pt_entry.branch} rebased onto origin/main"
+# v0.13: the legacy `_ALLOWED_TRANSITIONS` map, `_DEFAULT_SWEEP_ON_TRANSITION`,
+# `_capture_issue_pre_state`, `_rollback_transition`, and `_maybe_rebase_pt_branch`
+# helpers were deleted in WS7. Their behavior moved into the workflow
+# executor — `tripwire.core.workflow.transitions.execute_transition` — which
+# resolves routes from `workflow.yaml`, captures pre-state snapshots, runs
+# side-effects in declared order, and rolls back atomically on failure.
+# Side-effect handlers (`sweep_issues_forward`, `rebase_pt_branch`, etc.)
+# live in `tripwire.core.workflow.side_effects`.
 
 
 @session_cmd.command("transition")
