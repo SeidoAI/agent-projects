@@ -548,13 +548,19 @@ def _check_trap_statuses(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
     """
     out: list[WorkflowFinding] = []
     declared = {s.id for s in wf.statuses}
+    # Track outbound routes by kind. Revert-kind exits from a terminal
+    # status are the documented v0.13 reopen pattern (completed → paused)
+    # — they do not violate terminal-ness.
     has_outbound: dict[str, bool] = dict.fromkeys(declared, False)
+    has_non_revert_outbound: dict[str, bool] = dict.fromkeys(declared, False)
     for route in wf.routes:
         if route.from_ref in declared:
             has_outbound[route.from_ref] = True
+            if route.kind != "revert":
+                has_non_revert_outbound[route.from_ref] = True
     for status in wf.statuses:
         if status.terminal:
-            if has_outbound[status.id]:
+            if has_non_revert_outbound[status.id]:
                 out.append(
                     WorkflowFinding(
                         code="workflow/terminal_with_outbound_route",
@@ -562,8 +568,9 @@ def _check_trap_statuses(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
                         status=status.id,
                         message=(
                             f"status {status.id!r} declares `terminal: true` "
-                            f"but has outbound routes — terminal statuses "
-                            f"are sinks"
+                            f"but has non-revert outbound routes — terminal "
+                            f"statuses are sinks (revert-kind reopen edges "
+                            f"are allowed)"
                         ),
                     )
                 )
