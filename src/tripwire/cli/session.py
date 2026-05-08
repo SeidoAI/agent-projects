@@ -995,145 +995,51 @@ def session_transition_cmd(
     sweep_issues: bool | None,
     skip_validate: bool,
 ) -> None:
-    """Transition a session's status. Strict: rejects unknown statuses
-    and disallowed jumps.
+    """Transition a session's status via the v0.13 workflow executor.
 
-    Primary caller is the agent at exit time, flipping
-    ``executing → in_review`` once the PR is open and self-reviewed —
-    this is what unblocks ``tripwire session complete``. Other allowed
-    flips cover the resume/review/abandon happy paths; everything else
-    requires a direct yaml edit.
+    Routes through ``tripwire.core.workflow.transitions.execute_transition``,
+    which resolves the matching route in ``workflow.yaml`` from
+    ``(current_status, target_status)``, runs the route's gate (tripwires
+    listed in ``controls.tripwires``, JIT prompts, prompt-checks, consumed
+    artifacts), then fires ``route.side_effects[]`` in declared order
+    (sweep, PT-rebase, draft-PR flips, telemetry, etc.). On any failure
+    inverses run in reverse and the session is restored from a pre-state
+    snapshot.
 
-    v0.9.4: ``--sweep-issues`` (default-on for in_review/verified/completed)
-    advances member issues to the matching issue state per the status
-    contract.
-
-    v0.12: transition is the validate gate. After writing the new status
-    (and optionally sweeping issues), the CLI runs ``tripwire validate``
-    and rolls back the entire transition atomically if any error fires.
-    On transitions to ``in_review``, the PT worktree is also rebased onto
-    ``origin/main`` (closes the multi-session-wave staleness trap). Use
-    ``--no-validate`` to skip both checks for emergency state recovery.
+    The legacy ``--sweep-issues`` and ``--no-validate`` flags are kept
+    for backwards compatibility but are now no-ops: sweep is declared by
+    the route's ``side_effects: [sweep_issues_forward, ...]`` block and
+    validation is the route's ``controls.tripwires`` gate (the full
+    project validator runs as ``tripwire validate``).
     """
-    from tripwire.core.git_helpers import RebaseConflict
-    from tripwire.core.status_contract import sweep_issues as _sweep_issues_fn
-    from tripwire.models.enums import SessionStatus
+    from tripwire.core.workflow.transitions import (
+        TransitionError,
+        execute_transition,
+    )
 
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
-    valid_statuses = {s.value for s in SessionStatus}
-    if target_status not in valid_statuses:
-        raise click.ClickException(
-            f"unknown status {target_status!r}; expected one of "
-            f"{sorted(valid_statuses)}"
-        )
-
+    flags = {
+        "sweep_issues": sweep_issues,
+        "skip_validate": skip_validate,
+    }
     try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session '{session_id}' not found") from exc
-
-    allowed = _ALLOWED_TRANSITIONS.get(session.status, set())
-    if target_status not in allowed:
-        raise click.ClickException(
-            f"transition {session.status!r} → {target_status!r} not allowed; "
-            f"allowed targets from {session.status!r}: {sorted(allowed) or '<none>'}"
+        result = execute_transition(
+            resolved,
+            session_id=session_id,
+            target_status=target_status,
+            flags=flags,
         )
+    except TransitionError as exc:
+        raise click.ClickException(str(exc)) from exc
 
-    # Decide whether to sweep. Explicit user choice wins; fall back to the
-    # default-on set if not specified.
-    do_sweep = (
-        sweep_issues
-        if sweep_issues is not None
-        else target_status in _DEFAULT_SWEEP_ON_TRANSITION
-    )
-
-    # Capture pre-state for atomic rollback (v0.12).
-    new_status = SessionStatus(target_status)
-    prior_session_status = session.status
-    prior_updated_at = session.updated_at
-    issue_pre_state: dict[str, str] = (
-        _capture_issue_pre_state(resolved, session, target_status) if do_sweep else {}
-    )
-
-    session.status = new_status  # local-only mutation for sweep_issues to read
-
-    swept: list[str] = []
-    if do_sweep:
-        try:
-            swept = _sweep_issues_fn(resolved, session, target_status)
-        except Exception:
-            # Roll back the local mutation so caller sees consistent state
-            # if they catch this exception in a higher harness.
-            session.status = prior_session_status
-            raise
-
-    session.updated_at = datetime.now(tz=timezone.utc)
-    save_session(resolved, session)
-
-    if not skip_validate:
-        from tripwire.core.validator import validate_project
-
-        report = validate_project(resolved)
-        if report.errors:
-            _rollback_transition(
-                resolved,
-                session,
-                prior_session_status,
-                prior_updated_at,
-                swept,
-                issue_pre_state,
-            )
-            err_lines = [
-                f"  - {e.code}: {e.message}"
-                + (f"\n      (fix: {e.fix_hint})" if e.fix_hint else "")
-                for e in report.errors[:20]
-            ]
-            extra = (
-                f"\n  ... and {len(report.errors) - 20} more"
-                if len(report.errors) > 20
-                else ""
-            )
-            raise click.ClickException(
-                f"transition {prior_session_status!r} → {target_status!r} "
-                f"aborted by validate ({len(report.errors)} error(s)):\n"
-                + "\n".join(err_lines)
-                + extra
-                + "\n\nFix the errors and retry, or use --no-validate to bypass."
-            )
-
-        # PT-branch rebase on transition to in_review (v0.12 — kb-pivot
-        # wave-1 staleness fix). Only fires after validate passes so we
-        # don't rebase a session whose state is otherwise broken.
-        if target_status == "in_review":
-            try:
-                summary = _maybe_rebase_pt_branch(session, resolved)
-                if summary:
-                    click.echo(f"  {summary}")
-            except RebaseConflict as exc:
-                _rollback_transition(
-                    resolved,
-                    session,
-                    prior_session_status,
-                    prior_updated_at,
-                    swept,
-                    issue_pre_state,
-                )
-                raise click.ClickException(
-                    f"transition {prior_session_status!r} → {target_status!r} "
-                    f"aborted: PT-branch rebase failed.\n\n{exc}\n\n"
-                    "Send a `stuck` message describing the conflict; the PM "
-                    "will resolve it manually before re-attempting transition. "
-                    "Use --no-validate to bypass the rebase if you've already "
-                    "resolved the conflict."
-                ) from exc
+    if not result.ok:
+        raise click.ClickException(
+            f"transition not reachable: {result.message or result.reason}"
+        )
 
     click.echo(f"Session '{session_id}' → {target_status}")
-    if swept:
-        click.echo(f"  swept {len(swept)} issue(s) → matching state:")
-        for k in swept:
-            click.echo(f"    {k}")
 
 
 @session_cmd.command("abandon")

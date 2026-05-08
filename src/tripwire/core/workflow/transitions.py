@@ -311,19 +311,9 @@ def _run_gate(
         path: _read_path(session, path) for path in route.preserve_fields
     }
 
-    # 7. Apply clear_fields (set declared paths to None).
-    for path in route.clear_fields:
-        _write_path(session, path, None)
-
-    # 8. Flip status, assign status-instance id, save.
-    n = _next_status_instance_n(project_dir, WORKFLOW_ID, session_id, target_status)
-    status_instance = f"{WORKFLOW_ID}:{session_id}:{target_status}:{n}"
-    session.status = SessionStatus(target_status)
-    session.current_status_instance = status_instance
-    session.updated_at = when
-    save_session(project_dir, session)
-
-    # 9. Run side-effects in declared order, with rollback on any failure.
+    # 7. Run side-effects in declared order, BEFORE status flip. Gate-shaped
+    #    side-effects (verify_*) raise SideEffectFailure; rollback walks
+    #    completed effects' inverses and aborts the transition.
     completed_effects: list[tuple[object, object]] = []
     try:
         for effect_id in route.side_effects:
@@ -360,7 +350,8 @@ def _run_gate(
         _rollback_side_effects(
             project_dir, session_id, completed_effects, route=route, session=session
         )
-        # Restore session to pre-state snapshot and persist.
+        # Restore session to pre-state snapshot and persist (status was
+        # never flipped, so the snapshot is the correct restore target).
         save_session(project_dir, snapshot)
         return _reject(
             project_dir,
@@ -368,6 +359,17 @@ def _run_gate(
             target_status,
             reason=reason_code,
         )
+
+    # 8. Apply clear_fields (set declared paths to None).
+    for path in route.clear_fields:
+        _write_path(session, path, None)
+
+    # 9. Flip status, assign status-instance id, save.
+    n = _next_status_instance_n(project_dir, WORKFLOW_ID, session_id, target_status)
+    status_instance = f"{WORKFLOW_ID}:{session_id}:{target_status}:{n}"
+    session.status = SessionStatus(target_status)
+    session.current_status_instance = status_instance
+    session.updated_at = when
 
     # 10. Re-assert preserved fields against accidental clearing.
     for path, prior_value in preserved.items():
