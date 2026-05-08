@@ -374,14 +374,24 @@ def _append_audit_log_entry_apply(ctx: SideEffectContext) -> SideEffectResult:
 
 
 def _append_telemetry_row_apply(ctx: SideEffectContext) -> SideEffectResult:
-    """Append a routing-telemetry row for analytics. Best-effort."""
+    """Append a routing-telemetry row for analytics. Best-effort.
+
+    Mirrors the legacy ``session_complete`` path: compute cost from the
+    session's log, then build and append the row.
+    ``build_telemetry_row`` requires a numeric ``cost_usd``; the
+    historical ``cost_usd=None`` shortcut would raise ``TypeError`` and
+    the broad ``except`` would silently swallow it — meaning no row was
+    ever written for executor-driven completions.
+    """
     try:
         from tripwire.core.routing_telemetry import (
             append_telemetry_row,
             build_telemetry_row,
         )
+        from tripwire.core.session_cost import compute_session_cost
 
-        row = build_telemetry_row(ctx.project_dir, ctx.session, cost_usd=None)
+        cost = compute_session_cost(ctx.project_dir, ctx.session.id).total_usd
+        row = build_telemetry_row(ctx.project_dir, ctx.session, cost_usd=cost)
         append_telemetry_row(ctx.project_dir, row)
     except Exception:
         # Telemetry must never block a transition.
