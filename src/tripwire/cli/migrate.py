@@ -605,19 +605,15 @@ def migrate_workflow_cmd(project_dir: Path, dry_run: bool, yes: bool) -> None:
         click.echo("workflow.yaml already on v0.13 schema — nothing to migrate.")
         return
 
-    template_path = (
-        Path(__file__).parent.parent / "templates" / "workflow.yaml.j2"
-    )
+    template_path = Path(__file__).parent.parent / "templates" / "workflow.yaml.j2"
     new_text = template_path.read_text(encoding="utf-8")
 
     if dry_run:
-        click.echo(f"[dry-run] would rewrite {workflow_path} from packaged v0.13 template.")
         click.echo(
-            f"  before: {len(existing)} bytes / {existing.count(chr(10))} lines"
+            f"[dry-run] would rewrite {workflow_path} from packaged v0.13 template."
         )
-        click.echo(
-            f"  after:  {len(new_text)} bytes / {new_text.count(chr(10))} lines"
-        )
+        click.echo(f"  before: {len(existing)} bytes / {existing.count(chr(10))} lines")
+        click.echo(f"  after:  {len(new_text)} bytes / {new_text.count(chr(10))} lines")
         return
 
     if not yes:
@@ -630,9 +626,7 @@ def migrate_workflow_cmd(project_dir: Path, dry_run: bool, yes: bool) -> None:
             "pm-monitor:",
             "code-review:",
         )
-        looks_like_v012 = all(
-            sig in existing for sig in v012_signature_workflows
-        )
+        looks_like_v012 = all(sig in existing for sig in v012_signature_workflows)
         if not looks_like_v012:
             click.echo(
                 f"workflow.yaml at {workflow_path} does not look like the "
