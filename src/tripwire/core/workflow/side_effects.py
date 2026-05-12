@@ -9,18 +9,13 @@ The contract:
 - ``apply(ctx)`` runs the side effect. Raises :class:`SideEffectFailure`
   if it cannot succeed and the transition should be rolled back.
 - ``inverse(ctx, result)`` undoes a successful ``apply``. Called by the
-  executor when a later side-effect or rollback fires. Side effects
-  declared ``idempotent=True`` skip their inverse during rollback —
-  used for best-effort handlers like ``flip_drafts_to_*`` whose
-  network-bound effects are unsafe (or impossible) to rewind.
-- ``idempotent`` indicates the side effect is "fire-and-forget" — the
-  executor will not invoke its inverse during rollback. Best-effort or
-  read-only handlers (gates that raise on fail; ``gh`` calls that
-  flip state but cannot be cleanly un-flipped) carry this.
-
-WS2 wires the registry. WS3 plumbs the executor against it. WS4
-re-routes existing callers through the executor so each side-effect
-fires from one place.
+  executor when a later side-effect raises ``SideEffectFailure`` or the
+  surrounding transition rejects.
+- ``idempotent=True`` tells the executor to skip the inverse during
+  rollback. Two classes of handler carry it: (a) gates that raise on
+  fail and have no state to undo (e.g. ``verify_prs_merged``), and
+  (b) best-effort handlers whose effects cannot be cleanly reversed
+  (e.g. ``flip_drafts_to_*`` which modify GitHub PR state).
 """
 
 from __future__ import annotations
@@ -110,11 +105,10 @@ def clear() -> None:
 # Built-in side effects
 # ----------------------------------------------------------------------
 #
-# These wrap existing implementations in the codebase. WS2 is mostly
-# id-tagging and signature-normalising; the deep logic already lives in
-# session_complete.py, session_abandon.py, session_reopen.py,
-# git_helpers.py, and status_contract.py. WS3 adds inverses for the
-# non-idempotent handlers when the executor's rollback path is wired.
+# These wrap existing implementations in the codebase: id-tagging and
+# signature-normalising around the deep logic in session_complete.py,
+# session_abandon.py, session_reopen.py, git_helpers.py, and
+# status_contract.py.
 
 
 def _sweep_issues_forward_apply(ctx: SideEffectContext) -> SideEffectResult:

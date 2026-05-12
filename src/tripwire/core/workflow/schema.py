@@ -352,8 +352,7 @@ def _check_schema_version(spec: WorkflowSpec) -> list[WorkflowFinding]:
                 status=None,
                 message=(
                     "workflow.yaml is missing top-level "
-                    f"`workflow_schema_version: {WORKFLOW_SCHEMA_VERSION}`. "
-                    "Run `tripwire migrate workflow` to upgrade."
+                    f"`workflow_schema_version: {WORKFLOW_SCHEMA_VERSION}`."
                 ),
             )
         ]
@@ -365,8 +364,8 @@ def _check_schema_version(spec: WorkflowSpec) -> list[WorkflowFinding]:
             message=(
                 f"workflow.yaml declares `workflow_schema_version: "
                 f"{spec.schema_version}` but this build only understands "
-                f"version {WORKFLOW_SCHEMA_VERSION}. Run `tripwire migrate "
-                f"workflow` or upgrade tripwire."
+                f"version {WORKFLOW_SCHEMA_VERSION}. Upgrade tripwire or "
+                f"update workflow.yaml to match."
             ),
         )
     ]
