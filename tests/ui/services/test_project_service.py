@@ -169,7 +169,7 @@ class TestDiscoverProjects:
             "key_prefix: BRK\n"
             "next_issue_number: 1\n"
             "next_session_number: 1\n"
-            "tripwires:\n"  # legacy v0.7.4 field — rejected post-rename
+            "tripwires:\n"  # v0.7.4 field — rejected post-rename
             "  enabled: true\n",
             encoding="utf-8",
         )

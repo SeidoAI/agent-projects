@@ -82,17 +82,17 @@ def test_agent_yaml_missing_is_a_noop(tmp_path_project: Path):
 
 
 def test_agent_yaml_unknown_runtime_value_is_ignored(tmp_path_project: Path):
-    """Defensive: a misconfigured agent yaml (typo, legacy
+    """Defensive: a misconfigured agent yaml (typo, stale
     'claude-code' value) must not crash the resolver; we leave the
     runtime as-is so the validation error surfaces at spawn time
     via the registry, not from a corrupted resolved config."""
     _write_agent_yaml(
         tmp_path_project,
-        "legacy",
-        {"id": "legacy", "runtime": "claude-code"},
+        "stale",
+        {"id": "stale", "runtime": "claude-code"},
     )
     resolved = load_resolved_spawn_config(tmp_path_project, session=None)
-    _apply_agent_yaml_overrides(resolved, tmp_path_project, agent_id="legacy")
+    _apply_agent_yaml_overrides(resolved, tmp_path_project, agent_id="stale")
     # Untouched — claude is the default
     assert resolved.invocation.runtime == "claude"
 

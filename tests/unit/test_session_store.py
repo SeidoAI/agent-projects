@@ -172,13 +172,13 @@ class TestDelete:
         delete_session(project_dir, "never-existed")
 
 
-class TestLegacySessionStatus:
+class TestOutdatedSessionStatus:
     """`load_session` / `list_sessions` must intercept Pydantic's
     ValidationError when it fires on a pre-v0.9.4 ``status:`` value
     and surface a tight, actionable migration message instead.
     """
 
-    def _write_legacy(self, project_dir: Path, sid: str, status: str) -> None:
+    def _write_outdated(self, project_dir: Path, sid: str, status: str) -> None:
         from tripwire.core.parser import serialize_frontmatter_body
 
         sdir = project_dir / "sessions" / sid
@@ -186,7 +186,7 @@ class TestLegacySessionStatus:
         fm = {
             "uuid": "11111111-2222-4333-8444-555555555556",
             "id": sid,
-            "name": "Legacy session",
+            "name": "Outdated session",
             "agent": "backend-coder",
             "issues": [],
             "status": status,
@@ -195,18 +195,18 @@ class TestLegacySessionStatus:
         text = serialize_frontmatter_body(fm, "")
         (sdir / "session.yaml").write_text(text, encoding="utf-8")
 
-    def test_load_session_legacy_status_raises(self, project_dir: Path) -> None:
-        from tripwire.core.session_store import LegacySessionStatusError
+    def test_load_session_outdated_status_raises(self, project_dir: Path) -> None:
+        from tripwire.core.session_store import OutdatedSessionStatusError
 
-        self._write_legacy(project_dir, "sess-1", "active")
-        with pytest.raises(LegacySessionStatusError) as exc_info:
+        self._write_outdated(project_dir, "sess-1", "active")
+        with pytest.raises(OutdatedSessionStatusError) as exc_info:
             load_session(project_dir, "sess-1")
         assert exc_info.value.status == "active"
         assert "tripwire migrate status-values" in str(exc_info.value)
 
-    def test_list_sessions_legacy_status_raises(self, project_dir: Path) -> None:
-        from tripwire.core.session_store import LegacySessionStatusError
+    def test_list_sessions_outdated_status_raises(self, project_dir: Path) -> None:
+        from tripwire.core.session_store import OutdatedSessionStatusError
 
-        self._write_legacy(project_dir, "sess-1", "waiting_for_review")
-        with pytest.raises(LegacySessionStatusError):
+        self._write_outdated(project_dir, "sess-1", "waiting_for_review")
+        with pytest.raises(OutdatedSessionStatusError):
             list_sessions(project_dir)

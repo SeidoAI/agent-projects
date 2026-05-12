@@ -118,7 +118,7 @@ def test_extract_references_strips_pins_for_back_compat():
     Many callers (the validator, the cache, the UI) treat references
     as bare ids today. Adding pin syntax must not break them — the
     pinned form `[[user-model@v3]]` continues to resolve as
-    `user-model` for legacy callers.
+    `user-model` for callers that haven't adopted pins yet.
     """
     body = "See [[user-model]] and [[other-thing@v2]]."
     refs = graph_refs.extract_references(body)

@@ -32,7 +32,7 @@ class TestParseTaskChecklist:
         text = "| # | Status |\n|---|--------|\n| 1 | done |\n|:-:|:-:|\n| 2 | done |\n"
         assert parse_task_checklist(text) == TaskProgress(done=2, total=2)
 
-    def test_legacy_checkbox_form_returns_zero(self):
+    def test_bare_checkbox_form_returns_zero(self):
         text = "- [x] Task one\n- [ ] Task two\n- [X] Task three\n"
         assert parse_task_checklist(text) == TaskProgress(done=0, total=0)
 

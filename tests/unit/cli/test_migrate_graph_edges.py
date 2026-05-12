@@ -49,7 +49,7 @@ def _read_edges(project: Path) -> list[dict]:
 
 
 class TestMigrateGraphEdges:
-    def test_rewrites_legacy_strings(self, tmp_path: Path) -> None:
+    def test_rewrites_pre_v09_strings(self, tmp_path: Path) -> None:
         project = _make_project(tmp_path / "p")
         _write_cache(
             project,
@@ -148,7 +148,7 @@ class TestMigrateGraphEdges:
         assert result.exit_code == 0, result.output
         edges = _read_edges(project)
         types = [e["type"] for e in edges]
-        # Unknown kind survives untouched; legacy still rewritten.
+        # Unknown kind survives untouched; pre-v0.9 strings still rewritten.
         assert types == ["future_kind", "refs"]
 
     def test_rejects_non_project_dir(self, tmp_path: Path) -> None:

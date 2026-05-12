@@ -56,7 +56,7 @@ class TestListEnums:
         enum = list_enums(tmp_path_project)["states"]
         assert enum.values[0].label == "In Progress"
 
-    def test_legacy_id_field_accepted(self, tmp_path_project: Path):
+    def test_id_alias_for_value_accepted(self, tmp_path_project: Path):
         _write_enum(
             tmp_path_project,
             "kind",

@@ -20,7 +20,7 @@ import yaml
 from tripwire.core.graph.cache import (
     CACHE_VERSION,
     INDEX_REL_PATH,
-    LegacyCacheError,
+    OutdatedGraphCacheError,
     ensure_fresh,
     full_rebuild,
     load_index,
@@ -153,10 +153,11 @@ class TestLoadSave:
         (tmp_path / INDEX_REL_PATH).write_text("not: : : valid:\n")
         assert load_index(tmp_path) is None
 
-    def test_legacy_edge_type_raises(self, tmp_path: Path) -> None:
-        """Pre-v0.9 edge `type:` strings must raise LegacyCacheError, not
-        silently get under-reported by the v0.9 `_REFERENCING_EDGE_TYPES`
-        collapse. The error must point the user at `migrate graph-edges`.
+    def test_outdated_edge_type_raises(self, tmp_path: Path) -> None:
+        """Pre-v0.9 edge `type:` strings must raise OutdatedGraphCacheError,
+        not silently get under-reported by the v0.9
+        `_REFERENCING_EDGE_TYPES` collapse. The error must point the user
+        at `migrate graph-edges`.
         """
         import pytest
 
@@ -168,7 +169,7 @@ class TestLoadSave:
                     "version": CACHE_VERSION,
                     "files": {},
                     "edges": [
-                        # Mix of legacy + canonical types.
+                        # Mix of pre-v0.9 + canonical types.
                         {"from": "TST-1", "to": "TST-2", "type": "blocked_by"},
                         {"from": "TST-1", "to": "n", "type": "references"},
                         {"from": "TST-1", "to": "TST-3", "type": "depends_on"},
@@ -176,7 +177,7 @@ class TestLoadSave:
                 }
             )
         )
-        with pytest.raises(LegacyCacheError) as exc_info:
+        with pytest.raises(OutdatedGraphCacheError) as exc_info:
             load_index(tmp_path)
         message = str(exc_info.value)
         assert "blocked_by" in message

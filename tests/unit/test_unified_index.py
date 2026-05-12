@@ -180,7 +180,7 @@ class TestGraphNodeKindLooseString:
     code that wants the canonical names; the model field stays loose.
     """
 
-    def test_legacy_kinds_load(self):
+    def test_short_form_kinds_load(self):
         assert GraphNode(id="x", kind="issue")
         assert GraphNode(id="x", kind="node")
         # And the new canonical names also load

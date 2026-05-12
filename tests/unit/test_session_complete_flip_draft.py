@@ -2,8 +2,8 @@
 
 ``complete_session`` calls a new ``_flip_drafts_to_ready`` step that
 runs ``gh pr ready <draft-pr-url>`` per worktree. Worktrees without
-``draft_pr_url`` (legacy in-flight sessions that started pre-v0.7.5)
-fall back to ``gh pr create`` so a PR exists to merge.
+``draft_pr_url`` (in-flight sessions that started pre-v0.7.5 and never
+recorded the URL) fall back to ``gh pr create`` so a PR exists to merge.
 """
 
 from __future__ import annotations
@@ -125,7 +125,7 @@ class TestFlipDraftsToReady:
 
     def test_mixed_draft_and_no_draft_per_worktree(self, monkeypatch, tmp_path):
         """One worktree opened a draft (v0.7.5 path), the other didn't
-        (legacy / remote-less). Each worktree gets the matching call."""
+        (pre-v0.7.5 / remote-less). Each worktree gets the matching call."""
         calls: list[dict] = []
 
         def fake_run(cmd, **kwargs):

@@ -4,7 +4,7 @@ After each ``worktree_add`` the prep pipeline emits an empty marker
 commit, pushes ``-u origin``, and runs ``gh pr create --draft``. The
 draft PR URL is stored on ``WorktreeEntry.draft_pr_url``. When the
 worktree has no git remote the helper logs a warning and returns
-``None`` (graceful skip — pre-v0.7.5 sessions stay on the legacy
+``None`` (graceful skip — pre-v0.7.5 sessions stay on the fallback
 create-PR-at-complete path). Missing or unauthenticated ``gh``
 fails spawn fast at prep time, before any filesystem mutation.
 """

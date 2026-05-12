@@ -1,13 +1,13 @@
-"""Unit tests for ``tripwire.core.workflow.schema`` and ``loader`` (v0.13).
+"""Unit tests for ``tripwire.core.workflow.schema`` and ``loader``.
 
-Covers KUI-119 + v0.13 schema convergence: parsing the per-project
+Covers KUI-119 + the v0.13 schema convergence: parsing the per-project
 ``workflow.yaml`` into a typed dataclass tree and well-formedness
 validation. The loader is read-only: it returns a typed model and
 never mutates state.
 
-Routes are the single source of structural arrows in v0.13;
-``statuses[].next:`` is removed and surfaces as
-``workflow/legacy_next_field`` at load time.
+Routes are the single source of structural arrows;
+``statuses[].next:`` is not a recognized key and surfaces as
+``workflow/unknown_key`` at load time.
 """
 
 from __future__ import annotations
@@ -644,10 +644,12 @@ def test_validator_rejects_bad_route_refs(tmp_path: Path) -> None:
     assert "workflow/unknown_prompt_check" in codes
 
 
-def test_validator_rejects_legacy_next_field(tmp_path: Path) -> None:
-    """v0.13: ``statuses[].next:`` is removed. Any file declaring it
-    surfaces ``workflow/legacy_next_field`` and the operator is
-    pointed at ``tripwire migrate workflow``."""
+def test_validator_emits_unknown_key_for_legacy_next(  # legacy-allow: name fixed by plan
+    tmp_path: Path,
+) -> None:
+    """``statuses[].next:`` is not a recognized key. Any file declaring
+    it surfaces the generic ``workflow/unknown_key`` finding (the same
+    finding any other typo would produce)."""
     from tripwire.core.workflow.loader import load_workflows
     from tripwire.core.workflow.schema import validate_workflow_spec
 
@@ -682,9 +684,13 @@ def test_validator_rejects_legacy_next_field(tmp_path: Path) -> None:
         known_prompt_checks=set(),
     )
     codes = [f.code for f in findings]
-    assert "workflow/legacy_next_field" in codes
-    legacy = next(f for f in findings if f.code == "workflow/legacy_next_field")
-    assert "tripwire migrate workflow" in legacy.message
+    assert "workflow/unknown_key" in codes
+    unknown = next(
+        f
+        for f in findings
+        if f.code == "workflow/unknown_key" and "'next'" in f.message
+    )
+    assert unknown.status == "s1"
 
 
 def test_validator_rejects_duplicate_status_ids(tmp_path: Path) -> None:

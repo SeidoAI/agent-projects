@@ -62,7 +62,7 @@ class TestSessionStatusEnumTemplate:
 
     def test_does_not_ship_dropped_done_status(self) -> None:
         """KUI-110 dropped ``done`` from the session enum: it was a
-        legacy alias never present in the upstream Python enum, and
+        spurious alias never present in the upstream Python enum, and
         the schema-strict ``AgentSession.status`` field rejects it at
         load time. Re-introducing it would resurrect the bug the
         v1 hardening pass closed."""

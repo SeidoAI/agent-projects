@@ -4,8 +4,8 @@ The handoff named four gaps in the v0.12 lifecycle. v0.13 fixes
 A/C/D as data-only YAML edits; Gap B (squash-merge orphan branch)
 gets a follow-up dedicated side-effect handler. These tests exercise
 the routes' existence and the executor's transition behavior — they
-do NOT reach into the legacy direct-status-write callers (those are
-tracked as WS4-residual cutover work).
+do NOT reach into the direct-status-write callers that pre-date the
+executor (those are tracked as WS4-residual cutover work).
 """
 
 from __future__ import annotations

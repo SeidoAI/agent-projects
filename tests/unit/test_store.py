@@ -276,17 +276,17 @@ class TestCacheInvalidationOnSave:
 
 
 # ============================================================================
-# Legacy status interception (concern 1)
+# Pre-v0.9.4 status interception (concern 1)
 # ============================================================================
 
 
-class TestLegacyIssueStatus:
+class TestOutdatedIssueStatus:
     """`load_issue` / `list_issues` must intercept Pydantic's
     ValidationError when it fires on a pre-v0.9.4 ``status:`` value
     and surface a tight, actionable migration message instead.
     """
 
-    def _write_legacy(self, project_dir: Path, key: str, status: str) -> Path:
+    def _write_outdated(self, project_dir: Path, key: str, status: str) -> Path:
         from tripwire.core.parser import serialize_frontmatter_body
 
         idir = project_dir / "issues" / key
@@ -294,7 +294,7 @@ class TestLegacyIssueStatus:
         fm = {
             "uuid": "11111111-2222-4333-8444-555555555555",
             "id": key,
-            "title": f"Legacy {key}",
+            "title": f"Outdated {key}",
             "status": status,
             "priority": "medium",
             "executor": "ai",
@@ -305,18 +305,18 @@ class TestLegacyIssueStatus:
         path.write_text(text, encoding="utf-8")
         return path
 
-    def test_load_issue_legacy_status_raises(self, project_dir: Path) -> None:
-        from tripwire.core.store import LegacyIssueStatusError
+    def test_load_issue_outdated_status_raises(self, project_dir: Path) -> None:
+        from tripwire.core.store import OutdatedIssueStatusError
 
-        self._write_legacy(project_dir, "TST-1", "in_progress")
-        with pytest.raises(LegacyIssueStatusError) as exc_info:
+        self._write_outdated(project_dir, "TST-1", "in_progress")
+        with pytest.raises(OutdatedIssueStatusError) as exc_info:
             load_issue(project_dir, "TST-1")
         assert exc_info.value.status == "in_progress"
         assert "tripwire migrate status-values" in str(exc_info.value)
 
-    def test_list_issues_legacy_status_raises(self, project_dir: Path) -> None:
-        from tripwire.core.store import LegacyIssueStatusError
+    def test_list_issues_outdated_status_raises(self, project_dir: Path) -> None:
+        from tripwire.core.store import OutdatedIssueStatusError
 
-        self._write_legacy(project_dir, "TST-1", "backlog")
-        with pytest.raises(LegacyIssueStatusError):
+        self._write_outdated(project_dir, "TST-1", "backlog")
+        with pytest.raises(OutdatedIssueStatusError):
             list_issues(project_dir)

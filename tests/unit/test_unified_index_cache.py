@@ -183,7 +183,7 @@ def test_unified_index_returns_session_when_querying_downstream_of_issue(
 def test_referenced_by_includes_session_refs(tmp_path: Path) -> None:
     """Codex P1 (PR #74 follow-up): `_rebuild_derived_tables.referenced_by`
     must surface session→issue refs edges. Pre-fix, the rebuild loop only
-    considered legacy on-disk strings (`references|blocked_by|related`)
+    considered pre-v0.9 on-disk strings (`references|blocked_by|related`)
     and silently dropped sessions/comments emitting canonical `refs`.
     """
     _make_project(tmp_path)

@@ -276,10 +276,9 @@ def test_build_workflow_reports_definition_drift(tmp_path: Path) -> None:
         for finding in payload["drift"]["findings"]
         if finding["source"] == "definition"
     ]
-    # v0.13: legacy `next:` blocks surface as `workflow/legacy_next_field`
-    # (the v0.12 `unknown_next_status` shape was removed when `next:` was
-    # deleted from the schema).
-    assert definition_findings[0]["code"] == "workflow/legacy_next_field"
+    # `next:` is not a recognized status key, so it surfaces as the generic
+    # `workflow/unknown_key` finding alongside any other typo.
+    assert definition_findings[0]["code"] == "workflow/unknown_key"
 
 
 def test_build_workflow_workflows_empty_when_yaml_missing(tmp_path: Path) -> None:

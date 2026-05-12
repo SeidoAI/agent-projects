@@ -67,7 +67,7 @@ def _read_status(path: Path) -> str:
 
 
 class TestMigrateStatusValues:
-    def test_rewrites_legacy_issue_statuses(self, tmp_path: Path) -> None:
+    def test_rewrites_pre_v094_issue_statuses(self, tmp_path: Path) -> None:
         project = _make_project(tmp_path / "p")
         a = _write_issue(project, "SM-1", "backlog")
         b = _write_issue(project, "SM-2", "in_progress")
@@ -86,7 +86,7 @@ class TestMigrateStatusValues:
         assert _read_status(e) == "abandoned"
         assert "5 file(s) rewritten" in result.output
 
-    def test_rewrites_legacy_session_statuses(self, tmp_path: Path) -> None:
+    def test_rewrites_pre_v094_session_statuses(self, tmp_path: Path) -> None:
         project = _make_project(tmp_path / "p")
         a = _write_session(project, "sess-1", "active")
         b = _write_session(project, "sess-2", "waiting_for_ci")

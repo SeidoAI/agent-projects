@@ -47,7 +47,7 @@ def test_resolve_command_unknown_name_returns_nonexistent_package_path(tmp_path)
     assert not result.exists()
 
 
-# --- session_plan_path: subdir-canonical (KUI-158: legacy flat fallback removed) ---
+# --- session_plan_path: subdir-canonical (KUI-158: flat-layout fallback removed) ---
 
 
 def test_session_plan_path_returns_subdir_when_present(tmp_path):

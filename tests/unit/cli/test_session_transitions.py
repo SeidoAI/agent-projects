@@ -1,11 +1,12 @@
 """Drift-prevention tests for the session-transition declarations.
 
-In v0.13 the legacy ``_ALLOWED_TRANSITIONS`` map was deleted; transitions
-are now declared in ``workflow.yaml`` and read by the executor at runtime.
-These tests assert the shipped template's coding-session workflow uses
-only ``SessionStatus`` member values for status ids, and that the
-``verified → completed`` happy-path edge is declared (regression for
-the v0.9 ``verified → done`` drift bug that pre-dated the unification).
+In v0.13 the hard-coded ``_ALLOWED_TRANSITIONS`` map was deleted;
+transitions are now declared in ``workflow.yaml`` and read by the
+executor at runtime. These tests assert the shipped template's
+coding-session workflow uses only ``SessionStatus`` member values for
+status ids, and that the ``verified → completed`` happy-path edge is
+declared (regression for the v0.9 ``verified → done`` drift bug that
+pre-dated the unification).
 """
 
 from __future__ import annotations
@@ -58,8 +59,8 @@ def test_verified_can_transition_to_completed_in_template() -> None:
     )
 
 
-def test_no_route_targets_legacy_done_status_in_template() -> None:
-    """Regression: verified→done was the legacy drift that caused v0.9's
+def test_no_route_targets_removed_done_status_in_template() -> None:
+    """Regression: verified→done was the v0.9 drift that caused the
     enum/transition mismatch. The template must not declare it."""
     workflow = _shipped_coding_session()
     assert not any(r.to_ref == "done" for r in workflow.routes)
