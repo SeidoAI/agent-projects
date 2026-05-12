@@ -1,0 +1,93 @@
+name: no-legacy-word
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Scan repo for "legacy" mentions
+        run: |
+          set -euo pipefail
+
+          # The repo follows a hard-migration philosophy: code that exists
+          # only to tolerate old shapes is bloat. This gate fails the build
+          # when the word "legacy" appears anywhere in source, tests,
+          # docs, or workflows — unless the line carries an inline
+          # `legacy-allow: <reason>` opt-out marker.
+          #
+          # Once the repo earns more than 1 GitHub star (external
+          # consumers exist), the gate downgrades to a warning so a real
+          # migration can land without a synchronous rewrite of every
+          # historical mention.
+
+          STARS=$(gh api "repos/${{ github.repository }}" -q .stargazers_count)
+          echo "Stargazer count: ${STARS}"
+
+          # Search the four target trees across the file types where
+          # narration tends to leak: Python, Jinja templates, YAML, and
+          # Markdown. Self-exclude this workflow's own file so the
+          # explainer below can quote the banned word without tripping
+          # the gate.
+          if ! matches=$(grep -rni \
+                --include='*.py' \
+                --include='*.j2' \
+                --include='*.yaml' \
+                --include='*.yml' \
+                --include='*.md' \
+                'legacy' \
+                src tests docs .github 2>/dev/null \
+                | grep -v '.github/workflows/no-legacy-word.yml' \
+                | grep -v 'legacy-allow:'); then
+            matches=""
+          fi
+
+          if [ -z "${matches}" ]; then
+            echo "No offending 'legacy' mentions found."
+            exit 0
+          fi
+
+          echo "::group::Files with offending 'legacy' references"
+          echo "${matches}"
+          echo "::endgroup::"
+
+          if [ "${STARS}" -gt 1 ]; then
+            echo "::warning::Repository has ${STARS} stargazers (>1); downgrading 'legacy' word check to a warning. Address when convenient."
+            exit 0
+          fi
+
+          cat <<'EOF'
+
+          The word "legacy" was found in the codebase.
+
+          This project follows a hard-migration philosophy: shape changes are cutovers,
+          not soft transitions. Code that exists to support old shapes is bloat — the
+          assistant migrates external state directly rather than maintaining tolerance
+          shims.
+
+          If you genuinely need to keep the word for an externally-imposed reason (e.g.
+          a third-party API literally called "legacy"), add an inline opt-out marker on
+          the same line:
+
+              # legacy-allow: external API field name
+              <!-- legacy-allow: third-party docs heading -->
+
+          Otherwise:
+          1. Remove the mention from your change (and migrate any affected state).
+          2. Wait until this repo has more than 1 GitHub star — the rule downgrades to
+             a warning when external consumers exist.
+
+          Files with offending references:
+          EOF
+          echo "${matches}"
+          exit 1
