@@ -140,8 +140,8 @@ WORKSPACE_CHECKS = [check_workspace_link]
 # Canonical run order: matches the pre-split ALL_CHECKS literal so finding
 # output ordering stays byte-stable. The workflow check is appended at
 # the END so it doesn't perturb the byte-stable position of any
-# pre-existing check (KUI-119 — workflow.yaml is opt-in for v0.9; ALL
-# legacy projects without one see no findings from this check).
+# pre-existing check (KUI-119 — workflow.yaml is opt-in for v0.9; older
+# projects without one see no findings from this check).
 ALL_CHECKS = [
     check_uuid_present,
     check_id_format,

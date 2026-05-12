@@ -256,9 +256,7 @@ def _run_gate(
     from tripwire.core.workflow.registry import validator_catalog
 
     catalog_ids = set(validator_catalog())
-    unknown_tripwires = [
-        tid for tid in controls.tripwires if tid not in catalog_ids
-    ]
+    unknown_tripwires = [tid for tid in controls.tripwires if tid not in catalog_ids]
     if unknown_tripwires:
         return _reject(
             project_dir,

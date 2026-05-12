@@ -13,9 +13,9 @@ no fetch yet, repo isn't a git checkout), emit a single
 per-issue checks — the operator can re-run after a fetch.
 
 The session half of this rule (which gated on the deleted
-``legacy_completed`` status and checked the pre-v0.8 flat artifact
-layout) was removed in KUI-158. The modern session check is
-``check_artifact_presence`` in ``validator/__init__.py``.
+``completed`` status under the old taxonomy and checked the pre-v0.8
+flat artifact layout) was removed in KUI-158. The modern session check
+is ``check_artifact_presence`` in ``validator/__init__.py``.
 """
 
 from __future__ import annotations

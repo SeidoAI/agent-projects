@@ -140,10 +140,8 @@ class WorkflowCrossLink:
 class WorkflowStatus:
     """A node in the lifecycle.
 
-    ``terminal`` is the explicit terminal-ness flag (replaces the
-    synthetic ``next.kind == "terminal"`` discriminator from v0.12).
-    Terminal statuses must have no outbound routes (other than to
-    boundary ports).
+    ``terminal`` is the explicit terminal-ness flag — terminal statuses
+    must have no outbound routes (other than to boundary ports).
     """
 
     id: str

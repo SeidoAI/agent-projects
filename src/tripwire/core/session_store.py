@@ -44,15 +44,15 @@ class SessionLoadError(ValueError):
     exception type and a single migration instruction. Name-blind:
     the offending key(s) are extracted from the pydantic error
     rather than checked by name, so the wrapper does not encode any
-    knowledge of legacy session shapes.
+    knowledge of older session shapes.
     """
 
 
 # Pre-v0.9.4 → canonical session status rewrites. Used to detect when
-# a session file's ``status:`` field is a legacy alias so the loader
-# can raise :class:`LegacySessionStatusError` and point the user at
+# a session file's ``status:`` field is a pre-v0.9.4 alias so the loader
+# can raise :class:`OutdatedSessionStatusError` and point the user at
 # ``tripwire migrate status-values``.
-_LEGACY_SESSION_STATUSES: frozenset[str] = frozenset(
+_PRE_V094_SESSION_STATUSES: frozenset[str] = frozenset(
     {
         "active",
         "waiting_for_ci",
@@ -63,9 +63,9 @@ _LEGACY_SESSION_STATUSES: frozenset[str] = frozenset(
 )
 
 
-class LegacySessionStatusError(ValueError):
-    """Raised by :func:`load_session` when a legacy ``status:`` value is
-    detected on disk.
+class OutdatedSessionStatusError(ValueError):
+    """Raised by :func:`load_session` when a pre-v0.9.4 ``status:`` value
+    is detected on disk.
 
     Wraps the originating :class:`pydantic.ValidationError` and points
     the user at ``tripwire migrate status-values``.
@@ -76,17 +76,17 @@ class LegacySessionStatusError(ValueError):
         self.status = status
         super().__init__(
             f"{path} carries a pre-v0.9.4 `status: {status}` value. "
-            f"Run `tripwire migrate status-values` to rewrite legacy "
+            f"Run `tripwire migrate status-values` to rewrite "
             f"issue and session statuses to the canonical taxonomy."
         )
 
 
-def _legacy_session_status(exc: ValidationError, frontmatter: dict) -> str | None:
-    """Return the legacy status string if *exc* is the enum-rejection
+def _pre_v094_session_status(exc: ValidationError, frontmatter: dict) -> str | None:
+    """Return the pre-v0.9.4 status string if *exc* is the enum-rejection
     for `status`, else None.
     """
     status = frontmatter.get("status")
-    if not isinstance(status, str) or status not in _LEGACY_SESSION_STATUSES:
+    if not isinstance(status, str) or status not in _PRE_V094_SESSION_STATUSES:
         return None
     for err in exc.errors():
         loc = err.get("loc") or ()
@@ -113,7 +113,7 @@ def load_session(project_dir: Path, session_id: str) -> AgentSession:
     commonly when an old-shape session.yaml carries a key the current
     schema rejects. The wrapper extracts the offending key(s) from the
     pydantic error message and points at the regeneration path; it
-    does not encode any knowledge of legacy field names.
+    does not encode any knowledge of older field names.
     """
     path = session_yaml_path(project_dir, session_id)
     if not path.exists():
@@ -126,9 +126,9 @@ def load_session(project_dir: Path, session_id: str) -> AgentSession:
     try:
         return AgentSession.model_validate({**frontmatter, "body": body})
     except ValidationError as exc:
-        legacy = _legacy_session_status(exc, frontmatter)
-        if legacy is not None:
-            raise LegacySessionStatusError(path, legacy) from exc
+        outdated = _pre_v094_session_status(exc, frontmatter)
+        if outdated is not None:
+            raise OutdatedSessionStatusError(path, outdated) from exc
         offending = sorted(
             {".".join(str(part) for part in err["loc"]) for err in exc.errors()}
         )
@@ -245,8 +245,8 @@ def list_sessions(project_dir: Path) -> list[AgentSession]:
     to skip them. The validator loader swallows per-file errors and
     reports them as `session/parse_error` / `session/schema_invalid`.
 
-    Raises :class:`LegacySessionStatusError` if any session file holds a
-    pre-v0.9.4 ``status:`` value, pointing the user at
+    Raises :class:`OutdatedSessionStatusError` if any session file holds
+    a pre-v0.9.4 ``status:`` value, pointing the user at
     ``tripwire migrate status-values``.
     """
     sessions_root = paths.sessions_dir(project_dir)
@@ -264,9 +264,9 @@ def list_sessions(project_dir: Path) -> list[AgentSession]:
         try:
             sessions.append(AgentSession.model_validate({**frontmatter, "body": body}))
         except ValidationError as exc:
-            legacy = _legacy_session_status(exc, frontmatter)
-            if legacy is not None:
-                raise LegacySessionStatusError(yaml_path, legacy) from exc
+            outdated = _pre_v094_session_status(exc, frontmatter)
+            if outdated is not None:
+                raise OutdatedSessionStatusError(yaml_path, outdated) from exc
             raise
     return sessions
 

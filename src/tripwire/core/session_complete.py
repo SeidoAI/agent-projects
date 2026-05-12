@@ -158,11 +158,11 @@ def _flip_drafts_to_ready(session) -> None:
     intentionally pass ``check=False`` so a noisy "PR is not draft"
     warning doesn't fail the whole complete.
 
-    Worktrees without a ``draft_pr_url`` (legacy in-flight sessions
-    that started before v0.7.5 landed) fall back to ``gh pr create
-    --fill`` so a PR exists to merge against. The fallback is best-
-    effort — if the agent's exit protocol already opened the PR, gh
-    errors with "a PR already exists" which we swallow.
+    Worktrees without a ``draft_pr_url`` (in-flight sessions that
+    started before v0.7.5 landed and still lack the recorded URL) fall
+    back to ``gh pr create --fill`` so a PR exists to merge against.
+    The fallback is best-effort — if the agent's exit protocol already
+    opened the PR, gh errors with "a PR already exists" which we swallow.
     """
     for wt in session.runtime_state.worktrees:
         if wt.draft_pr_url:

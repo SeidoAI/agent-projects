@@ -147,7 +147,7 @@ def _apply_agent_yaml_overrides(
     if not isinstance(data, dict):
         return
     declared = data.get("runtime")
-    # Defensive: legacy values like "claude-code" or typos are ignored.
+    # Defensive: stale values like "claude-code" or typos are ignored.
     # Validation is the registry's job at spawn time, not ours.
     if declared not in ("claude", "codex"):
         return
@@ -282,8 +282,8 @@ def build_claude_args(
     :func:`tripwire.core.spawn_routing.resolve_route`. The route's
     ``(model, effort)`` replace ``cfg.model`` / ``cfg.effort`` (which
     become defaults that the route layers on top of). When
-    ``project_dir`` is ``None``, the legacy path is preserved — every
-    pre-routing test continues to pass without modification.
+    ``project_dir`` is ``None``, the pre-routing path is preserved —
+    every pre-routing test continues to pass without modification.
     """
     if interactive and prompt is not None:
         raise ValueError("prompt must be None when interactive=True")

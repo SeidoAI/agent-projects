@@ -32,9 +32,9 @@ _DEFAULT_TYPES: tuple[str, ...] = (
     "proj",
 )
 
-# Legacy module-level constant kept for callers that read it (e.g. docstrings
-# and error messages). Reflects the shipped default — projects with overrides
-# should always pass `project_dir`.
+# Module-level constant kept for callers that read it (e.g. docstrings
+# and error messages). Reflects the shipped default — projects with
+# overrides should always pass `project_dir`.
 ALLOWED_TYPES: tuple[str, ...] = _DEFAULT_TYPES
 
 MAX_BRANCH_LENGTH = 60

@@ -97,7 +97,7 @@ def _open_draft_pr(
 
     Returns the PR URL on success. Returns ``None`` when the worktree
     has no git remote (graceful skip — logs a warning and proceeds; the
-    legacy create-PR-at-complete path covers the spawn). Raises
+    fallback create-PR-at-complete path covers the spawn). Raises
     :class:`subprocess.CalledProcessError` if a remote is configured
     but commit/push/gh fails — spawn errors loud rather than silently
     leaving an orphan branch.
@@ -111,7 +111,7 @@ def _open_draft_pr(
     if remote_check.returncode != 0 or not remote_check.stdout.strip():
         log.warning(
             "worktree %s has no git remote; skipping draft PR creation "
-            "(falling back to legacy create-at-complete path)",
+            "(falling back to create-at-complete path)",
             worktree,
         )
         return None

@@ -70,7 +70,7 @@ def _all_checks_completed(payload: dict) -> bool:
     for run in runs:
         status = (run.get("status") or "").upper()
         # GitHub Actions reports COMPLETED with a conclusion; the
-        # legacy commit-status API returns just a state — treat
+        # older commit-status API returns just a state — treat
         # SUCCESS / FAILURE / ERROR as terminal there too.
         if status in {"COMPLETED", "SUCCESS", "FAILURE", "ERROR"}:
             continue

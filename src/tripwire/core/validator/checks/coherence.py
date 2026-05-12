@@ -263,10 +263,10 @@ def check_issue_session_status_compatibility(
                             f"{s_state!r}: {allowed}."
                         ),
                         fix_hint=(
-                            "Sweep the session forward via "
-                            "`tripwire session transition --sweep-issues`, "
-                            "or advance the issue status to match the "
-                            "contract."
+                            "Run `tripwire session transition` to a status "
+                            "whose route declares `sweep_issues_forward`, "
+                            "or advance the issue status directly to match "
+                            "the contract."
                         ),
                     )
                 )

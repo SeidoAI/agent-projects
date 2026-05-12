@@ -177,8 +177,9 @@ def sweep_issues(
     - are already at-or-beyond the sweep target on the lifecycle
     - have an off-path status (deferred, abandoned)
 
-    Used by ``session complete`` (sweeps to ``completed``) and the
-    ``--sweep-issues`` flag on ``session transition``.
+    Used by ``session complete`` (sweeps to ``completed``) and by the
+    ``sweep_issues_forward`` side-effect handler invoked from
+    ``workflow.yaml`` routes.
     """
     from tripwire.core.store import load_issue, save_issue
 

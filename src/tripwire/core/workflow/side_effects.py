@@ -185,9 +185,9 @@ def _rebase_pt_branch_apply(ctx: SideEffectContext) -> SideEffectResult:
     if pt is None:
         return SideEffectResult()
     wt_path = Path(pt.worktree_path)
-    # Mirror the v0.12 `_maybe_rebase_pt_branch` guard: if the PT worktree
-    # was cleaned up by `complete` and not yet recreated by `spawn --resume`,
-    # the path is gone. Skip the rebase rather than hard-fail the transition.
+    # `_maybe_rebase_pt_branch` guard: if the PT worktree was cleaned up
+    # by `complete` and not yet recreated by `spawn --resume`, the path
+    # is gone. Skip the rebase rather than hard-fail the transition.
     if not wt_path.is_dir():
         return SideEffectResult()
     try:
@@ -376,10 +376,10 @@ def _append_audit_log_entry_apply(ctx: SideEffectContext) -> SideEffectResult:
 def _append_telemetry_row_apply(ctx: SideEffectContext) -> SideEffectResult:
     """Append a routing-telemetry row for analytics. Best-effort.
 
-    Mirrors the legacy ``session_complete`` path: compute cost from the
+    Mirrors the ``session_complete`` path: compute cost from the
     session's log, then build and append the row.
     ``build_telemetry_row`` requires a numeric ``cost_usd``; the
-    historical ``cost_usd=None`` shortcut would raise ``TypeError`` and
+    earlier ``cost_usd=None`` shortcut would raise ``TypeError`` and
     the broad ``except`` would silently swallow it — meaning no row was
     ever written for executor-driven completions.
     """

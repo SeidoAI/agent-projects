@@ -97,9 +97,9 @@ def check_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
     A session that has reached the threshold for one artifact but not for
     another is checked only against the first.
 
-    v0.12: applies the artifact_phase → session_status mapping (so
+    Applies the artifact_phase → session_status mapping (so
     `produced_at: planning` correctly gates at session.status >= queued)
-    and checks both legacy `sessions/<sid>/<file>` and nested
+    and checks both flat `sessions/<sid>/<file>` and nested
     `sessions/<sid>/artifacts/<file>` layouts before reporting missing.
     Fix-hints prefix with the responsible-actor label from `owned_by`.
     """

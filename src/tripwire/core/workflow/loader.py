@@ -1,18 +1,17 @@
-"""Read-only loader for ``<project>/workflow.yaml`` (v0.13).
+"""Read-only loader for ``<project>/workflow.yaml``.
 
 Parses the raw YAML into the :class:`WorkflowSpec` typed tree. Never
 mutates state — the file is read, normalised into dataclasses, and
 returned. Structural anomalies that can't be expressed in the typed
-tree (e.g. a status carrying the deleted v0.12 ``next:`` key) are
-recorded as :class:`WorkflowFinding` entries on
+tree (e.g. a status carrying an unrecognized key such as ``next:``)
+are recorded as :class:`WorkflowFinding` entries on
 ``WorkflowSpec.load_findings`` and surfaced through
 :func:`validate_workflow_spec`.
 
 The file is optional: a missing ``workflow.yaml`` returns an empty
 :class:`WorkflowSpec`. Every present file must declare
-``workflow_schema_version: 1`` at the top; older shapes are rejected
-with ``workflow/missing_schema_version`` and the operator is pointed
-at ``tripwire migrate workflow``.
+``workflow_schema_version: 1`` at the top; files that omit it are
+rejected with ``workflow/missing_schema_version``.
 """
 
 from __future__ import annotations
@@ -97,7 +96,6 @@ _RECOGNIZED_EMITS_KEYS = frozenset(
 )
 _RECOGNIZED_TRIGGER_KEYS = frozenset({"type", "name"})
 
-_LEGACY_STATUS_KEYS = frozenset({"next"})
 _KNOWN_ROUTE_KINDS = frozenset(
     {"forward", "return", "loop", "side", "revert", "terminal"}
 )
@@ -118,10 +116,6 @@ def _audit_workflow_shape(wf_id: str, raw: dict) -> list[WorkflowFinding]:
     current schema accepts. Stale shapes therefore surface as a single
     error code with the offending key in the message, alongside the
     recognized-key list so the author can correct the file.
-
-    Legacy v0.12 keys (``next``) are surfaced as a dedicated
-    ``workflow/legacy_next_field`` finding so the migration command
-    can be cited in the fix hint.
     """
     findings: list[WorkflowFinding] = []
 
@@ -158,23 +152,8 @@ def _audit_workflow_shape(wf_id: str, raw: dict) -> list[WorkflowFinding]:
                 continue
             sid = str(status_raw.get("id") or "<unknown>")
             present = set(status_raw.keys())
-            legacy = present & _LEGACY_STATUS_KEYS
-            for key in sorted(legacy):
-                findings.append(
-                    WorkflowFinding(
-                        code="workflow/legacy_next_field",
-                        workflow=wf_id,
-                        status=sid,
-                        message=(
-                            f"status {sid!r} declares legacy `{key}:` block "
-                            f"(removed in v0.13). Routes are now the single "
-                            f"source of structural arrows. Run "
-                            f"`tripwire migrate workflow` to upgrade."
-                        ),
-                    )
-                )
             _emit_unknown(
-                present - _RECOGNIZED_STATUS_KEYS - _LEGACY_STATUS_KEYS,
+                present - _RECOGNIZED_STATUS_KEYS,
                 _RECOGNIZED_STATUS_KEYS,
                 f"status {sid!r}",
                 status=sid,
@@ -522,12 +501,12 @@ def _parse_artifact_refs(value: Any) -> list[WorkflowArtifactRef]:
 
 
 def _parse_route_trigger(value: Any) -> tuple[str | None, WorkflowRouteTrigger | None]:
-    """Return the legacy bare-string form alongside an optional typed form.
+    """Return the bare-string form alongside an optional typed form.
 
     Accepts either:
 
     - bare string ``trigger: command.pm-session-spawn`` — preserved as-is
-      in the legacy slot; not coerced into typed form
+      in the bare-string slot; not coerced into typed form
     - mapping ``trigger: { type: command, name: ... }`` — produces a
       typed :class:`WorkflowRouteTrigger`; the bare-string slot
       receives ``"<type>.<name>"`` for round-trip rendering.
