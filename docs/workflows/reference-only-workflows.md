@@ -1,4 +1,4 @@
-# Legacy workflow declarations (documentation only, v0.13)
+# Reference-only workflow declarations (documentation only)
 
 These workflows shipped in `workflow.yaml.j2` through v0.12 as
 documentation of the surrounding PM/review/ops process. None of them
@@ -9,7 +9,7 @@ doesn't drive).
 
 In v0.13 the live template carries only `coding-session`, the workflow
 the executor actually runs. The blocks below are reference material
-preserved verbatim from v0.12, except the duplicate
+preserved verbatim from earlier releases, except the duplicate
 `concept-freshness` block from lines 1417–1479 of v0.12 — that was a
 merge artifact, not a second workflow.
 
