@@ -345,8 +345,8 @@ def _parse_task_checklist(path: Path) -> tuple[int, int]:
 
     Delegates to :func:`tripwire.core.task_checklist.parse_task_checklist`
     so CLI and UI agree on what counts as a task. The canonical template
-    emits a Markdown table with a status column; legacy checkbox-form
-    files report (0, 0) and should migrate.
+    emits a Markdown table with a status column; bare-checkbox files
+    that don't match the table format report (0, 0) and should migrate.
     """
     if not path.is_file():
         return 0, 0
@@ -851,7 +851,7 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
     save_session(resolved, session)
 
 
-# Session-status transitions are now declared in `workflow.yaml` and
+# Session-status transitions are declared in `workflow.yaml` and
 # executed by `tripwire.core.workflow.transitions.execute_transition`,
 # which resolves the matching route, captures pre-state snapshots,
 # runs side-effects in declared order, and rolls back atomically on
@@ -869,37 +869,12 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
     default=".",
     show_default=True,
 )
-@click.option(
-    "--sweep-issues/--no-sweep-issues",
-    default=None,
-    help=(
-        "DEPRECATED in v0.13: no-op. Sweep behavior is now declared on "
-        "each route via `side_effects: [sweep_issues_forward, ...]` in "
-        "`workflow.yaml`. Flag retained for backwards-compat; will be "
-        "removed in v0.14."
-    ),
-)
-@click.option(
-    "--no-validate",
-    "skip_validate",
-    is_flag=True,
-    default=False,
-    help=(
-        "DEPRECATED in v0.13: no-op. The transition gate is now "
-        "route-scoped (`controls.tripwires` in `workflow.yaml`) and "
-        "always runs. Full project validation is a separate command "
-        "(`tripwire validate`). Flag retained for backwards-compat; "
-        "will be removed in v0.14."
-    ),
-)
 def session_transition_cmd(
     session_id: str,
     target_status: str,
     project_dir: Path,
-    sweep_issues: bool | None,
-    skip_validate: bool,
 ) -> None:
-    """Transition a session's status via the v0.13 workflow executor.
+    """Transition a session's status via the workflow executor.
 
     Routes through ``tripwire.core.workflow.transitions.execute_transition``,
     which resolves the matching route in ``workflow.yaml`` from
@@ -910,10 +885,9 @@ def session_transition_cmd(
     inverses run in reverse and the session is restored from a pre-state
     snapshot.
 
-    The legacy ``--sweep-issues`` and ``--no-validate`` flags are kept
-    for backwards compatibility but are now no-ops: sweep is declared by
-    the route's ``side_effects: [sweep_issues_forward, ...]`` block and
-    validation is the route's ``controls.tripwires`` gate (the full
+    Sweep behavior is declared by each route's
+    ``side_effects: [sweep_issues_forward, ...]`` block; per-route
+    validation runs as the route's ``controls.tripwires`` gate (the full
     project validator runs as ``tripwire validate``).
     """
     from tripwire.core.workflow.transitions import (
@@ -924,16 +898,12 @@ def session_transition_cmd(
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
-    flags = {
-        "sweep_issues": sweep_issues,
-        "skip_validate": skip_validate,
-    }
     try:
         result = execute_transition(
             resolved,
             session_id=session_id,
             target_status=target_status,
-            flags=flags,
+            flags={},
         )
     except TransitionError as exc:
         raise click.ClickException(str(exc)) from exc
@@ -2162,8 +2132,8 @@ def session_review_cmd(
 
 # ----------------------------------------------------------------------------
 # `tripwire session prepare-review` — scaffold pr-review.yaml from
-# member-issue ACs. v0.12 (handoff #3): the PM's substantive review
-# record. Authored during `/pm-session-review`; validator gates the
+# member-issue ACs. Carries the PM's substantive review record:
+# authored during `/pm-session-review`; validator gates the
 # transition to `verified` on its content (`pr_review/*` rules).
 # ----------------------------------------------------------------------------
 
@@ -2190,12 +2160,12 @@ def session_prepare_review_cmd(
     """Scaffold `sessions/<sid>/pr-review.yaml` from the session's
     member-issue ACs.
 
-    v0.12 (handoff #3): PM-review enforcement. The PM runs this as the
-    first step of `/pm-session-review`, then fills in `verified_by`
-    evidence, four-lens findings, external-reviewer signals, and
-    threshold-finding decisions before transitioning the session to
-    `verified`. The validator's `pr_review/*` rules gate that transition
-    on the file's substance.
+    PM-review enforcement: the PM runs this as the first step of
+    `/pm-session-review`, then fills in `verified_by` evidence,
+    four-lens findings, external-reviewer signals, and threshold-finding
+    decisions before transitioning the session to `verified`. The
+    validator's `pr_review/*` rules gate that transition on the file's
+    substance.
 
     Refuses to overwrite an existing pr-review.yaml unless `--force` is
     set, so a partially-filled review isn't blown away.
@@ -2293,7 +2263,7 @@ def session_prepare_review_cmd(
     import yaml as _yaml
 
     target.write_text(
-        "# v0.12 — PM-review record. Fill `verified_by` arrays with concrete\n"
+        "# PM-review record. Fill `verified_by` arrays with concrete\n"
         "# file:line citations or short evidence strings before transitioning\n"
         "# the session to `verified`. The validator's pr_review/* rules\n"
         "# block transition on placeholders or missing evidence.\n\n"

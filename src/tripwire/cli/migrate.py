@@ -35,8 +35,8 @@ from tripwire.core.parser import (
 
 # Source (flat) → destination (under templates/) mapping for the v0.10.0
 # layout migration. The destination paths are now the canonical layout
-# (defined as constants on ``core/paths.py``); the legacy source names
-# are inlined here because this command is the only consumer.
+# (defined as constants on ``core/paths.py``); the pre-migration source
+# names are inlined here because this command is the only consumer.
 _TEMPLATE_RENAMES: tuple[tuple[str, str], ...] = (
     ("agents", paths.AGENTS_DIR),  # → templates/agents
     ("enums", paths.ENUMS_DIR),  # → templates/enums
@@ -166,7 +166,7 @@ def migrate_templates_cmd(project_dir: Path, dry_run: bool) -> None:
 # graph migration — collapses ``graph/`` into ``nodes/``
 # ---------------------------------------------------------------------------
 
-# (legacy → canonical) for the v0.10.0 graph relocation. The cache moves
+# (source → canonical) for the v0.10.0 graph relocation. The cache moves
 # alongside the source nodes; the lock follows it.
 _GRAPH_RENAMES: tuple[tuple[str, str], ...] = (
     ("graph/index.yaml", paths.GRAPH_CACHE),
@@ -328,7 +328,7 @@ def migrate_graph_edges_cmd(project_dir: Path, dry_run: bool) -> None:
 
     Pre-v0.9 caches stored edge kinds as ``references``, ``blocked_by``,
     and ``related``. v0.9+ uses the canonical taxonomy (``refs``,
-    ``depends_on``). This command rewrites every legacy ``type:`` value
+    ``depends_on``). This command rewrites every pre-v0.9 ``type:`` value
     in ``nodes/tripwire-graph-index.yaml`` in place.
 
     Run this once after upgrading. Idempotent — already-canonical caches
@@ -402,7 +402,7 @@ def migrate_graph_edges_cmd(project_dir: Path, dry_run: bool) -> None:
 # Pre-v0.9.4 → canonical status rewrites. The IssueStatus / SessionStatus
 # StrEnums and their `_missing_` aliases were ripped in commit bb7b2ff;
 # this command is the only path back to a loadable project for any tree
-# that still carries the legacy values.
+# that still carries the pre-v0.9.4 values.
 _ISSUE_STATUS_RENAMES: dict[str, str] = {
     "backlog": "planned",
     "todo": "queued",
@@ -429,9 +429,9 @@ def _rewrite_status_in_place(
     """Rewrite ``status:`` in *path*'s frontmatter using *rename_map*.
 
     Returns ``(changed, before, after)``:
-    - ``changed`` — whether the file's status was a legacy value that
+    - ``changed`` — whether the file's status was a pre-v0.9.4 value that
       this call rewrote (or would rewrite, in dry-run).
-    - ``before`` / ``after`` — the legacy and canonical strings, for
+    - ``before`` / ``after`` — the pre-v0.9.4 and canonical strings, for
       output. ``None`` for files that needed no rewrite.
 
     Files that can't be parsed are skipped silently with ``(False, None,
@@ -477,7 +477,7 @@ def migrate_status_values_cmd(project_dir: Path, dry_run: bool) -> None:
 
     Walks every ``issues/<KEY>/issue.yaml`` and
     ``sessions/<id>/session.yaml`` under the project, finds frontmatter
-    ``status:`` values that match the legacy taxonomy, and rewrites
+    ``status:`` values that match the pre-v0.9.4 taxonomy, and rewrites
     them in place:
 
       \b
@@ -550,103 +550,6 @@ def migrate_status_values_cmd(project_dir: Path, dry_run: bool) -> None:
         f"\n{len(rewritten)} file(s) {summary_verb} "
         f"({scanned - len(rewritten)} already canonical)."
     )
-
-
-@migrate_cmd.command("workflow")
-@click.option(
-    "--project-dir",
-    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
-    default=".",
-    show_default=True,
-    help="Project root to migrate.",
-)
-@click.option(
-    "--dry-run",
-    is_flag=True,
-    help="Print the diff without writing.",
-)
-@click.option(
-    "--yes",
-    is_flag=True,
-    help=(
-        "Required when the existing workflow.yaml has been hand-edited "
-        "(diverges from the v0.12 shipped template). Forces overwrite."
-    ),
-)
-def migrate_workflow_cmd(project_dir: Path, dry_run: bool, yes: bool) -> None:
-    """Migrate ``workflow.yaml`` from v0.12 to v0.13 schema.
-
-    Hard cutover. The v0.13 schema removes ``statuses[].next:`` (routes
-    are the single source of structural arrows), adds
-    ``workflow_schema_version: 1`` at the top, and adds the executor
-    contract fields on routes (``preconditions``, ``preserve_fields``,
-    ``side_effects``, ``rollback``).
-
-    The migration regenerates ``workflow.yaml`` from the packaged v0.13
-    template. If the existing file is byte-identical to the v0.12
-    shipped template the migration runs unconditionally; otherwise it
-    refuses without ``--yes`` and prints the diff so the operator can
-    merge by hand.
-
-    Idempotent: running on a v0.13 file (already declares
-    ``workflow_schema_version: 1``) is a no-op.
-    """
-    resolved = project_dir.expanduser().resolve()
-    workflow_path = resolved / "workflow.yaml"
-    if not workflow_path.is_file():
-        click.echo(
-            f"No workflow.yaml at {workflow_path} — nothing to migrate. "
-            f"(Did you mean a different --project-dir?)"
-        )
-        return
-
-    existing = workflow_path.read_text(encoding="utf-8")
-    # Substring search across the file's first 1KB — robust against
-    # leading comments, indentation, and trailing whitespace that an
-    # exact-line match would miss.
-    if "workflow_schema_version: 1" in existing[:1024]:
-        click.echo("workflow.yaml already on v0.13 schema — nothing to migrate.")
-        return
-
-    template_path = Path(__file__).parent.parent / "templates" / "workflow.yaml.j2"
-    new_text = template_path.read_text(encoding="utf-8")
-
-    if dry_run:
-        click.echo(
-            f"[dry-run] would rewrite {workflow_path} from packaged v0.13 template."
-        )
-        click.echo(f"  before: {len(existing)} bytes / {existing.count(chr(10))} lines")
-        click.echo(f"  after:  {len(new_text)} bytes / {new_text.count(chr(10))} lines")
-        return
-
-    if not yes:
-        # Heuristic: if the existing file declares any of the v0.12
-        # documentation-only workflows, assume it's the v0.12 shipped
-        # shape and proceed. Otherwise refuse.
-        v012_signature_workflows = (
-            "pm-scoping:",
-            "pm-triage:",
-            "pm-monitor:",
-            "code-review:",
-        )
-        looks_like_v012 = all(sig in existing for sig in v012_signature_workflows)
-        if not looks_like_v012:
-            click.echo(
-                f"workflow.yaml at {workflow_path} does not look like the "
-                f"v0.12 shipped template (missing one or more of "
-                f"{list(v012_signature_workflows)}). Refusing to overwrite "
-                f"without --yes. Inspect the diff and either:\n"
-                f"  1. Re-run with --yes to overwrite (BAK retained), or\n"
-                f"  2. Hand-merge the v0.13 template at "
-                f"{template_path} into your workflow.yaml.",
-                err=True,
-            )
-            raise click.exceptions.Exit(1)
-
-    backup = workflow_path.with_suffix(".yaml.bak")
-    shutil.copy2(workflow_path, backup)
-    workflow_path.write_text(new_text, encoding="utf-8")
-    click.echo(f"Migrated {workflow_path} to v0.13 schema. Backup at {backup}.")
 
 
 __all__ = ["migrate_cmd"]
