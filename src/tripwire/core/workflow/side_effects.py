@@ -306,8 +306,18 @@ def _remove_worktrees_apply(ctx: SideEffectContext) -> SideEffectResult:
 
 
 def _append_pm_followup_stub_apply(ctx: SideEffectContext) -> SideEffectResult:
-    """Append the PM follow-up section to plan.md if absent (used by reopen)."""
-    plan_path = ctx.project_dir / "sessions" / ctx.session.id / "plan.md"
+    """Append the PM follow-up section to plan.md if absent (used by reopen).
+
+    Resolves the plan via ``paths.session_plan_path`` rather than
+    hardcoding ``sessions/<sid>/plan.md``: the canonical location is
+    ``sessions/<sid>/artifacts/plan.md``, and the existing
+    ``session_reopen.py`` path uses the same helper. Hardcoding the old
+    location silently skipped the stub for sessions whose plan was at
+    the canonical artifact path.
+    """
+    from tripwire.core import paths
+
+    plan_path = paths.session_plan_path(ctx.project_dir, ctx.session.id)
     if not plan_path.is_file():
         return SideEffectResult()
     text = plan_path.read_text(encoding="utf-8")
