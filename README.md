@@ -346,3 +346,9 @@ make pre-commit-install
 ## License
 
 MIT. See `LICENSE`.
+
+---
+
+## References
+
+- Lost in the middle (position effects) - Liu, N. F., Lin, K., Hewitt, J., Paranjape, A., Bevilacqua, M., Petroni, F., & Liang, P. (2024). https://arxiv.org/abs/2307.03172
