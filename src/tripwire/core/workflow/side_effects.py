@@ -367,6 +367,56 @@ def _append_audit_log_entry_apply(ctx: SideEffectContext) -> SideEffectResult:
     return SideEffectResult()
 
 
+_ENGAGEMENT_OUTCOME_BY_TARGET = {
+    "completed": "completed",
+    "abandoned": "abandoned",
+    "failed": "failed",
+}
+
+
+def _close_active_engagement_apply(ctx: SideEffectContext) -> SideEffectResult:
+    """Close the last open engagement on terminal-bound transitions.
+
+    Mirrors ``complete_session``/``abandon_session``: if the last
+    engagement has no ``ended_at``, stamp it with the current time and
+    derive ``outcome`` from the route's target status. ``append_telemetry_row``
+    derives ``duration_min`` from ``last.ended_at``; without this step
+    executor-driven completions record zero duration.
+
+    No-op when the target is not a terminal status, when there are no
+    engagements, or when the last engagement is already closed.
+    """
+    from datetime import datetime, timezone
+
+    outcome = _ENGAGEMENT_OUTCOME_BY_TARGET.get(ctx.route.to_ref)
+    if outcome is None:
+        return SideEffectResult()
+    if not ctx.session.engagements:
+        return SideEffectResult()
+    last = ctx.session.engagements[-1]
+    if last.ended_at is not None:
+        return SideEffectResult(data={"closed": False})
+
+    pre_state = {"ended_at": last.ended_at, "outcome": last.outcome}
+    last.ended_at = datetime.now(tz=timezone.utc)
+    last.outcome = outcome
+    return SideEffectResult(data={"closed": True, "pre_state": pre_state})
+
+
+def _close_active_engagement_inverse(
+    ctx: SideEffectContext, result: SideEffectResult
+) -> None:
+    """Restore the engagement to its pre-close state on rollback."""
+    if not result.data.get("closed"):
+        return
+    if not ctx.session.engagements:
+        return
+    last = ctx.session.engagements[-1]
+    pre = result.data.get("pre_state", {})
+    last.ended_at = pre.get("ended_at")
+    last.outcome = pre.get("outcome")
+
+
 def _append_telemetry_row_apply(ctx: SideEffectContext) -> SideEffectResult:
     """Append a routing-telemetry row for analytics. Best-effort.
 
@@ -376,6 +426,10 @@ def _append_telemetry_row_apply(ctx: SideEffectContext) -> SideEffectResult:
     earlier ``cost_usd=None`` shortcut would raise ``TypeError`` and
     the broad ``except`` would silently swallow it — meaning no row was
     ever written for executor-driven completions.
+
+    ``duration_min`` derives from ``last.ended_at``; routes that produce
+    a terminal status must declare ``close_active_engagement`` BEFORE
+    this handler so the engagement is closed when telemetry samples it.
     """
     try:
         from tripwire.core.routing_telemetry import (
@@ -485,6 +539,14 @@ def _register_builtins() -> None:
             apply=_append_pm_followup_stub_apply,
             inverse=None,
             idempotent=True,
+        )
+    )
+    register(
+        SideEffect(
+            id="close_active_engagement",
+            apply=_close_active_engagement_apply,
+            inverse=_close_active_engagement_inverse,
+            idempotent=False,
         )
     )
     register(

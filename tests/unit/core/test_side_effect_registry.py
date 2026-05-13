@@ -23,6 +23,7 @@ def test_registry_exposes_all_v013_handler_ids() -> None:
         "reset_acks",
         "append_audit_log_entry",
         "append_telemetry_row",
+        "close_active_engagement",
     }
     assert expected.issubset(known_ids())
 
@@ -166,6 +167,141 @@ def test_unknown_side_effect_lint_fires_with_registry(tmp_path: Path) -> None:
     findings = check_workflow_well_formed(ctx)
     codes = [f.code for f in findings]
     assert "workflow/unknown_side_effect" in codes
+
+
+def _make_engagement_context(target_status: str, *, engagement_open: bool = True):
+    """Build a minimal SideEffectContext targeting ``target_status``.
+
+    The session carries one engagement; ``engagement_open`` toggles
+    whether it has an ``ended_at`` set.
+    """
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from tripwire.core.workflow.schema import WorkflowRoute
+    from tripwire.core.workflow.side_effects import SideEffectContext
+    from tripwire.models.session import (
+        AgentSession,
+        EngagementEntry,
+        RuntimeState,
+        SessionStatus,
+    )
+
+    when = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    engagement = EngagementEntry.model_construct(
+        started_at=when,
+        ended_at=when.replace(hour=1) if not engagement_open else None,
+        outcome="completed" if not engagement_open else None,
+    )
+    session = AgentSession.model_construct(
+        id="s-engage",
+        name="x",
+        agent="backend-coder",
+        issues=[],
+        repos=[],
+        status=SessionStatus.EXECUTING,
+        runtime_state=RuntimeState.model_construct(),
+        engagements=[engagement],
+    )
+    route = WorkflowRoute(
+        id="r",
+        actor="pm-agent",
+        from_ref="executing",
+        to_ref=target_status,
+        kind="forward",
+        label="x",
+    )
+    return SideEffectContext(
+        project_dir=Path("/tmp"),
+        session=session,
+        route=route,
+        flags={},
+    )
+
+
+def test_close_active_engagement_stamps_ended_at_and_outcome() -> None:
+    """Target ``completed`` → ``ended_at`` set, ``outcome='completed'``,
+    ``result.data['closed']=True``."""
+    from tripwire.core.workflow.side_effects import get
+
+    ctx = _make_engagement_context("completed")
+    effect = get("close_active_engagement")
+    assert effect is not None
+
+    result = effect.apply(ctx)
+    last = ctx.session.engagements[-1]
+
+    assert result.data["closed"] is True
+    assert last.ended_at is not None
+    assert last.outcome == "completed"
+
+
+def test_close_active_engagement_maps_target_to_outcome() -> None:
+    """``abandoned`` and ``failed`` targets produce matching outcomes."""
+    from tripwire.core.workflow.side_effects import get
+
+    effect = get("close_active_engagement")
+    assert effect is not None
+
+    for target in ("abandoned", "failed"):
+        ctx = _make_engagement_context(target)
+        effect.apply(ctx)
+        assert ctx.session.engagements[-1].outcome == target
+
+
+def test_close_active_engagement_noop_on_non_terminal_target() -> None:
+    """Targets that are not in the engagement-outcome map (e.g.
+    ``in_review``) leave the engagement untouched."""
+    from tripwire.core.workflow.side_effects import get
+
+    ctx = _make_engagement_context("in_review")
+    effect = get("close_active_engagement")
+    assert effect is not None
+
+    result = effect.apply(ctx)
+
+    assert result.data == {}
+    assert ctx.session.engagements[-1].ended_at is None
+    assert ctx.session.engagements[-1].outcome is None
+
+
+def test_close_active_engagement_noop_when_already_closed() -> None:
+    """If ``last.ended_at`` is already set, leave it alone — the
+    engagement was closed by a pre-executor path (e.g. ``complete_session``)
+    and we must not overwrite the original timestamp."""
+    from tripwire.core.workflow.side_effects import get
+
+    ctx = _make_engagement_context("completed", engagement_open=False)
+    pre_ended_at = ctx.session.engagements[-1].ended_at
+    pre_outcome = ctx.session.engagements[-1].outcome
+
+    effect = get("close_active_engagement")
+    assert effect is not None
+    result = effect.apply(ctx)
+
+    assert result.data == {"closed": False}
+    assert ctx.session.engagements[-1].ended_at == pre_ended_at
+    assert ctx.session.engagements[-1].outcome == pre_outcome
+
+
+def test_close_active_engagement_inverse_restores_pre_state() -> None:
+    """After ``apply`` mutates the engagement, ``inverse`` restores the
+    pre-state captured in ``result.data['pre_state']``."""
+    from tripwire.core.workflow.side_effects import get
+
+    ctx = _make_engagement_context("completed")
+    effect = get("close_active_engagement")
+    assert effect is not None
+    assert effect.inverse is not None
+
+    result = effect.apply(ctx)
+    assert ctx.session.engagements[-1].ended_at is not None
+
+    effect.inverse(ctx, result)
+
+    last = ctx.session.engagements[-1]
+    assert last.ended_at is None
+    assert last.outcome is None
 
 
 def test_known_registered_side_effect_does_not_fire_lint(tmp_path: Path) -> None:
