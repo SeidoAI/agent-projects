@@ -264,6 +264,11 @@ workflows:
         label: approve review
         controls:
           prompt_checks: [pm-session-review]
+          tripwires:
+            - v_pr_review_evidence
+            - v_pr_review_threshold_findings
+            - v_pr_review_external_reviewer
+            - v_pr_review_code_review_skill
         skills: [project-manager, verification]
         side_effects: [sweep_issues_forward]
         emits:
