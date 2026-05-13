@@ -261,7 +261,7 @@ def test_loader_parses_explicit_routes(tmp_path: Path) -> None:
 
 
 def test_loader_parses_v013_route_fields(tmp_path: Path) -> None:
-    """v0.13: routes declare preconditions, preserve_fields, clear_fields,
+    """v0.13: routes declare preserve_fields, clear_fields,
     side_effects, rollback, and typed triggers."""
     from tripwire.core.workflow.loader import load_workflows
 
@@ -286,7 +286,6 @@ def test_loader_parses_v013_route_fields(tmp_path: Path) -> None:
                     trigger:
                       type: command
                       name: tripwire-session-reopen
-                    preconditions: [reason_provided]
                     preserve_fields:
                       - runtime_state.claude_session_id
                       - runtime_state.worktrees
@@ -302,7 +301,6 @@ def test_loader_parses_v013_route_fields(tmp_path: Path) -> None:
 
     route = load_workflows(tmp_path).workflows["coding-session"].routes[0]
     assert route.kind == "revert"
-    assert route.preconditions == ["reason_provided"]
     assert route.preserve_fields == [
         "runtime_state.claude_session_id",
         "runtime_state.worktrees",

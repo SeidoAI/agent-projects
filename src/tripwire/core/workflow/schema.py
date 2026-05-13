@@ -27,7 +27,6 @@ The shape:
             kind: forward | return | loop | side | revert | terminal
             command: <optional-command-id>
             trigger: <optional-event-or-condition>
-            preconditions: [<predicate-id>, ...]   # gate-time checks
             preserve_fields: [<dot-path>, ...]      # survive transition
             clear_fields: [<dot-path>, ...]         # cleared on transition
             side_effects: [<registered-id>, ...]    # ordered apply
@@ -199,9 +198,9 @@ class WorkflowRoute:
     route (e.g. ``signal.session_unblocked``). Used by the overseer
     loop to wire dispatch routes back to their source signals.
 
-    ``preconditions`` / ``preserve_fields`` / ``clear_fields`` /
-    ``side_effects`` / ``rollback`` are the v0.13 executor contract:
-    the dispatcher reads them to drive the transition.
+    ``preserve_fields`` / ``clear_fields`` / ``side_effects`` /
+    ``rollback`` are the v0.13 executor contract: the dispatcher reads
+    them to drive the transition.
     """
 
     id: str
@@ -217,7 +216,6 @@ class WorkflowRoute:
     signals: list[str] = field(default_factory=list)
     skills: list[str] = field(default_factory=list)
     emits: WorkflowRouteEmits = field(default_factory=WorkflowRouteEmits)
-    preconditions: list[str] = field(default_factory=list)
     preserve_fields: list[str] = field(default_factory=list)
     clear_fields: list[str] = field(default_factory=list)
     side_effects: list[str] = field(default_factory=list)

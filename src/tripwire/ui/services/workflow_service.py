@@ -162,7 +162,6 @@ def _route_to_dict(workflow_id: str, route: WorkflowRoute) -> dict[str, Any]:
             "comments": list(route.emits.comments),
             "status_changes": list(route.emits.status_changes),
         },
-        "preconditions": list(route.preconditions),
         "preserve_fields": list(route.preserve_fields),
         "clear_fields": list(route.clear_fields),
         "side_effects": list(route.side_effects),

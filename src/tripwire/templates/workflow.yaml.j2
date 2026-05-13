@@ -320,10 +320,10 @@ workflows:
             - cost-ceiling
         skills: [project-manager, verification]
         side_effects:
-          - verify_prs_merged
-          - verify_review_ok
-          - verify_issue_artifacts
           - flip_drafts_to_ready
+          - verify_prs_merged
+          - verify_issue_artifacts
+          - verify_review_ok
           - sweep_issues_forward
           - remove_worktrees
           - close_active_engagement
