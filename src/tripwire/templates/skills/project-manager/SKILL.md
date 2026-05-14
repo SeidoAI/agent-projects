@@ -10,6 +10,20 @@ intent (planning docs, requests, events) into schema-valid project
 files — issues, concept nodes, sessions, comments, artifacts — that
 execution agents consume.
 
+**Operating model (v0.13.1).** `workflow.yaml` declares structure.
+`tripwire validate` enforces invariants. You execute via CLI commands.
+The CLI codifies repetitive procedure in three layers:
+
+- **Layer 1** — individual operation wrappers (`tripwire git …`,
+  `tripwire gh …`, `tripwire session kill-runtime|close-prs|…`).
+- **Layer 2** — common combos (`tripwire session prepare-for-completion`,
+  `prepare-for-abandon`, `sweep-issues-forward`).
+- **Layer 3** — this skill markdown. You select and sequence Layer-1 /
+  Layer-2 commands and recover from validator findings.
+
+`docs/WORKFLOW_ACTIONS.md` is the canonical CLI + transitions reference.
+Read it when you need to look up a route, status, or command.
+
 ## Entry points
 
 Each slash command selects a workflow:
@@ -26,8 +40,8 @@ Each slash command selects a workflow:
 | `/pm-validate` | read-only wrapper | Running the validation gate and interpreting errors |
 | `/pm-lint` | read-only wrapper | Running stage-aware heuristic checks (scoping, handoff, session) |
 | `/pm-session-create` | specialization | Scaffolding a session for an issue |
-| `/pm-session-queue` | specialization | Transitioning an existing session from planned → queued |
-| `/pm-session-spawn` | specialization | Spawning a queued session locally via Claude Code subprocess |
+| `/pm-session-queue` | specialization | Transitioning a session from planned → queued |
+| `/pm-session-spawn` | specialization | Spawning a queued session via Claude Code subprocess |
 | `/pm-session-check` | read-only wrapper | Reporting launch-readiness for a session |
 | `/pm-session-progress` | read-only wrapper | Aggregating in-flight session status |
 | `/pm-session-agenda` | read-only wrapper | Session dependency DAG with launch recommendations |
@@ -45,7 +59,8 @@ When sources disagree:
    ownership. If the manifest says an artifact is owned by
    `execution-agent`, you (the PM) do NOT create it.
 2. **Reference docs** (`SCHEMA_*.md`, `VALIDATION.md`, `WORKFLOWS_*.md`,
-   `BRANCH_NAMING.md`) — canonical for schema, phase gates, naming.
+   `BRANCH_NAMING.md`, `docs/WORKFLOW_ACTIONS.md`) — canonical for
+   schema, phase gates, naming, transitions.
 3. **Command docs** (`.claude/commands/*.md`) — mechanics only; do NOT
    override the manifest or reference docs.
 4. **Templates** — shape, not responsibility.
@@ -54,54 +69,63 @@ If a command doc tells you to produce an artifact the manifest assigns
 elsewhere, follow the manifest and file a comment so the conflict gets
 fixed upstream.
 
-## Front-load context first
+## Transitioning any instance
 
-```bash
-tripwire brief
-```
+Whenever a session, issue, node, or project changes status:
 
-Dumps project config, next IDs, active enums, manifest, orchestration
-pattern, templates, and skill example paths in one tool result. Read
-it before reading planning docs or writing any file.
+1. Identify `workflow_id` + `instance_id` + `target_status`.
+2. Run `tripwire transition <workflow_id> <instance_id> <target_status>`.
+3. Exit code 0 → done. Continue with your work.
+4. Non-zero exit → read the validator findings. They name exact CLI
+   commands to run first.
+5. Run the named CLI commands. Re-attempt step 2.
 
-## Write files directly
+**You MUST NOT edit the `status:` field of any YAML file directly.**
+**You MUST NOT use the `Write` tool to mutate instance YAML.**
+**Every status change goes through `tripwire transition`.**
 
-There are no `issue create` / `node create` CLIs — you write files with
-the `Write` tool. Flow:
+Editing the YAML directly bypasses validators, skips audit / telemetry
+/ engagement-close, and produces silent drift between declared state
+and actual state. The transition CLI is the only writer of status
+fields.
 
-1. Read the schema reference (`references/SCHEMA_<ENTITY>.md`).
-2. Read the matching example (`examples/<entity>-*.yaml`).
-3. Allocate keys for issues: `tripwire next-key --type issue --count N`.
-   Nodes and sessions use slug ids you pick.
-4. Allocate UUIDs for all entities: `tripwire uuid --count N`. Do NOT
-   hand-craft — the validator checks RFC 4122 v4 bits.
-5. Write the YAML to the right directory.
+Reference: `docs/WORKFLOW_ACTIONS.md` lists every workflow, status,
+transition, and supporting CLI command. If you need to look up the
+pre-transition CLI for a specific route, that table is the source of
+truth.
 
-**The example is canonical.** If a schema reference disagrees, trust
-the example.
+### Common session transitions
 
-## The validation gate
+| Target | Pre-transition CLI (run first) | Transition command |
+|---|---|---|
+| `queued` | `tripwire session queue <sid> [--promote-issues]` | `tripwire transition coding-session <sid> queued` |
+| `executing` | `tripwire session spawn <sid>` (or `--resume`) | issued by `spawn`; do not run `transition` directly |
+| `in_review` | record artifacts in `controls.tripwires`; rebase PT branch | `tripwire transition coding-session <sid> in_review` |
+| `verified` | independent code-review evidence (`pr_review.yaml`); write `verified.md` | `tripwire transition coding-session <sid> verified` |
+| `executing` (changes requested) | write `pm-response.yaml` | `tripwire transition coding-session <sid> executing` |
+| `completed` | `tripwire session prepare-for-completion <sid>` | `tripwire transition coding-session <sid> completed` |
+| `paused` | `tripwire session pause <sid>` (typical) | issued by `pause` |
+| `abandoned` | `tripwire session prepare-for-abandon <sid>` | issued by `tripwire session abandon <sid>` |
+| `paused → executing` | `tripwire session normalise-branch <sid>` if PR squash-merged, then `spawn --resume` | issued by `spawn --resume` |
 
-After every batch of writes:
+If any step fails: read the validator output; run the CLI command it
+names; re-attempt the transition. Do not bypass.
+
+## After every batch of changes: validate
+
+Run `tripwire validate` after writing any file. Exit code 0 → proceed.
+Non-zero → **STOP**. Address every finding before any further changes.
+**You MUST NOT skip this step.** **You MUST NOT proceed with
+unaddressed findings.**
 
 ```bash
 tripwire validate
 ```
 
-Output formats: `text` (default), `summary` (counts), `compact` (one
-line/error), `json`, `--count` (integer only).
-
-Selectors for targeted edits:
-
-```bash
-tripwire validate --select SEI-42+   # downstream
-tripwire validate --select +SEI-42   # upstream
-tripwire validate --select SEI-42+2  # 2 hops
-tripwire validate --select SEI-42    # just this entity
-```
-
-Fix every error. Re-run until exit 0. The command rebuilds the graph
-cache as a side effect.
+Output formats: `text` (default), `summary`, `compact`, `json`,
+`--count`. Selectors for targeted runs: `--select SEI-42+`
+(downstream), `+SEI-42` (upstream), `SEI-42+2` (2 hops), `SEI-42`
+(just this entity).
 
 **Checks:** schema, references, bidi consistency, transitions,
 freshness, UUID format, phase requirements.
@@ -122,6 +146,39 @@ To advance, set `phase:` in `project.yaml` and run validate. Missing
 artifacts fail the gate — complete gap analysis and compliance first.
 
 Full error catalogue: `references/VALIDATION.md`.
+
+## Front-load context first
+
+```bash
+tripwire brief
+```
+
+Dumps project config, next IDs, active enums, manifest, orchestration
+pattern, templates, and skill example paths in one tool result. Run it
+before reading planning docs or writing any file.
+
+## Create new entities by writing files
+
+Creation (not mutation) of issues, nodes, and sessions is still file-
+based — there is no `tripwire issue create` CLI. For creation, use the
+`Write` tool. Procedure:
+
+1. Read the schema reference (`references/SCHEMA_<ENTITY>.md`).
+2. Read the matching example (`examples/<entity>-*.yaml`).
+3. Allocate keys for issues:
+   `tripwire next-key --type issue --count N`. Nodes and sessions use
+   slug ids you pick.
+4. Allocate UUIDs for all entities: `tripwire uuid --count N`. Do NOT
+   hand-craft — the validator checks RFC 4122 v4 bits.
+5. Write the YAML to the right directory.
+6. Run `tripwire validate`.
+
+**The example is canonical.** If a schema reference disagrees, trust
+the example.
+
+**You MUST NOT use `Write` to change an existing instance's `status:`
+field.** Status mutations go through `tripwire transition` (see
+"Transitioning any instance" above).
 
 ## Allocating IDs — the dual system
 
@@ -146,10 +203,12 @@ Each fails validation or warrants `REQUEST_CHANGES` at PM review:
 4. **Hand-writing UUIDs** — RFC 4122 v4 bits get checked.
 5. **Dangling refs** — `[[unknown-node]]`, `blocked_by: [INVENTED-99]`.
 6. **Shipping a schema variant** instead of the canonical shape from
-   the spec — `REQUEST_CHANGES` on the PR; do not let it merge with a
-   deferred fix. The verification-checklist's Schema parity section is
-   the agent-side gate (see `references/SCHEMA_ISSUES.md` § Schemas in
-   issue bodies).
+   the spec — `REQUEST_CHANGES` on the PR; do not defer the fix.
+
+Plus the v0.13.1 cardinal rule: **never edit `status:` directly.**
+Every status change goes through `tripwire transition` (see
+"Transitioning any instance" above). Direct edits bypass validators,
+skip audit / telemetry / engagement-close, and produce silent drift.
 
 Full list with examples: `references/ANTI_PATTERNS.md`.
 
@@ -166,15 +225,24 @@ backlog → todo → in_progress → verifying → reviewing → testing → rea
 that every status is reachable from `backlog` via the transitions in
 `project.yaml`; otherwise `status/unreachable` fires.
 
+Issue status changes go through `tripwire transition issue-closure
+<KEY> <target>` (used by `tripwire session sweep-issues-forward`).
+Do not edit `status:` on an issue by hand.
+
 ## Before modifying any concept node
+
+Run `tripwire refs reverse <node-id>` first.
 
 ```bash
 tripwire refs reverse <node-id>
 ```
 
-Lists every artifact holding a `[[node-id]]` reference. Changing the
-node's content invalidates each referrer's content hash and triggers
-`freshness/stale` until the referrer is updated or re-acknowledged.
+It lists every artifact holding a `[[node-id]]` reference. Changing
+the node's content invalidates each referrer's content hash and
+triggers `freshness/stale` until the referrer is updated or
+re-acknowledged.
+
+If any referrer surfaces unexpectedly: stop, audit, then proceed.
 
 ## The concept graph as working memory
 
@@ -229,6 +297,12 @@ independently once its `blocked_by_sessions` have reached a sufficient
 status. Each lives at `sessions/<id>/session.yaml` with `plan.md`
 alongside, using the template at `examples/artifacts/plan.md`.
 
+All session status mutations go through `tripwire transition
+coding-session <sid> <target>`. The session subcommands
+(`tripwire session queue|spawn|pause|abandon|reopen`) wrap the
+transition with their pre-CLI side-effects. Do not edit
+`session.yaml.status` by hand.
+
 ## Epics
 
 Epics group related issues. Label: `type/epic`. Relaxed rules:
@@ -259,9 +333,9 @@ threshold.
 Skip routine ops, scratch-pad reasoning, anything already on the
 dashboard.
 
-Write to `<project>/inbox/<id>.md` (frontmatter + body). Schema:
-`references/SCHEMA_INBOX.md`. Run validate after writing. Leave
-`resolved: false` — the human clicks ✓.
+Write to `<project>/inbox/<id>.md` (frontmatter + body) with the
+`Write` tool. Schema: `references/SCHEMA_INBOX.md`. Run validate
+after writing. Leave `resolved: false` — the human clicks ✓.
 
 ## Subagent policy
 
@@ -293,18 +367,21 @@ After scoping/triage, your output is:
 2. Issues assigned to the session.
 3. Relevant docs / skill references identified.
 
-After the execution agent finishes: run validate; if errors, create
-fix issues or re-delegate; if clean, update statuses and close the
-session.
+After the execution agent finishes: run `tripwire validate`; if
+errors, create fix issues or re-delegate; if clean, run the relevant
+`tripwire transition` commands to advance statuses and close the
+session via `tripwire session prepare-for-completion <sid>` +
+`tripwire transition coding-session <sid> completed`.
 
 ## Red flags — rationalisations to catch yourself making
 
 | Agent thought | Reality |
 |---|---|
 | "Warnings, I'll fix them later" | Gate is non-negotiable. Fix now. |
+| "I'll just patch `status:` in the YAML" | No. Run `tripwire transition`. Direct edits bypass validators and audit. |
 | "Target node will exist soon" | Create the target first, then the referrer. |
 | "Nothing references this — I'll skip refs reverse" | You don't know. Run it. |
-| "Basically done, I'll mark it done" | Run validate first. Fail = not done. |
+| "Basically done, I'll mark it done" | Run `tripwire transition coding-session <sid> completed` (after `prepare-for-completion`). Fail = not done. |
 | "Small change, no plan needed" | Yes there is. Even 3 steps. |
 | "I'll execute this plan myself" | No. PM scopes, plans, validates, reviews. Delegate. |
 | "Gap analysis later" | Deferral is cancellation. Do it now. |
@@ -324,8 +401,9 @@ session.
 - **Making a small update?** → `references/WORKFLOWS_INCREMENTAL_UPDATE.md`
 - **Need the project config shape?** → `references/SCHEMA_PROJECT.md`
 - **Need to understand the concept graph?** → `references/CONCEPT_GRAPH.md`
+- **Looking up a transition's pre-CLI procedure?** → `docs/WORKFLOW_ACTIONS.md`
 - **Errors from the validator you don't recognise?** → `references/VALIDATION.md`
 - **Want to see a worked example first?** → `examples/issue-fully-formed.yaml`
 
-Now: run `tripwire brief`, then read the workflow reference for the task
-you're on.
+Now: run `tripwire brief`, then read the workflow reference for the
+task you're on.
