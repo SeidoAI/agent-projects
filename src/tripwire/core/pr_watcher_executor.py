@@ -29,8 +29,7 @@ from tripwire.core.pr_watcher import (
     TransitionStatus,
     WatcherAction,
 )
-from tripwire.core.session_store import load_session, save_session
-from tripwire.models.enums import SessionStatus
+from tripwire.core.session_store import load_session
 
 logger = logging.getLogger(__name__)
 
@@ -191,21 +190,49 @@ class WatcherActionExecutor:
     # --- handlers -------------------------------------------------------
 
     def _do_transition(self, action: TransitionStatus) -> None:
+        # Pre-check session existence so the warning message matches
+        # the pre-v0.13 contract ("session file not found" rather than
+        # the executor's structured TransitionError).
         try:
-            session = load_session(self.project_dir, action.session_id)
+            load_session(self.project_dir, action.session_id)
         except FileNotFoundError:
             logger.warning(
                 "watcher: cannot transition '%s' — session file not found",
                 action.session_id,
             )
             return
-        # Coerce the action's string status into the typed enum so the
-        # serialiser doesn't warn (KUI-110 Phase 2.1). Invalid values
-        # raise ValueError here rather than silently writing yaml that
-        # then fails to load.
-        session.status = SessionStatus(action.new_status)
-        session.updated_at = datetime.now(tz=timezone.utc)
-        save_session(self.project_dir, session)
+        # v0.13: route through the workflow executor — sole writer of
+        # ``session.status``. The daemon path is a dumb status flip
+        # driven by observed PR state and does NOT run prep helpers
+        # (flip drafts, sweep issues, kill runtime, etc.) — the agent /
+        # PM handles those separately.
+        from tripwire.core.workflow.transitions import (
+            TransitionError,
+            execute_transition,
+        )
+
+        try:
+            result = execute_transition(
+                self.project_dir,
+                workflow_id="coding-session",
+                instance_id=action.session_id,
+                target_status=action.new_status,
+                flags={"action": "pr_watcher_transition"},
+            )
+        except TransitionError:
+            logger.exception(
+                "watcher: execute_transition errored for '%s' → %s",
+                action.session_id,
+                action.new_status,
+            )
+            return
+        if not result.ok:
+            logger.warning(
+                "watcher: transition rejected for '%s' → %s: %s",
+                action.session_id,
+                action.new_status,
+                result.message or result.reason,
+            )
 
     def _do_inject(self, action: InjectFollowUp) -> None:
         plan_path = paths.session_plan_path(self.project_dir, action.session_id)

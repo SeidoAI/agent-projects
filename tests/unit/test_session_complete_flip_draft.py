@@ -170,14 +170,18 @@ class TestFlipDraftsToReady:
 
 
 class TestCompleteSessionInvokesFlip:
-    """End-to-end sanity: ``complete_session`` runs ``_flip_drafts_to_ready``
-    so v0.7.5 sessions actually have their drafts flipped at complete-time.
+    """v0.13: ``_flip_drafts_to_ready`` moved out of ``complete_session()``
+    to the Layer-1 CLI wrapper ``tripwire session flip-drafts-ready``.
+    The helper is still available for the chained ``prepare-for-completion``
+    wrapper and the ``session_complete_cmd`` in-process prep block.
 
-    Drives through the real state machine — review.json present, issue
-    artifacts present, PR-merged gate stubbed. v0.7.9 §A4: there are no
-    bypass flags to take the shortcut path."""
+    This test now asserts the inverse: ``complete_session()`` itself
+    must NOT invoke ``_flip_drafts_to_ready`` (the side-effect lives
+    in the caller now). The CLI wrapper covers the chained flip via
+    its own test surface.
+    """
 
-    def test_complete_invokes_flip_drafts_to_ready(
+    def test_complete_does_not_invoke_flip_drafts_to_ready(
         self,
         tmp_path_project: Path,
         save_test_session,
@@ -195,7 +199,7 @@ class TestCompleteSessionInvokesFlip:
         save_test_session(
             tmp_path_project,
             "s1",
-            status="in_review",
+            status="verified",
             issues=["TMP-1"],
             runtime_state={
                 "worktrees": [
@@ -238,4 +242,5 @@ class TestCompleteSessionInvokesFlip:
 
         complete_session(tmp_path_project, "s1", dry_run=True)
 
-        assert called == ["s1"]
+        # v0.13: side-effect moved out — helper does NOT invoke it.
+        assert called == []

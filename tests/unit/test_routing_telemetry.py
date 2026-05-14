@@ -174,7 +174,10 @@ def test_complete_session_appends_routing_row(
     save_test_session(
         tmp_path_project,
         session_id="sx",
-        status="in_review",
+        # v0.13: only ``verified → completed`` is declared in the
+        # conftest workflow; start the session there so the executor
+        # can route the close-out transition.
+        status="verified",
         spawn_config=SpawnConfig(
             config={"task_kind": "agentic_loop", "model": "opus", "effort": "xhigh"}
         ),

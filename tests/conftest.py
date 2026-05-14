@@ -111,31 +111,29 @@ def tmp_path_project(tmp_path: Path) -> Path:
         "v_worktree_paths_unique",
     ]
     _route_lines = []
-    for idx, (f, t, kind) in enumerate(
-        [
-            ("planned", "queued", "forward"),
-            ("queued", "executing", "forward"),
-            ("executing", "in_review", "forward"),
-            ("in_review", "verified", "forward"),
-            ("verified", "completed", "forward"),
-            ("in_review", "executing", "revert"),
-            ("verified", "in_review", "revert"),
-            ("executing", "paused", "side"),
-            ("executing", "failed", "side"),
-            ("paused", "executing", "forward"),
-            ("failed", "executing", "forward"),
-            ("paused", "queued", "revert"),
-            ("paused", "completed", "revert"),
-            ("completed", "paused", "revert"),
-            ("planned", "abandoned", "side"),
-            ("queued", "abandoned", "side"),
-            ("executing", "abandoned", "side"),
-            ("paused", "abandoned", "side"),
-            ("failed", "abandoned", "side"),
-            ("in_review", "abandoned", "side"),
-            ("verified", "abandoned", "side"),
-        ]
-    ):
+    for f, t, kind in [
+        ("planned", "queued", "forward"),
+        ("queued", "executing", "forward"),
+        ("executing", "in_review", "forward"),
+        ("in_review", "verified", "forward"),
+        ("verified", "completed", "forward"),
+        ("in_review", "executing", "revert"),
+        ("verified", "in_review", "revert"),
+        ("executing", "paused", "side"),
+        ("executing", "failed", "side"),
+        ("paused", "executing", "forward"),
+        ("failed", "executing", "forward"),
+        ("paused", "queued", "revert"),
+        ("paused", "completed", "revert"),
+        ("completed", "paused", "revert"),
+        ("planned", "abandoned", "side"),
+        ("queued", "abandoned", "side"),
+        ("executing", "abandoned", "side"),
+        ("paused", "abandoned", "side"),
+        ("failed", "abandoned", "side"),
+        ("in_review", "abandoned", "side"),
+        ("verified", "abandoned", "side"),
+    ]:
         _route_lines.append(
             f"      - id: {f}-to-{t}\n"
             f"        actor: pm-agent\n"
@@ -149,13 +147,6 @@ def tmp_path_project(tmp_path: Path) -> Path:
                 "          - runtime_state.claude_session_id\n"
                 "          - runtime_state.worktrees\n"
             )
-        # Reference every implemented validator on the first route so
-        # `declared_validator_ids` (which feeds full-project validation
-        # when callers pass no `validator_ids=`) returns the full set.
-        if idx == 0:
-            _route_lines.append("        controls:\n          tripwires:\n")
-            for vid in _all_validators:
-                _route_lines.append(f"            - {vid}\n")
         # The in_review → verified route runs the PR-review tripwires
         # at gate time so test_transition_to_verified_blocked_by_missing_evidence
         # exercises the right surface.
@@ -168,6 +159,16 @@ def tmp_path_project(tmp_path: Path) -> Path:
                 "            - v_pr_review_external_reviewer\n"
                 "            - v_pr_review_code_review_skill\n"
             )
+
+    # v0.13: reference every implemented validator on a STATUS
+    # (specifically the entry-only ``planned`` status) so
+    # ``declared_validator_ids`` (which feeds full-project validation
+    # when callers pass no ``validator_ids=``) returns the full set —
+    # WITHOUT subjecting every route to the entire catalog at gate
+    # time. The executor only fires the route's ``controls.tripwires``
+    # when a route is declared (status-level tripwires are the
+    # fallback for routeless transitions, which we don't have here).
+    _status_tripwires = "\n".join(f"          - {vid}" for vid in _all_validators)
     (project_dir / "workflow.yaml").write_text(
         "workflow_schema_version: 1\n"
         "workflows:\n"
@@ -176,6 +177,7 @@ def tmp_path_project(tmp_path: Path) -> Path:
         "    trigger: session.spawn\n"
         "    statuses:\n"
         "      - id: planned\n"
+        "        tripwires:\n" + _status_tripwires + "\n"
         "      - id: queued\n"
         "      - id: executing\n"
         "      - id: in_review\n"

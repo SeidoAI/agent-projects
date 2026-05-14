@@ -312,7 +312,60 @@ See [[dec-shared-preview-drawer]] and [[inbox-preview-drawer]].
 
 ---
 
-## 9. Anti-patterns
+## 9. Specs declare, validate enforces, agents execute, CLI codifies
+
+The framework's load-bearing surfaces have a clear separation of
+concerns:
+
+1. **`workflow.yaml` declares structure.** State machines, routes,
+   invariants per status and per transition, instance shapes, required
+   fields. Pure data. No imperative code. No conditional predicates.
+2. **`tripwire validate` enforces invariants.** Always available. Reads
+   every instance file, runs every declared validator, produces
+   findings. Single accountability surface across every workflow.
+3. **Agents execute via CLI.** Skill markdown documents *what to do
+   and why*. CLI commands are the *how*. The agent calls CLI;
+   tripwire's validators catch deviation.
+4. **CLI codifies repetitive procedure.** Layer 1 wraps individual
+   external operations (git, gh, fs, process) with our defaults.
+   Layer 2 chains common combos. Layer 3 (skill markdown) selects,
+   sequences, and recovers from failure.
+
+### Why this separation
+
+Agents are unreliable but obedient. Validators are reliable but
+passive. Agents drive the work; validators trip them when they
+deviate. Validators don't try to prevent the deviation — they catch
+it after. That asymmetry is the point. Tripwire only fires on
+deviation.
+
+### What this rules out
+
+- No imperative side-effects in `workflow.yaml`. YAML does not
+  orchestrate. Side-effects that happen on transitions belong in CLI
+  commands the agent calls *before* transitioning.
+- No conditional logic in workflow declarations. "If X then Y"
+  becomes a validator finding + a CLI command that does Y.
+- No per-workflow Python class scaffolding. Adding a workflow is
+  declaring it in YAML. Side-effects only when a repetitive external
+  operation needs codifying.
+
+### What this enables
+
+- Agents extend tripwire by editing YAML. No Python knowledge
+  needed.
+- `tripwire validate` accountability scales linearly with workflow
+  count.
+- New skills (slash commands) wrap CLI; new workflows declare YAML;
+  new invariants are validators. Three orthogonal extension points.
+
+See [[WORKFLOW_ACTIONS.md]] for the canonical enumeration of every
+workflow, status, transition, and CLI command this principle
+produces.
+
+---
+
+## 10. Anti-patterns
 
 Concrete patterns this philosophy rules out. If a proposed
 change matches one of these, push back.
@@ -364,6 +417,7 @@ change matches one of these, push back.
 - [[dec-pm-only-inbox-authoring]] — §6
 - [[dec-no-messaging-for-inbox]] — §7
 - [[dec-shared-preview-drawer]] — §8
+- [[WORKFLOW_ACTIONS.md]] — §9, the canonical enumeration
 - [[project-dashboard-view]] — the composition this philosophy
   produced
 - [[inbox-entry-schema]] — the artifact shape that carries

@@ -4,12 +4,17 @@ The companion to ``session complete``: when a PR review surfaces fixes,
 this resets the lifecycle so ``session spawn <id> --resume`` can
 re-engage the agent. Side-effects (each best-effort):
 
-- Status: ``completed`` → ``paused``.
-- Each recorded draft PR is flipped ready→draft via ``gh pr ready --undo``.
+- Status: ``completed`` → ``paused`` (via the workflow executor).
 - A ``## PM follow-up`` section is appended to plan.md if absent.
 - One JSON line is appended to
   ``$TRIPWIRE_LOG_DIR/<project-slug>/audit.jsonl`` (or
   ``~/.tripwire/logs/...`` when unset) recording the reason + timestamp.
+
+v0.13: The ``ready→draft`` flip for recorded draft PRs is now a
+separate Layer-1 step (``tripwire session flip-drafts-draft``), which
+the CLI wrapper invokes before this helper. Ack reset is fired by the
+executor's ``reset_acks_if_requested`` post-write hook (via the
+``flags['reset_acks']`` flag).
 
 The CLI wrapper at ``cli/session.py:session_reopen_cmd`` parses args,
 calls :func:`reopen_session`, and prints the success line. All
@@ -19,16 +24,14 @@ business logic lives here.
 from __future__ import annotations
 
 import os
-import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
 from tripwire.core import paths
-from tripwire.core.session_store import load_session, save_session
+from tripwire.core.session_store import load_session
 from tripwire.core.store import load_project
 from tripwire.models.enums import SessionStatus
-from tripwire.ui.services._atomic_write import append_jsonl
 
 
 @dataclass
@@ -74,24 +77,11 @@ def reopen_session(
             f"'completed' to reopen"
         )
 
-    # Flip recorded draft PRs ready → draft. Best-effort: keeps the
-    # reopen transition usable even when gh hiccups.
+    # v0.13: the ready→draft flip moved to the Layer-1 CLI
+    # ``tripwire session flip-drafts-draft``; the CLI wrapper for
+    # reopen invokes it before us. Keep an empty list so the result
+    # shape is unchanged for the CLI's summary block.
     flipped: list[str] = []
-    for wt in session.runtime_state.worktrees:
-        if not wt.draft_pr_url:
-            continue
-        try:
-            subprocess.run(
-                ["gh", "pr", "ready", wt.draft_pr_url, "--undo"],
-                cwd=wt.worktree_path,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            flipped.append(wt.draft_pr_url)
-        except (subprocess.SubprocessError, OSError, FileNotFoundError):
-            pass
 
     # Append a `## PM follow-up` stub to plan.md when missing so the
     # resumed agent has a place to read PM directives even if the PM
@@ -136,31 +126,40 @@ def reopen_session(
             )
             plan_updated = True
 
-    # Status: completed → paused (the slot `spawn --resume` already accepts).
-    session.status = SessionStatus.PAUSED
-    session.updated_at = datetime.now(tz=timezone.utc)
-    save_session(project_dir, session)
+    # v0.13: status flip goes through ``execute_transition`` — the sole
+    # writer of ``session.status``. The executor's post-write hooks
+    # take care of the audit log row (``action`` and ``reason`` come
+    # from the flags below) so we don't write a separate row here.
+    # We still own the ack reset because the executor's hook returns
+    # the deleted count but doesn't surface it to the caller.
+    from tripwire.core.workflow.transitions import (
+        TransitionError,
+        execute_transition,
+    )
 
-    # KUI-137: optional ack reset BEFORE the audit-log entry so the
-    # event ordering reflects what the agent will see on resume.
+    try:
+        transition = execute_transition(
+            project_dir,
+            workflow_id="coding-session",
+            instance_id=session_id,
+            target_status="paused",
+            flags={"action": "session_reopen", "reason": reason},
+        )
+    except TransitionError as exc:
+        raise ValueError(f"executor refused reopen: {exc}") from exc
+    if not transition.ok:
+        raise ValueError(
+            f"transition to paused rejected: "
+            f"{transition.message or transition.reason}"
+        )
+
+    # KUI-137: optional ack reset AFTER the transition so the event
+    # ordering still reflects what the agent will see on resume.
     acks_reset_count = 0
     if reset_acks:
         acks_reset_count = _reset_session_acks(project_dir, session_id, reason)
 
-    # Audit-log the reopen so the "how many round trips this session
-    # took" history is queryable later.
     audit_path = _audit_path(project_dir)
-    append_jsonl(
-        audit_path,
-        {
-            "action": "session_reopen",
-            "session_id": session_id,
-            "reason": reason,
-            "timestamp": datetime.now(tz=timezone.utc)
-            .isoformat(timespec="milliseconds")
-            .replace("+00:00", "Z"),
-        },
-    )
 
     return ReopenResult(
         session_id=session_id,

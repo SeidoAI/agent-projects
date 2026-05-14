@@ -2,12 +2,26 @@
 
 Gates session close-out behind: (a) session in a completable status,
 (b) every worktree branch has a merged PR, (c) every required issue
-artifact present, (d) most recent review exit_code ≤ 1. Then closes
-issues, transitions the session to `completed`, and removes worktrees.
+artifact present, (d) most recent review exit_code ≤ 1. Then transitions
+the session to `completed` via the workflow executor.
 
 v0.7.9 §A4: every gate is mandatory. There are no bypass flags. A
 session that can't pass these gates should be `tripwire session
 abandon`-ed, which is a terminal status that does not claim success.
+
+v0.13 (KUI-…): the inline side-effects (flip drafts, sweep issues,
+remove worktrees, append telemetry, close engagement) have moved out:
+
+- ``flip_drafts_to_ready`` → Layer-1 CLI ``tripwire session flip-drafts-ready``
+  (chained from ``tripwire session prepare-for-completion``).
+- ``sweep_issues`` → Layer-1 ``tripwire session sweep-issues-forward``.
+- ``remove_worktrees`` → Layer-1 ``tripwire session remove-worktrees``.
+- ``append_telemetry_row`` → executor post-write hook
+  (:func:`tripwire.core.workflow.side_effects.append_telemetry_record`).
+- ``close_active_engagement`` → executor post-write hook.
+
+This helper now: verifies gates, then calls ``execute_transition``
+which is the sole writer of ``session.status``.
 
 Insights application is out-of-scope here — the PM's
 `/pm-session-complete` runs `tripwire session insights apply/reject`
@@ -19,7 +33,6 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 
 from tripwire.core import paths
@@ -27,9 +40,8 @@ from tripwire.core.issue_artifact_store import (
     load_issue_artifact_manifest,
     status_at_or_past,
 )
-from tripwire.core.session_store import load_session, save_session
+from tripwire.core.session_store import load_session
 from tripwire.core.store import load_issue
-from tripwire.models.enums import SessionStatus
 
 
 class CompleteError(ValueError):
@@ -55,7 +67,7 @@ def complete_session(
     *,
     dry_run: bool = False,
 ) -> CompleteResult:
-    """Run the close-out gates then transition the session to `done`.
+    """Run the close-out gates then transition the session to `completed`.
 
     Gates per spec §11.2 (v0.7.9 §A4: no bypass flags):
       1. Status in {in_review, verified}.
@@ -66,6 +78,14 @@ def complete_session(
     If a session can't pass these gates, the right move is
     ``tripwire session abandon`` (terminal status that does not claim
     success), not a bypass flag.
+
+    v0.13: the status flip routes through
+    :func:`tripwire.core.workflow.transitions.execute_transition` (sole
+    writer of ``session.status``). Inline side-effects (flip drafts,
+    sweep issues, worktree cleanup, telemetry, engagement close) have
+    moved out — the executor handles the housekeeping hooks and the
+    agent procedure invokes the Layer-1 CLI wrappers before/after this
+    helper.
     """
     session = load_session(project_dir, session_id)
     result = CompleteResult(session_id=session_id)
@@ -82,12 +102,6 @@ def complete_session(
             "`tripwire session abandon` instead.",
         )
 
-    # v0.7.5 — flip session-start draft PRs to ready so the operator can
-    # merge without toggling state in the GH UI. Idempotent: `gh pr
-    # ready` on a non-draft or merged PR is swallowed by ``check=False``.
-    # Always runs (v0.7.9 §A4: no bypass flags).
-    _flip_drafts_to_ready(session)
-
     _verify_pr_merged(session)
     _verify_issue_artifacts(project_dir, session)
     _verify_review_ok(project_dir, session)
@@ -97,54 +111,32 @@ def complete_session(
     if dry_run:
         return result
 
-    # v0.9.4: route through the canonical sweep helper. This advances any
-    # member issue that's behind the "completed" target on the lifecycle
-    # without backsliding ones that are already past it (e.g. a `deferred`
-    # issue stays deferred). Tests that previously asserted "every member
-    # issue ends at done" now assert "every on-path member issue ends at
-    # completed".
-    from tripwire.core.status_contract import sweep_issues
+    # v0.13: route the status flip through the workflow executor — the
+    # sole writer of ``session.status``. Engagement close + telemetry +
+    # audit are post-write hooks fired inside ``execute_transition``.
+    from tripwire.core.workflow.transitions import (
+        TransitionError,
+        execute_transition,
+    )
 
-    result.issues_closed = sweep_issues(project_dir, session, "completed")
-
-    now = datetime.now(tz=timezone.utc)
-    session.status = SessionStatus.COMPLETED
-    session.updated_at = now
-    if session.engagements:
-        last = session.engagements[-1]
-        if last.ended_at is None:
-            last.ended_at = now
-            last.outcome = "completed"
-    save_session(project_dir, session)
-
-    # KUI-96 §E4 — append a row to the project's routing telemetry log
-    # so analyze-routing can compare $/merged-PR per route over time.
-    # Cost computation reads the session's stream-json log; failure is
-    # non-fatal — telemetry is observability, not part of the gate.
     try:
-        from tripwire.core.routing_telemetry import (
-            append_telemetry_row,
-            build_telemetry_row,
+        transition = execute_transition(
+            project_dir,
+            workflow_id="coding-session",
+            instance_id=session_id,
+            target_status="completed",
+            flags={"action": "session_complete"},
         )
-        from tripwire.core.session_cost import compute_session_cost
-
-        cost = compute_session_cost(project_dir, session_id).total_usd
-        row = build_telemetry_row(project_dir, session, cost_usd=cost)
-        append_telemetry_row(project_dir, row)
-    except OSError:
-        # Worst case: cost log moved or telemetry file is unwritable.
-        # The session-complete gates have already passed; surfacing
-        # this as a hard failure would block a legitimate done.
-        pass
-
-    from tripwire.core.git_helpers import worktree_remove
-
-    for wt in session.runtime_state.worktrees:
-        try:
-            worktree_remove(Path(wt.clone_path), Path(wt.worktree_path))
-            result.worktrees_removed.append(wt.worktree_path)
-        except (subprocess.SubprocessError, OSError):
-            pass
+    except TransitionError as exc:
+        raise CompleteError(
+            "complete/transition_error", f"executor refused: {exc}"
+        ) from exc
+    if not transition.ok:
+        raise CompleteError(
+            "complete/transition_rejected",
+            f"transition to completed rejected: "
+            f"{transition.message or transition.reason}",
+        )
 
     return result
 

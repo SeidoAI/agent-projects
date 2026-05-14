@@ -66,7 +66,6 @@ from tripwire.core.session_review_writer import (
 )
 from tripwire.core.session_store import list_sessions, load_session, save_session
 from tripwire.core.task_checklist import parse_task_checklist
-from tripwire.models.enums import SessionStatus
 from tripwire.models.session import EngagementEntry
 
 console = Console()
@@ -528,9 +527,25 @@ def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) 
                     click.echo(f"    → {item.fix_hint}")
         raise click.ClickException("Not ready to queue — fix errors above")
 
-    session.status = SessionStatus.QUEUED
-    session.updated_at = datetime.now(tz=timezone.utc)
-    save_session(resolved, session)
+    from tripwire.core.workflow.transitions import (
+        TransitionError,
+        execute_transition,
+    )
+
+    try:
+        result = execute_transition(
+            resolved,
+            workflow_id="coding-session",
+            instance_id=session_id,
+            target_status="queued",
+            flags={},
+        )
+    except TransitionError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not result.ok:
+        raise click.ClickException(
+            f"transition rejected: {result.message or result.reason}"
+        )
     click.echo(f"Session '{session_id}' → queued")
 
 
@@ -669,8 +684,10 @@ def session_spawn_cmd(
     # Launch via the runtime
     start_result = runtime.start(prepped)
 
+    # Persist runtime_state + new engagement BEFORE the status flip. The
+    # executor reloads the session inside the transition lock so these
+    # writes are observed when it flips status to `executing`.
     now = datetime.now(tz=timezone.utc)
-    session.status = SessionStatus.EXECUTING
     session.runtime_state.worktrees = start_result.worktrees
     session.runtime_state.claude_session_id = start_result.claude_session_id
     session.runtime_state.pid = start_result.pid
@@ -685,6 +702,26 @@ def session_spawn_cmd(
         )
     )
     save_session(resolved, session)
+
+    from tripwire.core.workflow.transitions import (
+        TransitionError,
+        execute_transition,
+    )
+
+    try:
+        result = execute_transition(
+            resolved,
+            workflow_id="coding-session",
+            instance_id=session_id,
+            target_status="executing",
+            flags={},
+        )
+    except TransitionError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not result.ok:
+        raise click.ClickException(
+            f"transition rejected: {result.message or result.reason}"
+        )
 
     click.echo(f"Session '{session_id}' → executing  (runtime: {runtime.name})")
     click.echo(f"  Branch: {prepped.worktrees[0].branch}")
@@ -825,15 +862,31 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
     spawn = load_resolved_spawn_config(resolved, session=session)
     runtime = get_runtime(spawn.invocation.runtime)
 
+    from tripwire.core.workflow.transitions import (
+        TransitionError,
+        execute_transition,
+    )
+
     # For subprocess runtime, a dead pid means the agent already exited
     # (cleanly or otherwise). Surface that as 'failed' — pause doesn't
     # make sense once the process is gone.
     pid = session.runtime_state.pid
     if pid and not is_alive(pid):
-        session.status = SessionStatus.FAILED
+        try:
+            result = execute_transition(
+                resolved,
+                workflow_id="coding-session",
+                instance_id=session_id,
+                target_status="failed",
+                flags={},
+            )
+        except TransitionError as exc:
+            raise click.ClickException(str(exc)) from exc
+        if not result.ok:
+            raise click.ClickException(
+                f"transition rejected: {result.message or result.reason}"
+            )
         click.echo(f"Warning: PID {pid} not alive — session '{session_id}' → failed")
-        session.updated_at = datetime.now(tz=timezone.utc)
-        save_session(resolved, session)
         return
 
     try:
@@ -845,10 +898,21 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
         )
         return
 
-    session.status = SessionStatus.PAUSED
+    try:
+        result = execute_transition(
+            resolved,
+            workflow_id="coding-session",
+            instance_id=session_id,
+            target_status="paused",
+            flags={},
+        )
+    except TransitionError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not result.ok:
+        raise click.ClickException(
+            f"transition rejected: {result.message or result.reason}"
+        )
     click.echo(f"Session '{session_id}' → paused")
-    session.updated_at = datetime.now(tz=timezone.utc)
-    save_session(resolved, session)
 
 
 # Session-status transitions are declared in `workflow.yaml` and
@@ -1000,12 +1064,39 @@ def session_reopen_cmd(
     """Move a completed session back to ``paused`` for PR-fix iteration.
 
     Thin wrapper — see :func:`tripwire.core.session_reopen.reopen_session`
-    for the side-effect contract.
+    for the side-effect contract. v0.13: the ready→draft PR flip moved
+    to the Layer-1 ``tripwire session flip-drafts-draft`` command; we
+    invoke it in-process here before calling the lifecycle helper so the
+    end-to-end CLI behaviour is preserved.
     """
     from tripwire.core.session_reopen import reopen_session
 
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
+
+    # v0.13 in-process prep: flip recorded draft PRs ready → draft. The
+    # daemon paths skip this; the CLI wrapper does it to preserve the
+    # pre-v0.13 user-facing surface.
+    try:
+        session_for_prep = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session '{session_id}' not found") from exc
+    flipped: list[str] = []
+    for wt in session_for_prep.runtime_state.worktrees:
+        if not wt.draft_pr_url:
+            continue
+        try:
+            subprocess.run(
+                ["gh", "pr", "ready", wt.draft_pr_url, "--undo"],
+                cwd=wt.worktree_path,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            flipped.append(wt.draft_pr_url)
+        except (subprocess.SubprocessError, OSError, FileNotFoundError):
+            pass
 
     try:
         result = reopen_session(resolved, session_id, reason, reset_acks=reset_acks)
@@ -1013,6 +1104,10 @@ def session_reopen_cmd(
         raise click.ClickException(f"session '{session_id}' not found") from exc
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
+
+    # Stamp the in-process flip outcomes onto the result for the CLI
+    # summary (the helper no longer owns the gh ready-undo step).
+    result.draft_prs_flipped = flipped
 
     click.echo(f"Session '{session_id}' reopened (→ paused). Reason: {reason}")
     if reset_acks:
@@ -1930,6 +2025,26 @@ def session_complete_cmd(
                 click.echo(prompt)
             raise SystemExit(1)
 
+    # v0.13: pre-flight side-effects that used to run inline inside
+    # ``complete_session()`` — flip drafts to ready, sweep member issues
+    # forward. The agent procedure now runs ``tripwire session
+    # prepare-for-completion`` as a separate step; do the same work
+    # in-process here so the ``tripwire session complete`` CLI behaviour
+    # is preserved end-to-end. Skipped in dry-run (no mutations).
+    sweep_closed: list[str] = []
+    if not dry_run:
+        try:
+            session_for_prep = load_session(resolved, session_id)
+        except FileNotFoundError as exc:
+            raise click.ClickException(
+                f"session '{session_id}' not found"
+            ) from exc
+        from tripwire.core.session_complete import _flip_drafts_to_ready
+        from tripwire.core.status_contract import sweep_issues
+
+        _flip_drafts_to_ready(session_for_prep)
+        sweep_closed = sweep_issues(resolved, session_for_prep, "completed")
+
     try:
         result = complete_session(resolved, session_id, dry_run=dry_run)
     except CompleteError as exc:
@@ -1940,6 +2055,23 @@ def session_complete_cmd(
         if result.node_diffs:
             click.echo(f"  Node diffs to review: {len(result.node_diffs)}")
         return
+
+    # Stamp the sweep + worktree-removal outcomes onto the result for
+    # the CLI summary (these moved out of complete_session()).
+    result.issues_closed = sweep_closed
+    try:
+        session_after = load_session(resolved, session_id)
+    except FileNotFoundError:
+        session_after = None
+    if session_after is not None and session_after.runtime_state:
+        from tripwire.core.git_helpers import worktree_remove
+
+        for wt in session_after.runtime_state.worktrees:
+            try:
+                worktree_remove(Path(wt.clone_path), Path(wt.worktree_path))
+                result.worktrees_removed.append(wt.worktree_path)
+            except (subprocess.SubprocessError, OSError):
+                pass
 
     click.echo(f"Session {session_id} → completed")
     for iss in result.issues_closed:

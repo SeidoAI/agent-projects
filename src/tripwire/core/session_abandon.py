@@ -12,7 +12,7 @@ Behaviour:
 - Close any OPEN PRs for the session's branches via ``gh pr close``.
   Merged PRs are left alone (closing a merged PR makes no sense).
 - Remove every worktree the session created.
-- Transition the session to ``abandoned``.
+- Transition the session to ``abandoned`` via the workflow executor.
 - Issues are NOT closed as ``done``. They stay where they are; the
   PM moves them to ``backlog`` / ``canceled`` / ``won't-do`` per case.
 
@@ -21,6 +21,11 @@ the failure in the result and proceed with the rest — abandoning is
 about state cleanup, and a failure in one step shouldn't block the
 others. The session ALWAYS transitions to ``abandoned``; that's the
 contract.
+
+v0.13: ``session.status`` is written exclusively by
+:func:`tripwire.core.workflow.transitions.execute_transition` —
+including the engagement-close housekeeping (now an executor
+post-write hook).
 """
 
 from __future__ import annotations
@@ -28,12 +33,10 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 
 from tripwire.core.git_helpers import worktree_remove
-from tripwire.core.session_store import load_session, save_session
-from tripwire.models.enums import SessionStatus
+from tripwire.core.session_store import load_session
 
 
 class AbandonError(ValueError):
@@ -128,15 +131,33 @@ def abandon_session(
             result.errors.append(f"worktree remove failed for {wt_path}: {exc}")
 
     # 4. Transition. This step always happens — it's the contract.
-    now = datetime.now(tz=timezone.utc)
-    session.status = SessionStatus.ABANDONED
-    session.updated_at = now
-    if session.engagements:
-        last = session.engagements[-1]
-        if last.ended_at is None:
-            last.ended_at = now
-            last.outcome = "abandoned"
-    save_session(project_dir, session)
+    # v0.13: route through ``execute_transition`` — the sole writer of
+    # ``session.status``. Engagement close is now a post-write hook
+    # (:func:`tripwire.core.workflow.side_effects.close_active_engagement`)
+    # which the executor fires for terminal-bound transitions.
+    from tripwire.core.workflow.transitions import (
+        TransitionError,
+        execute_transition,
+    )
+
+    try:
+        transition = execute_transition(
+            project_dir,
+            workflow_id="coding-session",
+            instance_id=session_id,
+            target_status="abandoned",
+            flags={"action": "session_abandon"},
+        )
+    except TransitionError as exc:
+        raise AbandonError(
+            "abandon/transition_error", f"executor refused: {exc}"
+        ) from exc
+    if not transition.ok:
+        raise AbandonError(
+            "abandon/transition_rejected",
+            f"transition to abandoned rejected: "
+            f"{transition.message or transition.reason}",
+        )
 
     return result
 

@@ -137,7 +137,10 @@ needs details.
 
 ## Routes And Actors
 
-Routes are the visible process flow. They should encode who or what moves work:
+Routes are the visible process flow. They encode who or what moves
+work, but they do not themselves perform that work — they describe
+the legal moves and the gates each move must pass. The actor invokes
+the CLI; the route documents the transition that invocation produces.
 
 - PM-agent routes: scoping, triage, review, queueing, spawning, issue closing,
   and other project-management commands.
@@ -162,19 +165,33 @@ comes from geometry. Labels should name the meaning of the movement: spawn,
 validate, approve, request changes, resume, complete, close issue, file
 follow-up.
 
+Side-effects that look like they belong to a route (worktree cleanup,
+draft-PR flipping, runtime teardown) are pre-CLI procedure — the
+agent runs the relevant Layer-1 or Layer-2 CLI command *before*
+requesting the transition. The transition itself is a thin gate-and-
+flip: it does not orchestrate side-effects on the agent's behalf.
+
 ## Commands And Skills
 
-Commands are invocation points in the workflow. PM commands, especially, are not
-outside the process; they are how the PM-agent enters and moves through it.
+Commands are how actors move work. They are the invocation surface the
+agent calls into; the workflow declares which command corresponds to
+which transition, and the agent executes the command. The declaration
+itself is data — it does not orchestrate. The agent runs the CLI
+command, the command performs its repetitive external work, and
+`tripwire validate` (and the route's tripwires at transition time)
+catches deviation.
 
 Commands should appear as route triggers with:
 
 - actor
 - invocation condition
 - affected status region or transition
-- controls triggered
-- outputs emitted
-- skills or references loaded
+- controls (tripwires, prompt-checks) that gate the transition
+- outputs the agent is expected to have produced before invoking
+
+The map should make clear that the command is agent-invoked, not
+system-orchestrated: a route fires because an actor ran a CLI, not
+because the workflow engine reached an internal state.
 
 Skills are instruction sources. They should not be rendered as workflow states.
 They belong in the north/control layer and attach to the actor routes that load
@@ -187,14 +204,23 @@ For example:
 - `agent-messaging/SKILL.md` attaches to runtime status/progress messaging.
 - `verification/SKILL.md` attaches to review and verification routes.
 
-The user should be able to inspect where a skill enters the process without
-having the skill dominate the first-read map.
+Skills are the third layer of the CLI stack — they sequence the
+Layer-1/Layer-2 CLI commands the agent runs, with reasoning and
+recovery procedures around each call. The map should reveal where a
+skill enters the process without the skill dominating the first-read.
 
 ## Gates
 
-Gates should usually be grouped. If several validators or checks run at the same
-status boundary, command invocation, or transition, the user experiences them as
-one checkpoint, not as a row of unrelated peer nodes.
+Gates are validators. Every check declared at a status boundary or
+transition is enforced by `tripwire validate` — the same single
+accountability surface that runs project-wide on demand. A gate is
+not a special object; it is a validator the workflow declares should
+run at this moment in addition to running on every full validate.
+
+Gates should usually be grouped. If several validators run at the
+same status boundary, command invocation, or transition, the user
+experiences them as one checkpoint, not as a row of unrelated peer
+nodes.
 
 A gate cluster can show:
 
@@ -206,6 +232,10 @@ A gate cluster can show:
 
 Individual checks should be available through expansion or a drawer. They should
 not dominate the first read.
+
+A gate firing does not orchestrate a recovery. It reports a finding;
+the agent reads the finding, addresses it (often by running a CLI
+command codified for that recovery), and retries the transition.
 
 ## JIT Prompts
 
@@ -227,6 +257,12 @@ Artifacts should not look like workflow steps. They are proof objects.
 They should sit in or below the region where they are produced, consumed, or
 required. Their default role is to answer: what durable evidence exists at this
 point in the workflow?
+
+Artifacts are produced by the agent's CLI calls and edits, not by the
+workflow engine on the agent's behalf. A `produces:` declaration in
+the workflow YAML is a contract: the agent is expected to have
+emitted this artifact before requesting the transition. Validators
+check the contract; the transition rejects if proof is missing.
 
 ## Sources And Sinks
 

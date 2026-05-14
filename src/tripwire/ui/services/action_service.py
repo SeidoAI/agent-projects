@@ -38,7 +38,6 @@ from tripwire.core.session_complete import CompleteError, complete_session
 from tripwire.core.session_store import load_session
 from tripwire.core.store import load_project
 from tripwire.core.validator import ValidationReport, validate_project
-from tripwire.models.enums import SessionStatus
 from tripwire.models.project import ProjectConfig, ProjectPhase
 from tripwire.models.session import AgentSession
 from tripwire.ui.services._atomic_write import atomic_write_text, atomic_write_yaml
@@ -306,6 +305,10 @@ def pause_session(project_dir: Path, session_id: str) -> SessionResult:
     """
     from tripwire.core.process_helpers import is_alive
     from tripwire.core.spawn_config import load_resolved_spawn_config
+    from tripwire.core.workflow.transitions import (
+        TransitionError,
+        execute_transition,
+    )
     from tripwire.runtimes import get_runtime
 
     with project_lock(project_dir):
@@ -322,9 +325,27 @@ def pause_session(project_dir: Path, session_id: str) -> SessionResult:
         now = datetime.now(tz=timezone.utc)
         pid = session.runtime_state.pid
         if pid and not is_alive(pid):
-            session.status = SessionStatus.FAILED
-            session.updated_at = now
-            _atomic_save_session(project_dir, session)
+            # v0.13: route through the workflow executor — sole writer
+            # of ``session.status``. UI pause path does not auto-run
+            # prep helpers; killing processes / closing PRs is an
+            # explicit user action elsewhere.
+            try:
+                transition = execute_transition(
+                    project_dir,
+                    workflow_id="coding-session",
+                    instance_id=session_id,
+                    target_status="failed",
+                    flags={"action": "ui_pause_session", "reason": "dead_pid"},
+                )
+            except TransitionError as exc:
+                raise SessionRuntimeError(
+                    f"executor refused transition: {exc}"
+                ) from exc
+            if not transition.ok:
+                raise SessionRuntimeError(
+                    f"transition to failed rejected: "
+                    f"{transition.message or transition.reason}"
+                )
             write_audit_entry(
                 project_dir,
                 "actions.pause_session",
@@ -345,9 +366,23 @@ def pause_session(project_dir: Path, session_id: str) -> SessionResult:
         except RuntimeError as exc:
             raise SessionRuntimeError(str(exc)) from exc
 
-        session.status = SessionStatus.PAUSED
-        session.updated_at = now
-        _atomic_save_session(project_dir, session)
+        try:
+            transition = execute_transition(
+                project_dir,
+                workflow_id="coding-session",
+                instance_id=session_id,
+                target_status="paused",
+                flags={"action": "ui_pause_session"},
+            )
+        except TransitionError as exc:
+            raise SessionRuntimeError(
+                f"executor refused transition: {exc}"
+            ) from exc
+        if not transition.ok:
+            raise SessionRuntimeError(
+                f"transition to paused rejected: "
+                f"{transition.message or transition.reason}"
+            )
         write_audit_entry(
             project_dir,
             "actions.pause_session",

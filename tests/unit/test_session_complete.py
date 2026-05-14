@@ -149,7 +149,15 @@ def test_complete_closes_issues_and_transitions_session(
     tmp_path_project: Path, save_test_session, save_test_issue, stub_pr_merged
 ):
     """Real (non-dry-run) close-out: every gate passes, transitions
-    happen. Worktree cleanup is a no-op here (empty runtime_state)."""
+    happen. Worktree cleanup is a no-op here (empty runtime_state).
+
+    v0.13: the executor only declares a ``verified → completed`` route
+    in the conftest workflow, so the test session enters ``verified``
+    here. Issue sweep moved out of ``complete_session()`` to the
+    Layer-1 CLI wrapper, so the assertion on ``issue.status`` /
+    ``result.issues_closed`` no longer applies — the helper just runs
+    the gates + status flip now.
+    """
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
     (tmp_path_project / "issues" / "TMP-1" / "developer.md").write_text(
         "# notes\n", encoding="utf-8"
@@ -157,19 +165,15 @@ def test_complete_closes_issues_and_transitions_session(
     save_test_session(
         tmp_path_project,
         "s1",
-        status="in_review",
+        status="verified",
         issues=["TMP-1"],
     )
     _write_review_json(tmp_path_project, "s1", exit_code=0, verdict="approved")
 
-    result = complete_session(tmp_path_project, "s1")
-    assert "TMP-1" in result.issues_closed
+    complete_session(tmp_path_project, "s1")
 
     from tripwire.core.session_store import load_session
-    from tripwire.core.store import load_issue
 
-    issue = load_issue(tmp_path_project, "TMP-1")
-    assert issue.status == "completed"
     session = load_session(tmp_path_project, "s1")
     assert session.status == "completed"
 
