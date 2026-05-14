@@ -52,6 +52,12 @@ from tripwire.core.validator.checks.references import (
     check_no_stale_pins,
     check_reference_integrity,
 )
+from tripwire.core.validator.checks.session_lifecycle import (
+    check_pr_merged_for_session,
+    check_pr_review_approved,
+    check_session_has_developer_md,
+    check_session_has_verified_md,
+)
 from tripwire.core.validator.checks.structure import (
     check_handoff_artifact,
     check_issue_body_structure,
@@ -122,6 +128,17 @@ PR_REVIEW_CHECKS = [
     check_pr_review_code_review_skill,
 ]
 
+# Session-lifecycle (v0.13 — promoted from side-effect handlers): gates
+# the verified → completed route on PR merge, review approval, and the
+# per-issue developer.md / verified.md artifacts that the session's
+# member issues are required to produce.
+SESSION_LIFECYCLE_CHECKS = [
+    check_pr_merged_for_session,
+    check_pr_review_approved,
+    check_session_has_developer_md,
+    check_session_has_verified_md,
+]
+
 # Quality: project-standards, coverage heuristics, phase requirements,
 # anti-fatigue degradation detection.
 QUALITY_CHECKS = [
@@ -177,6 +194,10 @@ ALL_CHECKS = [
     check_pr_review_threshold_findings,
     check_pr_review_external_reviewer,
     check_pr_review_code_review_skill,
+    check_pr_merged_for_session,
+    check_pr_review_approved,
+    check_session_has_developer_md,
+    check_session_has_verified_md,
 ]
 
 
@@ -189,6 +210,7 @@ __all__ = [
     "PR_REVIEW_CHECKS",
     "QUALITY_CHECKS",
     "REFERENCE_CHECKS",
+    "SESSION_LIFECYCLE_CHECKS",
     "STRUCTURE_CHECKS",
     "WORKFLOW_CHECKS",
     "WORKSPACE_CHECKS",

@@ -267,3 +267,38 @@ def _close_pr_for_branch(branch: str, worktree_path: str) -> _PrCloseVerdict:
         break
 
     return verdict
+
+
+def _close_pr_by_num(pr_num: int, cwd: Path | str | None = None) -> _PrCloseVerdict:
+    """Close a PR by its number via ``gh pr close <num>``.
+
+    The branch-keyed and URL-keyed close paths above retain their
+    bespoke ``gh pr list`` round-trip / URL parsing; this helper exists
+    so the Layer-1 ``tripwire gh pr-close`` CLI can target a known PR
+    number directly without re-discovering it.
+
+    ``cwd`` is optional; when supplied, ``gh`` runs from that directory
+    so it picks up the correct remote when worktrees have non-default
+    origins (v0.7.4 dual-PR case). Errors are captured on the verdict
+    rather than raised — matches the rest of this module's contract.
+    """
+    verdict = _PrCloseVerdict()
+    try:
+        close = subprocess.run(
+            ["gh", "pr", "close", str(pr_num)],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            cwd=str(cwd) if cwd is not None else None,
+        )
+    except (subprocess.SubprocessError, OSError) as exc:
+        verdict.error = f"gh pr close #{pr_num} failed: {exc}"
+        return verdict
+    if close.returncode != 0:
+        verdict.error = (
+            f"gh pr close #{pr_num} exit={close.returncode}: "
+            f"{(close.stderr or '').strip()}"
+        )
+        return verdict
+    verdict.closed_pr = pr_num
+    return verdict

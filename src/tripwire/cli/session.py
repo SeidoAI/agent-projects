@@ -853,11 +853,14 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
 
 # Session-status transitions are declared in `workflow.yaml` and
 # executed by `tripwire.core.workflow.transitions.execute_transition`,
-# which resolves the matching route, captures pre-state snapshots,
-# runs side-effects in declared order, and rolls back atomically on
-# failure. Side-effect handlers (`sweep_issues_forward`,
-# `rebase_pt_branch`, etc.) live in
-# `tripwire.core.workflow.side_effects`.
+# which resolves the matching route, runs the gate (tripwires, JIT
+# prompts, prompt-checks, artifact-existence), and atomically writes
+# `session.status` plus a small fixed set of post-write housekeeping
+# records (engagement close, audit, telemetry, ack reset).
+#
+# External side effects historically dispatched by the executor
+# (sweep issues, rebase PT, kill runtime, flip draft PRs, etc.) now
+# live as Layer-1/Layer-2 CLI wrappers and direct-mutation cli paths.
 
 
 @session_cmd.command("transition")
@@ -880,15 +883,17 @@ def session_transition_cmd(
     which resolves the matching route in ``workflow.yaml`` from
     ``(current_status, target_status)``, runs the route's gate (tripwires
     listed in ``controls.tripwires``, JIT prompts, prompt-checks, consumed
-    artifacts), then fires ``route.side_effects[]`` in declared order
-    (sweep, PT-rebase, draft-PR flips, telemetry, etc.). On any failure
-    inverses run in reverse and the session is restored from a pre-state
-    snapshot.
+    artifacts), atomically flips the status, then runs a small fixed set
+    of best-effort post-write hooks (close active engagement on terminal
+    transitions, append audit + telemetry records, reset acks if the
+    route opts in).
 
-    Sweep behavior is declared by each route's
-    ``side_effects: [sweep_issues_forward, ...]`` block; per-route
-    validation runs as the route's ``controls.tripwires`` gate (the full
-    project validator runs as ``tripwire validate``).
+    External side effects historically declared by ``route.side_effects``
+    (sweep, PT-rebase, draft-PR flips, kill runtime, etc.) now live as
+    Layer-1 CLI wrappers and direct-mutation cli paths; routes still
+    document them informationally but the executor no longer orchestrates
+    them. Per-route validation runs as the route's ``controls.tripwires``
+    gate (the full project validator runs as ``tripwire validate``).
     """
     from tripwire.core.workflow.transitions import (
         TransitionError,
@@ -2574,3 +2579,754 @@ def session_insights_reject_cmd(
         insights.model_copy(update={"proposals": remaining}),
     )
     click.echo(f"Rejected proposal {proposal_id}")
+
+
+# ----------------------------------------------------------------------
+# v0.13 Layer-1 wrappers around side-effect handler bodies.
+# ----------------------------------------------------------------------
+#
+# These commands let an operator replay one side-effect at a time
+# without driving a transition. The workflow executor still owns
+# orchestration; each command here is a thin click wrapper.
+
+
+@session_cmd.command("kill-runtime")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_kill_runtime_cmd(session_id: str, project_dir: Path) -> None:
+    """SIGTERM the session's recorded runtime pid. Best-effort.
+
+    Reads ``session.runtime_state.pid`` and sends ``SIGTERM``. A
+    missing pid is a clean no-op; ``ESRCH`` (pid already dead) is
+    swallowed; any other OS error surfaces as a click error so the
+    operator can investigate.
+    """
+    import os
+    import signal
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session {session_id!r} not found") from exc
+
+    pid = session.runtime_state.pid if session.runtime_state else None
+    if not pid:
+        click.echo(
+            f"session {session_id}: no runtime pid recorded; skipping",
+            err=True,
+        )
+        return
+    try:
+        os.kill(pid, signal.SIGTERM)
+        click.echo(f"sent SIGTERM to pid {pid} (session {session_id})")
+    except ProcessLookupError:
+        click.echo(f"pid {pid} already dead; skipping", err=True)
+    except OSError as exc:
+        raise click.ClickException(f"failed to signal pid {pid}: {exc}") from exc
+
+
+@session_cmd.command("close-prs")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_close_prs_cmd(session_id: str, project_dir: Path) -> None:
+    """Close any open PR across the session's recorded worktrees.
+
+    Iterates ``session.runtime_state.worktrees`` and calls the
+    canonical :func:`tripwire.core.session_abandon._close_pr_for_branch`
+    helper for each. Skips merged PRs. Best-effort — per-worktree
+    failures are reported but never abort the loop.
+    """
+    from tripwire.core.session_abandon import _close_pr_for_branch
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session {session_id!r} not found") from exc
+
+    if session.runtime_state is None or not session.runtime_state.worktrees:
+        click.echo(f"session {session_id}: no recorded worktrees", err=True)
+        return
+
+    closed: list[int] = []
+    errors: list[str] = []
+    for wt in session.runtime_state.worktrees:
+        if not wt.branch:
+            continue
+        verdict = _close_pr_for_branch(wt.branch, wt.worktree_path)
+        if verdict.closed_pr is not None and verdict.closed_pr > 0:
+            closed.append(verdict.closed_pr)
+        if verdict.error:
+            errors.append(verdict.error)
+
+    for pr in closed:
+        click.echo(f"closed PR #{pr}")
+    for err in errors:
+        click.echo(f"warning: {err}", err=True)
+    if not closed and not errors:
+        click.echo(f"session {session_id}: no open PRs to close")
+
+
+@session_cmd.command("remove-worktrees")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_remove_worktrees_cmd(session_id: str, project_dir: Path) -> None:
+    """Remove every recorded worktree directory for the session.
+
+    Iterates ``session.runtime_state.worktrees`` and calls
+    :func:`tripwire.core.git_helpers.worktree_remove` for each. Errors
+    are reported but never abort the loop — filesystem deletion is
+    best-effort.
+    """
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session {session_id!r} not found") from exc
+
+    if session.runtime_state is None or not session.runtime_state.worktrees:
+        click.echo(f"session {session_id}: no recorded worktrees", err=True)
+        return
+
+    removed: list[str] = []
+    errors: list[str] = []
+    for wt in session.runtime_state.worktrees:
+        try:
+            worktree_remove(Path(wt.clone_path), Path(wt.worktree_path))
+            removed.append(wt.worktree_path)
+        except (subprocess.SubprocessError, OSError) as exc:
+            # Best-effort: filesystem deletion errors and subprocess
+            # blow-ups are reported but never abort the loop.
+            errors.append(f"{wt.worktree_path}: {exc}")
+
+    for wt_path in removed:
+        click.echo(f"removed worktree: {wt_path}")
+    for err in errors:
+        click.echo(f"warning: {err}", err=True)
+    if not removed and not errors:
+        click.echo(f"session {session_id}: no worktrees to remove")
+
+
+@session_cmd.command("flip-drafts-ready")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_flip_drafts_ready_cmd(session_id: str, project_dir: Path) -> None:
+    """Flip every draft PR on the session's worktrees to ready-for-review.
+
+    Delegates to the canonical
+    :func:`tripwire.core.session_complete._flip_drafts_to_ready` helper
+    so the CLI surface stays in sync with the close-out path.
+    """
+    from tripwire.core.session_complete import _flip_drafts_to_ready
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session {session_id!r} not found") from exc
+
+    _flip_drafts_to_ready(session)
+    click.echo(f"flipped drafts to ready for session {session_id}")
+
+
+@session_cmd.command("flip-drafts-draft")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_flip_drafts_draft_cmd(session_id: str, project_dir: Path) -> None:
+    """Flip every ready PR on the session's worktrees back to draft.
+
+    Mirrors the ``flip_drafts_to_draft`` side-effect: for each worktree
+    with a recorded ``draft_pr_url``, run ``gh pr ready <url> --undo``.
+    Best-effort — ``gh`` errors are swallowed (the operator can re-run
+    or inspect ``gh`` output directly).
+    """
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session {session_id!r} not found") from exc
+
+    if session.runtime_state is None or not session.runtime_state.worktrees:
+        click.echo(f"session {session_id}: no recorded worktrees", err=True)
+        return
+
+    flipped: list[str] = []
+    for wt in session.runtime_state.worktrees:
+        if not wt.draft_pr_url:
+            continue
+        try:
+            subprocess.run(
+                ["gh", "pr", "ready", wt.draft_pr_url, "--undo"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            flipped.append(wt.draft_pr_url)
+        except OSError:
+            continue
+
+    for url in flipped:
+        click.echo(f"flipped to draft: {url}")
+    if not flipped:
+        click.echo(f"session {session_id}: no draft URLs to flip")
+
+
+@session_cmd.command("normalise-branch")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_normalise_branch_cmd(session_id: str, project_dir: Path) -> None:
+    """Reset squash-merged worktree branches to ``origin/main``.
+
+    For each recorded worktree, asks ``gh`` whether the PR for the
+    branch was merged. If merged AND the local branch still carries
+    commits not present on ``origin/main`` (the canonical fingerprint
+    of a squash-merge — the original commits stay behind on the
+    feature branch), runs ``git reset --hard origin/main`` in the
+    worktree. Idempotent: a worktree whose branch is already at
+    ``origin/main`` is left alone; an unmerged PR is left alone.
+
+    Skips worktrees whose path is missing on disk (e.g. already
+    cleaned up by ``session complete``) and reports them as warnings.
+    """
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session {session_id!r} not found") from exc
+
+    if session.runtime_state is None or not session.runtime_state.worktrees:
+        click.echo(f"session {session_id}: no recorded worktrees", err=True)
+        return
+
+    reset: list[str] = []
+    skipped: list[str] = []
+    errors: list[str] = []
+    for wt in session.runtime_state.worktrees:
+        wt_path = Path(wt.worktree_path)
+        if not wt_path.is_dir():
+            skipped.append(f"{wt_path}: worktree missing")
+            continue
+
+        # Look up the PR for this branch — gh may return nothing if no
+        # PR was ever opened; we treat that as "nothing to normalise".
+        try:
+            listing = subprocess.run(
+                [
+                    "gh",
+                    "pr",
+                    "list",
+                    "--head",
+                    wt.branch,
+                    "--state",
+                    "merged",
+                    "--json",
+                    "number,mergedAt,mergeCommit",
+                    "--limit",
+                    "1",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                cwd=str(wt_path),
+            )
+        except (subprocess.SubprocessError, OSError) as exc:
+            errors.append(f"gh pr list failed for {wt.branch}: {exc}")
+            continue
+
+        if listing.returncode != 0:
+            errors.append(
+                f"gh pr list for {wt.branch} exit={listing.returncode}: "
+                f"{(listing.stderr or '').strip()}"
+            )
+            continue
+
+        try:
+            prs = json.loads(listing.stdout or "[]")
+        except json.JSONDecodeError as exc:
+            errors.append(f"gh pr list invalid JSON for {wt.branch}: {exc}")
+            continue
+
+        if not prs or not prs[0].get("mergedAt"):
+            skipped.append(f"{wt.branch}: PR not merged")
+            continue
+
+        # Squash detection — does the local branch have commits absent
+        # from origin/main? `git rev-list --count origin/main..HEAD`
+        # answers that in one shot.
+        try:
+            ahead = subprocess.run(
+                ["git", "-C", str(wt_path), "rev-list", "--count", "origin/main..HEAD"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except (subprocess.SubprocessError, OSError) as exc:
+            errors.append(f"git rev-list failed for {wt_path}: {exc}")
+            continue
+        if ahead.returncode != 0:
+            errors.append(
+                f"git rev-list for {wt_path} exit={ahead.returncode}: "
+                f"{(ahead.stderr or '').strip()}"
+            )
+            continue
+        try:
+            count = int((ahead.stdout or "0").strip())
+        except ValueError:
+            errors.append(f"git rev-list returned non-int for {wt_path}")
+            continue
+        if count == 0:
+            skipped.append(f"{wt.branch}: already at origin/main")
+            continue
+
+        try:
+            subprocess.run(
+                ["git", "-C", str(wt_path), "reset", "--hard", "origin/main"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            errors.append(
+                f"git reset --hard origin/main for {wt_path} failed: "
+                f"{(exc.stderr or '').strip()}"
+            )
+            continue
+        reset.append(wt.worktree_path)
+
+    for path in reset:
+        click.echo(f"reset to origin/main: {path}")
+    for entry in skipped:
+        click.echo(f"skipped: {entry}", err=True)
+    for err in errors:
+        click.echo(f"warning: {err}", err=True)
+
+
+@session_cmd.command("followup-stub")
+@click.argument("session_id")
+@click.option(
+    "--reason",
+    default="",
+    help="Reopen reason recorded in the PM follow-up section.",
+)
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_followup_stub_cmd(
+    session_id: str, reason: str, project_dir: Path
+) -> None:
+    """Append the canonical PM follow-up stub to the session's plan.md.
+
+    Resolves the plan path via :func:`paths.session_plan_path` (the
+    canonical ``sessions/<sid>/artifacts/plan.md`` location). Idempotent
+    — re-running once the stub is present is a clean no-op.
+    """
+    from tripwire.core import paths as _paths
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session {session_id!r} not found") from exc
+
+    plan_path = _paths.session_plan_path(resolved, session_id)
+    if not plan_path.is_file():
+        click.echo(
+            f"session {session_id}: plan.md not found at {plan_path}",
+            err=True,
+        )
+        return
+    text = plan_path.read_text(encoding="utf-8")
+    if "## PM follow-up" in text:
+        click.echo(f"session {session_id}: PM follow-up section already present")
+        return
+    reason_str = reason or "<reason omitted>"
+    appended = (
+        f"\n\n## PM follow-up\n\n"
+        f"Session reopened by PM. Reason: {reason_str}.\n\n"
+        f"Re-engage the agent via `tripwire session spawn {session_id} --resume`.\n"
+    )
+    plan_path.write_text(text + appended, encoding="utf-8")
+    click.echo(f"appended PM follow-up stub to {plan_path}")
+
+
+# ----------------------------------------------------------------------
+# v0.13 Layer-2 chained commands.
+# ----------------------------------------------------------------------
+#
+# These compose the Layer-1 wrappers above into the "common combos" an
+# agent runs before a workflow transition. Each chain is idempotent and
+# fails loud + actionable when a step blocks the transition.
+
+
+@session_cmd.command("prepare-for-completion")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_prepare_for_completion_cmd(session_id: str, project_dir: Path) -> None:
+    """Pre-flight a session for the ``coding-session → completed`` transition.
+
+    Runs three checks in order, each gated on the previous passing:
+
+    1. ``tripwire validate --select <sid>`` — the project must be clean
+       under the session's selector. Any error fails loud.
+    2. ``tripwire session flip-drafts-ready <sid>`` — flip every draft
+       PR on the session's worktrees to ready-for-review. Idempotent.
+    3. ``gh pr view --json state,mergeStateStatus`` per worktree. If
+       any PR is ``BLOCKED`` or ``BEHIND``, exit 1 with the PR number
+       + reason; ``MERGEABLE`` or already ``MERGED`` PRs are clean.
+
+    Exits 0 only when all three steps pass. Idempotent — safe to re-run
+    after the agent has fixed whatever each loud failure pointed at.
+    """
+    from tripwire.cli.validate import _filter_report_by_selector
+    from tripwire.core.session_complete import _flip_drafts_to_ready
+    from tripwire.core.validator import validate_project
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session {session_id!r} not found") from exc
+
+    # Step 1: validate, filtered by selector
+    report = validate_project(resolved, strict=True, heuristic_mode="surface")
+    _filter_report_by_selector(report, resolved, session_id)
+    if report.errors:
+        click.echo(
+            f"validate failed for session {session_id}: "
+            f"{len(report.errors)} error(s)",
+            err=True,
+        )
+        for err in report.errors:
+            location = err.file or ""
+            if err.field:
+                location = f"{location}:{err.field}" if location else err.field
+            click.echo(f"  [{err.code}] {location} — {err.message}", err=True)
+        raise click.ClickException(
+            f"validate gate blocked completion for {session_id}"
+        )
+    click.echo(f"validate clean for session {session_id}")
+
+    # Step 2: flip drafts to ready
+    _flip_drafts_to_ready(session)
+    click.echo(f"flipped drafts to ready for session {session_id}")
+
+    # Step 3: per-PR merge readiness via gh pr view
+    if session.runtime_state is None or not session.runtime_state.worktrees:
+        click.echo(f"session {session_id}: no recorded worktrees")
+        return
+
+    blockers: list[str] = []
+    checked: list[str] = []
+    for wt in session.runtime_state.worktrees:
+        wt_path = Path(wt.worktree_path)
+        if not wt_path.is_dir():
+            # Worktree gone — can't ask gh from inside it. Skip with a
+            # warning so the agent sees what we couldn't check.
+            click.echo(
+                f"warning: worktree {wt.worktree_path} missing; "
+                f"cannot check PR for branch {wt.branch}",
+                err=True,
+            )
+            continue
+        try:
+            view = subprocess.run(
+                [
+                    "gh",
+                    "pr",
+                    "view",
+                    "--json",
+                    "number,state,mergeStateStatus",
+                ],
+                cwd=str(wt_path),
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+        except (subprocess.SubprocessError, OSError) as exc:
+            blockers.append(f"gh pr view failed for {wt.branch}: {exc}")
+            continue
+        if view.returncode != 0:
+            blockers.append(
+                f"gh pr view for {wt.branch} exit={view.returncode}: "
+                f"{(view.stderr or '').strip()}"
+            )
+            continue
+        try:
+            data = json.loads(view.stdout or "{}")
+        except json.JSONDecodeError as exc:
+            blockers.append(f"gh pr view invalid JSON for {wt.branch}: {exc}")
+            continue
+        num = data.get("number")
+        state = (data.get("state") or "").upper()
+        merge_status = (data.get("mergeStateStatus") or "").upper()
+        label = f"PR #{num}" if num else f"PR for {wt.branch}"
+        checked.append(f"{label}: state={state} merge={merge_status}")
+        if state == "MERGED":
+            continue
+        if merge_status in {"BLOCKED", "BEHIND"}:
+            blockers.append(f"{label}: mergeStateStatus={merge_status}")
+            continue
+        # CLEAN / UNSTABLE / HAS_HOOKS / MERGEABLE / UNKNOWN all pass —
+        # only the explicit BLOCKED/BEHIND signals are actionable.
+
+    for line in checked:
+        click.echo(line)
+
+    if blockers:
+        click.echo(
+            f"session {session_id}: {len(blockers)} PR(s) not mergeable", err=True
+        )
+        for b in blockers:
+            click.echo(f"  {b}", err=True)
+        raise click.ClickException(
+            f"PRs blocking completion for session {session_id}"
+        )
+
+    click.echo(f"session {session_id}: ready for completion")
+
+
+@session_cmd.command("prepare-for-abandon")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_prepare_for_abandon_cmd(session_id: str, project_dir: Path) -> None:
+    """Tear down a session's live state before the abandon transition.
+
+    Runs three Layer-1 wrappers back to back, each best-effort:
+
+    1. ``kill-runtime`` — SIGTERM the recorded runtime pid (no-op if none).
+    2. ``close-prs`` — close any open PRs on the session's worktrees.
+    3. ``remove-worktrees`` — delete the worktree directories.
+
+    Per-step failures are collected, not raised — we always make a best
+    effort to complete every step. Exit 0 if everything succeeded or
+    was a no-op; exit 1 with a per-step summary if any step had a hard
+    failure so the operator knows what to clean up manually.
+    """
+    from tripwire.core.session_abandon import _close_pr_for_branch
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session {session_id!r} not found") from exc
+
+    failures: list[str] = []
+
+    # Step 1: kill-runtime — same logic as session_kill_runtime_cmd, inlined
+    # so we can collect errors rather than re-raise.
+    import os
+    import signal
+
+    pid = session.runtime_state.pid if session.runtime_state else None
+    if pid:
+        try:
+            os.kill(pid, signal.SIGTERM)
+            click.echo(f"sent SIGTERM to pid {pid}")
+        except ProcessLookupError:
+            click.echo(f"pid {pid} already dead; skipping", err=True)
+        except OSError as exc:
+            failures.append(f"kill-runtime: failed to signal pid {pid}: {exc}")
+    else:
+        click.echo(f"session {session_id}: no runtime pid recorded; skipping")
+
+    # Step 2: close-prs — same as session_close_prs_cmd.
+    if session.runtime_state and session.runtime_state.worktrees:
+        closed: list[int] = []
+        for wt in session.runtime_state.worktrees:
+            if not wt.branch:
+                continue
+            try:
+                verdict = _close_pr_for_branch(wt.branch, wt.worktree_path)
+            except Exception as exc:  # pragma: no cover - defensive
+                failures.append(f"close-prs: {wt.branch}: {exc}")
+                continue
+            if verdict.closed_pr is not None and verdict.closed_pr > 0:
+                closed.append(verdict.closed_pr)
+            if verdict.error:
+                failures.append(f"close-prs: {verdict.error}")
+        for pr in closed:
+            click.echo(f"closed PR #{pr}")
+        if not closed:
+            click.echo(f"session {session_id}: no open PRs to close")
+    else:
+        click.echo(f"session {session_id}: no recorded worktrees for close-prs")
+
+    # Step 3: remove-worktrees — same as session_remove_worktrees_cmd.
+    if session.runtime_state and session.runtime_state.worktrees:
+        removed: list[str] = []
+        for wt in session.runtime_state.worktrees:
+            try:
+                worktree_remove(Path(wt.clone_path), Path(wt.worktree_path))
+                removed.append(wt.worktree_path)
+            except (subprocess.SubprocessError, OSError) as exc:
+                failures.append(f"remove-worktrees: {wt.worktree_path}: {exc}")
+        for wt_path in removed:
+            click.echo(f"removed worktree: {wt_path}")
+        if not removed and not any(
+            f.startswith("remove-worktrees") for f in failures
+        ):
+            click.echo(f"session {session_id}: no worktrees to remove")
+    else:
+        click.echo(
+            f"session {session_id}: no recorded worktrees for remove-worktrees"
+        )
+
+    if failures:
+        click.echo(
+            f"session {session_id}: {len(failures)} step(s) failed during prepare-for-abandon",
+            err=True,
+        )
+        for f in failures:
+            click.echo(f"  {f}", err=True)
+        raise click.ClickException(
+            f"prepare-for-abandon had hard failures for {session_id}"
+        )
+
+    click.echo(f"session {session_id}: ready for abandon")
+
+
+@session_cmd.command("sweep-issues-forward")
+@click.argument("session_id")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+)
+def session_sweep_issues_forward_cmd(session_id: str, project_dir: Path) -> None:
+    """Drive every member issue forward to match the session's current state.
+
+    The target issue state is derived from the session's current status
+    via :func:`tripwire.core.status_contract.sweep_target_for` (e.g. a
+    ``verified`` session sweeps issues to ``verified``; ``completed``
+    sweeps to ``completed``). Issues already at-or-beyond the target
+    are no-ops; off-path issues (``deferred``, ``abandoned``) are left
+    alone — same contract as the ``sweep_issues_forward`` side-effect.
+
+    Approach (b) per the v0.13 step-3 spec: shell out to
+    ``tripwire transition issue-closure <key> <target>`` per issue. The
+    ``execute_transition`` Python entry point is hardcoded to the
+    ``coding-session`` workflow today (step 4 generalises it), so the
+    shell hop keeps this CLI decoupled from that change. Exit code is
+    inherited per-issue: any non-zero subprocess exit becomes a
+    structured per-issue rejection in the summary.
+    """
+    from tripwire.core.status_contract import sweep_target_for
+
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        session = load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session {session_id!r} not found") from exc
+
+    target = sweep_target_for(session.status.value)
+    if target is None:
+        click.echo(
+            f"session {session_id}: status {session.status.value!r} has no sweep target"
+        )
+        return
+
+    if not session.issues:
+        click.echo(f"session {session_id}: no member issues; nothing to sweep")
+        return
+
+    rejected: list[tuple[str, str]] = []
+    advanced: list[str] = []
+    for issue_key in session.issues:
+        try:
+            result = subprocess.run(
+                [
+                    "tripwire",
+                    "transition",
+                    "issue-closure",
+                    issue_key,
+                    target,
+                    "--project-dir",
+                    str(resolved),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+        except (subprocess.SubprocessError, OSError) as exc:
+            rejected.append((issue_key, f"subprocess failure: {exc}"))
+            continue
+        if result.returncode == 0:
+            advanced.append(issue_key)
+            click.echo(f"advanced {issue_key} → {target}")
+        else:
+            reason = (result.stderr or result.stdout or "").strip() or (
+                f"exit={result.returncode}"
+            )
+            rejected.append((issue_key, reason))
+
+    if rejected:
+        click.echo(
+            f"session {session_id}: {len(rejected)} issue(s) rejected by issue-closure",
+            err=True,
+        )
+        for key, reason in rejected:
+            click.echo(f"  {key}: {reason}", err=True)
+        raise click.ClickException(
+            f"sweep-issues-forward rejected {len(rejected)} issue(s) for {session_id}"
+        )
+
+    click.echo(
+        f"session {session_id}: swept {len(advanced)} issue(s) → {target}"
+    )
