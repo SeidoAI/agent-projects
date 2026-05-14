@@ -4,6 +4,21 @@ workflows:
     actor: coding-agent
     trigger: session.spawn
     brief-description: "one session: plan, execute, review, ship."
+    instance:
+      storage_path: sessions/{instance_id}/session.yaml
+      status_field: status
+      status_enum:
+        - planned
+        - queued
+        - executing
+        - in_review
+        - verified
+        - completed
+        - paused
+        - failed
+        - abandoned
+      required_fields: [id, status]
+      instance_id_field: id
     statuses:
       - id: planned
       - id: queued

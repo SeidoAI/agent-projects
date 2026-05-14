@@ -7,14 +7,18 @@ command. Updated when `templates/workflow.yaml.j2` changes.
 a change that diverges from what's documented, validate flags it.
 
 In v0.13 the live template (`src/tripwire/templates/workflow.yaml.j2`)
-carries only `coding-session` — the workflow the executor actually
-runs. The other workflow blocks from v0.12 (pm-scoping, pm-triage,
-pm-incremental-update, project-maintenance, pm-monitor, code-review,
-inbox-handling, pr-lifecycle, phase-advancement, issue-closure) have
-been moved to `docs/workflows/reference-only-workflows.md` because
-they never had executor coverage and were drift hazards while
-declared as if they did. They are catalogued below for completeness,
-clearly flagged as reference-only.
+carries `coding-session` as the executor-driven workflow plus the 10
+other workflow blocks (pm-scoping, pm-triage, pm-incremental-update,
+project-maintenance, pm-monitor, code-review, inbox-handling,
+pr-lifecycle, phase-advancement, issue-closure, concept-freshness) as
+**reference declarations**. Step 7 (v0.13.1) restored these blocks
+into the live template and added an `instance:` block on every
+workflow so the runtime contract (storage path, status field, status
+enum) is declared uniformly. They remain executor-free — only
+`coding-session` is wired to `tripwire.core.workflow.transitions` —
+but `tripwire validate` lints them and the renderer can draw them.
+The historical pre-v0.13.1 view is preserved verbatim under
+`docs/workflows/reference-only-workflows.md`.
 
 ---
 

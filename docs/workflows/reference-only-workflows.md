@@ -1,4 +1,19 @@
-# Reference-only workflow declarations (documentation only)
+# Reference-only workflow declarations (historical snapshot)
+
+> **As of v0.13.1 step 7, these workflows are again declared in
+> `src/tripwire/templates/workflow.yaml.j2`** — converted to the v0.13
+> schema shape (no `next:` keys, routes as the single source of
+> structural arrows) and carrying `instance:` blocks declaring the
+> runtime instance shape per workflow. The live template is the source
+> of truth; the blocks below are a historical snapshot of how the
+> workflows looked in earlier v0.12 / early-v0.13 releases.
+>
+> Even though they are declared, they remain **executor-free** — no
+> `WORKFLOW_ID` is registered for them in
+> `tripwire.core.workflow.transitions`. The PM agent drives the
+> transitions conversationally per the skill markdown. The
+> declarations exist so `tripwire validate` can lint cross-links,
+> route shape, and instance contracts uniformly.
 
 These workflows shipped in `workflow.yaml.j2` through v0.12 as
 documentation of the surrounding PM/review/ops process. None of them
@@ -7,11 +22,10 @@ mutations or fire side-effects, and keeping them in the live template
 created a drift hazard (someone trusting the spec to drive behavior it
 doesn't drive).
 
-In v0.13 the live template carries only `coding-session`, the workflow
-the executor actually runs. The blocks below are reference material
-preserved verbatim from earlier releases, except the duplicate
-`concept-freshness` block from lines 1417–1479 of v0.12 — that was a
-merge artifact, not a second workflow.
+Between WS5 (v0.13) and v0.13.1 step 7 the live template carried only
+`coding-session`. Step 7 restored the other 10 workflows so the
+declarations and the doc agree, and added the `instance:` block on
+every workflow so the runtime contract is uniform.
 
 If you want to materialise any of these into an executable workflow,
 the path is: register a `WORKFLOW_ID` in the executor module, add the

@@ -26,6 +26,7 @@ from tripwire.core.workflow.schema import (
     WorkflowArtifactRef,
     WorkflowCrossLink,
     WorkflowFinding,
+    WorkflowInstanceShape,
     WorkflowRoute,
     WorkflowRouteControls,
     WorkflowRouteEmits,
@@ -46,7 +47,24 @@ WORKFLOW_FILENAME = "workflow.yaml"
 # typos with one mechanism.
 _RECOGNIZED_TOPLEVEL_KEYS = frozenset({"workflow_schema_version", "workflows"})
 _RECOGNIZED_WORKFLOW_KEYS = frozenset(
-    {"actor", "trigger", "brief-description", "brief_description", "statuses", "routes"}
+    {
+        "actor",
+        "trigger",
+        "brief-description",
+        "brief_description",
+        "statuses",
+        "routes",
+        "instance",
+    }
+)
+_RECOGNIZED_INSTANCE_KEYS = frozenset(
+    {
+        "storage_path",
+        "status_field",
+        "status_enum",
+        "required_fields",
+        "instance_id_field",
+    }
 )
 _RECOGNIZED_STATUS_KEYS = frozenset(
     {
@@ -145,6 +163,25 @@ def _audit_workflow_shape(wf_id: str, raw: dict) -> list[WorkflowFinding]:
             f"workflow {wf_id!r}",
             status=None,
         )
+
+        instance_raw = raw.get("instance")
+        if isinstance(instance_raw, dict):
+            unknown_instance = (
+                set(instance_raw.keys()) - _RECOGNIZED_INSTANCE_KEYS
+            )
+            for key in sorted(unknown_instance):
+                findings.append(
+                    WorkflowFinding(
+                        code="workflow/instance_unknown_field",
+                        workflow=wf_id,
+                        status=None,
+                        message=(
+                            f"unknown field {key!r} in `instance:` block on "
+                            f"workflow {wf_id!r}; recognized fields are "
+                            f"{sorted(_RECOGNIZED_INSTANCE_KEYS)}"
+                        ),
+                    )
+                )
 
         for status_raw in raw.get("statuses") or []:
             if not isinstance(status_raw, dict):
@@ -333,6 +370,7 @@ def _parse_workflow(wf_id: str, raw: dict) -> tuple[Workflow, list[WorkflowFindi
     # workflow. Anyone hitting this from a stale shape (e.g. an old
     # `stations:` block from before the rename) gets the same generic
     # message — the loader never knew the old key name.
+    instance = _parse_instance(raw.get("instance"))
     if not statuses_raw:
         findings.append(
             WorkflowFinding(
@@ -355,6 +393,7 @@ def _parse_workflow(wf_id: str, raw: dict) -> tuple[Workflow, list[WorkflowFindi
                 trigger=trigger,
                 statuses=[],
                 brief_description=brief_description,
+                instance=instance,
             ),
             findings,
         )
@@ -366,6 +405,7 @@ def _parse_workflow(wf_id: str, raw: dict) -> tuple[Workflow, list[WorkflowFindi
                 trigger=trigger,
                 statuses=[],
                 brief_description=brief_description,
+                instance=instance,
             ),
             findings,
         )
@@ -385,8 +425,31 @@ def _parse_workflow(wf_id: str, raw: dict) -> tuple[Workflow, list[WorkflowFindi
             statuses=statuses,
             routes=routes,
             brief_description=brief_description,
+            instance=instance,
         ),
         findings,
+    )
+
+
+def _parse_instance(value: Any) -> WorkflowInstanceShape | None:
+    """Parse an ``instance:`` block into a :class:`WorkflowInstanceShape`.
+
+    Returns ``None`` when the block is absent or shaped wrong; the
+    workflow-level missing-block warning fires from
+    :func:`validate_workflow_spec`.
+    """
+    if not isinstance(value, dict):
+        return None
+    storage_path = str(value.get("storage_path", "")).strip()
+    status_field = str(value.get("status_field", "")).strip()
+    if not storage_path or not status_field:
+        return None
+    return WorkflowInstanceShape(
+        storage_path=storage_path,
+        status_field=status_field,
+        status_enum=_str_list(value.get("status_enum")),
+        required_fields=_str_list(value.get("required_fields")),
+        instance_id_field=str(value.get("instance_id_field") or "id").strip(),
     )
 
 

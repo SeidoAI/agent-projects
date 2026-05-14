@@ -777,6 +777,10 @@ def test_validator_clean_on_well_formed(tmp_path: Path) -> None:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
+                instance:
+                  storage_path: sessions/{instance_id}/session.yaml
+                  status_field: status
+                  status_enum: [queued, executing, verified]
                 statuses:
                   - id: queued
                     prompt_checks: [pm-session-launch]
@@ -1305,3 +1309,181 @@ def test_validator_warns_on_unknown_cross_link_status(tmp_path: Path) -> None:
     )
     codes = [f.code for f in findings]
     assert "workflow/cross_link_unknown_status" in codes
+
+
+# ----------------------------------------------------------------------
+# v0.13.1: `instance:` block — declared instance shape per workflow
+# ----------------------------------------------------------------------
+
+
+def test_loader_parses_instance_block(tmp_path: Path) -> None:
+    """A workflow with an `instance:` block parses the fields into a
+    typed :class:`WorkflowInstanceShape`."""
+    from tripwire.core.workflow.loader import load_workflows
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                instance:
+                  storage_path: sessions/{instance_id}/session.yaml
+                  status_field: status
+                  status_enum:
+                    - planned
+                    - executing
+                    - completed
+                  required_fields: [id, status]
+                  instance_id_field: id
+                statuses:
+                  - id: planned
+                  - id: completed
+                    terminal: true
+                routes:
+                  - id: planned-to-completed
+                    actor: pm-agent
+                    from: planned
+                    to: completed
+                    kind: forward
+            """
+        ),
+        encoding="utf-8",
+    )
+    wf = load_workflows(tmp_path).workflows["coding-session"]
+    assert wf.instance is not None
+    assert wf.instance.storage_path == "sessions/{instance_id}/session.yaml"
+    assert wf.instance.status_field == "status"
+    assert wf.instance.status_enum == ["planned", "executing", "completed"]
+    assert wf.instance.required_fields == ["id", "status"]
+    assert wf.instance.instance_id_field == "id"
+
+
+def test_loader_emits_warning_for_missing_instance_block(tmp_path: Path) -> None:
+    """A workflow without an `instance:` block surfaces a warning
+    (back-compat in v0.13.1; mandatory in v0.14)."""
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: s
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    missing = [f for f in findings if f.code == "workflow/instance_missing"]
+    assert len(missing) == 1
+    assert missing[0].severity == "warning"
+    assert missing[0].workflow == "w"
+
+
+def test_loader_emits_finding_for_unknown_instance_field(tmp_path: Path) -> None:
+    """An unknown key inside an `instance:` block fires
+    ``workflow/instance_unknown_field``."""
+    from tripwire.core.workflow.loader import load_workflows
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                instance:
+                  storage_path: w/{instance_id}.yaml
+                  status_field: status
+                  status_enum: [a, b]
+                  bogus_extra_field: oops
+                statuses:
+                  - id: s
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    spec = load_workflows(tmp_path)
+    codes = [f.code for f in spec.load_findings]
+    assert "workflow/instance_unknown_field" in codes
+    finding = next(
+        f for f in spec.load_findings if f.code == "workflow/instance_unknown_field"
+    )
+    assert "bogus_extra_field" in finding.message
+    assert finding.workflow == "w"
+
+
+def test_loader_clean_when_instance_block_present(tmp_path: Path) -> None:
+    """A workflow with a valid `instance:` block produces no
+    instance-related findings."""
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                instance:
+                  storage_path: w/{instance_id}.yaml
+                  status_field: status
+                  status_enum: [s]
+                statuses:
+                  - id: s
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    codes = [f.code for f in findings]
+    assert "workflow/instance_missing" not in codes
+    assert "workflow/instance_unknown_field" not in codes
+
+
+def test_template_declares_instance_on_all_12_workflows() -> None:
+    """The shipped template (`templates/workflow.yaml.j2`) declares an
+    `instance:` block on every workflow it declares. Foundation for
+    v0.14 mandatory enforcement."""
+    import yaml
+
+    from tripwire.core.workflow.loader import parse_workflow_spec
+
+    template = Path("src/tripwire/templates/workflow.yaml.j2").read_text(
+        encoding="utf-8"
+    )
+    spec = parse_workflow_spec(yaml.safe_load(template))
+    assert len(spec.workflows) == 12, sorted(spec.workflows)
+    for wf_id, wf in spec.workflows.items():
+        assert wf.instance is not None, f"workflow {wf_id!r} has no instance: block"
+        assert wf.instance.storage_path
+        assert wf.instance.status_field
+        assert wf.instance.status_enum, (
+            f"workflow {wf_id!r} has empty status_enum"
+        )

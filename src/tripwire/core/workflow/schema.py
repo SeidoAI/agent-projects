@@ -95,6 +95,40 @@ class WorkflowStatusArtifacts:
 
 
 @dataclass(frozen=True)
+class WorkflowInstanceShape:
+    """Declared instance shape for a workflow (v0.13.1).
+
+    Each workflow's runtime instances (sessions, issues, scoping runs,
+    etc.) live somewhere on disk and carry a status field. This block
+    declares that contract so ``tripwire validate`` can enforce it
+    uniformly across every workflow.
+
+    ``storage_path`` is the disk layout for an instance file. It is a
+    string template with ``{instance_id}`` substituted at runtime; in
+    v0.13 the path uses the current flat layout (e.g.
+    ``sessions/{instance_id}/session.yaml``). Step 7a rewrites these
+    to ``instances/<type>/``.
+
+    ``status_field`` is the dot-path of the status field on the
+    instance model. ``status_enum`` enumerates the legal values.
+    ``required_fields`` lists the always-present fields a well-formed
+    instance must carry (sanity check, not exhaustive). ``instance_id_field``
+    names the field that holds the id used to render ``storage_path``;
+    almost always ``id``.
+
+    The block is optional in v0.13.1 — a missing block surfaces a
+    ``workflow/instance_missing`` warning but doesn't fail load. It
+    becomes mandatory in v0.14.
+    """
+
+    storage_path: str
+    status_field: str
+    status_enum: list[str]
+    required_fields: list[str] = field(default_factory=list)
+    instance_id_field: str = "id"
+
+
+@dataclass(frozen=True)
 class WorkflowWorkStep:
     """Work performed by an actor *inside* a status — no status change.
 
@@ -230,6 +264,7 @@ class Workflow:
     statuses: list[WorkflowStatus]
     routes: list[WorkflowRoute] = field(default_factory=list)
     brief_description: str | None = None
+    instance: WorkflowInstanceShape | None = None
 
     @property
     def statuses_by_id(self) -> dict[str, WorkflowStatus]:
@@ -417,6 +452,25 @@ def _check_cross_links(spec: WorkflowSpec) -> list[WorkflowFinding]:
 
 def _check_workflow(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
     out: list[WorkflowFinding] = []
+    # v0.13.1: workflows should declare an `instance:` block describing
+    # the runtime instance shape (storage path, status field, status
+    # enum). Missing is a warning in v0.13.1 for back-compat; mandatory
+    # in v0.14.
+    if wf.instance is None:
+        out.append(
+            WorkflowFinding(
+                code="workflow/instance_missing",
+                workflow=wf_id,
+                status=None,
+                severity="warning",
+                message=(
+                    f"workflow {wf_id!r} declares no `instance:` block — "
+                    f"add storage_path, status_field, status_enum so "
+                    f"`tripwire validate` can enforce instance shape "
+                    f"(warning in v0.13.1, mandatory in v0.14)"
+                ),
+            )
+        )
     seen: set[str] = set()
     has_terminal = False
     for status in wf.statuses:
@@ -939,6 +993,7 @@ __all__ = [
     "WorkflowArtifactRef",
     "WorkflowCrossLink",
     "WorkflowFinding",
+    "WorkflowInstanceShape",
     "WorkflowRoute",
     "WorkflowRouteControls",
     "WorkflowRouteEmits",

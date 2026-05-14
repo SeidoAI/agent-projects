@@ -581,6 +581,19 @@ def _resolve_clone_path(project_dir: Path, repo_slug: str) -> Path | None:
 @click.option("--log-dir", type=click.Path(path_type=Path), default=None)
 @click.option("--dry-run", is_flag=True, default=False)
 @click.option("--resume", "resume_flag", is_flag=True, default=False)
+@click.option(
+    "--from-remote",
+    "from_remote",
+    type=str,
+    default=None,
+    help=(
+        "Resume partial work from an existing remote branch. After "
+        "creating the local worktree, ``git fetch origin <branch>`` "
+        "and check out that branch into the worktree so the spawned "
+        "agent inherits the in-progress code. Does not error on an "
+        "existing remote branch the way a fresh spawn would."
+    ),
+)
 def session_spawn_cmd(
     session_id: str,
     project_dir: Path,
@@ -588,6 +601,7 @@ def session_spawn_cmd(
     log_dir: Path | None,
     dry_run: bool,
     resume_flag: bool,
+    from_remote: str | None,
 ) -> None:
     """Prep worktrees + skills + CLAUDE.md, then dispatch to the
     configured runtime to launch the agent. Transitions to executing."""
@@ -603,12 +617,54 @@ def session_spawn_cmd(
     except FileNotFoundError as exc:
         raise click.ClickException(f"session '{session_id}' not found") from exc
 
-    # Status gate
+    # --from-remote and --resume are mutually exclusive — they're two
+    # different "the slot isn't clean" recoveries and combining them
+    # would scramble the worktree state.
+    if from_remote and resume_flag:
+        raise click.ClickException(
+            "--from-remote and --resume are mutually exclusive. "
+            "--resume re-attaches to a paused/failed session's existing "
+            "worktree; --from-remote hydrates a fresh worktree from a "
+            "remote branch."
+        )
+
+    # Status gate. --resume is allowed from any non-terminal state.
+    # Semantics by source state:
+    #   paused / failed → re-attach to the runtime (the historic path)
+    #   executing       → re-attach to the running runtime, or restart
+    #                     it if the recorded pid is dead (e.g. host
+    #                     reboot, OOM kill)
+    #   in_review       → rare. The agent was conceptually waiting for
+    #                     review feedback; resuming re-spawns the agent
+    #                     with the review-feedback context loaded.
+    # Terminal states fail loudly — resume after a session has reached
+    # a terminal state is a backslide, not a resume.
+    _TERMINAL_STATUSES_FOR_RESUME = ("verified", "completed", "abandoned")
+    _PRE_SPAWN_STATUSES = ("planned", "queued")
     if resume_flag:
-        if session.status not in ("failed", "paused"):
+        if session.status == "verified":
             raise click.ClickException(
-                f"--resume requires status 'failed' or 'paused', got '{session.status}'"
+                f"--resume rejected: session '{session_id}' is 'verified'. "
+                "Resuming a verified session is a backslide, not a resume — "
+                "the verification artefact would be stale by definition. "
+                "If real work remains, use 'tripwire session reopen' to "
+                "move it back to 'paused' with an explicit audit reason."
             )
+        if session.status in _TERMINAL_STATUSES_FOR_RESUME:
+            raise click.ClickException(
+                f"--resume rejected: session '{session_id}' is "
+                f"'{session.status}' (terminal). Use 'tripwire session "
+                "reopen' for completed sessions; abandoned sessions cannot "
+                "be resumed."
+            )
+        if session.status in _PRE_SPAWN_STATUSES:
+            raise click.ClickException(
+                f"--resume rejected: session '{session_id}' is "
+                f"'{session.status}' — it has never been spawned. Drop "
+                "--resume to do the initial spawn."
+            )
+        # Any remaining state (executing, in_review, paused, failed) is
+        # a valid resume source — fall through.
     else:
         if session.status != "queued":
             raise click.ClickException(
@@ -680,6 +736,34 @@ def session_spawn_cmd(
         )
     except RuntimeError as exc:
         raise click.ClickException(str(exc)) from exc
+
+    # --from-remote: prep_run created the worktree on the
+    # handoff-derived branch; now fetch the partial-work branch from
+    # origin and hard-reset the worktree onto it so the spawned agent
+    # inherits the in-progress code.
+    if from_remote:
+        code_wt = prepped.code_worktree
+        try:
+            subprocess.run(
+                ["git", "fetch", "origin", from_remote],
+                cwd=str(code_wt),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "checkout", "-B", from_remote, f"origin/{from_remote}"],
+                cwd=str(code_wt),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            stderr = exc.stderr or ""
+            raise click.ClickException(
+                f"--from-remote: failed to hydrate worktree from "
+                f"origin/{from_remote}: {stderr.strip() or exc}"
+            ) from exc
 
     # Launch via the runtime
     start_result = runtime.start(prepped)
@@ -1143,12 +1227,25 @@ def session_reopen_cmd(
     default=False,
     help="Also remove the session's log files from ~/.tripwire/logs/",
 )
+@click.option(
+    "--preserve-work",
+    "preserve_work",
+    is_flag=True,
+    default=False,
+    help=(
+        "Kill runtime processes and clear session locks, but KEEP "
+        "worktrees, plan.md, and artifacts/ on disk. Use when you "
+        "want to free up a stuck runtime without losing in-progress "
+        "work. Default: full cleanup (worktrees + locks)."
+    ),
+)
 def session_cleanup_cmd(
     session_id: str | None,
     project_dir: Path,
     clean_all: bool,
     force: bool,
     with_logs: bool,
+    preserve_work: bool,
 ) -> None:
     """Remove worktrees for completed/abandoned sessions."""
     resolved = project_dir.expanduser().resolve()
@@ -1184,6 +1281,31 @@ def session_cleanup_cmd(
             # Best-effort — unknown runtime / missing config shouldn't
             # block worktree cleanup.
             pass
+
+        # --preserve-work: skip the worktree teardown + log-rm passes
+        # below. Locks for this session still get cleared (the spawn
+        # process is dead, so the lock is stale by definition).
+        if preserve_work:
+            locks_dir = resolved / ".tripwire" / "locks"
+            removed_locks = 0
+            if locks_dir.is_dir():
+                # Match locks belonging to this session — both the
+                # exact-id form ``<sid>.lock`` and the ``*-<sid>.lock``
+                # form some workflow gates use.
+                for lock in locks_dir.glob("*.lock"):
+                    name = lock.stem
+                    if name == session.id or name.endswith(f"-{session.id}"):
+                        try:
+                            lock.unlink()
+                            removed_locks += 1
+                        except OSError:
+                            pass
+            click.echo(
+                f"  Preserved work for '{session.id}' "
+                f"(runtime killed; {removed_locks} lock(s) cleared; "
+                "worktrees + plan.md kept)"
+            )
+            continue
 
         for wt in session.runtime_state.worktrees:
             wt_path = Path(wt.worktree_path)
