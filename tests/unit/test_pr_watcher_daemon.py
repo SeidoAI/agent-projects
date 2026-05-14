@@ -65,8 +65,8 @@ def test_build_watched_sessions_filters_inactive(project: Path, save_test_sessio
     assert s.pt_branch == "proj/s_active"
     # required_artifacts populated from project.yaml manifest, prefixed
     # with the session-specific path so file-list comparisons work.
-    assert "sessions/s_active/self-review.md" in s.required_artifacts
-    assert "sessions/s_active/insights.yaml" in s.required_artifacts
+    assert "instances/sessions/s_active/self-review.md" in s.required_artifacts
+    assert "instances/sessions/s_active/insights.yaml" in s.required_artifacts
 
 
 def test_pidfile_lifecycle(tmp_path: Path):

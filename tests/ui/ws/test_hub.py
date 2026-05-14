@@ -66,7 +66,7 @@ def _file_changed(project_id: str = "p") -> FileChangedEvent:
         entity_type="issue",
         entity_id="KUI-1",
         action="modified",
-        path="issues/KUI-1/issue.yaml",
+        path="instances/issues/KUI-1/issue.yaml",
     )
 
 

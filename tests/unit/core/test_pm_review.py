@@ -77,7 +77,7 @@ def _scaffold_project(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
-    sdir = tmp_path / "sessions" / "pm-review-target"
+    sdir = tmp_path / "instances" / "sessions" / "pm-review-target"
     sdir.mkdir(parents=True)
     (sdir / "session.yaml").write_text(
         "---\n"
@@ -121,13 +121,13 @@ def failing_validator(monkeypatch):
                 CheckResult(
                     code="schema/uuid_missing",
                     severity="error",
-                    file="issues/TST-1/issue.yaml",
+                    file="instances/issues/TST-1/issue.yaml",
                     message="uuid missing",
                 ),
                 CheckResult(
                     code="refs/unresolved",
                     severity="error",
-                    file="issues/TST-1/issue.yaml",
+                    file="instances/issues/TST-1/issue.yaml",
                     message="reference [[node-x]] does not resolve",
                 ),
             ],
@@ -175,7 +175,7 @@ def test_run_pm_review_writes_artifact(tmp_path, clean_validator):
     pd = _scaffold_project(tmp_path)
     verdict = run_pm_review(pd, session_id="pm-review-target")
 
-    artifact = pd / "sessions" / "pm-review-target" / "artifacts" / "pm-review.md"
+    artifact = pd / "instances" / "sessions" / "pm-review-target" / "artifacts" / "pm-review.md"
     assert artifact.is_file()
     assert verdict.artifact_path == artifact
     text = artifact.read_text(encoding="utf-8")

@@ -57,7 +57,7 @@ def test_classify_process_event_returns_none_for_non_event_path(
     tmp_path: Path,
 ) -> None:
     # An ordinary project file is not a process_event.
-    other = tmp_path / "nodes" / "abc.yaml"
+    other = tmp_path / "instances" / "nodes" / "abc.yaml"
     assert classify_process_event("p", tmp_path, other) is None
 
 

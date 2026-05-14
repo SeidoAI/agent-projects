@@ -102,7 +102,7 @@ def write_verified_for_session(project_dir: Path, session, report) -> None:
     """
     stamp = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
     for ir in report.issue_reviews:
-        verified_path = paths.issue_dir(project_dir, ir.key) / "verified.md"
+        verified_path = paths.verified_md_path(project_dir, ir.key)
         if verified_path.is_file():
             existing = verified_path.read_text(encoding="utf-8")
             addition = (
@@ -129,7 +129,7 @@ def write_verified_for_session(project_dir: Path, session, report) -> None:
 
 def write_review_json(project_dir: Path, session, report) -> None:
     """Persist ``sessions/<id>/review.json`` for the complete-time gate."""
-    review_path = project_dir / "sessions" / session.id / "review.json"
+    review_path = paths.session_dir(project_dir, session.id) / "review.json"
     review_path.parent.mkdir(parents=True, exist_ok=True)
 
     head_sha = None

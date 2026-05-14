@@ -35,7 +35,7 @@ def _write_session_artifacts(
 ) -> None:
     """Write filled-in artifacts for a session so each test can isolate
     one tripwire under test from interference by the others."""
-    sess_dir = project_dir / "sessions" / session_id
+    sess_dir = project_dir / "instances" / "sessions" / session_id
     artifacts_dir = sess_dir / "artifacts"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     if plan:
@@ -187,9 +187,7 @@ class TestPlanUnfilled:
         )
         # Overwrite plan.md with placeholder content from the scaffold template.
         (
-            tmp_path_project
-            / "sessions"
-            / "session-plan-placeholder"
+            tmp_path_project / "instances" / "sessions" / "session-plan-placeholder"
             / "artifacts"
             / "plan.md"
         ).write_text(
@@ -213,9 +211,7 @@ class TestPlanUnfilled:
         # Even without `<>` placeholders, the literal scaffold-doc string
         # "What to read, what to understand" reveals an unfilled plan.
         (
-            tmp_path_project
-            / "sessions"
-            / "session-plan-scaffold-string"
+            tmp_path_project / "instances" / "sessions" / "session-plan-scaffold-string"
             / "artifacts"
             / "plan.md"
         ).write_text(
@@ -239,9 +235,7 @@ class TestPlanUnfilled:
             save_test_issue,
         )
         (
-            tmp_path_project
-            / "sessions"
-            / "session-plan-short"
+            tmp_path_project / "instances" / "sessions" / "session-plan-short"
             / "artifacts"
             / "plan.md"
         ).write_text(
@@ -283,9 +277,7 @@ class TestChecklistUnfilled:
         )
         # Scaffolded task-checklist: every row pending, comments are em-dashes.
         (
-            tmp_path_project
-            / "sessions"
-            / "session-checklist-empty"
+            tmp_path_project / "instances" / "sessions" / "session-checklist-empty"
             / "task-checklist.md"
         ).write_text(
             "# Task Checklist — example\n\n"
@@ -310,9 +302,7 @@ class TestChecklistUnfilled:
             save_test_issue,
         )
         (
-            tmp_path_project
-            / "sessions"
-            / "session-checklist-commented"
+            tmp_path_project / "instances" / "sessions" / "session-checklist-commented"
             / "task-checklist.md"
         ).write_text(
             "# Task Checklist — example\n\n"
@@ -343,9 +333,7 @@ class TestVerificationUnfilled:
             save_test_issue,
         )
         (
-            tmp_path_project
-            / "sessions"
-            / "session-verif-empty"
+            tmp_path_project / "instances" / "sessions" / "session-verif-empty"
             / "verification-checklist.md"
         ).write_text(
             "# Verification Checklist — example\n\n"
@@ -609,9 +597,7 @@ class TestAggregate:
 
         # Drop plan.md to a placeholder.
         (
-            tmp_path_project
-            / "sessions"
-            / "session-clean-aggregate"
+            tmp_path_project / "instances" / "sessions" / "session-clean-aggregate"
             / "artifacts"
             / "plan.md"
         ).write_text("# <fill>\n", encoding="utf-8")

@@ -292,9 +292,9 @@ def _verify_issue_artifacts(project_dir: Path, session) -> None:
                 issue.status, entry.required_at_status, project_dir
             ):
                 continue
-            file_path = paths.issue_dir(project_dir, issue_key) / entry.file
+            file_path = paths.issue_docs_dir(project_dir, issue_key) / entry.file
             if not file_path.is_file():
-                missing.append(f"{issue_key}/{entry.file}")
+                missing.append(f"{issue_key}/{paths.ISSUE_DOCS_SUBDIR}/{entry.file}")
     if missing:
         raise CompleteError(
             "complete/missing_artifacts",

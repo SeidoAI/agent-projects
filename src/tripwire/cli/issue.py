@@ -62,7 +62,7 @@ def issue_artifact_list_cmd(
 
     rows: list[dict] = []
     for entry in manifest.artifacts:
-        file_path = paths.issue_dir(resolved, issue_key) / entry.file
+        file_path = paths.issue_docs_dir(resolved, issue_key) / entry.file
         rows.append(
             {
                 "name": entry.name,
@@ -136,7 +136,7 @@ def issue_artifact_init_cmd(
             f"Unknown artifact {artifact_name!r}. Available: {available}"
         )
 
-    target = paths.issue_dir(resolved, issue_key) / entry.file
+    target = paths.issue_docs_dir(resolved, issue_key) / entry.file
     if target.is_file() and not force:
         raise click.ClickException(
             f"{target} already exists. Use --force to overwrite."
@@ -182,7 +182,7 @@ def issue_artifact_verify_cmd(issue_key: str, project_dir: Path) -> None:
             continue
         if not status_at_or_past(issue.status, entry.required_at_status, resolved):
             continue
-        file_path = paths.issue_dir(resolved, issue_key) / entry.file
+        file_path = paths.issue_docs_dir(resolved, issue_key) / entry.file
         if not file_path.is_file():
             missing.append(entry.file)
 

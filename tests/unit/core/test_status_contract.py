@@ -174,14 +174,14 @@ def _write_minimal_project(project_dir: Path) -> None:
             }
         )
     )
-    (project_dir / "issues").mkdir(parents=True, exist_ok=True)
-    (project_dir / "sessions").mkdir(parents=True, exist_ok=True)
+    (project_dir / "instances" / "issues").mkdir(parents=True, exist_ok=True)
+    (project_dir / "instances" / "sessions").mkdir(parents=True, exist_ok=True)
     (project_dir / "events").mkdir(parents=True, exist_ok=True)
     (project_dir / "graph" / "nodes").mkdir(parents=True, exist_ok=True)
 
 
 def _make_issue(project_dir: Path, key: str, status: str) -> None:
-    issue_dir = project_dir / "issues" / key
+    issue_dir = project_dir / "instances" / "issues" / key
     issue_dir.mkdir(parents=True, exist_ok=True)
     body = yaml.safe_dump(
         {

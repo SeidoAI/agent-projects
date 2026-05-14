@@ -74,7 +74,7 @@ def _project_dir(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
-    sessions_dir = tmp_path / "sessions" / "test-session"
+    sessions_dir = tmp_path / "instances" / "sessions" / "test-session"
     sessions_dir.mkdir(parents=True)
     (sessions_dir / "session.yaml").write_text(
         "---\n"
@@ -152,7 +152,7 @@ def test_transition_pass_path_advances_session(tmp_path: Path, clean_validator) 
     assert result.exit_code == 0, result.output
 
     # Session status flipped.
-    session_yaml = (pd / "sessions" / "test-session" / "session.yaml").read_text()
+    session_yaml = (pd / "instances" / "sessions" / "test-session" / "session.yaml").read_text()
     assert "status: queued" in session_yaml
     # Status-instance id present.
     assert "current_status_instance:" in session_yaml
@@ -343,7 +343,7 @@ def test_transition_rejects_disallowed_target(tmp_path: Path) -> None:
     assert "not reachable" in result.output.lower()
 
     # Session stays at planned.
-    session_yaml = (pd / "sessions" / "test-session" / "session.yaml").read_text()
+    session_yaml = (pd / "instances" / "sessions" / "test-session" / "session.yaml").read_text()
     assert "status: planned" in session_yaml
 
     # transition.rejected emitted with reason.
@@ -370,7 +370,7 @@ def test_transition_increments_status_instance_n(
         transition_cmd, ["test-session", "in_review", "--project-dir", str(pd)]
     )
 
-    session_yaml = (pd / "sessions" / "test-session" / "session.yaml").read_text()
+    session_yaml = (pd / "instances" / "sessions" / "test-session" / "session.yaml").read_text()
     assert "coding-session:test-session:in_review:1" in session_yaml
 
 
@@ -445,8 +445,8 @@ def test_transition_rejected_when_tripwires_fail(tmp_path: Path) -> None:
 
     pd = _project_dir(tmp_path)
     # Plant a bad node so validate produces an error.
-    (pd / "nodes").mkdir(parents=True, exist_ok=True)
-    (pd / "nodes" / "bad-node.yaml").write_text(
+    (pd / "instances" / "nodes").mkdir(parents=True, exist_ok=True)
+    (pd / "instances" / "nodes" / "bad-node.yaml").write_text(
         "---\nbroken: yaml syntax\n  no quotes here: oops:\n",
         encoding="utf-8",
     )
@@ -461,7 +461,7 @@ def test_transition_rejected_when_tripwires_fail(tmp_path: Path) -> None:
         r["details"].get("reason", "").startswith("tripwires_failed") for r in rows
     )
     # Session did NOT advance.
-    session_yaml = (pd / "sessions" / "test-session" / "session.yaml").read_text()
+    session_yaml = (pd / "instances" / "sessions" / "test-session" / "session.yaml").read_text()
     assert "status: planned" in session_yaml
 
 
@@ -592,7 +592,7 @@ def test_missing_consumed_artifacts_resolves_issue_key_from_session(
                 WorkflowArtifactRef(
                     id="developer-doc",
                     label="developer.md",
-                    path="issues/{issue_key}/developer.md",
+                    path="instances/issues/{issue_key}/developer.md",
                 )
             ]
         ),
@@ -613,7 +613,7 @@ def test_missing_consumed_artifacts_resolves_issue_key_from_session(
     missing = _missing_consumed_artifacts(
         tmp_path, session_id="test-session", target=target, session=session
     )
-    assert missing == ["issues/SEI-42/developer.md"]
+    assert missing == ["instances/issues/SEI-42/developer.md"]
 
 
 def test_missing_consumed_artifacts_skips_unresolved_placeholders(
@@ -639,7 +639,7 @@ def test_missing_consumed_artifacts_skips_unresolved_placeholders(
                     id="completion-comment",
                     label="completion comment",
                     path=(
-                        "issues/{issue_key}/comments/{nnn}-completion-{yyyy-mm-dd}.yaml"
+                        "instances/issues/{issue_key}/comments/{nnn}-completion-{yyyy-mm-dd}.yaml"
                     ),
                 )
             ]
@@ -679,7 +679,7 @@ def test_missing_consumed_artifacts_handles_session_without_issues(
                 WorkflowArtifactRef(
                     id="developer-doc",
                     label="developer.md",
-                    path="issues/{issue_key}/developer.md",
+                    path="instances/issues/{issue_key}/developer.md",
                 )
             ]
         ),

@@ -128,7 +128,7 @@ def test_update_without_node_id_is_rejected(tmp_path: Path) -> None:
 def test_no_update_flag_is_read_only(tmp_path: Path) -> None:
     proj, _src = _make_project_with_local_repo(tmp_path)
     _save_node_with_stale_hash(proj)
-    before = (proj / "nodes" / "auth-system.yaml").read_text(encoding="utf-8")
+    before = (proj / "instances" / "nodes" / "auth-system.yaml").read_text(encoding="utf-8")
 
     runner = CliRunner()
     result = runner.invoke(
@@ -138,7 +138,7 @@ def test_no_update_flag_is_read_only(tmp_path: Path) -> None:
     # Read-only check — should not raise.
     assert result.exit_code == 0, result.output
 
-    after = (proj / "nodes" / "auth-system.yaml").read_text(encoding="utf-8")
+    after = (proj / "instances" / "nodes" / "auth-system.yaml").read_text(encoding="utf-8")
     assert before == after
 
 

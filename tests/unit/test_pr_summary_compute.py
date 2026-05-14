@@ -272,7 +272,7 @@ def test_compute_handles_base_with_no_project(tmp_path: Path):
 def test_compute_does_not_disturb_caller_working_tree(repo_two_states):
     repo, base_sha, head_sha = repo_two_states
     head_before = _git(repo, "rev-parse", "HEAD")
-    issues_dir = repo / "issues"
+    issues_dir = repo / "instances" / "issues"
     files_before = sorted(p.name for p in issues_dir.iterdir())
 
     compute_pr_summary(repo, base_sha=base_sha, head_sha=head_sha)

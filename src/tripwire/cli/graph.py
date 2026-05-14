@@ -375,14 +375,16 @@ def _node_kind_for(idx: graph_index.UnifiedIndex, node_id: str) -> str | None:
     for e in idx.edges_from(node_id):
         if e.source_file:
             files.add(e.source_file)
+    from tripwire.core import paths
+
     for f in files:
-        if f.startswith("sessions/"):
+        if f.startswith(f"{paths.SESSIONS_DIR}/"):
             return "session"
         if "/comments/" in f:
             return "comment"
-        if f.startswith("nodes/"):
+        if f.startswith(f"{paths.NODES_DIR}/"):
             return "concept-node"
-        if f.startswith("issues/") and f.endswith("/issue.yaml"):
+        if f.startswith(f"{paths.ISSUES_DIR}/") and f.endswith("/issue.yaml"):
             return "issue"
     return None
 

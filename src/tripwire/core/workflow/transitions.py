@@ -37,10 +37,10 @@ the gate either rejects before the write (no state mutated) or commits
 the write (the four post-write hooks are best-effort and never fail
 the transition).
 
-Concurrency: per-instance lockfile under
-``.tripwire/locks/transition-<sid>.lock`` serialises concurrent
-transitions on the same entity — the execute path is the single
-serialization point for ``session.status`` mutations.
+Concurrency: per-(workflow, instance) lockfile under
+``.tripwire/locks/transition-<workflow>-<instance>.lock`` serialises
+concurrent transitions on the same entity — the execute path is the
+single serialization point for ``session.status`` mutations.
 """
 
 from __future__ import annotations
@@ -50,6 +50,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from tripwire.core import paths
 from tripwire.core.events.log import emit_event, read_events
 from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.session_store import load_session, save_session
@@ -182,7 +183,8 @@ def execute_transition(
         now=when,
     )
 
-    lock_name = f".tripwire/locks/transition-{instance}.lock"
+    lock_path = paths.transition_lock_path(project_dir, workflow_id, instance)
+    lock_name = str(lock_path.relative_to(project_dir))
     try:
         with project_lock(project_dir, name=lock_name):
             # Re-read session state INSIDE the lock — stale snapshots

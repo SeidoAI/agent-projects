@@ -91,9 +91,7 @@ class TestSessionScaffold:
         # `artifacts/` subdir to match `check_artifact_presence`'s subdir-
         # aware path resolution.
         vc_path = (
-            tmp_path_project
-            / "sessions"
-            / "s1"
+            tmp_path_project / "instances" / "sessions" / "s1"
             / "artifacts"
             / "verification-checklist.md"
         )
@@ -105,7 +103,7 @@ class TestSessionScaffold:
         assert "Issues: 2" in body
         # Should NOT have written a flat-layout copy.
         assert not (
-            tmp_path_project / "sessions" / "s1" / "verification-checklist.md"
+            tmp_path_project / "instances" / "sessions" / "s1" / "verification-checklist.md"
         ).is_file()
 
 
@@ -155,9 +153,9 @@ class TestVerificationChecklistTemplateContent:
             ["scaffold", "s1", "--project-dir", str(tmp_path_project)],
         )
 
-        assert not (tmp_path_project / "sessions" / "s1" / "task-checklist.md").exists()
+        assert not (tmp_path_project / "instances" / "sessions" / "s1" / "task-checklist.md").exists()
         assert not (
-            tmp_path_project / "sessions" / "s1" / "artifacts" / "task-checklist.md"
+            tmp_path_project / "instances" / "sessions" / "s1" / "artifacts" / "task-checklist.md"
         ).exists()
 
     def test_scaffold_refuses_existing_without_force(
@@ -166,7 +164,7 @@ class TestVerificationChecklistTemplateContent:
         _seed_manifest_with_verification(tmp_path_project)
         save_test_session(tmp_path_project, "s1", status="planned")
 
-        artifacts_dir = tmp_path_project / "sessions" / "s1" / "artifacts"
+        artifacts_dir = tmp_path_project / "instances" / "sessions" / "s1" / "artifacts"
         artifacts_dir.mkdir(parents=True, exist_ok=True)
         (artifacts_dir / "verification-checklist.md").write_text("CUSTOM\n")
 
@@ -184,7 +182,7 @@ class TestVerificationChecklistTemplateContent:
         _seed_manifest_with_verification(tmp_path_project)
         save_test_session(tmp_path_project, "s1", status="planned")
 
-        artifacts_dir = tmp_path_project / "sessions" / "s1" / "artifacts"
+        artifacts_dir = tmp_path_project / "instances" / "sessions" / "s1" / "artifacts"
         artifacts_dir.mkdir(parents=True, exist_ok=True)
         (artifacts_dir / "verification-checklist.md").write_text("CUSTOM\n")
 
@@ -223,12 +221,12 @@ class TestVerificationChecklistTemplateContent:
             ],
         )
         assert result.exit_code == 0, result.output
-        artifacts_dir = tmp_path_project / "sessions" / "s1" / "artifacts"
+        artifacts_dir = tmp_path_project / "instances" / "sessions" / "s1" / "artifacts"
         assert (artifacts_dir / "verification-checklist.md").is_file()
         # plan.md is ALSO a planning-phase pm-owned required artifact in
         # the test manifest, but --artifact scoped us to one.
         assert not (artifacts_dir / "plan.md").is_file()
-        assert not (tmp_path_project / "sessions" / "s1" / "plan.md").is_file()
+        assert not (tmp_path_project / "instances" / "sessions" / "s1" / "plan.md").is_file()
 
     def test_scaffold_unknown_artifact_errors(
         self, tmp_path_project, save_test_session
@@ -276,7 +274,7 @@ class TestSessionScaffoldHandoff:
         )
 
         assert result.exit_code == 0, result.output
-        handoff_path = tmp_path_project / "sessions" / "auth-rework" / "handoff.yaml"
+        handoff_path = tmp_path_project / "instances" / "sessions" / "auth-rework" / "handoff.yaml"
         assert handoff_path.is_file()
         body = handoff_path.read_text()
         # Branch derived from kind=feat + session-id slug.
@@ -304,7 +302,7 @@ class TestSessionScaffoldHandoff:
             ],
         )
         assert result.exit_code == 0, result.output
-        assert not (tmp_path_project / "sessions" / "s1" / "handoff.yaml").is_file()
+        assert not (tmp_path_project / "instances" / "sessions" / "s1" / "handoff.yaml").is_file()
 
     def test_handoff_skipped_when_already_exists_without_force(
         self, tmp_path_project, save_test_session, save_test_issue
@@ -313,7 +311,7 @@ class TestSessionScaffoldHandoff:
         save_test_issue(tmp_path_project, "T-1", kind="feat")
         save_test_session(tmp_path_project, "s1", status="planned", issues=["T-1"])
 
-        sess_dir = tmp_path_project / "sessions" / "s1"
+        sess_dir = tmp_path_project / "instances" / "sessions" / "s1"
         sess_dir.mkdir(parents=True, exist_ok=True)
         (sess_dir / "handoff.yaml").write_text("CUSTOM HANDOFF\n")
 

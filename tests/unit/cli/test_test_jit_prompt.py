@@ -138,7 +138,9 @@ def test_test_jit_prompt_ack_writes_marker(tmp_path: Path, pm_role: Path) -> Non
         ],
     )
     assert result.exit_code == 0, result.output
-    marker = tmp_path / ".tripwire" / "acks" / "self-review-sess-1.json"
+    marker = (
+        tmp_path / ".tripwire" / "acks" / "coding-session-sess-1-self-review.json"
+    )
     assert marker.is_file()
 
 

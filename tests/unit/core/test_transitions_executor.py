@@ -50,7 +50,7 @@ def project_with_workflow(tmp_path: Path):
         ),
         encoding="utf-8",
     )
-    sessions_dir = tmp_path / "sessions" / "test-session"
+    sessions_dir = tmp_path / "instances" / "sessions" / "test-session"
     sessions_dir.mkdir(parents=True)
     (sessions_dir / "session.yaml").write_text(
         "---\n"

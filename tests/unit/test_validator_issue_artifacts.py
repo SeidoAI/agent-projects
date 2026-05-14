@@ -26,7 +26,8 @@ def test_issue_at_verified_missing_verified_errors(
 ):
     save_test_issue(tmp_path_project, "TMP-1", status="verified")
     # Write developer.md so only verified.md is missing.
-    (tmp_path_project / "issues" / "TMP-1" / "developer.md").write_text(
+    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").write_text(
         "# notes\n", encoding="utf-8"
     )
 
@@ -50,7 +51,8 @@ def test_issue_at_in_review_with_developer_present_passes(
     tmp_path_project: Path, save_test_issue
 ):
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
-    (tmp_path_project / "issues" / "TMP-1" / "developer.md").write_text(
+    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").write_text(
         "# notes\n", encoding="utf-8"
     )
     report = validate_project(tmp_path_project)

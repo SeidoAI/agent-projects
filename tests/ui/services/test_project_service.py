@@ -40,11 +40,11 @@ def _make_project(
         "next_issue_number: 1\nnext_session_number: 1\n",
         encoding="utf-8",
     )
-    for sub in ("issues", "nodes", "sessions"):
-        (root / sub).mkdir(exist_ok=True)
+    for sub in ("instances/issues", "instances/nodes", "instances/sessions"):
+        (root / sub).mkdir(parents=True, exist_ok=True)
 
     for i in range(issues):
-        issue_dir = root / "issues" / f"TST-{i + 1}"
+        issue_dir = root / "instances" / "issues" / f"TST-{i + 1}"
         issue_dir.mkdir()
         (issue_dir / "issue.yaml").write_text(
             f"---\nid: TST-{i + 1}\ntitle: Issue {i + 1}\nstatus: queued\n"
@@ -54,13 +54,13 @@ def _make_project(
         )
 
     for i in range(nodes):
-        (root / "nodes" / f"node-{i}.yaml").write_text(
+        (root / "instances" / "nodes" / f"node-{i}.yaml").write_text(
             f"id: node-{i}\ntype: model\nname: Node {i}\nstatus: active\n",
             encoding="utf-8",
         )
 
     for i in range(sessions):
-        (root / "sessions" / f"s{i}").mkdir()
+        (root / "instances" / "sessions" / f"s{i}").mkdir(parents=True, exist_ok=True)
 
     return root
 

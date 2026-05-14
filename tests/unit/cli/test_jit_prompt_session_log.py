@@ -110,7 +110,12 @@ def test_session_log_ack_status_shown(tmp_path: Path) -> None:
         },
     )
     # Write the ack marker for fixture-1.
-    marker = tmp_path / ".tripwire" / "acks" / "self-review-fixture-1.json"
+    marker = (
+        tmp_path
+        / ".tripwire"
+        / "acks"
+        / "coding-session-fixture-1-self-review.json"
+    )
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text(json.dumps({"fix_commits": ["abc123"]}), encoding="utf-8")
     runner = CliRunner()

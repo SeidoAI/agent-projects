@@ -36,7 +36,7 @@ def project_dir(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
-    (tmp_path / "issues").mkdir()
+    (tmp_path / "instances" / "issues").mkdir(parents=True)
     return tmp_path
 
 
@@ -119,7 +119,7 @@ class TestIssueStore:
             verifier="none",
         )
         save_issue(tmp_path, issue)
-        assert (tmp_path / "issues" / "TST-1" / "issue.yaml").exists()
+        assert (tmp_path / "instances" / "issues" / "TST-1" / "issue.yaml").exists()
 
     def test_load_missing_issue_raises(self, project_dir: Path) -> None:
         with pytest.raises(FileNotFoundError):
@@ -186,7 +186,7 @@ class TestIssueStore:
         original_uuid = original.uuid
         save_issue(project_dir, original)
         # Read the raw YAML to confirm uuid is the first frontmatter field.
-        raw = (project_dir / "issues" / "TST-1" / "issue.yaml").read_text()
+        raw = (project_dir / "instances" / "issues" / "TST-1" / "issue.yaml").read_text()
         assert raw.startswith("---\nuuid:")
         loaded = load_issue(project_dir, "TST-1")
         assert loaded.uuid == original_uuid
@@ -251,7 +251,7 @@ class TestCacheInvalidationOnSave:
 
         cache = load_index(project_dir)
         assert cache is not None, "save_issue should have created the cache"
-        assert "issues/TST-42/issue.yaml" in cache.files
+        assert "instances/issues/TST-42/issue.yaml" in cache.files
 
     def test_save_issue_with_update_cache_false_does_not_touch_cache(
         self, project_dir: Path
@@ -272,7 +272,7 @@ class TestCacheInvalidationOnSave:
         cache = load_index(project_dir)
         # Either no cache file at all, or the cache doesn't include TST-99.
         if cache is not None:
-            assert "issues/TST-99/issue.yaml" not in cache.files
+            assert "instances/issues/TST-99/issue.yaml" not in cache.files
 
 
 # ============================================================================
@@ -289,7 +289,7 @@ class TestOutdatedIssueStatus:
     def _write_outdated(self, project_dir: Path, key: str, status: str) -> Path:
         from tripwire.core.parser import serialize_frontmatter_body
 
-        idir = project_dir / "issues" / key
+        idir = project_dir / "instances" / "issues" / key
         idir.mkdir(parents=True, exist_ok=True)
         fm = {
             "uuid": "11111111-2222-4333-8444-555555555555",

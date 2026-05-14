@@ -21,7 +21,7 @@ def _make_project(root: Path) -> Path:
         "next_issue_number: 1\nnext_session_number: 1\n",
         encoding="utf-8",
     )
-    (root / "nodes").mkdir()
+    (root / "instances" / "nodes").mkdir(parents=True, exist_ok=True)
     return root
 
 

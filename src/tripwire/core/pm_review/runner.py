@@ -74,7 +74,9 @@ def run_pm_review(
     Raises :class:`FileNotFoundError` when the session directory is
     missing — the PM is reviewing a session that doesn't exist.
     """
-    session_dir = project_dir / "sessions" / session_id
+    from tripwire.core import paths
+
+    session_dir = paths.session_dir(project_dir, session_id)
     if not session_dir.is_dir():
         raise FileNotFoundError(f"session {session_id!r} not found at {session_dir}")
     artifacts_dir = session_dir / "artifacts"

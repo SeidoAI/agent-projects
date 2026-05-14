@@ -147,7 +147,7 @@ def test_execute_inject_follow_up_appends_to_plan_md(project: Path):
             message="## PM follow-up\n\nMissing PT PR.",
         )
     )
-    text = (project / "sessions" / "s1" / "artifacts" / "plan.md").read_text()
+    text = (project / "instances" / "sessions" / "s1" / "artifacts" / "plan.md").read_text()
     assert "Missing PT PR." in text
     # Idempotent on second run.
     executor.execute(
@@ -157,7 +157,7 @@ def test_execute_inject_follow_up_appends_to_plan_md(project: Path):
             message="## PM follow-up\n\nMissing PT PR.",
         )
     )
-    text2 = (project / "sessions" / "s1" / "artifacts" / "plan.md").read_text()
+    text2 = (project / "instances" / "sessions" / "s1" / "artifacts" / "plan.md").read_text()
     assert text2.count("Missing PT PR.") == 1
 
 

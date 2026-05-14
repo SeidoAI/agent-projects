@@ -189,21 +189,25 @@ def check_issue_artifact_presence(ctx: ValidationContext) -> list[CheckResult]:
                 issue.status, entry.required_at_status, ctx.project_dir
             ):
                 continue
-            artifact_path = ctx.project_dir / "issues" / issue.id / entry.file
+            artifact_path = paths.issue_docs_dir(ctx.project_dir, issue.id) / entry.file
+            rel_path = (
+                f"{paths.ISSUES_DIR}/{issue.id}/"
+                f"{paths.ISSUE_DOCS_SUBDIR}/{entry.file}"
+            )
             if artifact_path.is_file():
                 continue
             results.append(
                 CheckResult(
                     code="issue_artifact/missing",
                     severity="error",
-                    file=f"issues/{issue.id}/{entry.file}",
+                    file=rel_path,
                     message=(
                         f"Issue {issue.id!r} ({issue.status}) has reached "
                         f"{entry.required_at_status!r} but is missing "
                         f"required artifact {entry.file!r}."
                     ),
                     fix_hint=(
-                        f"Write issues/{issue.id}/{entry.file} from {entry.template}."
+                        f"Write {rel_path} from {entry.template}."
                     ),
                 )
             )

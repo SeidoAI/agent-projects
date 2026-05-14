@@ -36,7 +36,7 @@ from tripwire.core.validator import (
 def _seed_session_artifacts(
     project_dir: Path, sid: str, *, self_review: str, pm_response: str
 ) -> None:
-    sdir = project_dir / "sessions" / sid
+    sdir = project_dir / "instances" / "sessions" / sid
     sdir.mkdir(parents=True, exist_ok=True)
     (sdir / "self-review.md").write_text(self_review, encoding="utf-8")
     (sdir / "pm-response.yaml").write_text(pm_response, encoding="utf-8")
@@ -163,7 +163,7 @@ class TestPmResponseCoversSelfReview:
         `check_artifact_presence`). The coverage check returns no
         findings when there's nothing to cover against."""
         save_test_session(tmp_path_project, "s1", status="completed")
-        sdir = tmp_path_project / "sessions" / "s1"
+        sdir = tmp_path_project / "instances" / "sessions" / "s1"
         sdir.mkdir(parents=True, exist_ok=True)
         (sdir / "self-review.md").write_text(
             "## Lens 1: AC\n- alpha\n- beta\n", encoding="utf-8"
@@ -209,7 +209,7 @@ class TestPmResponseFollowupsResolve:
     ) -> None:
         save_test_issue(tmp_path_project, "TMP-1")
         save_test_session(tmp_path_project, "s1", status="completed")
-        sdir = tmp_path_project / "sessions" / "s1"
+        sdir = tmp_path_project / "instances" / "sessions" / "s1"
         sdir.mkdir(parents=True, exist_ok=True)
         (sdir / "pm-response.yaml").write_text(
             "items:\n"
@@ -227,7 +227,7 @@ class TestPmResponseFollowupsResolve:
         """AC fixture: ``follow_up: KUI-9999`` (no such issue) → fails
         with code ``pm_response/missing_followup``."""
         save_test_session(tmp_path_project, "s1", status="completed")
-        sdir = tmp_path_project / "sessions" / "s1"
+        sdir = tmp_path_project / "instances" / "sessions" / "s1"
         sdir.mkdir(parents=True, exist_ok=True)
         (sdir / "pm-response.yaml").write_text(
             "items:\n"
@@ -257,7 +257,7 @@ class TestPmResponseFollowupsResolve:
         self, tmp_path_project, save_test_session
     ) -> None:
         save_test_session(tmp_path_project, "s1", status="completed")
-        sdir = tmp_path_project / "sessions" / "s1"
+        sdir = tmp_path_project / "instances" / "sessions" / "s1"
         sdir.mkdir(parents=True, exist_ok=True)
         (sdir / "pm-response.yaml").write_text(
             "items:\n"
@@ -296,7 +296,7 @@ class TestProducedAtGate:
         self, tmp_path_project, save_test_session, status: str
     ) -> None:
         save_test_session(tmp_path_project, "s1", status=status)
-        sdir = tmp_path_project / "sessions" / "s1"
+        sdir = tmp_path_project / "instances" / "sessions" / "s1"
         sdir.mkdir(parents=True, exist_ok=True)
         # Self-review present but no pm-response — the original trap.
         (sdir / "self-review.md").write_text(
@@ -322,7 +322,7 @@ class TestProducedAtGate:
         self, tmp_path_project, save_test_session, status: str
     ) -> None:
         save_test_session(tmp_path_project, "s1", status=status)
-        sdir = tmp_path_project / "sessions" / "s1"
+        sdir = tmp_path_project / "instances" / "sessions" / "s1"
         sdir.mkdir(parents=True, exist_ok=True)
         (sdir / "pm-response.yaml").write_text(
             "items:\n"

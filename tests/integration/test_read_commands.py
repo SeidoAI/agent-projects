@@ -67,7 +67,7 @@ def write_issue_file(
     body: str | None = None,
     **frontmatter: Any,
 ) -> None:
-    idir = project_dir / "issues" / key
+    idir = project_dir / "instances" / "issues" / key
     idir.mkdir(parents=True, exist_ok=True)
 
     fm: dict[str, Any] = {
@@ -110,7 +110,7 @@ def write_node_file(
     related: list[str] | None = None,
     body: str = "Description.\n",
 ) -> None:
-    nodes_dir = project_dir / "nodes"
+    nodes_dir = project_dir / "instances" / "nodes"
     nodes_dir.mkdir(parents=True, exist_ok=True)
     fm = {
         "uuid": str(uuid.uuid4()),
@@ -803,7 +803,7 @@ class TestArtifacts:
             )
         )
 
-        session_dir = target / "sessions" / "api-endpoints" / "artifacts"
+        session_dir = target / "instances" / "sessions" / "api-endpoints" / "artifacts"
         session_dir.mkdir(parents=True)
         (session_dir / "plan.md").write_text("# Plan\n\nSteps...\n")
         # post-completion-comments.md intentionally missing → required-missing
@@ -840,7 +840,7 @@ class TestArtifacts:
         target = tmp_path / "p"
         init_project(runner, target)
 
-        session_dir = target / "sessions" / "api-endpoints" / "artifacts"
+        session_dir = target / "instances" / "sessions" / "api-endpoints" / "artifacts"
         session_dir.mkdir(parents=True)
         (session_dir / "plan.md").write_text("content")
 
@@ -865,7 +865,7 @@ class TestArtifacts:
         target = tmp_path / "p"
         init_project(runner, target)
 
-        session_dir = target / "sessions" / "api-endpoints" / "artifacts"
+        session_dir = target / "instances" / "sessions" / "api-endpoints" / "artifacts"
         session_dir.mkdir(parents=True)
         (session_dir / "plan.md").write_text("# Plan content\n")
 
@@ -906,7 +906,7 @@ class TestArtifacts:
             )
         )
 
-        session_dir = target / "sessions" / "api-endpoints" / "artifacts"
+        session_dir = target / "instances" / "sessions" / "api-endpoints" / "artifacts"
         session_dir.mkdir(parents=True)
         (session_dir / "plan.md").write_text("VIA MANIFEST NAME\n")
 

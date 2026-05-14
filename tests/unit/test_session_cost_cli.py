@@ -21,7 +21,7 @@ def _assistant_event(model: str, usage: dict) -> dict:
 
 def test_session_cost_table_output(save_test_session, tmp_path_project: Path) -> None:
     """``session cost <sid>`` prints a per-category breakdown by default."""
-    log = tmp_path_project / "sessions" / "demo" / "session.log"
+    log = tmp_path_project / "instances" / "sessions" / "demo" / "session.log"
     _write_log(
         log,
         [
@@ -50,7 +50,7 @@ def test_session_cost_table_output(save_test_session, tmp_path_project: Path) ->
 
 def test_session_cost_json_output(save_test_session, tmp_path_project: Path) -> None:
     """``--format json`` returns the breakdown as a parseable object."""
-    log = tmp_path_project / "sessions" / "demo" / "session.log"
+    log = tmp_path_project / "instances" / "sessions" / "demo" / "session.log"
     _write_log(
         log,
         [

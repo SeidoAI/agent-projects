@@ -35,8 +35,8 @@ def ui_project(tmp_path: Path) -> tuple[Path, str]:
     (project / "project.yaml").write_text(
         "name: t\nkey_prefix: T\nnext_issue_number: 1\nnext_session_number: 1\n"
     )
-    (project / "issues" / "T-1").mkdir(parents=True)
-    (project / "nodes").mkdir()
+    (project / "instances" / "issues" / "T-1").mkdir(parents=True)
+    (project / "instances" / "nodes").mkdir(parents=True, exist_ok=True)
     reload_project_index()
     seed_project_index([project])
     pid = _project_id(project.resolve())
@@ -118,7 +118,7 @@ class TestEventDelivery:
         with client.websocket_connect(f"/api/ws?project={pid}") as ws:
             # Let the observer settle before touching the filesystem.
             time.sleep(0.15)
-            (project / "issues" / "T-1" / "issue.yaml").write_text("title: t")
+            (project / "instances" / "issues" / "T-1" / "issue.yaml").write_text("title: t")
 
             event = _poll_event(
                 ws,
@@ -141,7 +141,7 @@ class TestEventDelivery:
             client.websocket_connect(f"/api/ws?project={pid}") as ws_b,
         ):
             time.sleep(0.15)
-            (project / "nodes" / "shared.yaml").write_text("x: 1")
+            (project / "instances" / "nodes" / "shared.yaml").write_text("x: 1")
 
             match = {"entity_type": "node", "entity_id": "shared"}
             a = _poll_event(ws_a, "file_changed", timeout=3.0, match=match)
@@ -158,7 +158,7 @@ class TestEventDelivery:
             # The server just swallows pong messages. Trigger a real event
             # to prove the connection is still live after the pong.
             time.sleep(0.15)
-            (project / "issues" / "T-1" / "issue.yaml").write_text("title: t")
+            (project / "instances" / "issues" / "T-1" / "issue.yaml").write_text("title: t")
             event = _poll_event(
                 ws,
                 "file_changed",

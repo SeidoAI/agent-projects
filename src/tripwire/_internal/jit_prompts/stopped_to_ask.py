@@ -118,9 +118,9 @@ class StoppedToAskJitPrompt(JitPrompt):
         return _marker_substantive(marker)
 
     def should_fire(self, ctx: JitPromptContext) -> bool:
-        plan_path = (
-            ctx.project_dir / "sessions" / ctx.session_id / "artifacts" / "plan.md"
-        )
+        from tripwire.core import paths
+
+        plan_path = paths.session_plan_path(ctx.project_dir, ctx.session_id)
         if not plan_path.is_file():
             return False
         try:
@@ -149,7 +149,9 @@ def _stop_ask_signalled(project_dir: Path, session_id: str) -> bool:
     contains one of the well-known phrases. Unreadable / malformed
     files are ignored.
     """
-    comments_dir = project_dir / "sessions" / session_id / "comments"
+    from tripwire.core import paths
+
+    comments_dir = paths.session_dir(project_dir, session_id) / "comments"
     if not comments_dir.is_dir():
         return False
     for path in comments_dir.glob("*.yaml"):
@@ -202,7 +204,9 @@ def _file_in_key_set(path: str, key_files: list[str]) -> bool:
 
 
 def _session_key_files(project_dir: Path, session_id: str) -> list[str]:
-    syaml = project_dir / "sessions" / session_id / "session.yaml"
+    from tripwire.core import paths
+
+    syaml = paths.session_yaml_path(project_dir, session_id)
     if not syaml.is_file():
         return []
     try:

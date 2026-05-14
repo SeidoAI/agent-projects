@@ -36,7 +36,7 @@ def write_project_yaml(project_dir: Path) -> None:
 
 
 def write_issue(project_dir: Path, key: str, **overrides: object) -> None:
-    idir = project_dir / "issues" / key
+    idir = project_dir / "instances" / "issues" / key
     idir.mkdir(parents=True, exist_ok=True)
     fm = {
         "uuid": str(uuid.uuid4()),
@@ -59,8 +59,8 @@ def write_issue(project_dir: Path, key: str, **overrides: object) -> None:
 @pytest.fixture
 def project(tmp_path: Path) -> Path:
     write_project_yaml(tmp_path)
-    (tmp_path / "issues").mkdir()
-    (tmp_path / "nodes").mkdir(parents=True)
+    (tmp_path / "instances" / "issues").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "instances" / "nodes").mkdir(parents=True)
     return tmp_path
 
 

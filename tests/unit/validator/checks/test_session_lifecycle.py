@@ -62,7 +62,7 @@ def _seed_session_with_worktree(
 
 
 def _write_review_json(project_dir: Path, sid: str, *, exit_code: int) -> None:
-    sdir = project_dir / "sessions" / sid
+    sdir = project_dir / "instances" / "sessions" / sid
     sdir.mkdir(parents=True, exist_ok=True)
     (sdir / "review.json").write_text(
         json.dumps({"exit_code": exit_code, "verdict": "approved"}),
@@ -182,7 +182,8 @@ class TestSessionHasDeveloperMd:
         save_test_session(
             tmp_path_project, "s1", status="in_review", issues=["TMP-1"]
         )
-        (tmp_path_project / "issues" / "TMP-1" / "developer.md").write_text(
+        (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").write_text(
             "## Developer notes\n\nReady for review.\n", encoding="utf-8"
         )
         ctx = load_context(tmp_path_project)
@@ -222,9 +223,14 @@ class TestSessionHasVerifiedMd:
         save_test_session(
             tmp_path_project, "s1", status="verified", issues=["TMP-1"]
         )
-        issue_dir = tmp_path_project / "issues" / "TMP-1"
-        (issue_dir / "developer.md").write_text("dev notes\n", encoding="utf-8")
-        (issue_dir / "verified.md").write_text("verified notes\n", encoding="utf-8")
+        issue_docs_dir = (
+            tmp_path_project / "instances" / "issues" / "TMP-1" / "docs"
+        )
+        issue_docs_dir.mkdir(parents=True, exist_ok=True)
+        (issue_docs_dir / "developer.md").write_text("dev notes\n", encoding="utf-8")
+        (issue_docs_dir / "verified.md").write_text(
+            "verified notes\n", encoding="utf-8"
+        )
         ctx = load_context(tmp_path_project)
         assert check_session_has_verified_md(ctx) == []
 
@@ -240,7 +246,8 @@ class TestSessionHasVerifiedMd:
         )
         # developer.md present (so the developer-md check doesn't noise),
         # but verified.md intentionally missing.
-        (tmp_path_project / "issues" / "TMP-1" / "developer.md").write_text(
+        (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").write_text(
             "dev notes\n", encoding="utf-8"
         )
         ctx = load_context(tmp_path_project)

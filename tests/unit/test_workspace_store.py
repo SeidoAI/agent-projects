@@ -36,7 +36,7 @@ def test_exists_false_for_empty_dir(tmp_path):
 
 
 def test_save_then_load_roundtrip(tmp_path):
-    (tmp_path / "nodes").mkdir()
+    (tmp_path / "instances" / "nodes").mkdir(parents=True, exist_ok=True)
     ws = _fresh_ws()
     save_workspace(tmp_path, ws)
     loaded = load_workspace(tmp_path)
@@ -44,7 +44,7 @@ def test_save_then_load_roundtrip(tmp_path):
 
 
 def test_add_project(tmp_path):
-    (tmp_path / "nodes").mkdir()
+    (tmp_path / "instances" / "nodes").mkdir(parents=True, exist_ok=True)
     save_workspace(tmp_path, _fresh_ws())
     add_project(
         tmp_path,
@@ -56,7 +56,7 @@ def test_add_project(tmp_path):
 
 
 def test_add_duplicate_slug_rejected(tmp_path):
-    (tmp_path / "nodes").mkdir()
+    (tmp_path / "instances" / "nodes").mkdir(parents=True, exist_ok=True)
     save_workspace(tmp_path, _fresh_ws())
     add_project(
         tmp_path,
@@ -70,7 +70,7 @@ def test_add_duplicate_slug_rejected(tmp_path):
 
 
 def test_remove_project(tmp_path):
-    (tmp_path / "nodes").mkdir()
+    (tmp_path / "instances" / "nodes").mkdir(parents=True, exist_ok=True)
     save_workspace(tmp_path, _fresh_ws())
     add_project(
         tmp_path,
@@ -82,7 +82,7 @@ def test_remove_project(tmp_path):
 
 
 def test_update_pull_state(tmp_path):
-    (tmp_path / "nodes").mkdir()
+    (tmp_path / "instances" / "nodes").mkdir(parents=True, exist_ok=True)
     save_workspace(tmp_path, _fresh_ws())
     add_project(
         tmp_path,
@@ -99,7 +99,7 @@ def test_update_pull_state(tmp_path):
 
 
 def test_update_push_state(tmp_path):
-    (tmp_path / "nodes").mkdir()
+    (tmp_path / "instances" / "nodes").mkdir(parents=True, exist_ok=True)
     save_workspace(tmp_path, _fresh_ws())
     add_project(
         tmp_path,

@@ -42,7 +42,7 @@ def _seed_project(
         yaml.safe_dump(project_yaml, sort_keys=False), encoding="utf-8"
     )
 
-    issues_root = project_dir / "issues"
+    issues_root = project_dir / "instances" / "issues"
     issues_root.mkdir(parents=True, exist_ok=True)
     for issue_id, status, labels in issues:
         idir = issues_root / issue_id

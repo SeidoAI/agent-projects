@@ -34,7 +34,7 @@ def test_self_review_without_pm_response_errors(
     """self-review.md on main but pm-response.yaml missing → 1 error
     with code ``self_review_implies_pm_response/missing_pm_response``."""
     save_test_session(tmp_path_project, "s1", status="in_review")
-    _stub_main(monkeypatch, {"sessions/s1/self-review.md"})
+    _stub_main(monkeypatch, {"instances/sessions/s1/self-review.md"})
 
     ctx = load_context(tmp_path_project)
     results = self_review_implies_pm_response.check(ctx)
@@ -42,7 +42,7 @@ def test_self_review_without_pm_response_errors(
     assert len(results) == 1
     assert results[0].code == "self_review_implies_pm_response/missing_pm_response"
     assert results[0].severity == "error"
-    assert "sessions/s1/pm-response.yaml" in results[0].message
+    assert "instances/sessions/s1/pm-response.yaml" in results[0].message
     assert "s1" in results[0].message
 
 
@@ -52,7 +52,7 @@ def test_self_review_with_pm_response_passes(
     save_test_session(tmp_path_project, "s1", status="in_review")
     _stub_main(
         monkeypatch,
-        {"sessions/s1/self-review.md", "sessions/s1/pm-response.yaml"},
+        {"instances/sessions/s1/self-review.md", "instances/sessions/s1/pm-response.yaml"},
     )
 
     ctx = load_context(tmp_path_project)
@@ -74,7 +74,7 @@ def test_only_iterates_known_sessions(tmp_path_project: Path, monkeypatch):
     in the project is ignored — the rule cares about live sessions."""
     _stub_main(
         monkeypatch,
-        {"sessions/ghost/self-review.md"},  # no matching session.yaml
+        {"instances/sessions/ghost/self-review.md"},  # no matching session.yaml
     )
 
     ctx = load_context(tmp_path_project)

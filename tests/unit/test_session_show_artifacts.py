@@ -16,7 +16,7 @@ from tripwire.cli.session import session_cmd
 
 
 def _write_files(project_dir: Path, sid: str) -> None:
-    sdir = project_dir / "sessions" / sid
+    sdir = project_dir / "instances" / "sessions" / sid
     sdir.mkdir(parents=True, exist_ok=True)
     (sdir / "self-review.md").write_text(
         "## Lens 1: AC\n- something\n", encoding="utf-8"

@@ -27,7 +27,7 @@ from tripwire.models import ConceptNode, NodeLayout
 
 @pytest.fixture
 def project_dir(tmp_path: Path) -> Path:
-    (tmp_path / "nodes").mkdir(parents=True)
+    (tmp_path / "instances" / "nodes").mkdir(parents=True)
     return tmp_path
 
 

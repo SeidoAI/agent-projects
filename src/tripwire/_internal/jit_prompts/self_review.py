@@ -97,7 +97,8 @@ fix-commit SHAs or `declared_no_findings: true`.
 class SelfReviewJitPrompt(JitPrompt):
     """Self-review JIT prompt — fires on ``session.complete``.
 
-    The marker file (``.tripwire/acks/self-review-<sid>.json``) must
+    The marker file
+    (``.tripwire/acks/coding-session-<sid>-self-review.json``) must
     contain ``fix_commits: [...]`` (≥1 SHA) OR
     ``declared_no_findings: true``. An empty marker is rejected — the
     spec calls this the "substantiveness check" (§8 + AC bullet 3).

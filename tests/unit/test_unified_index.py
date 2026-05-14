@@ -73,15 +73,15 @@ class TestGraphEdgeNewFields:
             from_id="a",
             to_id="b",
             type="refs",
-            via_artifact="issues/KUI-1/issue.yaml",
+            via_artifact="instances/issues/KUI-1/issue.yaml",
             line=42,
         )
-        assert e.via_artifact == "issues/KUI-1/issue.yaml"
+        assert e.via_artifact == "instances/issues/KUI-1/issue.yaml"
         assert e.line == 42
         # round-trip via dict (alias mode is what graph cache writes)
         dumped = e.model_dump(mode="json", by_alias=True, exclude_none=True)
         revived = GraphEdge.model_validate(dumped)
-        assert revived.via_artifact == "issues/KUI-1/issue.yaml"
+        assert revived.via_artifact == "instances/issues/KUI-1/issue.yaml"
         assert revived.line == 42
 
 

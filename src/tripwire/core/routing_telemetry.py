@@ -36,7 +36,9 @@ _TELEMETRY_FILENAME = ".routing_telemetry.jsonl"
 
 def telemetry_path(project_dir: Path) -> Path:
     """Return the on-disk telemetry log path for ``project_dir``."""
-    return project_dir / "sessions" / _TELEMETRY_FILENAME
+    from tripwire.core import paths
+
+    return paths.sessions_dir(project_dir) / _TELEMETRY_FILENAME
 
 
 # ---------- Row schema ---------------------------------------------------

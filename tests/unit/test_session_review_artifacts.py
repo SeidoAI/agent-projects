@@ -122,7 +122,7 @@ class TestBuildReport:
     ) -> None:
         from tripwire.core.session_review_artifacts import build_report
 
-        sdir = tmp_path / "sessions" / "s1"
+        sdir = tmp_path / "instances" / "sessions" / "s1"
         _write_self_review(
             sdir,
             "## Lens 1: AC\n- mypy disables 9 categories\n- README rendered\n",
@@ -149,7 +149,7 @@ class TestBuildReport:
     def test_unaddressed_self_review_item_flagged(self, tmp_path: Path) -> None:
         from tripwire.core.session_review_artifacts import build_report
 
-        sdir = tmp_path / "sessions" / "s1"
+        sdir = tmp_path / "instances" / "sessions" / "s1"
         _write_self_review(
             sdir,
             "## Lens 1: AC\n- alpha thing\n- beta thing\n- gamma thing\n",
@@ -171,7 +171,7 @@ class TestBuildReport:
         from tripwire.core.session_review_artifacts import build_report
 
         # No files at all in sessions/s1/
-        sdir = tmp_path / "sessions" / "s1"
+        sdir = tmp_path / "instances" / "sessions" / "s1"
         sdir.mkdir(parents=True)
 
         report = build_report(tmp_path, "s1")
@@ -182,7 +182,7 @@ class TestBuildReport:
     def test_missing_pm_response_with_self_review_present(self, tmp_path: Path) -> None:
         from tripwire.core.session_review_artifacts import build_report
 
-        sdir = tmp_path / "sessions" / "s1"
+        sdir = tmp_path / "instances" / "sessions" / "s1"
         _write_self_review(sdir, "## Lens 1: AC\n- alpha thing\n")
         report = build_report(tmp_path, "s1")
         assert report.self_review_present

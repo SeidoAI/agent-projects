@@ -41,7 +41,7 @@ def _seed(tmp_path: Path) -> None:
         )
         save_issue(tmp_path, issue, update_cache=False)
     # Session that works on TST-1
-    sdir = tmp_path / "sessions" / "session-foo"
+    sdir = tmp_path / "instances" / "sessions" / "session-foo"
     sdir.mkdir(parents=True)
     front = yaml.safe_dump(
         {"id": "session-foo", "name": "foo", "agent": "dev", "issues": ["TST-1"]},

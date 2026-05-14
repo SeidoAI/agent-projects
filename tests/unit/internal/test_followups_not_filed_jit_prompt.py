@@ -34,7 +34,7 @@ def _seed_project(project_dir: Path) -> None:
 
 
 def _seed_session(project_dir: Path, session_id: str) -> None:
-    sdir = project_dir / "sessions" / session_id
+    sdir = project_dir / "instances" / "sessions" / session_id
     sdir.mkdir(parents=True, exist_ok=True)
     body = {
         "id": session_id,
@@ -50,7 +50,7 @@ def _seed_session(project_dir: Path, session_id: str) -> None:
 
 
 def _seed_issue(project_dir: Path, issue_id: str) -> None:
-    idir = project_dir / "issues" / issue_id
+    idir = project_dir / "instances" / "issues" / issue_id
     idir.mkdir(parents=True, exist_ok=True)
     body = {
         "id": issue_id,
@@ -72,7 +72,7 @@ def _seed_pm_response(
     session_id: str,
     items: list[dict],
 ) -> None:
-    sdir = project_dir / "sessions" / session_id / "artifacts"
+    sdir = project_dir / "instances" / "sessions" / session_id / "artifacts"
     sdir.mkdir(parents=True, exist_ok=True)
     payload = {
         "read_at": "2026-05-01T00:00:00",

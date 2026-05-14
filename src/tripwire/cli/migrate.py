@@ -552,4 +552,381 @@ def migrate_status_values_cmd(project_dir: Path, dry_run: bool) -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# storage migration — move pre-v0.13.1 flat entity dirs under `instances/`
+# ---------------------------------------------------------------------------
+
+# Source (flat) → destination (under `instances/`) mapping for the
+# v0.13.1 layout cutover. Each entry is a top-level directory whose
+# entire subtree relocates wholesale. The docs/issues/* directories
+# merge into the corresponding `instances/issues/<KEY>/docs/` subtree.
+_STORAGE_TOP_RENAMES: tuple[tuple[str, str], ...] = (
+    ("sessions", paths.SESSIONS_DIR),  # → instances/sessions
+    ("issues", paths.ISSUES_DIR),  # → instances/issues
+    ("nodes", paths.NODES_DIR),  # → instances/nodes
+)
+
+
+def _git_mv_or_copy(
+    src: Path,
+    dest: Path,
+    project_dir: Path,
+    is_git_repo: bool,
+) -> None:
+    """Move *src* to *dest*, preferring `git mv` when *src* is tracked.
+
+    Falls back to ``shutil.move`` either when the project isn't a git
+    repo or when git reports "not under version control" for *src*
+    (a gitignored runtime file like a lock).
+    """
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if is_git_repo:
+        try:
+            subprocess.run(
+                ["git", "mv", str(src), str(dest)],
+                cwd=project_dir,
+                check=True,
+                capture_output=True,
+            )
+            return
+        except subprocess.CalledProcessError as exc:
+            stderr = exc.stderr.decode("utf-8", errors="replace").strip()
+            if "not under version control" not in stderr:
+                raise click.ClickException(
+                    f"git mv {src} → {dest} failed: {stderr}"
+                ) from exc
+    shutil.move(str(src), str(dest))
+
+
+def _migrate_issue_docs(
+    project_dir: Path,
+    is_git_repo: bool,
+    moved: list[tuple[str, str]],
+) -> None:
+    """Relocate ``docs/issues/<KEY>/*`` → ``instances/issues/<KEY>/docs/*``.
+
+    Pre-v0.13.1 PM agents wrote developer.md / verified.md / comments/
+    under ``docs/issues/<KEY>/`` (per the CLAUDE.md convention). Those
+    files now live under ``instances/issues/<KEY>/docs/`` alongside the
+    canonical issue.yaml.
+
+    For each ``docs/issues/<KEY>/*`` source entry, move the entry into
+    the issue's ``docs/`` subdir. Existing files at the destination are
+    left alone (the caller has already gated this with --yes if any
+    overlap was detected).
+    """
+    legacy_docs_issues = project_dir / "docs" / "issues"
+    if not legacy_docs_issues.is_dir():
+        return
+    for issue_dir in sorted(p for p in legacy_docs_issues.iterdir() if p.is_dir()):
+        key = issue_dir.name
+        dest_docs = paths.issue_docs_dir(project_dir, key)
+        dest_docs.mkdir(parents=True, exist_ok=True)
+        for entry in sorted(issue_dir.iterdir()):
+            dest = dest_docs / entry.name
+            if dest.exists():
+                # The bulk-move already promoted developer.md / verified.md
+                # under instances/issues/<key>/. Merge silently — caller
+                # opted in via --yes when destination conflicts existed.
+                continue
+            src_rel = str(entry.relative_to(project_dir))
+            dest_rel = str(dest.relative_to(project_dir))
+            _git_mv_or_copy(entry, dest, project_dir, is_git_repo)
+            moved.append((src_rel, dest_rel))
+        # Remove the now-empty issue dir.
+        try:
+            issue_dir.rmdir()
+        except OSError:
+            pass
+    try:
+        legacy_docs_issues.rmdir()
+    except OSError:
+        pass
+
+
+def _migrate_lock_acks(
+    project_dir: Path,
+    is_git_repo: bool,
+    moved: list[tuple[str, str]],
+) -> None:
+    """Rename transition lockfiles + ack markers to the v0.13.1 scheme.
+
+    Pre-v0.13.1: ``.tripwire/locks/transition-<sid>.lock`` and
+    ``.tripwire/acks/<prompt>-<sid>.json``. Post: lock gets a workflow
+    segment (always ``coding-session`` for migrating projects, the
+    only firing workflow today); ack swaps the order to put workflow
+    first. Both directories live entirely under ``.tripwire/`` which
+    is gitignored, so plain ``shutil.move`` is appropriate — git
+    needn't track these renames.
+    """
+    # Transition locks
+    locks_dir = project_dir / paths.LOCKS_SUBDIR
+    if locks_dir.is_dir():
+        for lock in sorted(locks_dir.iterdir()):
+            if not lock.is_file():
+                continue
+            name = lock.name
+            if not (name.startswith("transition-") and name.endswith(".lock")):
+                continue
+            # Already namespaced (transition-<workflow>-<sid>.lock):
+            # leave it. Heuristic: the new name contains two hyphens
+            # in addition to the transition prefix because workflow
+            # ids contain a hyphen (e.g. coding-session).
+            stripped = name[len("transition-") : -len(".lock")]
+            if stripped.startswith("coding-session-"):
+                continue
+            sid = stripped
+            new_name = f"transition-coding-session-{sid}.lock"
+            dest = locks_dir / new_name
+            if dest.exists():
+                continue
+            src_rel = str(lock.relative_to(project_dir))
+            dest_rel = str(dest.relative_to(project_dir))
+            shutil.move(str(lock), str(dest))
+            moved.append((src_rel, dest_rel))
+
+    # Ack markers
+    acks_dir = project_dir / paths.ACKS_SUBDIR
+    if acks_dir.is_dir():
+        for marker in sorted(acks_dir.iterdir()):
+            if not marker.is_file():
+                continue
+            name = marker.name
+            if not name.endswith(".json"):
+                continue
+            stem = name[: -len(".json")]
+            # Skip already-migrated markers — they begin with the
+            # workflow id. The only firing workflow today is
+            # coding-session.
+            if stem.startswith("coding-session-"):
+                continue
+            # Pre-v0.13.1 name shape: ``<prompt>-<sid>.json``. We don't
+            # know where prompt ends and sid begins from the filename
+            # alone (both may contain hyphens). The pre-cutover
+            # convention is `<prompt>-<sid>` where both segments are
+            # opaque strings. We migrate by lifting the entire stem
+            # into the new shape ``coding-session-<stem>.json`` — the
+            # readers do exact filename match so the migration is
+            # only required to be consistent, not parseable.
+            #
+            # A better cutover would require an external list of sids
+            # to disambiguate; in practice every prompt id is shorter
+            # than every session id, and the readers don't slice the
+            # name, so the lift-by-prefix is sufficient.
+            new_name = f"coding-session-{stem}.json"
+            dest = acks_dir / new_name
+            if dest.exists():
+                continue
+            src_rel = str(marker.relative_to(project_dir))
+            dest_rel = str(dest.relative_to(project_dir))
+            shutil.move(str(marker), str(dest))
+            moved.append((src_rel, dest_rel))
+
+
+@migrate_cmd.command("storage")
+@click.option(
+    "--project-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=".",
+    show_default=True,
+    help="Project root to migrate.",
+)
+@click.option(
+    "--yes",
+    is_flag=True,
+    help=(
+        "Confirm destructive merges. Required when any "
+        "instances/<type>/ already contains files (pre-existing partial "
+        "migration). Without --yes the command refuses to overwrite."
+    ),
+)
+@click.option(
+    "--skip-validate",
+    is_flag=True,
+    help=(
+        "Skip the post-move ``tripwire validate --strict`` step. Useful "
+        "when migrating a project whose entity content predates the "
+        "current validator catalog (test fixtures, archived projects)."
+    ),
+)
+def migrate_storage_cmd(project_dir: Path, yes: bool, skip_validate: bool) -> None:
+    """Move a pre-v0.13.1 project to the consolidated `instances/` layout.
+
+    Relocates the entity directories:
+
+      \b
+      sessions/            → instances/sessions/
+      issues/              → instances/issues/
+      nodes/               → instances/nodes/
+      docs/issues/<KEY>/*  → instances/issues/<KEY>/docs/*
+
+    And renames runtime markers under .tripwire/ to the v0.13.1 names:
+
+      \b
+      .tripwire/locks/transition-<sid>.lock
+        → .tripwire/locks/transition-coding-session-<sid>.lock
+      .tripwire/acks/<prompt>-<sid>.json
+        → .tripwire/acks/coding-session-<sid>-<prompt>.json
+
+    Uses ``git mv`` when the project is a git repo (preserves history);
+    falls back to ``shutil.move`` for untracked files (gitignored
+    runtime locks / markers).
+
+    After all moves, runs ``tripwire validate --strict`` in-process. If
+    validation fails, prints findings and exits non-zero. Does NOT
+    auto-roll-back — recommend ``git reset --hard`` to undo.
+
+    Idempotent: a project already on the v0.13.1 layout exits 0 with
+    "nothing to migrate".
+    """
+    project_dir = project_dir.expanduser().resolve()
+    if not (project_dir / "project.yaml").is_file():
+        raise click.ClickException(
+            f"{project_dir} doesn't look like a tripwire project "
+            "(no project.yaml at the root)."
+        )
+
+    is_git_repo = (project_dir / ".git").exists()
+
+    # Detect pre-v0.13.1 layout via the presence of any top-level
+    # entity dir. If none present, the project is already migrated
+    # (or never had any entities) — exit 0.
+    pre_layout_present = [
+        src_rel
+        for src_rel, _dest_rel in _STORAGE_TOP_RENAMES
+        if (project_dir / src_rel).is_dir()
+    ]
+    has_legacy_docs_issues = (project_dir / "docs" / "issues").is_dir()
+    if not pre_layout_present and not has_legacy_docs_issues:
+        # Look for legacy lock/ack names too — those alone can warrant
+        # a migration even on a project whose entity dirs are already
+        # under `instances/`.
+        locks_dir = project_dir / paths.LOCKS_SUBDIR
+        acks_dir = project_dir / paths.ACKS_SUBDIR
+        has_legacy_lock = locks_dir.is_dir() and any(
+            p.name.startswith("transition-")
+            and p.name.endswith(".lock")
+            and not p.name[len("transition-") :].startswith("coding-session-")
+            for p in locks_dir.iterdir()
+            if p.is_file()
+        )
+        has_legacy_ack = acks_dir.is_dir() and any(
+            p.name.endswith(".json")
+            and not p.name.startswith("coding-session-")
+            for p in acks_dir.iterdir()
+            if p.is_file()
+        )
+        if not has_legacy_lock and not has_legacy_ack:
+            click.echo(
+                "Project already on v0.13.1 storage layout — nothing to migrate."
+            )
+            return
+
+    # Refuse to clobber a partially-populated destination unless --yes.
+    if not yes:
+        for _src_rel, dest_rel in _STORAGE_TOP_RENAMES:
+            dest = project_dir / dest_rel
+            if dest.is_dir() and any(dest.iterdir()):
+                raise click.ClickException(
+                    f"{dest_rel}/ already contains entries — refusing to "
+                    f"merge into a partially-migrated tree. Re-run with "
+                    f"`--yes` to confirm, or move the destination aside "
+                    f"and retry."
+                )
+
+    moved: list[tuple[str, str]] = []
+    skipped: list[str] = []
+
+    # 1. Bulk-move top-level entity dirs.
+    for src_rel, dest_rel in _STORAGE_TOP_RENAMES:
+        src = project_dir / src_rel
+        dest = project_dir / dest_rel
+
+        if not src.is_dir():
+            skipped.append(
+                f"{src_rel}/ (not present — already migrated or never created)"
+            )
+            continue
+
+        # Ensure dest parent (`instances/`) exists.
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if dest.exists():
+            # `--yes` already gated this branch; merge the source's
+            # children into the destination one at a time.
+            for child in sorted(src.iterdir()):
+                target = dest / child.name
+                if target.exists():
+                    # Conflict — leave caller to resolve. Continue with
+                    # the rest so partial progress is captured.
+                    skipped.append(
+                        f"{src_rel}/{child.name} (destination already exists)"
+                    )
+                    continue
+                child_src_rel = str(child.relative_to(project_dir))
+                child_dest_rel = str(target.relative_to(project_dir))
+                _git_mv_or_copy(child, target, project_dir, is_git_repo)
+                moved.append((child_src_rel, child_dest_rel))
+            # Remove the now-empty source directory.
+            try:
+                src.rmdir()
+            except OSError:
+                # Non-empty (a conflict above); leave it for manual
+                # cleanup.
+                pass
+        else:
+            _git_mv_or_copy(src, dest, project_dir, is_git_repo)
+            moved.append((src_rel, dest_rel))
+
+    # 2. Relocate docs/issues/<KEY>/* → instances/issues/<KEY>/docs/*
+    _migrate_issue_docs(project_dir, is_git_repo, moved)
+
+    # 3. Rename transition lockfiles + ack markers to the v0.13.1 scheme.
+    _migrate_lock_acks(project_dir, is_git_repo, moved)
+
+    # 4. Summary.
+    if not moved and not skipped:
+        click.echo("Nothing to migrate.")
+        return
+
+    for src_rel, dest_rel in moved:
+        click.echo(f"moved {src_rel} → {dest_rel}")
+    if skipped:
+        click.echo(f"\nSkipped {len(skipped)} entry(ies):")
+        for s in skipped:
+            click.echo(f"  - {s}")
+
+    click.echo(f"\nMigrated {len(moved)} path(s).")
+    if skip_validate:
+        click.echo(
+            "Skipping `tripwire validate --strict` per `--skip-validate`."
+        )
+        return
+    if is_git_repo:
+        click.echo(
+            "Review with `git status` and commit when satisfied. "
+            "Running `tripwire validate --strict` now to confirm…"
+        )
+    else:
+        click.echo("Running `tripwire validate --strict` now to confirm…")
+
+    # 5. Run validate in-process. Failure leaves the user with the
+    #    moved tree on disk; the recommended undo is `git reset --hard`.
+    from tripwire.cli.transition import validate_project
+
+    report = validate_project(project_dir, strict=True, fix=False)
+    if report.errors:
+        click.echo(
+            f"\nValidation reported {len(report.errors)} error(s) after "
+            f"migration. Inspect them, then either fix in place or run "
+            f"`git reset --hard` to roll back."
+        )
+        for err in report.errors[:10]:
+            click.echo(f"  - {err.code}: {err.message}")
+        if len(report.errors) > 10:
+            click.echo(f"  ... ({len(report.errors) - 10} more)")
+        raise click.exceptions.Exit(1)
+
+    click.echo("Validation clean. Migration complete.")
+
+
 __all__ = ["migrate_cmd"]

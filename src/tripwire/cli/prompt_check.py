@@ -55,7 +55,9 @@ def prompt_check_invoke_cmd(
             f"prompt-check {prompt_check_id!r} is not implemented"
         )
 
-    session_yaml = resolved / "sessions" / session_id / "session.yaml"
+    from tripwire.core import paths as _paths
+
+    session_yaml = _paths.session_yaml_path(resolved, session_id)
     if not session_yaml.is_file():
         raise click.ClickException(f"session {session_id!r} not found")
 

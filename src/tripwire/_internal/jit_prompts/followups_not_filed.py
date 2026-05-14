@@ -109,7 +109,9 @@ def _missing_followups(project_dir: Path, session_id: str) -> set[str]:
     is checked against ``issues/<KEY>/issue.yaml``. Missing files are
     collected and returned.
     """
-    pm_path = project_dir / "sessions" / session_id / _PM_RESPONSE_REL
+    from tripwire.core import paths
+
+    pm_path = paths.session_dir(project_dir, session_id) / _PM_RESPONSE_REL
     if not pm_path.is_file():
         return set()
 
@@ -125,7 +127,7 @@ def _missing_followups(project_dir: Path, session_id: str) -> set[str]:
         return set()
 
     missing: set[str] = set()
-    issues_root = project_dir / "issues"
+    issues_root = paths.issues_dir(project_dir)
     for item in items:
         if not isinstance(item, dict):
             continue

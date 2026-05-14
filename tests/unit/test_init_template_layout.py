@@ -73,8 +73,14 @@ def test_init_writes_consolidated_templates_layout(tmp_path: Path):
             f"flat-layout {sibling}/ must not exist at project root after v0.10.0 init"
         )
 
-    # Operational state dirs still at the root (unchanged by v0.10.0).
-    for state in ("issues", "nodes", "sessions", "plans"):
+    # v0.13.1: operational state dirs live under `instances/`. Plans
+    # remain at the root (PM working dir, not an entity type).
+    for state in (
+        "instances/issues",
+        "instances/nodes",
+        "instances/sessions",
+        "plans",
+    ):
         assert (project / state).is_dir(), f"state dir {state}/ missing"
 
 

@@ -25,7 +25,7 @@ workflows:
     trigger: session.spawn
     brief-description: "one session: plan, execute, review, ship."
     instance:
-      storage_path: sessions/{instance_id}/session.yaml
+      storage_path: instances/sessions/{instance_id}/session.yaml
       status_field: status
       status_enum:
         - planned
@@ -48,10 +48,10 @@ workflows:
           produces:
             - id: plan
               label: plan.md
-              path: sessions/{session_id}/artifacts/plan.md
+              path: instances/sessions/{session_id}/artifacts/plan.md
             - id: verification-checklist
               label: verification-checklist.md
-              path: sessions/{session_id}/artifacts/verification-checklist.md
+              path: instances/sessions/{session_id}/artifacts/verification-checklist.md
         work_steps:
           - id: plan
             actor: pm-agent
@@ -81,19 +81,19 @@ workflows:
               label: implementation diff
             - id: task-checklist
               label: task-checklist.md
-              path: sessions/{session_id}/artifacts/task-checklist.md
+              path: instances/sessions/{session_id}/artifacts/task-checklist.md
             - id: self-review
               label: self-review.md
-              path: sessions/{session_id}/artifacts/self-review.md
+              path: instances/sessions/{session_id}/artifacts/self-review.md
             - id: recommended-testing-plan
               label: recommended-testing-plan.md
-              path: sessions/{session_id}/artifacts/recommended-testing-plan.md
+              path: instances/sessions/{session_id}/artifacts/recommended-testing-plan.md
             - id: post-completion-comments
               label: post-completion-comments.md
-              path: sessions/{session_id}/artifacts/post-completion-comments.md
+              path: instances/sessions/{session_id}/artifacts/post-completion-comments.md
             - id: developer-doc
               label: developer.md
-              path: issues/{issue_key}/developer.md
+              path: instances/issues/{issue_key}/docs/developer.md
             - id: tripwire-pr
               label: tripwire-repo PR
             - id: project-pr
@@ -129,7 +129,7 @@ workflows:
           produces:
             - id: pm-response
               label: pm-response.yaml
-              path: sessions/{session_id}/artifacts/pm-response.yaml
+              path: instances/sessions/{session_id}/artifacts/pm-response.yaml
         work_steps:
           - id: review
             actor: pm-agent
@@ -145,7 +145,7 @@ workflows:
           produces:
             - id: completion-comment
               label: completion-comment.yaml
-              path: issues/{issue_key}/comments/{nnn}-completion-{yyyy-mm-dd}.yaml
+              path: instances/issues/{issue_key}/docs/comments/{nnn}-completion-{yyyy-mm-dd}.yaml
         work_steps:
           - id: close-out
             actor: pm-agent
@@ -1546,7 +1546,7 @@ workflows:
     actor: pm-agent
     trigger: command.pm-issue-close
     instance:
-      storage_path: issues/{instance_id}/issue.yaml
+      storage_path: instances/issues/{instance_id}/issue.yaml
       status_field: status
       status_enum:
         - planned
@@ -1604,7 +1604,7 @@ workflows:
     actor: pm-agent
     trigger: signal.stale_node_count_high
     instance:
-      storage_path: nodes/{instance_id}.yaml
+      storage_path: instances/nodes/{instance_id}.yaml
       status_field: status
       status_enum: [active, stale, archived]
       required_fields: [id, status]

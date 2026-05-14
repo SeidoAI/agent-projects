@@ -55,7 +55,7 @@ def gated_project(tmp_path: Path) -> tuple[Path, str]:
     for sub in ("issues", "nodes", "sessions"):
         (project_dir / sub).mkdir(exist_ok=True)
     sid = "s1"
-    (project_dir / "sessions" / sid).mkdir()
+    (project_dir / "instances" / "sessions" / sid).mkdir(parents=True, exist_ok=True)
 
     _write_manifest(
         project_dir,

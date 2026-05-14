@@ -181,7 +181,9 @@ def _session_log_path(project_dir: Path, session_id: str) -> Path | None:
     Avoids importing the full session model so unit fixtures don't
     have to satisfy every required field.
     """
-    syaml = project_dir / "sessions" / session_id / "session.yaml"
+    from tripwire.core import paths
+
+    syaml = paths.session_yaml_path(project_dir, session_id)
     if not syaml.is_file():
         return None
     try:

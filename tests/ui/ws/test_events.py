@@ -30,7 +30,7 @@ class TestFileChangedEvent:
             entity_type="issue",
             entity_id="KUI-42",
             action="modified",
-            path="issues/KUI-42/issue.yaml",
+            path="instances/issues/KUI-42/issue.yaml",
         )
         assert ev.type == "file_changed"
 
@@ -40,7 +40,7 @@ class TestFileChangedEvent:
             entity_type="node",
             entity_id="n",
             action="created",
-            path="nodes/n.yaml",
+            path="instances/nodes/n.yaml",
         )
         # 2026-04-21T12:34:56.789Z
         assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$", ev.timestamp)
@@ -51,7 +51,7 @@ class TestFileChangedEvent:
             entity_type="session",
             entity_id="s",
             action="deleted",
-            path="sessions/s/session.yaml",
+            path="instances/sessions/s/session.yaml",
         )
         d = ev.to_json()
         assert d["type"] == "file_changed"
@@ -148,7 +148,7 @@ class TestParseEvent:
                 "entity_type": "issue",
                 "entity_id": "KUI-1",
                 "action": "modified",
-                "path": "issues/KUI-1/issue.yaml",
+                "path": "instances/issues/KUI-1/issue.yaml",
             }
         )
         assert isinstance(ev, FileChangedEvent)
@@ -180,7 +180,7 @@ class TestRoundTrip:
                 entity_type="issue",
                 entity_id="KUI-1",
                 action="modified",
-                path="issues/KUI-1/issue.yaml",
+                path="instances/issues/KUI-1/issue.yaml",
             ),
             ArtifactUpdatedEvent(
                 project_id="p",

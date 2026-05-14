@@ -86,7 +86,7 @@ def _seed(tmp_path: Path) -> Path:
             update_cache=False,
         )
 
-    sdir = proj / "sessions" / "session-foo"
+    sdir = proj / "instances" / "sessions" / "session-foo"
     sdir.mkdir(parents=True)
     (sdir / "session.yaml").write_text(
         "---\n"
@@ -103,7 +103,7 @@ def _seed(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
 
-    cdir = proj / "issues" / "TST-1" / "comments"
+    cdir = proj / "instances" / "issues" / "TST-1" / "comments"
     cdir.mkdir(parents=True)
     (cdir / "01-pm-feedback-2026-04-30.yaml").write_text(
         "---\n"

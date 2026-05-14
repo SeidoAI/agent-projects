@@ -51,10 +51,10 @@ def test_resolve_command_unknown_name_returns_nonexistent_package_path(tmp_path)
 
 
 def test_session_plan_path_returns_subdir_when_present(tmp_path):
-    """Modern layout: plan.md under sessions/<sid>/artifacts/."""
+    """Modern layout: plan.md under instances/sessions/<sid>/artifacts/."""
     from tripwire.core.paths import session_plan_path
 
-    sd = tmp_path / "sessions" / "s1"
+    sd = tmp_path / "instances" / "sessions" / "s1"
     (sd / "artifacts").mkdir(parents=True)
     subdir_plan = sd / "artifacts" / "plan.md"
     subdir_plan.write_text("# subdir plan\n", encoding="utf-8")
@@ -68,5 +68,13 @@ def test_session_plan_path_returns_subdir_for_nonexistent_session(tmp_path):
     from tripwire.core.paths import session_plan_path
 
     p = session_plan_path(tmp_path, "never-created")
-    assert p == tmp_path / "sessions" / "never-created" / "artifacts" / "plan.md"
+    assert (
+        p
+        == tmp_path
+        / "instances"
+        / "sessions"
+        / "never-created"
+        / "artifacts"
+        / "plan.md"
+    )
     assert not p.exists()

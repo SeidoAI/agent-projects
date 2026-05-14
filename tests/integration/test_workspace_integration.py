@@ -81,6 +81,8 @@ def _bootstrap_workspace_with_node(
     )
     assert r.returncode == 0, r.stdout + r.stderr
 
+    # Workspaces keep their own flat `nodes/` layout — the instances/<type>/ cutover
+    # in v0.13.1 only applies to projects, not workspaces.
     (ws_dir / "nodes" / f"{node_id}.yaml").write_text(
         f"""---
 uuid: 00000000-0000-4000-8000-000000000001
@@ -164,7 +166,7 @@ class TestSyncHappyPath:
         proj_b = tmp_path / "proj-b"
 
         # Project A edits the node locally.
-        node_a_path = proj_a / "nodes" / "auth-system.yaml"
+        node_a_path = proj_a / "instances" / "nodes" / "auth-system.yaml"
         text = node_a_path.read_text(encoding="utf-8")
         text = text.replace("description: v1", "description: A-edit")
         node_a_path.write_text(text, encoding="utf-8")
@@ -177,7 +179,7 @@ class TestSyncHappyPath:
         r = _run_tripwire(proj_b, "workspace", "pull")
         assert r.returncode == 0, r.stdout + r.stderr
 
-        node_b_text = (proj_b / "nodes" / "auth-system.yaml").read_text(
+        node_b_text = (proj_b / "instances" / "nodes" / "auth-system.yaml").read_text(
             encoding="utf-8"
         )
         assert "A-edit" in node_b_text
@@ -216,7 +218,7 @@ class TestSyncConflict:
             assert r.returncode == 0
 
         # Project A edits description and pushes.
-        path_a = proj_a / "nodes" / "auth-system.yaml"
+        path_a = proj_a / "instances" / "nodes" / "auth-system.yaml"
         path_a.write_text(
             path_a.read_text().replace("description: base", "description: A-text"),
             encoding="utf-8",
@@ -224,7 +226,7 @@ class TestSyncConflict:
         _run_tripwire(proj_a, "workspace", "push", check=True)
 
         # Project B edits description differently (without pulling first).
-        path_b = proj_b / "nodes" / "auth-system.yaml"
+        path_b = proj_b / "instances" / "nodes" / "auth-system.yaml"
         path_b.write_text(
             path_b.read_text().replace("description: base", "description: B-text"),
             encoding="utf-8",
@@ -321,7 +323,7 @@ class TestConcurrentPushes:
 
             # Add a local scope=workspace node unique to this project.
             node_id = f"concept-{i}"
-            (proj_dir / "nodes" / f"{node_id}.yaml").write_text(
+            (proj_dir / "instances" / "nodes" / f"{node_id}.yaml").write_text(
                 f"""---
 uuid: 00000000-0000-4000-8000-00000000000{i}
 id: {node_id}

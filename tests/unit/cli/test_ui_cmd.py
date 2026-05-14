@@ -125,11 +125,11 @@ class TestCwdAutodetect:
 
     def test_cwd_subdir_walks_up_to_project_root(self, tmp_path: Path, monkeypatch):
         proj = tmp_path / "proj"
-        (proj / "issues" / "KUI-1").mkdir(parents=True)
+        (proj / "instances" / "issues" / "KUI-1").mkdir(parents=True)
         (proj / "project.yaml").write_text(
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        monkeypatch.chdir(proj / "issues" / "KUI-1")
+        monkeypatch.chdir(proj / "instances" / "issues" / "KUI-1")
         with patch(
             "tripwire.ui.services.project_service.discover_projects",
             return_value=[],
@@ -239,11 +239,11 @@ class TestPinBehavior:
 
     def test_bare_ui_from_subdir_does_not_pin(self, tmp_path: Path, monkeypatch):
         proj = tmp_path / "proj"
-        (proj / "issues" / "KUI-1").mkdir(parents=True)
+        (proj / "instances" / "issues" / "KUI-1").mkdir(parents=True)
         (proj / "project.yaml").write_text(
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        monkeypatch.chdir(proj / "issues" / "KUI-1")
+        monkeypatch.chdir(proj / "instances" / "issues" / "KUI-1")
         with patch("tripwire.ui.server.start_server") as mock_start:
             result = runner.invoke(cli, ["ui"])
         assert result.exit_code == 0

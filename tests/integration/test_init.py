@@ -64,8 +64,14 @@ class TestInitBasics:
         assert (target / "CLAUDE.md").exists()
         assert (target / ".gitignore").exists()
 
-        # Empty project directories with .gitkeep markers
-        for rel in ("issues", "nodes", "sessions", "plans"):
+        # Empty project directories with .gitkeep markers (v0.13.1:
+        # entity dirs live under `instances/`; plans/ stays at the root).
+        for rel in (
+            "instances/issues",
+            "instances/nodes",
+            "instances/sessions",
+            "plans",
+        ):
             assert (target / rel).is_dir(), f"Missing directory: {rel}"
             assert (target / rel / ".gitkeep").exists(), f"Missing .gitkeep in {rel}"
         # docs/issues is no longer created by init (Phase 4 of v0.5 refactor
@@ -181,7 +187,7 @@ class TestInitBasics:
         runner.invoke(cli, _init_args(target))
         gi = (target / ".gitignore").read_text()
         assert ".tripwire.lock" in gi
-        assert "nodes/.tripwire-graph-index.lock" in gi
+        assert "instances/nodes/.tripwire-graph-index.lock" in gi
 
     def test_non_interactive_missing_name_uses_target_basename(
         self, runner: CliRunner, tmp_path: Path
@@ -461,7 +467,7 @@ class TestInitThenValidate:
         assert report.warnings == []
         # Cache should have been built by the validator's side-effect.
         assert report.cache_rebuilt is True
-        assert (target / "nodes" / "tripwire-graph-index.yaml").exists()
+        assert (target / "instances" / "nodes" / "tripwire-graph-index.yaml").exists()
 
     def test_initd_project_with_repos_passes_validate(
         self, runner: CliRunner, tmp_path: Path

@@ -47,6 +47,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from tripwire.core import paths
 from tripwire.core.validator._types import CheckResult, ValidationContext
 
 
@@ -136,7 +137,7 @@ def check_pr_merged_for_session(ctx: ValidationContext) -> list[CheckResult]:
                 CheckResult(
                     code="session/pr_not_merged",
                     severity="error",
-                    file=f"sessions/{sid}/session.yaml",
+                    file=f"{paths.SESSIONS_DIR}/{sid}/session.yaml",
                     field="runtime_state.worktrees",
                     message=(
                         f"Session {sid!r} has no recorded worktrees; cannot "
@@ -160,7 +161,7 @@ def check_pr_merged_for_session(ctx: ValidationContext) -> list[CheckResult]:
                 CheckResult(
                     code="session/pr_not_merged",
                     severity="error",
-                    file=f"sessions/{sid}/session.yaml",
+                    file=f"{paths.SESSIONS_DIR}/{sid}/session.yaml",
                     field="runtime_state.worktrees",
                     message=(
                         f"Session {sid!r}: no merged PR found for branch(es): "
@@ -215,7 +216,7 @@ def check_pr_review_approved(ctx: ValidationContext) -> list[CheckResult]:
                 CheckResult(
                     code="session/review_not_approved",
                     severity="error",
-                    file=f"sessions/{sid}/review.json",
+                    file=f"{paths.SESSIONS_DIR}/{sid}/review.json",
                     message=(
                         f"Session {sid!r}: no review.json — run "
                         f"`tripwire session review {sid}` before completing."
@@ -234,7 +235,7 @@ def check_pr_review_approved(ctx: ValidationContext) -> list[CheckResult]:
                 CheckResult(
                     code="session/review_not_approved",
                     severity="error",
-                    file=f"sessions/{sid}/review.json",
+                    file=f"{paths.SESSIONS_DIR}/{sid}/review.json",
                     field="exit_code",
                     message=(
                         f"Session {sid!r}: review.json missing a valid "
@@ -254,7 +255,7 @@ def check_pr_review_approved(ctx: ValidationContext) -> list[CheckResult]:
                 CheckResult(
                     code="session/review_not_approved",
                     severity="error",
-                    file=f"sessions/{sid}/review.json",
+                    file=f"{paths.SESSIONS_DIR}/{sid}/review.json",
                     field="exit_code",
                     message=(
                         f"Session {sid!r}: last review reported verdict="
@@ -286,7 +287,6 @@ def _issue_artifacts_for_session(
     are derived from the caller's choice in the public ``check_*``
     wrappers.
     """
-    from tripwire.core import paths
     from tripwire.core.issue_artifact_store import load_issue_artifact_manifest
     from tripwire.core.store import load_issue
 
@@ -315,22 +315,27 @@ def _issue_artifacts_for_session(
                 continue
             if not _issue_at_or_past(ctx, issue.status, entry.required_at_status):
                 continue
-            artifact_path = paths.issue_dir(ctx.project_dir, issue_key) / entry.file
+            artifact_path = (
+                paths.issue_docs_dir(ctx.project_dir, issue_key) / entry.file
+            )
+            rel_path = (
+                f"{paths.ISSUES_DIR}/{issue_key}/"
+                f"{paths.ISSUE_DOCS_SUBDIR}/{entry.file}"
+            )
             if artifact_path.is_file():
                 continue
             results.append(
                 CheckResult(
                     code=code,
                     severity="error",
-                    file=f"issues/{issue_key}/{entry.file}",
+                    file=rel_path,
                     message=(
                         f"Session {sid!r} member issue {issue_key!r} ({issue.status}) "
                         f"is at-or-past {entry.required_at_status!r} but is missing "
                         f"required artifact {entry.file!r}."
                     ),
                     fix_hint=(
-                        f"Write issues/{issue_key}/{entry.file} from "
-                        f"{entry.template}."
+                        f"Write {rel_path} from {entry.template}."
                     ),
                 )
             )

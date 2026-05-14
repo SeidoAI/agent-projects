@@ -79,7 +79,7 @@ def _write_issue(
         "## Test plan\n```\nuv run pytest\n```\n\n"
         "## Dependencies\nnone\n\n## Definition of Done\n- [ ] done\n"
     )
-    idir = proj / "issues" / key
+    idir = proj / "instances" / "issues" / key
     idir.mkdir(parents=True, exist_ok=True)
     text = "---\n" + yaml.safe_dump(fm, sort_keys=False) + "---\n" + body
     (idir / "issue.yaml").write_text(text, encoding="utf-8")
@@ -94,7 +94,9 @@ def _write_node(proj: Path, node_id: str, *, name: str = "Auth System") -> None:
         "status": "active",
     }
     text = "---\n" + yaml.safe_dump(fm, sort_keys=False) + "---\n"
-    (proj / "nodes" / f"{node_id}.yaml").write_text(text, encoding="utf-8")
+    target = proj / "instances" / "nodes" / f"{node_id}.yaml"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
 
 
 def test_dogfood_validate_no_errors(tmp_path: Path) -> None:
@@ -142,7 +144,7 @@ def test_concept_name_prose_fires_on_synthetic_corpus(tmp_path: Path) -> None:
     # excludes properly-referenced issues from the prose count, so
     # these need to stay link-free.
     for n in range(1, 3):
-        idir = proj / "issues" / f"DOG-{n}"
+        idir = proj / "instances" / "issues" / f"DOG-{n}"
         idir.mkdir(parents=True, exist_ok=True)
         body = (
             "## Context\nThe authentication subsystem matters here.\n\n"

@@ -71,7 +71,7 @@ def _write_issue_without_uuid(project_dir: Path, n: int) -> None:
         "updated_at: '2026-04-07T10:00:00'\n"
         "---\n" + body
     )
-    idir = project_dir / "issues" / f"TST-{n}"
+    idir = project_dir / "instances" / "issues" / f"TST-{n}"
     idir.mkdir(parents=True, exist_ok=True)
     (idir / "issue.yaml").write_text(text, encoding="utf-8")
 
@@ -79,8 +79,8 @@ def _write_issue_without_uuid(project_dir: Path, n: int) -> None:
 def _seed_anchor_node(project_dir: Path) -> None:
     """The issues reference `[[anchor-node]]` — create it so
     ref/dangling doesn't drown out the uuid/missing fixes."""
-    (project_dir / "nodes").mkdir(parents=True, exist_ok=True)
-    (project_dir / "nodes" / "anchor-node.yaml").write_text(
+    (project_dir / "instances" / "nodes").mkdir(parents=True, exist_ok=True)
+    (project_dir / "instances" / "nodes" / "anchor-node.yaml").write_text(
         "---\n"
         "uuid: 11111111-1111-4111-8111-111111111111\n"
         "id: anchor-node\n"
@@ -141,7 +141,7 @@ class TestConcurrentFix:
 
         # Every issue file now has a uuid.
         for n in range(1, 11):
-            fm = _read_frontmatter(target / "issues" / f"TST-{n}" / "issue.yaml")
+            fm = _read_frontmatter(target / "instances" / "issues" / f"TST-{n}" / "issue.yaml")
             assert "uuid" in fm, f"TST-{n} missing uuid after concurrent --fix"
             uid = str(fm["uuid"]).replace("-", "")
             assert len(uid) == 32, f"TST-{n} uuid has wrong shape: {fm['uuid']}"

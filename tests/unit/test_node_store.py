@@ -18,7 +18,7 @@ from tripwire.models import ConceptNode, NodeSource
 
 @pytest.fixture
 def project_dir(tmp_path: Path) -> Path:
-    (tmp_path / "nodes").mkdir(parents=True)
+    (tmp_path / "instances" / "nodes").mkdir(parents=True)
     return tmp_path
 
 
@@ -56,7 +56,7 @@ class TestNodeStore:
 
     def test_save_creates_directory(self, tmp_path: Path) -> None:
         save_node(tmp_path, make_node())
-        assert (tmp_path / "nodes" / "user-model.yaml").exists()
+        assert (tmp_path / "instances" / "nodes" / "user-model.yaml").exists()
 
     def test_load_missing_node_raises(self, project_dir: Path) -> None:
         with pytest.raises(FileNotFoundError):
@@ -87,7 +87,7 @@ class TestNodeStore:
         save_node(project_dir, make_node("user-model"))
         # Hand-write a fake cache file as it would appear after a
         # graph rebuild.
-        (project_dir / "nodes" / "tripwire-graph-index.yaml").write_text(
+        (project_dir / "instances" / "nodes" / "tripwire-graph-index.yaml").write_text(
             "version: 2\nfiles: {}\n", encoding="utf-8"
         )
         loaded = list_nodes(project_dir)
@@ -136,7 +136,7 @@ class TestNodeExists:
 
     def test_uuid_first_in_yaml(self, project_dir: Path) -> None:
         save_node(project_dir, make_node())
-        raw = (project_dir / "nodes" / "user-model.yaml").read_text()
+        raw = (project_dir / "instances" / "nodes" / "user-model.yaml").read_text()
         assert raw.startswith("---\nuuid:")
 
     def test_node_without_source_round_trip(self, project_dir: Path) -> None:

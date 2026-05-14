@@ -171,7 +171,9 @@ def build_report(project_dir: Path, session_id: str) -> ReviewArtifactsReport:
     (``self_review_present`` / ``pm_response_present``) tell the
     caller what was on disk.
     """
-    sdir = project_dir / "sessions" / session_id
+    from tripwire.core import paths
+
+    sdir = paths.session_dir(project_dir, session_id)
     sr_path = sdir / "self-review.md"
     pr_path = sdir / "pm-response.yaml"
 

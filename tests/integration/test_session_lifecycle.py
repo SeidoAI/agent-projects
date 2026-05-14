@@ -50,7 +50,7 @@ def test_full_session_lifecycle(save_test_issue, tmp_path_project):
 
     # Scaffold session directory + session.yaml + plan.md +
     # verification-checklist.md (PM-owned planning artifacts per manifest).
-    sess = tmp_path_project / "sessions" / session_id
+    sess = tmp_path_project / "instances" / "sessions" / session_id
     sess.mkdir(parents=True)
     (sess / "session.yaml").write_text(
         f"""---

@@ -285,7 +285,8 @@ def session_id_from_rel_path(rel_path: str) -> str | None:
 
 
 def comment_id_from_rel_path(rel_path: str) -> str | None:
-    """Synthesize a comment id from `issues/<KEY>/comments/<stem>.yaml`.
+    """Synthesize a comment id from
+    `instances/issues/<KEY>/comments/<stem>.yaml`.
 
     The Comment model has no `id` field — only a UUID. The unified
     index uses `<issue-key>:<filename-stem>` so the id is stable
@@ -298,11 +299,15 @@ def comment_id_from_rel_path(rel_path: str) -> str | None:
     p = Path(rel_path)
     if p.suffix != ".yaml":
         return None
-    # parts: ["issues", "<KEY>", "comments", "<stem>.yaml"]
-    parts = p.parts
-    if len(parts) < 4:
+    # Strip the canonical ISSUES_PREFIX so the issue key is the first
+    # remaining segment regardless of how many ancestors that prefix
+    # contains. v0.13.1 the prefix is `instances/issues/` (two
+    # segments); pre-v0.13.1 it was `issues/` (one segment).
+    relative = rel_path[len(ISSUES_PREFIX) :]
+    sub_parts = Path(relative).parts
+    if len(sub_parts) < 3:
         return None
-    issue_key = parts[1]
+    issue_key = sub_parts[0]
     stem = p.stem
     return f"{issue_key}:{stem}"
 

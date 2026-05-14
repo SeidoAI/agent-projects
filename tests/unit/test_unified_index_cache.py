@@ -48,7 +48,7 @@ def _make_issue(project_dir: Path, key: str, body: str = "") -> None:
 def _write_session(
     project_dir: Path, sid: str, *, agent: str, issues: list[str], body: str = ""
 ) -> None:
-    sdir = project_dir / "sessions" / sid
+    sdir = project_dir / "instances" / "sessions" / sid
     sdir.mkdir(parents=True, exist_ok=True)
     fm = {
         "id": sid,
@@ -70,7 +70,7 @@ def _write_comment(
     type_: str,
     body: str = "",
 ) -> None:
-    cdir = project_dir / "issues" / issue_key / "comments"
+    cdir = project_dir / "instances" / "issues" / issue_key / "comments"
     cdir.mkdir(parents=True, exist_ok=True)
     fm = {
         "issue_key": issue_key,
@@ -97,7 +97,7 @@ def test_full_rebuild_emits_session_to_issue_refs(tmp_path: Path) -> None:
     cache = full_rebuild(tmp_path)
 
     # Session should appear as a fingerprinted file.
-    session_rel = "sessions/session-foo/session.yaml"
+    session_rel = "instances/sessions/session-foo/session.yaml"
     assert session_rel in cache.files
 
     # Edges from session to each issue, with canonical kind = refs.
@@ -125,7 +125,7 @@ def test_full_rebuild_emits_session_body_refs(tmp_path: Path) -> None:
     )
 
     cache = full_rebuild(tmp_path)
-    session_rel = "sessions/session-bar/session.yaml"
+    session_rel = "instances/sessions/session-bar/session.yaml"
     body_edges = [
         e
         for e in cache.edges
@@ -148,7 +148,7 @@ def test_full_rebuild_emits_comment_to_issue_refs(tmp_path: Path) -> None:
 
     cache = full_rebuild(tmp_path)
 
-    comment_rel = "issues/TST-1/comments/01-pm-feedback-2026-04-30.yaml"
+    comment_rel = "instances/issues/TST-1/comments/01-pm-feedback-2026-04-30.yaml"
     assert comment_rel in cache.files
 
     comment_edges = [e for e in cache.edges if e.source_file == comment_rel]
@@ -229,7 +229,7 @@ def test_referenced_by_includes_comment_refs(tmp_path: Path) -> None:
     comment_refs_into_anything = [
         e
         for e in cache.edges
-        if e.type == "refs" and e.source_file.startswith("issues/TST-1/comments/")
+        if e.type == "refs" and e.source_file.startswith("instances/issues/TST-1/comments/")
     ]
     # If the comment emitted any refs edges (it can), they must show up
     # in referenced_by. Absent any body-side lowercase ref, this loop
@@ -284,7 +284,7 @@ def test_save_session_invalidates_cache(tmp_path: Path) -> None:
     post = load_index(tmp_path)
     assert post is not None, "save_session should have updated the cache file"
     post_session_edges = [
-        e for e in post.edges if e.source_file == "sessions/session-x/session.yaml"
+        e for e in post.edges if e.source_file == "instances/sessions/session-x/session.yaml"
     ]
     assert len(post_session_edges) >= 2  # one ref edge per linked issue
     targets = {e.to_id for e in post_session_edges}

@@ -60,8 +60,12 @@ def tmp_path_project(tmp_path: Path) -> Path:
             }
         )
     )
-    for sub in ("issues", "nodes", "sessions", "docs", "plans"):
-        (project_dir / sub).mkdir()
+    # v0.13.1: per-type subdirs sit under `instances/`. Create the
+    # `instances/` parent + the four standard children plus
+    # `plans/` (a PM working dir, unrelated to instance-entities).
+    (project_dir / "instances").mkdir()
+    for sub in ("instances/issues", "instances/nodes", "instances/sessions", "plans"):
+        (project_dir / sub).mkdir(parents=True, exist_ok=True)
     # v0.13: workflow.yaml is required for execute_transition to resolve
     # routes. Provide a minimal coding-session covering all SessionStatus
     # values + the transitions the test suite exercises.
@@ -176,7 +180,7 @@ def tmp_path_project(tmp_path: Path) -> Path:
         "    actor: coding-agent\n"
         "    trigger: session.spawn\n"
         "    instance:\n"
-        "      storage_path: sessions/{instance_id}/session.yaml\n"
+        "      storage_path: instances/sessions/{instance_id}/session.yaml\n"
         "      status_field: status\n"
         "      status_enum: [planned, queued, executing, in_review,\n"
         "        verified, completed, paused, failed, abandoned]\n"
@@ -369,7 +373,7 @@ def fresh_project():
             "next_session_number: 1\n",
             encoding="utf-8",
         )
-        for sub in ("issues", "nodes", "sessions", "docs"):
+        for sub in ("instances/issues", "instances/nodes", "instances/sessions"):
             (proj_dir / sub).mkdir(parents=True, exist_ok=True)
         return proj_dir
 
@@ -420,9 +424,8 @@ def tmp_project_manifest(tmp_path: Path):
         (project_dir / "project.yaml").write_text(
             "name: tmp\nkey_prefix: TMP\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        (project_dir / "issues").mkdir()
-        (project_dir / "nodes").mkdir()
-        (project_dir / "sessions").mkdir()
+        for sub in ("instances/issues", "instances/nodes", "instances/sessions"):
+            (project_dir / sub).mkdir(parents=True, exist_ok=True)
         templates = project_dir / "templates" / "artifacts"
         templates.mkdir(parents=True)
         (templates / "manifest.yaml").write_text(

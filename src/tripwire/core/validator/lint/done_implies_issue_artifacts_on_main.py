@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from tripwire.core import paths
 from tripwire.core.git_helpers import MainTreeUnavailable, list_paths_on_main
 from tripwire.core.store import PROJECT_CONFIG_FILENAME
 
@@ -65,7 +66,10 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
     for entity in done_issues:
         issue = entity.model
         for fname in manifest.issue_required:
-            rel = f"issues/{issue.id}/{fname}"
+            rel = (
+                f"{paths.ISSUES_DIR}/{issue.id}/"
+                f"{paths.ISSUE_DOCS_SUBDIR}/{fname}"
+            )
             if rel in on_main:
                 continue
             results.append(

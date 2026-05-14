@@ -21,7 +21,7 @@ def test_list_sessions_includes_cost_usd(
     save_test_session, tmp_path_project: Path
 ) -> None:
     """``cost_usd`` lives on every summary so the UI grid can display it."""
-    log = tmp_path_project / "sessions" / "s1" / "session.log"
+    log = tmp_path_project / "instances" / "sessions" / "s1" / "session.log"
     _write_log(
         log,
         [
@@ -45,7 +45,7 @@ def test_get_session_includes_cost_usd(
     save_test_session, tmp_path_project: Path
 ) -> None:
     """The session detail view also surfaces ``cost_usd`` for real-time UX."""
-    log = tmp_path_project / "sessions" / "s1" / "session.log"
+    log = tmp_path_project / "instances" / "sessions" / "s1" / "session.log"
     _write_log(
         log,
         [

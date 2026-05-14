@@ -20,7 +20,7 @@ from tripwire.models import ConceptNode, Issue
 
 def _make_entity(model, body: str) -> LoadedEntity:
     return LoadedEntity(
-        rel_path="issues/TST-1/issue.yaml",
+        rel_path="instances/issues/TST-1/issue.yaml",
         raw_frontmatter=model.model_dump(mode="python"),
         body=body,
         model=model,
@@ -75,7 +75,7 @@ class TestStalePinValidator:
             issues=[_make_entity(issue, issue.body)],
             nodes=[
                 LoadedEntity(
-                    rel_path="nodes/user-model.yaml",
+                    rel_path="instances/nodes/user-model.yaml",
                     raw_frontmatter=target.model_dump(mode="python"),
                     body="",
                     model=target,
@@ -97,7 +97,7 @@ class TestStalePinValidator:
             issues=[_make_entity(issue, issue.body)],
             nodes=[
                 LoadedEntity(
-                    rel_path="nodes/user-model.yaml",
+                    rel_path="instances/nodes/user-model.yaml",
                     raw_frontmatter=target.model_dump(mode="python"),
                     body="",
                     model=target,
@@ -117,7 +117,7 @@ class TestStalePinValidator:
             issues=[_make_entity(issue, issue.body)],
             nodes=[
                 LoadedEntity(
-                    rel_path="nodes/user-model.yaml",
+                    rel_path="instances/nodes/user-model.yaml",
                     raw_frontmatter=target.model_dump(mode="python"),
                     body="",
                     model=target,
@@ -144,7 +144,7 @@ class TestStalePinValidator:
             issues=[_make_entity(issue, issue.body)],
             nodes=[
                 LoadedEntity(
-                    rel_path="nodes/user-model.yaml",
+                    rel_path="instances/nodes/user-model.yaml",
                     raw_frontmatter=target.model_dump(mode="python"),
                     body="",
                     model=target,

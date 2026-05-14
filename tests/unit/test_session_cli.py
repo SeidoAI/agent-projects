@@ -200,7 +200,7 @@ class TestSessionProgress:
             issues=["TMP-1"],
             status="executing",
         )
-        checklist = tmp_path_project / "sessions" / "session-x" / "task-checklist.md"
+        checklist = tmp_path_project / "instances" / "sessions" / "session-x" / "task-checklist.md"
         checklist.write_text(
             "| # | Task  | Status      |\n"
             "|---|-------|-------------|\n"

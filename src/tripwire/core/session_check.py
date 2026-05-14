@@ -135,7 +135,9 @@ def _check_plan_unfilled(
 def _check_checklist_unfilled(
     project_dir: Path, session: AgentSession
 ) -> StrictCheckResult | None:
-    path = project_dir / "sessions" / session.id / "task-checklist.md"
+    from tripwire.core import paths
+
+    path = paths.session_dir(project_dir, session.id) / "task-checklist.md"
     if not path.is_file():
         # task-checklist is owned by the execution agent (produced_at:
         # in_progress in the shipped manifest) — its absence pre-spawn is
@@ -204,7 +206,9 @@ _CHECKBOX_RE = re.compile(r"-\s*\[(?P<state>[ xX])\]\s*(?P<rest>.*)")
 def _check_verification_unfilled(
     project_dir: Path, session: AgentSession
 ) -> StrictCheckResult | None:
-    path = project_dir / "sessions" / session.id / "verification-checklist.md"
+    from tripwire.core import paths
+
+    path = paths.session_dir(project_dir, session.id) / "verification-checklist.md"
     if not path.is_file():
         return None
     text = path.read_text(encoding="utf-8")

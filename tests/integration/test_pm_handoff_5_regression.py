@@ -37,14 +37,14 @@ def project_with_v013_workflow(tmp_path: Path):
     (tmp_path / "workflow.yaml").write_text(
         template_path.read_text(encoding="utf-8"), encoding="utf-8"
     )
-    sessions_dir = tmp_path / "sessions" / "test-session"
+    sessions_dir = tmp_path / "instances" / "sessions" / "test-session"
     sessions_dir.mkdir(parents=True)
     return tmp_path
 
 
 def _save_session_at_status(project_dir: Path, status: str) -> None:
     """Write a session.yaml at the given status."""
-    sessions_dir = project_dir / "sessions" / "test-session"
+    sessions_dir = project_dir / "instances" / "sessions" / "test-session"
     sessions_dir.mkdir(parents=True, exist_ok=True)
     (sessions_dir / "session.yaml").write_text(
         dedent(

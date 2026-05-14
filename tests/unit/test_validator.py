@@ -95,9 +95,11 @@ def write_issue(
     body: str | None = None,
     **frontmatter_overrides: Any,
 ) -> Path:
-    """Write a syntactically valid issue to `issues/<key>/issue.yaml`
-    with all required body sections."""
-    idir = project_dir / "issues" / key
+    """Write a syntactically valid issue to
+    `instances/issues/<key>/issue.yaml` with all required body sections."""
+    from tripwire.core import paths
+
+    idir = paths.issue_dir(project_dir, key)
     idir.mkdir(parents=True, exist_ok=True)
 
     fm: dict[str, Any] = {
@@ -138,7 +140,9 @@ def write_node(
     body: str = "Description.\n",
     **frontmatter_overrides: Any,
 ) -> Path:
-    nodes_dir = project_dir / "nodes"
+    from tripwire.core import paths
+
+    nodes_dir = paths.nodes_dir(project_dir)
     nodes_dir.mkdir(parents=True, exist_ok=True)
     fm: dict[str, Any] = {
         "uuid": str(_uuid.uuid4()),
@@ -164,8 +168,10 @@ def write_session(
     **frontmatter_overrides: Any,
 ) -> Path:
     """Write a session in the canonical directory layout:
-    `sessions/<id>/session.yaml`, with an optional `plan.md`."""
-    sdir = project_dir / "sessions" / session_id
+    `instances/sessions/<id>/session.yaml`, with an optional `plan.md`."""
+    from tripwire.core import paths
+
+    sdir = paths.session_dir(project_dir, session_id)
     sdir.mkdir(parents=True, exist_ok=True)
     fm: dict[str, Any] = {
         "uuid": str(_uuid.uuid4()),
@@ -336,17 +342,17 @@ class TestLoading:
         assert any(c.startswith("schema/project") for c in codes(report))
 
     def test_unparseable_issue(self, empty_project: Path) -> None:
-        (empty_project / "issues" / "TST-1").mkdir(parents=True)
-        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(
+        (empty_project / "instances" / "issues" / "TST-1").mkdir(parents=True)
+        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(
             "no frontmatter at all"
         )
         report = validate_project(empty_project)
         assert "issue/parse_error" in codes(report)
 
     def test_schema_invalid_issue(self, empty_project: Path) -> None:
-        (empty_project / "issues" / "TST-1").mkdir(parents=True)
+        (empty_project / "instances" / "issues" / "TST-1").mkdir(parents=True)
         # Missing required fields like title, status, etc.
-        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(
+        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(
             "---\nuuid: 7c3a4b1d-9f2e-4a8c-b5d6-1e2f3a4b5c6d\nid: TST-1\n---\nbody\n"
         )
         report = validate_project(empty_project)
@@ -367,7 +373,7 @@ class TestLoading:
 class TestUuidPresence:
     def test_missing_uuid_is_error(self, empty_project: Path) -> None:
         # Hand-write an issue without uuid (bypassing the helper).
-        (empty_project / "issues" / "TST-1").mkdir(parents=True)
+        (empty_project / "instances" / "issues" / "TST-1").mkdir(parents=True)
         text = serialize_frontmatter_body(
             {
                 "id": "TST-1",
@@ -379,7 +385,7 @@ class TestUuidPresence:
             },
             "## Context\n[[user-model]]\n\n## Implements\nx\n\n## Repo scope\nx\n\n## Requirements\nx\n\n## Execution constraints\nstop and ask.\n\n## Acceptance criteria\n- [ ] x\n\n## Test plan\nx\n\n## Dependencies\nnone\n\n## Definition of Done\n- [ ] done\n",
         )
-        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(text)
+        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(text)
         report = validate_project(empty_project)
         assert "uuid/missing" in codes(report)
 
@@ -713,14 +719,14 @@ class TestIdCollisions:
         write_issue(empty_project, "TST-1")
         # Simulate a collision: a second issue directory with a different
         # name but the same `id` field in its frontmatter.
-        original = (empty_project / "issues" / "TST-1" / "issue.yaml").read_text()
+        original = (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").read_text()
         new_uuid = str(_uuid.uuid4())
         lines = original.splitlines()
         for i, line in enumerate(lines):
             if line.startswith("uuid:"):
                 lines[i] = f"uuid: {new_uuid}"
                 break
-        dup_dir = empty_project / "issues" / "TST-1-dup"
+        dup_dir = empty_project / "instances" / "issues" / "TST-1-dup"
         dup_dir.mkdir(parents=True)
         (dup_dir / "issue.yaml").write_text("\n".join(lines) + "\n")
 
@@ -765,7 +771,7 @@ class TestCommentProvenance:
     def test_invalid_comment_type_caught(self, empty_project: Path) -> None:
         write_node(empty_project, "user-model")
         write_issue(empty_project, "TST-1")
-        comment_dir = empty_project / "issues" / "TST-1" / "comments"
+        comment_dir = empty_project / "instances" / "issues" / "TST-1" / "comments"
         comment_dir.mkdir(parents=True)
         text = serialize_frontmatter_body(
             {
@@ -810,7 +816,7 @@ class TestProjectStandards:
 class TestAutoFix:
     def test_fix_missing_uuid(self, empty_project: Path) -> None:
         # Hand-write an issue without uuid.
-        (empty_project / "issues" / "TST-1").mkdir(parents=True)
+        (empty_project / "instances" / "issues" / "TST-1").mkdir(parents=True)
         body = (
             "## Context\n[[user-model]]\n\n## Implements\nx\n\n## Repo scope\nx\n\n"
             "## Requirements\nx\n\n## Execution constraints\nstop and ask.\n\n"
@@ -830,14 +836,14 @@ class TestAutoFix:
             },
             body,
         )
-        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(text)
+        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(text)
         write_node(empty_project, "user-model")
 
         report = validate_project(empty_project, fix=True)
         # Fix recorded
         assert "uuid/missing" in [f.code for f in report.fixed]
         # File now has a uuid
-        new_text = (empty_project / "issues" / "TST-1" / "issue.yaml").read_text()
+        new_text = (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").read_text()
         assert new_text.startswith("---\nuuid:")
 
     def test_fix_sequence_drift(self, empty_project: Path) -> None:
@@ -861,7 +867,7 @@ class TestAutoFix:
         report = validate_project(empty_project, fix=True)
         assert "bidi/related" in [f.code for f in report.fixed]
         # node-b's file should now contain node-a in its related list.
-        b_text = (empty_project / "nodes" / "node-b.yaml").read_text()
+        b_text = (empty_project / "instances" / "nodes" / "node-b.yaml").read_text()
         assert "node-a" in b_text
 
     def test_fix_sorted_lists(self, empty_project: Path) -> None:
@@ -873,7 +879,7 @@ class TestAutoFix:
         report = validate_project(empty_project, fix=True)
         sorted_codes = [f.code for f in report.fixed if f.code == "sorted/list"]
         assert len(sorted_codes) >= 1
-        text = (empty_project / "nodes" / "user-model.yaml").read_text()
+        text = (empty_project / "instances" / "nodes" / "user-model.yaml").read_text()
         # alpha should come before monkey before zebra in the sorted list
         a = text.find("alpha")
         m = text.find("monkey")
@@ -1373,7 +1379,7 @@ class TestAutoFixIdempotency:
     """
 
     def test_fix_missing_uuid_idempotent(self, empty_project: Path) -> None:
-        (empty_project / "issues" / "TST-1").mkdir(parents=True)
+        (empty_project / "instances" / "issues" / "TST-1").mkdir(parents=True)
         body = (
             "## Context\n[[user-model]]\n\n## Implements\nx\n\n"
             "## Repo scope\nx\n\n## Requirements\nx\n\n"
@@ -1394,7 +1400,7 @@ class TestAutoFixIdempotency:
             },
             body,
         )
-        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(text)
+        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(text)
         write_node(empty_project, "user-model")
 
         validate_project(empty_project, fix=True)

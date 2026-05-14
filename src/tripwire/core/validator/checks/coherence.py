@@ -379,7 +379,7 @@ def check_pm_response_covers_self_review(
             continue
 
         sid = entity.model.id
-        sdir = ctx.project_dir / "sessions" / sid
+        sdir = paths.session_dir(ctx.project_dir, sid)
         sr_path = sdir / "self-review.md"
         if not sr_path.is_file():
             # Presence is enforced by check_artifact_presence.
@@ -392,7 +392,7 @@ def check_pm_response_covers_self_review(
                 CheckResult(
                     code="pm_response/io_error",
                     severity="error",
-                    file=f"sessions/{sid}/self-review.md",
+                    file=f"{paths.SESSIONS_DIR}/{sid}/self-review.md",
                     message=f"Could not read self-review.md: {exc}",
                     fix_hint=(
                         "PM action — investigate the read failure on "
@@ -418,7 +418,7 @@ def check_pm_response_covers_self_review(
                 CheckResult(
                     code="pm_response/parse_error",
                     severity="error",
-                    file=f"sessions/{sid}/pm-response.yaml",
+                    file=f"{paths.SESSIONS_DIR}/{sid}/pm-response.yaml",
                     message=f"pm-response.yaml could not be parsed: {exc}",
                     fix_hint=(
                         "PM action — fix YAML syntax in pm-response.yaml "
@@ -440,7 +440,7 @@ def check_pm_response_covers_self_review(
                 CheckResult(
                     code="pm_response/incomplete_coverage",
                     severity="error",
-                    file=f"sessions/{sid}/pm-response.yaml",
+                    file=f"{paths.SESSIONS_DIR}/{sid}/pm-response.yaml",
                     message=(
                         f"Self-review item under Lens {sr.lens} has no "
                         f"matching quote_excerpt in pm-response.yaml: "
@@ -490,7 +490,7 @@ def check_pm_response_followups_resolve(
             continue
 
         sid = entity.model.id
-        pr_path = ctx.project_dir / "sessions" / sid / "pm-response.yaml"
+        pr_path = paths.session_dir(ctx.project_dir, sid) / "pm-response.yaml"
         if not pr_path.is_file():
             continue
         try:
@@ -508,7 +508,7 @@ def check_pm_response_followups_resolve(
                 CheckResult(
                     code="pm_response/missing_followup",
                     severity="error",
-                    file=f"sessions/{sid}/pm-response.yaml",
+                    file=f"{paths.SESSIONS_DIR}/{sid}/pm-response.yaml",
                     message=(
                         f"pm-response.yaml references follow_up "
                         f"{item.follow_up!r}, but no such issue exists."

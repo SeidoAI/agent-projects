@@ -232,7 +232,9 @@ def session_show_cmd(
     except UnknownTaskKindError as exc:
         click.echo(f"  task_kind: {task_kind!r} — UNKNOWN ({exc})")
 
-    sdir = resolved / "sessions" / session_id
+    from tripwire.core import paths as _paths
+
+    sdir = _paths.session_dir(resolved, session_id)
     sr_path = sdir / "self-review.md"
     pr_path = sdir / "pm-response.yaml"
 
@@ -385,6 +387,8 @@ def session_progress_cmd(
 
     Active = session.status in {queued, executing, active}.
     """
+    from tripwire.core import paths as _paths
+
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
@@ -395,7 +399,7 @@ def session_progress_cmd(
 
     reports: list[dict] = []
     for s in sessions:
-        checklist_path = resolved / "sessions" / s.id / "task-checklist.md"
+        checklist_path = _paths.session_dir(resolved, s.id) / "task-checklist.md"
         total, done = _parse_task_checklist(checklist_path)
         reports.append(
             {
@@ -1131,7 +1135,7 @@ def session_abandon_cmd(session_id: str, project_dir: Path) -> None:
     is_flag=True,
     default=False,
     help=(
-        "Delete `.tripwire/acks/*-<session_id>.json` so the agent "
+        "Delete `.tripwire/acks/*-<session_id>-*.json` so the agent "
         "re-encounters every tripwire on resume. Use after substantial "
         "rework (PR closed + reopened, plan.md materially edited)."
     ),
@@ -2461,6 +2465,8 @@ def session_prepare_review_cmd(
                 items.append(m.group(1).strip())
         return items
 
+    from tripwire.core import paths as _paths
+
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
@@ -2469,7 +2475,7 @@ def session_prepare_review_cmd(
     except FileNotFoundError as exc:
         raise click.ClickException(f"session '{session_id}' not found") from exc
 
-    sdir = resolved / "sessions" / session_id
+    sdir = _paths.session_dir(resolved, session_id)
     sdir.mkdir(parents=True, exist_ok=True)
     target = sdir / "pr-review.yaml"
     if target.exists() and not force:

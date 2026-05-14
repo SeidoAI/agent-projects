@@ -34,7 +34,7 @@ from tripwire.models.session import (
 
 def test_telemetry_path_lives_under_sessions(tmp_path: Path) -> None:
     """Telemetry log lives at ``<project>/sessions/.routing_telemetry.jsonl``."""
-    expected = tmp_path / "sessions" / ".routing_telemetry.jsonl"
+    expected = tmp_path / "instances" / "sessions" / ".routing_telemetry.jsonl"
     assert telemetry_path(tmp_path) == expected
 
 

@@ -16,7 +16,7 @@ from tripwire.cli.validate_plan import validate_plan_cmd
 
 
 def _write_plan(project_dir: Path, session_id: str, body: str) -> None:
-    artifacts_dir = project_dir / "sessions" / session_id / "artifacts"
+    artifacts_dir = project_dir / "instances" / "sessions" / session_id / "artifacts"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     (artifacts_dir / "plan.md").write_text(body, encoding="utf-8")
 

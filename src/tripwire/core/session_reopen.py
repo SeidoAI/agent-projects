@@ -59,11 +59,11 @@ def reopen_session(
     """Flip a completed session back to ``paused`` and arm the resume path.
 
     When ``reset_acks=True`` (KUI-137), every per-session tripwire ack
-    marker (files named ``<tripwire-id>-<session-id>.json`` under
-    ``<project_dir>/.tripwire/acks/``) is deleted before the audit-log
-    entry is written, and a ``session.acks_reset`` event is emitted.
-    Use this after substantial rework so the agent re-encounters every
-    tripwire fresh on resume.
+    marker (files named ``<workflow>-<session-id>-<tripwire-id>.json``
+    under ``<project_dir>/.tripwire/acks/``) is deleted before the
+    audit-log entry is written, and a ``session.acks_reset`` event is
+    emitted. Use this after substantial rework so the agent
+    re-encounters every tripwire fresh on resume.
 
     Raises:
         FileNotFoundError: session.yaml does not exist.
@@ -172,7 +172,11 @@ def reopen_session(
 
 
 def _reset_session_acks(project_dir: Path, session_id: str, reason: str) -> int:
-    """Delete `<project_dir>/.tripwire/acks/*-<session_id>.json` markers.
+    """Delete `<project_dir>/.tripwire/acks/<workflow>-<session_id>-*.json` markers.
+
+    v0.13.1 the marker name is keyed by (workflow, instance, prompt);
+    matching by the ``-<session_id>-`` infix selects every prompt's
+    ack across all workflows for this instance.
 
     Returns the count of markers deleted. Also emits one
     ``session_acks_reset`` event (skipped when zero markers existed —
@@ -180,12 +184,19 @@ def _reset_session_acks(project_dir: Path, session_id: str, reason: str) -> int:
     """
     from tripwire.core.event_emitter import FileEmitter
 
-    acks_dir = project_dir / ".tripwire" / "acks"
-    suffix = f"-{session_id}.json"
+    acks_dir = project_dir / paths.ACKS_SUBDIR
+    infix = f"-{session_id}-"
     deleted = 0
     if acks_dir.is_dir():
         for marker in acks_dir.iterdir():
-            if marker.is_file() and marker.name.endswith(suffix):
+            if not (marker.is_file() and marker.name.endswith(".json")):
+                continue
+            # Match `<workflow>-<sid>-<prompt>.json` exactly: the
+            # session id must be the middle segment, sandwiched
+            # between two hyphens. An infix substring match is enough
+            # because workflow ids and prompt ids never embed dashes
+            # adjacent to the session id boundary in v0.13.1.
+            if infix in marker.name:
                 try:
                     marker.unlink()
                     deleted += 1

@@ -5,7 +5,7 @@ workflows:
     trigger: session.spawn
     brief-description: "one session: plan, execute, review, ship."
     instance:
-      storage_path: sessions/{instance_id}/session.yaml
+      storage_path: instances/sessions/{instance_id}/session.yaml
       status_field: status
       status_enum:
         - planned
