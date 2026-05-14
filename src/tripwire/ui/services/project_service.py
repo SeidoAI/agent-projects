@@ -90,7 +90,10 @@ class ProjectDetail(ProjectSummary):
     environments: list[str]
     repos: dict[str, dict]
     statuses: list[str]
-    status_transitions: dict[str, list[str]]
+    # v0.13.1 (B8): `status_transitions` was removed — issue transitions
+    # now travel through the `issue-closure` workflow declared in
+    # workflow.yaml. UI consumers should fetch the workflow spec via the
+    # workflow API rather than reading this object.
     label_categories: dict[str, list[str]]
     graph: dict
     orchestration: dict
@@ -498,7 +501,6 @@ def get_project(project_id: str) -> ProjectDetail:
         environments=list(config.environments),
         repos=config_data.get("repos", {}),
         statuses=list(config.statuses),
-        status_transitions=dict(config.status_transitions),
         label_categories=config_data.get("label_categories", {}),
         graph=config_data.get("graph", {}),
         orchestration=config_data.get("orchestration", {}),

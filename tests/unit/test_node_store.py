@@ -140,14 +140,16 @@ class TestNodeExists:
         assert raw.startswith("---\nuuid:")
 
     def test_node_without_source_round_trip(self, project_dir: Path) -> None:
-        # A `planned` node has no source.
-        planned = ConceptNode(
+        # A node may legitimately have no source (e.g. a decision node
+        # that points at docs); status defaults to active per the
+        # concept-freshness workflow's instance.status_enum.
+        sourceless = ConceptNode(
             id="refresh-endpoint",
             type="endpoint",
             name="POST /auth/refresh",
-            status="planned",
+            status="active",
         )
-        save_node(project_dir, planned)
+        save_node(project_dir, sourceless)
         loaded = load_node(project_dir, "refresh-endpoint")
         assert loaded.source is None
-        assert loaded.status == "planned"
+        assert loaded.status == "active"

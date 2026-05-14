@@ -103,6 +103,13 @@ def load_project(project_dir: Path) -> ProjectConfig:
         raise ValueError(
             f"project.yaml must be a YAML mapping, got {type(raw).__name__}"
         )
+    # v0.13.1 (B8): drop the legacy `status_transitions:` block. The
+    # field was the hand-rolled state-machine table for issue lifecycle;
+    # the `issue-closure` workflow in workflow.yaml replaces it. Stripping
+    # at load (rather than failing pydantic's `extra="forbid"`) lets old
+    # project.yaml files keep loading on upgrade — the block becomes
+    # advisory until the project is re-rendered from the template.
+    raw.pop("status_transitions", None)
     return ProjectConfig.model_validate(raw)
 
 

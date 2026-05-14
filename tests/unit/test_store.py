@@ -64,16 +64,14 @@ class TestProject:
         assert reloaded.repos["SeidoAI/web-app-backend"].local == "~/Code/x"
 
     def test_save_full_project_config_round_trip(self, tmp_path: Path) -> None:
+        # v0.13.1 (B8): `status_transitions:` is no longer a ProjectConfig
+        # field — it moved to workflow.yaml's issue-closure routes. Pure
+        # round-trip exercises the simpler shape now.
         config = ProjectConfig(
             name="seido",
             key_prefix="SEI",
             base_branch="main",
             statuses=["planned", "queued", "done"],
-            status_transitions={
-                "planned": ["queued"],
-                "queued": ["done"],
-                "done": [],
-            },
             repos={"SeidoAI/x": RepoEntry(local="~/x")},
             next_issue_number=5,
         )
@@ -81,7 +79,7 @@ class TestProject:
         reloaded = load_project(tmp_path)
         assert reloaded.name == "seido"
         assert reloaded.next_issue_number == 5
-        assert reloaded.status_transitions["queued"] == ["done"]
+        assert reloaded.statuses == ["planned", "queued", "done"]
 
 
 # ----------------------------------------------------------------------------

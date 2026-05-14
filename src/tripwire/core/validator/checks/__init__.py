@@ -60,6 +60,7 @@ from tripwire.core.validator.checks.session_lifecycle import (
 )
 from tripwire.core.validator.checks.structure import (
     check_handoff_artifact,
+    check_instance_shape_conforms,
     check_issue_body_structure,
     check_project_repos_present,
     check_status_transitions,
@@ -88,12 +89,14 @@ REFERENCE_CHECKS = [
 ]
 
 # Structure: required Markdown sections in issue bodies, status transitions,
-# handoff.yaml schema, project.yaml.repos presence.
+# handoff.yaml schema, project.yaml.repos presence, per-workflow instance
+# shape conformance.
 STRUCTURE_CHECKS = [
     check_issue_body_structure,
     check_status_transitions,
     check_handoff_artifact,
     check_project_repos_present,
+    check_instance_shape_conforms,
 ]
 
 # Artifacts: manifest schema valid, completed sessions ship required artifacts.
@@ -198,6 +201,7 @@ ALL_CHECKS = [
     check_pr_review_approved,
     check_session_has_developer_md,
     check_session_has_verified_md,
+    check_instance_shape_conforms,
 ]
 
 

@@ -41,17 +41,11 @@ statuses:
   - abandoned
   - deferred
 
-# Directed graph of allowed status transitions. The validator checks that
-# every issue's status is reachable from `planned` via these transitions.
-status_transitions:
-  planned: [queued, deferred, abandoned]
-  queued: [executing, planned, deferred, abandoned]
-  executing: [in_review, queued, deferred, abandoned]
-  in_review: [verified, executing, deferred]
-  verified: [completed, in_review]
-  completed: []
-  abandoned: [planned]
-  deferred: [planned, queued, abandoned]
+# v0.13.1 (B8): the `status_transitions:` adjacency table that used to
+# live here was removed. Issue transitions are now driven by the
+# `issue-closure` workflow's routes in workflow.yaml. Use
+# `tripwire transition issue-closure <issue-key> <target>` to advance
+# an issue.
 
 # Label categories for the validator to check against.
 label_categories:

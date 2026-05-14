@@ -173,6 +173,43 @@ def tmp_path_project(tmp_path: Path) -> Path:
     # when a route is declared (status-level tripwires are the
     # fallback for routeless transitions, which we don't have here).
     _status_tripwires = "\n".join(f"          - {vid}" for vid in _all_validators)
+    # v0.13.1 (B8): the test workflow now also declares an
+    # ``issue-closure`` workflow because issue-status reachability is
+    # derived from those routes (the legacy
+    # ``project.yaml.status_transitions`` table was removed). The
+    # routes mirror the canonical 8-status issue flow so any test
+    # whose project.yaml inherits this conftest gets the same
+    # transitions the production template ships.
+    _issue_routes_data = [
+        ("planned", "queued"),
+        ("planned", "deferred"),
+        ("planned", "abandoned"),
+        ("queued", "executing"),
+        ("queued", "planned"),
+        ("queued", "deferred"),
+        ("queued", "abandoned"),
+        ("executing", "in_review"),
+        ("executing", "queued"),
+        ("executing", "deferred"),
+        ("executing", "abandoned"),
+        ("in_review", "verified"),
+        ("in_review", "executing"),
+        ("in_review", "deferred"),
+        ("verified", "completed"),
+        ("verified", "in_review"),
+        ("abandoned", "planned"),
+        ("deferred", "planned"),
+        ("deferred", "queued"),
+        ("deferred", "abandoned"),
+    ]
+    _issue_routes_yaml = "".join(
+        f"      - id: issue-{f}-to-{t}\n"
+        f"        actor: pm-agent\n"
+        f"        from: {f}\n"
+        f"        to: {t}\n"
+        f"        kind: forward\n"
+        for f, t in _issue_routes_data
+    )
     (project_dir / "workflow.yaml").write_text(
         "workflow_schema_version: 1\n"
         "workflows:\n"
@@ -198,6 +235,28 @@ def tmp_path_project(tmp_path: Path) -> Path:
         "      - id: abandoned\n"
         "        terminal: true\n"
         "    routes:\n" + "".join(_route_lines)
+        + "  issue-closure:\n"
+        "    actor: pm-agent\n"
+        "    trigger: command.pm-issue-close\n"
+        "    instance:\n"
+        "      storage_path: instances/issues/{instance_id}/issue.yaml\n"
+        "      status_field: status\n"
+        "      status_enum: [planned, queued, executing, in_review,\n"
+        "        verified, completed, abandoned, deferred]\n"
+        "    statuses:\n"
+        "      - id: planned\n"
+        "      - id: queued\n"
+        "      - id: executing\n"
+        "      - id: in_review\n"
+        "      - id: verified\n"
+        "      - id: completed\n"
+        "        terminal: true\n"
+        # `abandoned` still has the `abandoned → planned` rehab route in
+        # the canonical 8-stage flow, so it isn't a sink. Marking it
+        # terminal would trip `workflow/terminal_with_outbound_route`.
+        "      - id: abandoned\n"
+        "      - id: deferred\n"
+        "    routes:\n" + _issue_routes_yaml
     )
     templates = project_dir / "templates" / "artifacts"
     templates.mkdir(parents=True)

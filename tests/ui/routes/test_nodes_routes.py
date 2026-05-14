@@ -40,7 +40,7 @@ def node_client(
         node_project,
         "api-contract",
         type="contract",
-        status="draft",
+        status="stale",
     )
     save_test_issue(
         node_project,
@@ -73,9 +73,11 @@ class TestListNodes:
         assert [n["id"] for n in r.json()] == ["user-model"]
 
     def test_filter_by_status(self, node_client, node_project_id):
+        # v0.13.1 (B9): NodeStatus is {active, stale, archived}. Filter
+        # by `stale` to single out the non-default node in this fixture.
         r = node_client.get(
             f"/api/projects/{node_project_id}/nodes",
-            params={"status": "draft"},
+            params={"status": "stale"},
         )
         assert [n["id"] for n in r.json()] == ["api-contract"]
 

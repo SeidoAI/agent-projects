@@ -367,3 +367,96 @@ def test_instance_id_alias_accepts_legacy_session_id_kwarg(
     assert result.ok is True
     session = load_session(project_with_workflow, "test-session")
     assert session.status.value == "queued"
+
+
+# ---------------------------------------------------------------------------
+# B10 — phase-advancement workflow
+# ---------------------------------------------------------------------------
+
+
+def test_phase_advancement_transition_today_raises_on_load(
+    tmp_path: Path, fake_validate
+) -> None:
+    """Document v0.13.1 behaviour for non-coding-session transitions.
+
+    The B10 promotion adds ``ProjectConfig.current_status_instance`` so
+    the project itself can be a phase-advancement instance. The
+    executor's pipeline is already workflow-agnostic at the gate level
+    (status/route lookups go through ``workflow_id``) — but the
+    instance loader is still ``load_session``. Driving
+    ``phase-advancement`` requires step 8's generic instance loader.
+
+    Until that lands, calling ``execute_transition`` with
+    ``workflow_id="phase-advancement"`` falls through to
+    ``load_session`` and surfaces a structured ``TransitionError`` for
+    the missing session — pinning the current ceiling so a regression
+    that silently mutates the wrong file would surface here.
+    """
+    # Minimal project with phase-advancement declared but no session.
+    (tmp_path / "project.yaml").write_text(
+        "name: test\nkey_prefix: TST\nbase_branch: main\nstatuses: [planned]\n"
+        "repos: {}\nnext_issue_number: 1\nnext_session_number: 1\n"
+        "phase: scoping\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              phase-advancement:
+                actor: pm-agent
+                trigger: command.pm-phase
+                instance:
+                  storage_path: project.yaml
+                  status_field: phase
+                  status_enum: [scoping, scoped]
+                  instance_id_field: name
+                statuses:
+                  - id: scoping
+                  - id: scoped
+                    terminal: true
+                routes:
+                  - id: advance-to-scoped
+                    actor: pm-agent
+                    from: scoping
+                    to: scoped
+                    kind: forward
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    from tripwire.core.workflow.transitions import (
+        TransitionError,
+        execute_transition,
+    )
+
+    # The executor today calls `load_session(project_dir, instance)`
+    # regardless of `workflow_id`. The project name is "test" but
+    # there's no session at instances/sessions/test/session.yaml —
+    # the loader raises FileNotFoundError, which the executor wraps
+    # in TransitionError("session 'test' not found"). When step 8's
+    # generic instance loader lands this test should be updated to
+    # exercise the happy path against ``project.yaml.phase``.
+    with pytest.raises(TransitionError, match="session 'test' not found"):
+        execute_transition(
+            tmp_path,
+            workflow_id="phase-advancement",
+            instance_id="test",
+            target_status="scoped",
+        )
+
+
+def test_project_config_carries_current_status_instance_field() -> None:
+    """B10: ``ProjectConfig.current_status_instance`` is the workflow
+    status-instance id for the project's role as the phase-advancement
+    instance. Defaults to ``None`` so existing project.yaml files load
+    cleanly; the executor back-fills on first transition (step 8).
+    """
+    from tripwire.models.project import ProjectConfig
+
+    config = ProjectConfig(name="t", key_prefix="T")
+    assert config.current_status_instance is None
+    config.current_status_instance = "phase-advancement:t:scoped:1"
+    assert config.current_status_instance == "phase-advancement:t:scoped:1"

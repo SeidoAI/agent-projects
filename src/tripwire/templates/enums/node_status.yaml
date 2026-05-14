@@ -1,15 +1,12 @@
 name: NodeStatus
-description: Concept node lifecycle state
+description: Concept node lifecycle state — aligned with the concept-freshness workflow's instance.status_enum.
 values:
   - id: active
     label: Active
     color: green
-  - id: planned
-    label: Planned
-    color: blue
-  - id: deprecated
-    label: Deprecated
-    color: orange
   - id: stale
     label: Stale
-    color: red
+    color: orange
+  - id: archived
+    label: Archived
+    color: gray

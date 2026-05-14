@@ -477,7 +477,9 @@ def _make_rich_project(root: Path, name: str = "rich", key_prefix: str = "RCH") 
         "environments:\n  - dev\n  - prod\n"
         "repos:\n  SeidoAI/web:\n    local: /tmp/web\n"
         "statuses:\n  - queued\n  - completed\n"
-        "status_transitions:\n  queued: [completed]\n  completed: []\n"
+        # v0.13.1 (B8): `status_transitions:` was removed from
+        # ProjectConfig — issue transitions now live in workflow.yaml's
+        # issue-closure routes. Project detail no longer surfaces it.
         "label_categories:\n"
         "  executor: [ai, human]\n"
         "  verifier: [required, optional]\n"
@@ -545,7 +547,10 @@ class TestGetProject:
         assert detail.environments == ["dev", "prod"]
         assert detail.repos == {"SeidoAI/web": {"local": "/tmp/web"}}
         assert detail.statuses == ["queued", "completed"]
-        assert detail.status_transitions == {"queued": ["completed"], "completed": []}
+        # v0.13.1 (B8): `status_transitions` is no longer a ProjectDetail
+        # field; the same data lives in workflow.yaml's issue-closure
+        # workflow routes, fetched separately by the UI.
+        assert not hasattr(detail, "status_transitions")
         assert detail.label_categories["executor"] == ["ai", "human"]
         assert detail.graph["node_types"] == ["model", "decision"]
         assert detail.orchestration["default_pattern"] == "default"

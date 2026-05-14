@@ -909,8 +909,9 @@ def _apply_pushes(
         body = canonical.pop("body", "")
 
         # Normalise for YAML: datetimes → iso strings, UUIDs → str,
-        # anything else that doesn't round-trip through yaml.safe_dump
-        # gets coerced via json-mode dump.
+        # StrEnum members → their string value, anything else that
+        # doesn't round-trip through yaml.safe_dump gets coerced.
+        from enum import Enum as _Enum
         from uuid import UUID as _UUID
 
         clean: dict[str, object] = {}
@@ -919,6 +920,10 @@ def _apply_pushes(
                 clean[k] = v.isoformat()
             elif isinstance(v, _UUID):
                 clean[k] = str(v)
+            elif isinstance(v, _Enum):
+                # NodeStatus and friends — write the string value so
+                # the canonical workspace YAML stays loader-stable.
+                clean[k] = v.value
             else:
                 clean[k] = v
         dest.write_text(serialize_frontmatter_body(clean, body), encoding="utf-8")

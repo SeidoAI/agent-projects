@@ -111,6 +111,7 @@ from tripwire.core.validator.checks.structure import (
     REQUIRED_EPIC_BODY_HEADINGS,
     REQUIRED_ISSUE_BODY_HEADINGS,
     check_handoff_artifact,
+    check_instance_shape_conforms,
     check_issue_body_structure,
     check_status_transitions,
 )
@@ -1237,6 +1238,7 @@ __all__ = [
     "check_handoff_artifact",
     "check_id_collisions",
     "check_id_format",
+    "check_instance_shape_conforms",
     "check_issue_artifact_presence",
     "check_issue_body_structure",
     "check_issue_session_status_compatibility",

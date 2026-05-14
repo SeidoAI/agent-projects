@@ -131,7 +131,22 @@ class TestInitBasics:
         assert raw["next_issue_number"] == 1
         assert raw["next_session_number"] == 1
         assert "planned" in raw["statuses"]
-        assert "queued" in raw["status_transitions"]["planned"]
+        # v0.13.1 (B8): `status_transitions:` was removed from
+        # project.yaml; issue transitions are declared in the
+        # issue-closure workflow in workflow.yaml. The legacy key
+        # should no longer be rendered.
+        assert "status_transitions" not in raw
+        # workflow.yaml should declare an issue-closure workflow (the
+        # contract that drives transition-time issue gates). Its
+        # instance.status_enum is the source of truth for legal issue
+        # status values.
+        wf_raw = yaml.safe_load((target / "workflow.yaml").read_text())
+        ic = wf_raw["workflows"]["issue-closure"]
+        # The shipped template gates the closing step; declared statuses
+        # include the canonical lifecycle via `instance.status_enum`.
+        assert "instance" in ic
+        assert "planned" in ic["instance"]["status_enum"]
+        assert "queued" in ic["instance"]["status_enum"]
 
     def test_claude_md_has_project_name_and_prefix(
         self, runner: CliRunner, tmp_path: Path
