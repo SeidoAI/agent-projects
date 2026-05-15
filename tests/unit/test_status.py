@@ -88,9 +88,7 @@ class TestBuildIssueTransitions:
         # to "trivially reachable".
         assert build_issue_transitions(tmp_path) == {}
 
-    def test_collapses_issue_closure_routes_to_adjacency(
-        self, tmp_path: Path
-    ) -> None:
+    def test_collapses_issue_closure_routes_to_adjacency(self, tmp_path: Path) -> None:
         (tmp_path / "workflow.yaml").write_text(
             dedent(
                 """\

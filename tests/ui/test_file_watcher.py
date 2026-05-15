@@ -66,7 +66,10 @@ class TestClassify:
 
     def test_session_artifacts_subdir_is_artifact(self, tmp_path: Path):
         path = (
-            tmp_path / "instances" / "sessions" / "backend-realtime"
+            tmp_path
+            / "instances"
+            / "sessions"
+            / "backend-realtime"
             / "artifacts"
             / "task-checklist.md"
         )
@@ -134,7 +137,9 @@ class TestShouldIgnore:
         assert _should_ignore(tmp_path / "instances" / "issues" / ".DS_Store", tmp_path)
 
     def test_swap_file(self, tmp_path: Path):
-        assert _should_ignore(tmp_path / "instances" / "issues" / "x.yaml.swp", tmp_path)
+        assert _should_ignore(
+            tmp_path / "instances" / "issues" / "x.yaml.swp", tmp_path
+        )
 
     def test_trailing_tilde(self, tmp_path: Path):
         assert _should_ignore(tmp_path / "instances" / "issues" / "x.yaml~", tmp_path)
@@ -272,7 +277,9 @@ class TestProjectFileHandler:
         handler = ProjectFileHandler(
             "p", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
-        handler.on_any_event(DirCreatedEvent(str(project / "instances" / "issues" / "KUI-2")))
+        handler.on_any_event(
+            DirCreatedEvent(str(project / "instances" / "issues" / "KUI-2"))
+        )
         time.sleep(0.05)
         assert q.qsize() == 0
 
@@ -284,7 +291,9 @@ class TestProjectFileHandler:
         )
         handler.on_any_event(FileModifiedEvent(str(project / ".git" / "HEAD")))
         handler.on_any_event(
-            FileModifiedEvent(str(project / "instances" / "nodes" / "tripwire-graph-index.yaml"))
+            FileModifiedEvent(
+                str(project / "instances" / "nodes" / "tripwire-graph-index.yaml")
+            )
         )
         time.sleep(0.05)
         assert q.qsize() == 0
@@ -296,7 +305,9 @@ class TestProjectFileHandler:
             "pid", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
         handler.on_any_event(
-            FileModifiedEvent(str(project / "instances" / "issues" / "KUI-1" / "issue.yaml"))
+            FileModifiedEvent(
+                str(project / "instances" / "issues" / "KUI-1" / "issue.yaml")
+            )
         )
         time.sleep(0.08)
 
@@ -325,7 +336,9 @@ class TestProjectFileHandler:
         handler = ProjectFileHandler(
             "p", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
-        handler.on_any_event(FileDeletedEvent(str(project / "instances" / "nodes" / "foo.yaml")))
+        handler.on_any_event(
+            FileDeletedEvent(str(project / "instances" / "nodes" / "foo.yaml"))
+        )
         time.sleep(0.05)
         fut = asyncio.run_coroutine_threadsafe(q.get(), loop_in_thread)
         event = fut.result(timeout=1)
@@ -361,7 +374,9 @@ class TestProjectFileHandler:
         handler = ProjectFileHandler(
             "p", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
-        handler.on_any_event(FileCreatedEvent(str(project / "instances" / "nodes" / "new.yaml")))
+        handler.on_any_event(
+            FileCreatedEvent(str(project / "instances" / "nodes" / "new.yaml"))
+        )
         time.sleep(0.05)
         fut = asyncio.run_coroutine_threadsafe(q.get(), loop_in_thread)
         event = fut.result(timeout=1)

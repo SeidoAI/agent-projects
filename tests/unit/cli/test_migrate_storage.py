@@ -265,10 +265,7 @@ class TestMigrateStorage:
         # Lock got the workflow segment.
         assert not (project / ".tripwire" / "locks" / "transition-s1.lock").exists()
         assert (
-            project
-            / ".tripwire"
-            / "locks"
-            / "transition-coding-session-s1.lock"
+            project / ".tripwire" / "locks" / "transition-coding-session-s1.lock"
         ).is_file()
 
         # Ack got the workflow prefix.

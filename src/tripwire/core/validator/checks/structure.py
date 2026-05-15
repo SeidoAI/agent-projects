@@ -432,10 +432,7 @@ def check_instance_shape_conforms(ctx: ValidationContext) -> list[CheckResult]:
                                 f"{required!r} declared on "
                                 f"workflow.yaml `instance.required_fields`."
                             ),
-                            fix_hint=(
-                                f"Add `{required}: <value>` to "
-                                f"{rel_path}."
-                            ),
+                            fix_hint=(f"Add `{required}: <value>` to {rel_path}."),
                         )
                     )
 

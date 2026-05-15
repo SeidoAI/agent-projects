@@ -108,6 +108,7 @@ class TestSpawnFromRemote:
                 "git",
                 "checkout",
             ]:
+
                 class _R:
                     returncode = 0
                     stdout = ""

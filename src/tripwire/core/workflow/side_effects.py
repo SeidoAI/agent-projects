@@ -19,12 +19,20 @@ from tripwire.models.session import AgentSession
 
 _DECLARED_SIDE_EFFECT_IDS: frozenset[str] = frozenset(
     {
-        "sweep_issues_forward", "rebase_pt_branch",
-        "flip_drafts_to_ready", "flip_drafts_to_draft",
-        "verify_prs_merged", "verify_review_ok", "verify_issue_artifacts",
-        "kill_runtime", "close_open_prs", "remove_worktrees",
-        "append_pm_followup_stub", "reset_acks",
-        "append_audit_log_entry", "append_telemetry_row",
+        "sweep_issues_forward",
+        "rebase_pt_branch",
+        "flip_drafts_to_ready",
+        "flip_drafts_to_draft",
+        "verify_prs_merged",
+        "verify_review_ok",
+        "verify_issue_artifacts",
+        "kill_runtime",
+        "close_open_prs",
+        "remove_worktrees",
+        "append_pm_followup_stub",
+        "reset_acks",
+        "append_audit_log_entry",
+        "append_telemetry_row",
         "close_active_engagement",
     }
 )
@@ -107,9 +115,7 @@ def append_audit_record(
         pass
 
 
-def append_telemetry_record(
-    project_dir: Path, *, session: AgentSession
-) -> None:
+def append_telemetry_record(project_dir: Path, *, session: AgentSession) -> None:
     """Append a routing-telemetry row. Best-effort; telemetry must never
     block a transition. ``close_active_engagement`` must run first so
     ``duration_min`` derives from a closed engagement on terminals."""

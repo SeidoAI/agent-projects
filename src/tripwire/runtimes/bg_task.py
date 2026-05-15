@@ -86,9 +86,19 @@ def run_bg_task(
         try:
             out, err = proc.communicate(timeout=5.0)
         except subprocess.TimeoutExpired:
-            out = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-            err = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-        return BgTaskResult(returncode=-1, stdout=out or "", stderr=err or "", timed_out=True)
+            out = (
+                exc.stdout.decode()
+                if isinstance(exc.stdout, bytes)
+                else (exc.stdout or "")
+            )
+            err = (
+                exc.stderr.decode()
+                if isinstance(exc.stderr, bytes)
+                else (exc.stderr or "")
+            )
+        return BgTaskResult(
+            returncode=-1, stdout=out or "", stderr=err or "", timed_out=True
+        )
 
     return BgTaskResult(
         returncode=proc.returncode,

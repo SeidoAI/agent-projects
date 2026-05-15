@@ -179,13 +179,23 @@ class TestSessionHasDeveloperMd:
         save_test_issue,
     ):
         _save_issue(save_test_issue, tmp_path_project, "TMP-1", status="in_review")
-        save_test_session(
-            tmp_path_project, "s1", status="in_review", issues=["TMP-1"]
-        )
-        (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").parent.mkdir(parents=True, exist_ok=True)
-        (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").write_text(
-            "## Developer notes\n\nReady for review.\n", encoding="utf-8"
-        )
+        save_test_session(tmp_path_project, "s1", status="in_review", issues=["TMP-1"])
+        (
+            tmp_path_project
+            / "instances"
+            / "issues"
+            / "TMP-1"
+            / "docs"
+            / "developer.md"
+        ).parent.mkdir(parents=True, exist_ok=True)
+        (
+            tmp_path_project
+            / "instances"
+            / "issues"
+            / "TMP-1"
+            / "docs"
+            / "developer.md"
+        ).write_text("## Developer notes\n\nReady for review.\n", encoding="utf-8")
         ctx = load_context(tmp_path_project)
         assert check_session_has_developer_md(ctx) == []
 
@@ -196,9 +206,7 @@ class TestSessionHasDeveloperMd:
         save_test_issue,
     ):
         _save_issue(save_test_issue, tmp_path_project, "TMP-1", status="in_review")
-        save_test_session(
-            tmp_path_project, "s1", status="in_review", issues=["TMP-1"]
-        )
+        save_test_session(tmp_path_project, "s1", status="in_review", issues=["TMP-1"])
         # No developer.md written on purpose.
         ctx = load_context(tmp_path_project)
         results = check_session_has_developer_md(ctx)
@@ -220,12 +228,8 @@ class TestSessionHasVerifiedMd:
         save_test_issue,
     ):
         _save_issue(save_test_issue, tmp_path_project, "TMP-1", status="verified")
-        save_test_session(
-            tmp_path_project, "s1", status="verified", issues=["TMP-1"]
-        )
-        issue_docs_dir = (
-            tmp_path_project / "instances" / "issues" / "TMP-1" / "docs"
-        )
+        save_test_session(tmp_path_project, "s1", status="verified", issues=["TMP-1"])
+        issue_docs_dir = tmp_path_project / "instances" / "issues" / "TMP-1" / "docs"
         issue_docs_dir.mkdir(parents=True, exist_ok=True)
         (issue_docs_dir / "developer.md").write_text("dev notes\n", encoding="utf-8")
         (issue_docs_dir / "verified.md").write_text(
@@ -241,15 +245,25 @@ class TestSessionHasVerifiedMd:
         save_test_issue,
     ):
         _save_issue(save_test_issue, tmp_path_project, "TMP-1", status="verified")
-        save_test_session(
-            tmp_path_project, "s1", status="verified", issues=["TMP-1"]
-        )
+        save_test_session(tmp_path_project, "s1", status="verified", issues=["TMP-1"])
         # developer.md present (so the developer-md check doesn't noise),
         # but verified.md intentionally missing.
-        (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").parent.mkdir(parents=True, exist_ok=True)
-        (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").write_text(
-            "dev notes\n", encoding="utf-8"
-        )
+        (
+            tmp_path_project
+            / "instances"
+            / "issues"
+            / "TMP-1"
+            / "docs"
+            / "developer.md"
+        ).parent.mkdir(parents=True, exist_ok=True)
+        (
+            tmp_path_project
+            / "instances"
+            / "issues"
+            / "TMP-1"
+            / "docs"
+            / "developer.md"
+        ).write_text("dev notes\n", encoding="utf-8")
         ctx = load_context(tmp_path_project)
         results = check_session_has_verified_md(ctx)
         assert any(r.code == "session/verified_md_missing" for r in results), (

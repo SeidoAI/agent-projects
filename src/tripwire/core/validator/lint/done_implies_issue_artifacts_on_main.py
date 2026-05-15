@@ -66,10 +66,7 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
     for entity in done_issues:
         issue = entity.model
         for fname in manifest.issue_required:
-            rel = (
-                f"{paths.ISSUES_DIR}/{issue.id}/"
-                f"{paths.ISSUE_DOCS_SUBDIR}/{fname}"
-            )
+            rel = f"{paths.ISSUES_DIR}/{issue.id}/{paths.ISSUE_DOCS_SUBDIR}/{fname}"
             if rel in on_main:
                 continue
             results.append(

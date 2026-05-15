@@ -201,7 +201,9 @@ def test_cost_overrun_e2e_sigterms_real_subprocess_and_pauses_session(
         session = load_session(project, "s1")
         assert session.status == "paused"
         # 3. plan.md has the follow-up block.
-        plan_text = (project / "instances" / "sessions" / "s1" / "artifacts" / "plan.md").read_text()
+        plan_text = (
+            project / "instances" / "sessions" / "s1" / "artifacts" / "plan.md"
+        ).read_text()
         assert "cost overrun" in plan_text.lower()
         assert "monitor:tripwire=monitor/cost_overrun" in plan_text
     finally:
@@ -236,7 +238,9 @@ def test_post_pr_watcher_e2e_reengages_on_missing_pt_pr_after_10_min(
     )
     # Plan.md must already exist for the inject to land. The fixture
     # writes a one-line stub.
-    plan_path = project / "instances" / "sessions" / "s_active" / "artifacts" / "plan.md"
+    plan_path = (
+        project / "instances" / "sessions" / "s_active" / "artifacts" / "plan.md"
+    )
 
     from tripwire.core.pr_watcher import PRState
     from tripwire.core.pr_watcher_daemon import (

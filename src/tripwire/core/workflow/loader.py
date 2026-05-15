@@ -166,9 +166,7 @@ def _audit_workflow_shape(wf_id: str, raw: dict) -> list[WorkflowFinding]:
 
         instance_raw = raw.get("instance")
         if isinstance(instance_raw, dict):
-            unknown_instance = (
-                set(instance_raw.keys()) - _RECOGNIZED_INSTANCE_KEYS
-            )
+            unknown_instance = set(instance_raw.keys()) - _RECOGNIZED_INSTANCE_KEYS
             for key in sorted(unknown_instance):
                 findings.append(
                     WorkflowFinding(

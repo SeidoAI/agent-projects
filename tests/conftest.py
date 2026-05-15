@@ -234,8 +234,7 @@ def tmp_path_project(tmp_path: Path) -> Path:
         "      - id: failed\n"
         "      - id: abandoned\n"
         "        terminal: true\n"
-        "    routes:\n" + "".join(_route_lines)
-        + "  issue-closure:\n"
+        "    routes:\n" + "".join(_route_lines) + "  issue-closure:\n"
         "    actor: pm-agent\n"
         "    trigger: command.pm-issue-close\n"
         "    instance:\n"

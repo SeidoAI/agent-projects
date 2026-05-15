@@ -175,7 +175,14 @@ def test_run_pm_review_writes_artifact(tmp_path, clean_validator):
     pd = _scaffold_project(tmp_path)
     verdict = run_pm_review(pd, session_id="pm-review-target")
 
-    artifact = pd / "instances" / "sessions" / "pm-review-target" / "artifacts" / "pm-review.md"
+    artifact = (
+        pd
+        / "instances"
+        / "sessions"
+        / "pm-review-target"
+        / "artifacts"
+        / "pm-review.md"
+    )
     assert artifact.is_file()
     assert verdict.artifact_path == artifact
     text = artifact.read_text(encoding="utf-8")

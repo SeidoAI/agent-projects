@@ -141,7 +141,9 @@ class TestConcurrentFix:
 
         # Every issue file now has a uuid.
         for n in range(1, 11):
-            fm = _read_frontmatter(target / "instances" / "issues" / f"TST-{n}" / "issue.yaml")
+            fm = _read_frontmatter(
+                target / "instances" / "issues" / f"TST-{n}" / "issue.yaml"
+            )
             assert "uuid" in fm, f"TST-{n} missing uuid after concurrent --fix"
             uid = str(fm["uuid"]).replace("-", "")
             assert len(uid) == 32, f"TST-{n} uuid has wrong shape: {fm['uuid']}"

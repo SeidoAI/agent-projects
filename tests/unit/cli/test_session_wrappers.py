@@ -82,9 +82,7 @@ def test_kill_runtime_sigterm_recorded_pid(
     assert "SIGTERM" in result.output
 
 
-def test_kill_runtime_no_pid_skips(
-    tmp_path_project: Path, save_test_session
-) -> None:
+def test_kill_runtime_no_pid_skips(tmp_path_project: Path, save_test_session) -> None:
     save_test_session(tmp_path_project, "s1", status="planned")
     runner = CliRunner()
     result = runner.invoke(
@@ -182,9 +180,7 @@ def test_close_prs_invokes_per_branch_helper(
     # patching the source module is sufficient.
     monkeypatch.setattr(sa, "_close_pr_for_branch", fake_close)
     # Belt-and-braces: any future re-export on cli.session is also patched.
-    monkeypatch.setattr(
-        cli_session, "_close_pr_for_branch", fake_close, raising=False
-    )
+    monkeypatch.setattr(cli_session, "_close_pr_for_branch", fake_close, raising=False)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -198,9 +194,7 @@ def test_close_prs_invokes_per_branch_helper(
     assert "closed PR #17" in result.output
 
 
-def test_close_prs_no_worktrees(
-    tmp_path_project: Path, save_test_session
-) -> None:
+def test_close_prs_no_worktrees(tmp_path_project: Path, save_test_session) -> None:
     save_test_session(tmp_path_project, "s1", status="planned")
     runner = CliRunner()
     result = runner.invoke(
@@ -570,9 +564,7 @@ def test_followup_stub_appends_when_absent(
     assert "tripwire session spawn s1 --resume" in after
 
 
-def test_followup_stub_idempotent(
-    tmp_path_project: Path, save_test_session
-) -> None:
+def test_followup_stub_idempotent(tmp_path_project: Path, save_test_session) -> None:
     """Re-running once the section is present is a clean no-op."""
     from tripwire.core import paths as _paths
 
@@ -663,9 +655,7 @@ def test_prepare_for_completion_happy_path(
     wt_dir = tmp_path_project / "code-wt-s1"
     wt_dir.mkdir()
 
-    rs = _mk_runtime_state(
-        tmp_path_project, draft_url="https://github.com/o/r/pull/9"
-    )
+    rs = _mk_runtime_state(tmp_path_project, draft_url="https://github.com/o/r/pull/9")
     rs.worktrees[0].worktree_path = str(wt_dir)
     save_test_session(
         tmp_path_project, "s1", status="verified", runtime_state=rs.model_dump()
@@ -765,9 +755,7 @@ def test_prepare_for_completion_pr_blocked(
 
     def fake_run(cmd, **kwargs):
         if cmd[:3] == ["gh", "pr", "view"]:
-            payload = (
-                '{"number": 42, "state": "OPEN", "mergeStateStatus": "BLOCKED"}'
-            )
+            payload = '{"number": 42, "state": "OPEN", "mergeStateStatus": "BLOCKED"}'
             return _mk_completed(0, stdout=payload)
         raise AssertionError(f"unexpected cmd: {cmd}")
 

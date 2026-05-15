@@ -248,7 +248,13 @@ class TestApproveArtifact:
         status = approve_artifact(
             project_with_manifest, "s1", "plan", feedback="looks good"
         )
-        sidecar = project_with_manifest / "instances" / "sessions" / "s1" / "plan.approval.yaml"
+        sidecar = (
+            project_with_manifest
+            / "instances"
+            / "sessions"
+            / "s1"
+            / "plan.approval.yaml"
+        )
         assert sidecar.is_file()
         raw = yaml.safe_load(sidecar.read_text(encoding="utf-8"))
         assert raw["approved"] is True
@@ -289,7 +295,13 @@ class TestRejectArtifact:
         status = reject_artifact(
             project_with_manifest, "s1", "plan", feedback="needs rework"
         )
-        sidecar = project_with_manifest / "instances" / "sessions" / "s1" / "plan.approval.yaml"
+        sidecar = (
+            project_with_manifest
+            / "instances"
+            / "sessions"
+            / "s1"
+            / "plan.approval.yaml"
+        )
         raw = yaml.safe_load(sidecar.read_text(encoding="utf-8"))
         assert raw["approved"] is False
         assert raw["feedback"] == "needs rework"
@@ -323,7 +335,13 @@ class TestAtomicSidecarWrite:
         approve_artifact(project_with_manifest, "s1", "plan", feedback="first")
         reject_artifact(project_with_manifest, "s1", "plan", feedback="changed mind")
 
-        sidecar = project_with_manifest / "instances" / "sessions" / "s1" / "plan.approval.yaml"
+        sidecar = (
+            project_with_manifest
+            / "instances"
+            / "sessions"
+            / "s1"
+            / "plan.approval.yaml"
+        )
         raw = yaml.safe_load(sidecar.read_text(encoding="utf-8"))
         assert raw["approved"] is False
         assert raw["feedback"] == "changed mind"

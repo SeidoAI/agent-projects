@@ -52,7 +52,10 @@ def test_self_review_with_pm_response_passes(
     save_test_session(tmp_path_project, "s1", status="in_review")
     _stub_main(
         monkeypatch,
-        {"instances/sessions/s1/self-review.md", "instances/sessions/s1/pm-response.yaml"},
+        {
+            "instances/sessions/s1/self-review.md",
+            "instances/sessions/s1/pm-response.yaml",
+        },
     )
 
     ctx = load_context(tmp_path_project)

@@ -53,7 +53,9 @@ class TestSpawnCallsStrictCheckFirst:
         )
         write_handoff_yaml(tmp_path_project, "s-placeholder")
         # Write a scaffold-only plan.md.
-        (tmp_path_project / "instances" / "sessions" / "s-placeholder" / "plan.md").write_text(
+        (
+            tmp_path_project / "instances" / "sessions" / "s-placeholder" / "plan.md"
+        ).write_text(
             "# Plan — <session-id>\n\n## Goal\nWhat is this session trying "
             "to achieve, in one paragraph?\n",
             encoding="utf-8",

@@ -126,10 +126,7 @@ def test_hook_passes_with_substantive_ack(tmp_path: Path) -> None:
     )
 
     marker = (
-        project_dir
-        / ".tripwire"
-        / "acks"
-        / "coding-session-fixture-1-self-review.json"
+        project_dir / ".tripwire" / "acks" / "coding-session-fixture-1-self-review.json"
     )
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text(

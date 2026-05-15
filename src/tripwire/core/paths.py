@@ -372,20 +372,14 @@ LOCKS_SUBDIR = ".tripwire/locks"
 ACKS_SUBDIR = ".tripwire/acks"
 
 
-def transition_lock_path(
-    project_dir: Path, workflow_id: str, instance_id: str
-) -> Path:
+def transition_lock_path(project_dir: Path, workflow_id: str, instance_id: str) -> Path:
     """Per-(workflow, instance) transition lock path.
 
     `.tripwire/locks/transition-<workflow>-<instance>.lock`. The
     workflow segment disambiguates a same-named instance id appearing
     under multiple workflows (e.g. an issue id and a session id that
     happen to match)."""
-    return (
-        project_dir
-        / LOCKS_SUBDIR
-        / f"transition-{workflow_id}-{instance_id}.lock"
-    )
+    return project_dir / LOCKS_SUBDIR / f"transition-{workflow_id}-{instance_id}.lock"
 
 
 def ack_marker_path(
@@ -400,11 +394,7 @@ def ack_marker_path(
     moved the workflow segment to the front so glob filters by
     workflow (and reset-by-workflow operations) are straightforward.
     """
-    return (
-        project_dir
-        / ACKS_SUBDIR
-        / f"{workflow_id}-{instance_id}-{prompt_id}.json"
-    )
+    return project_dir / ACKS_SUBDIR / f"{workflow_id}-{instance_id}-{prompt_id}.json"
 
 
 def resolve_command_path(project_dir: Path, command_name: str) -> Path:

@@ -44,9 +44,7 @@ class TestRunBgTask:
         """stderr and stdout are distinct streams in the result; one
         does not bleed into the other."""
         script = (
-            "import sys; "
-            "sys.stdout.write('to-out\\n'); "
-            "sys.stderr.write('to-err\\n')"
+            "import sys; sys.stdout.write('to-out\\n'); sys.stderr.write('to-err\\n')"
         )
         result = run_bg_task([sys.executable, "-c", script])
 

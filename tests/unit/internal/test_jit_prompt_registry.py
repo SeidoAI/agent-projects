@@ -52,8 +52,7 @@ def test_jit_prompt_context_ack_path_layout(tmp_path: Path) -> None:
     ack = ctx.ack_path("self-review")
     # v0.13.1: marker name is `<workflow>-<sid>-<prompt>.json`.
     assert (
-        ack
-        == tmp_path / ".tripwire" / "acks" / "coding-session-v08-x-self-review.json"
+        ack == tmp_path / ".tripwire" / "acks" / "coding-session-v08-x-self-review.json"
     )
 
 

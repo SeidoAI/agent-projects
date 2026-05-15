@@ -375,9 +375,7 @@ def pause_session(project_dir: Path, session_id: str) -> SessionResult:
                 flags={"action": "ui_pause_session"},
             )
         except TransitionError as exc:
-            raise SessionRuntimeError(
-                f"executor refused transition: {exc}"
-            ) from exc
+            raise SessionRuntimeError(f"executor refused transition: {exc}") from exc
         if not transition.ok:
             raise SessionRuntimeError(
                 f"transition to paused rejected: "

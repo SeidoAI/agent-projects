@@ -229,7 +229,8 @@ def test_referenced_by_includes_comment_refs(tmp_path: Path) -> None:
     comment_refs_into_anything = [
         e
         for e in cache.edges
-        if e.type == "refs" and e.source_file.startswith("instances/issues/TST-1/comments/")
+        if e.type == "refs"
+        and e.source_file.startswith("instances/issues/TST-1/comments/")
     ]
     # If the comment emitted any refs edges (it can), they must show up
     # in referenced_by. Absent any body-side lowercase ref, this loop
@@ -284,7 +285,9 @@ def test_save_session_invalidates_cache(tmp_path: Path) -> None:
     post = load_index(tmp_path)
     assert post is not None, "save_session should have updated the cache file"
     post_session_edges = [
-        e for e in post.edges if e.source_file == "instances/sessions/session-x/session.yaml"
+        e
+        for e in post.edges
+        if e.source_file == "instances/sessions/session-x/session.yaml"
     ]
     assert len(post_session_edges) >= 2  # one ref edge per linked issue
     targets = {e.to_id for e in post_session_edges}

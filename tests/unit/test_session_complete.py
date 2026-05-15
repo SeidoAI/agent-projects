@@ -91,10 +91,12 @@ def test_complete_refuses_without_review(
 ):
     """Spec §11.2 step 4 — review.json is required, no bypass available."""
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
-    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").parent.mkdir(parents=True, exist_ok=True)
-    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").write_text(
-        "# notes\n", encoding="utf-8"
-    )
+    (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md"
+    ).parent.mkdir(parents=True, exist_ok=True)
+    (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md"
+    ).write_text("# notes\n", encoding="utf-8")
     save_test_session(
         tmp_path_project,
         "s1",
@@ -111,10 +113,12 @@ def test_complete_refuses_on_failed_review(
 ):
     """Spec §11.2 step 4 — exit_code > 1 blocks complete."""
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
-    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").parent.mkdir(parents=True, exist_ok=True)
-    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").write_text(
-        "# notes\n", encoding="utf-8"
-    )
+    (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md"
+    ).parent.mkdir(parents=True, exist_ok=True)
+    (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md"
+    ).write_text("# notes\n", encoding="utf-8")
     save_test_session(
         tmp_path_project,
         "s1",
@@ -132,10 +136,12 @@ def test_complete_dry_run_passes_when_gates_satisfied(
     tmp_path_project: Path, save_test_session, save_test_issue, stub_pr_merged
 ):
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
-    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").parent.mkdir(parents=True, exist_ok=True)
-    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").write_text(
-        "# notes\n", encoding="utf-8"
-    )
+    (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md"
+    ).parent.mkdir(parents=True, exist_ok=True)
+    (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md"
+    ).write_text("# notes\n", encoding="utf-8")
     save_test_session(
         tmp_path_project,
         "s1",
@@ -162,10 +168,12 @@ def test_complete_closes_issues_and_transitions_session(
     the gates + status flip now.
     """
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
-    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").parent.mkdir(parents=True, exist_ok=True)
-    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").write_text(
-        "# notes\n", encoding="utf-8"
-    )
+    (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md"
+    ).parent.mkdir(parents=True, exist_ok=True)
+    (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md"
+    ).write_text("# notes\n", encoding="utf-8")
     save_test_session(
         tmp_path_project,
         "s1",

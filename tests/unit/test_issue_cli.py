@@ -58,15 +58,19 @@ def test_issue_artifact_init_writes_file(tmp_path_project: Path, save_test_issue
         ],
     )
     assert result.exit_code == 0, result.output
-    assert (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").is_file()
+    assert (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md"
+    ).is_file()
 
 
 def test_issue_artifact_init_refuses_overwrite(tmp_path_project: Path, save_test_issue):
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
-    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").parent.mkdir(parents=True, exist_ok=True)
-    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").write_text(
-        "# existing\n", encoding="utf-8"
-    )
+    (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md"
+    ).parent.mkdir(parents=True, exist_ok=True)
+    (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md"
+    ).write_text("# existing\n", encoding="utf-8")
     runner = CliRunner()
     result = runner.invoke(
         issue_cmd,
@@ -126,10 +130,12 @@ def test_issue_artifact_verify_passes_when_present(
     tmp_path_project: Path, save_test_issue
 ):
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
-    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").parent.mkdir(parents=True, exist_ok=True)
-    (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").write_text(
-        "# notes\n", encoding="utf-8"
-    )
+    (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md"
+    ).parent.mkdir(parents=True, exist_ok=True)
+    (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md"
+    ).write_text("# notes\n", encoding="utf-8")
     runner = CliRunner()
     result = runner.invoke(
         issue_cmd,

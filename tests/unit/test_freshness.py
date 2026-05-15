@@ -155,7 +155,9 @@ class TestCheckNodeFreshness:
     def test_no_source_status(self) -> None:
         # A node without `source:` always reports NO_SOURCE regardless of
         # its lifecycle status. Use the v0.13.1 default `active` value.
-        node = ConceptNode(id="sourceless-x", type="endpoint", name="x", status="active")
+        node = ConceptNode(
+            id="sourceless-x", type="endpoint", name="x", status="active"
+        )
         result = check_node_freshness(node, ProjectConfig(name="t", key_prefix="T"))
         assert result.status == FreshnessStatus.NO_SOURCE
 

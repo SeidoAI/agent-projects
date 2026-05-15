@@ -163,11 +163,7 @@ def classify(
     if parts and parts[0] == "instances":
         sub = parts[1:]
         sub_suffix = suffix
-        if (
-            len(sub) == 3
-            and sub[0] == "issues"
-            and sub[2] == "issue.yaml"
-        ):
+        if len(sub) == 3 and sub[0] == "issues" and sub[2] == "issue.yaml":
             return _event(project_id, "issue", sub[1], action, rel_posix)
         if (
             len(sub) == 2
@@ -176,25 +172,17 @@ def classify(
             and sub[1] != "tripwire-graph-index.yaml"
         ):
             return _event(project_id, "node", stem, action, rel_posix)
-        if (
-            len(sub) == 3
-            and sub[0] == "sessions"
-            and sub[2] == "session.yaml"
-        ):
+        if len(sub) == 3 and sub[0] == "sessions" and sub[2] == "session.yaml":
             return _event(project_id, "session", sub[1], action, rel_posix)
         if len(sub) == 3 and sub[0] == "sessions" and sub_suffix == ".md":
-            return _event(
-                project_id, "artifact", f"{sub[1]}/{stem}", action, rel_posix
-            )
+            return _event(project_id, "artifact", f"{sub[1]}/{stem}", action, rel_posix)
         if (
             len(sub) == 4
             and sub[0] == "sessions"
             and sub[2] == "artifacts"
             and sub_suffix == ".md"
         ):
-            return _event(
-                project_id, "artifact", f"{sub[1]}/{stem}", action, rel_posix
-            )
+            return _event(project_id, "artifact", f"{sub[1]}/{stem}", action, rel_posix)
 
     # inbox/<id>.md — PM-agent escalation entries (KUI-? phase D).
     # entity_id is the bare entry id so the frontend can invalidate

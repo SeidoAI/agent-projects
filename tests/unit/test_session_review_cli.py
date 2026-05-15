@@ -60,7 +60,9 @@ def test_review_with_issue_writes_verified(
         0,
         1,
     ), result.output  # may emit notes due to zero PR files
-    verified = tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "verified.md"
+    verified = (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "verified.md"
+    )
     assert verified.is_file()
     text = verified.read_text(encoding="utf-8")
     assert "Verified by" in text
@@ -112,7 +114,9 @@ def test_review_verified_md_rendered_from_template(
             ],
         )
     assert result.exit_code in (0, 1), result.output
-    verified = tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "verified.md"
+    verified = (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "verified.md"
+    )
     assert verified.is_file()
     text = verified.read_text(encoding="utf-8")
     # Header from the template.

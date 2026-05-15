@@ -22,7 +22,9 @@ from tripwire.core.workflow.instance_io import (
 )
 
 
-def _write_workflow(tmp_path: Path, storage_path: str, *, with_instance: bool = True) -> None:
+def _write_workflow(
+    tmp_path: Path, storage_path: str, *, with_instance: bool = True
+) -> None:
     """Write a minimal workflow.yaml with one workflow named ``demo``."""
     if with_instance:
         instance_block = dedent(
@@ -59,7 +61,8 @@ def _write_workflow(tmp_path: Path, storage_path: str, *, with_instance: bool = 
         # Indent the instance block under `demo:` (six spaces).
         .replace(
             "actor: pm-agent\n",
-            "actor: pm-agent\n" + "".join(
+            "actor: pm-agent\n"
+            + "".join(
                 "    " + line + "\n" if line else ""
                 for line in instance_block.splitlines()
             )

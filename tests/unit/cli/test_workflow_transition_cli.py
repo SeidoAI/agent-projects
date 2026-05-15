@@ -152,7 +152,9 @@ def test_transition_pass_path_advances_session(tmp_path: Path, clean_validator) 
     assert result.exit_code == 0, result.output
 
     # Session status flipped.
-    session_yaml = (pd / "instances" / "sessions" / "test-session" / "session.yaml").read_text()
+    session_yaml = (
+        pd / "instances" / "sessions" / "test-session" / "session.yaml"
+    ).read_text()
     assert "status: queued" in session_yaml
     # Status-instance id present.
     assert "current_status_instance:" in session_yaml
@@ -343,7 +345,9 @@ def test_transition_rejects_disallowed_target(tmp_path: Path) -> None:
     assert "not reachable" in result.output.lower()
 
     # Session stays at planned.
-    session_yaml = (pd / "instances" / "sessions" / "test-session" / "session.yaml").read_text()
+    session_yaml = (
+        pd / "instances" / "sessions" / "test-session" / "session.yaml"
+    ).read_text()
     assert "status: planned" in session_yaml
 
     # transition.rejected emitted with reason.
@@ -370,7 +374,9 @@ def test_transition_increments_status_instance_n(
         transition_cmd, ["test-session", "in_review", "--project-dir", str(pd)]
     )
 
-    session_yaml = (pd / "instances" / "sessions" / "test-session" / "session.yaml").read_text()
+    session_yaml = (
+        pd / "instances" / "sessions" / "test-session" / "session.yaml"
+    ).read_text()
     assert "coding-session:test-session:in_review:1" in session_yaml
 
 
@@ -461,7 +467,9 @@ def test_transition_rejected_when_tripwires_fail(tmp_path: Path) -> None:
         r["details"].get("reason", "").startswith("tripwires_failed") for r in rows
     )
     # Session did NOT advance.
-    session_yaml = (pd / "instances" / "sessions" / "test-session" / "session.yaml").read_text()
+    session_yaml = (
+        pd / "instances" / "sessions" / "test-session" / "session.yaml"
+    ).read_text()
     assert "status: planned" in session_yaml
 
 

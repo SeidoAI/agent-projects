@@ -811,8 +811,7 @@ def migrate_storage_cmd(project_dir: Path, yes: bool, skip_validate: bool) -> No
             if p.is_file()
         )
         has_legacy_ack = acks_dir.is_dir() and any(
-            p.name.endswith(".json")
-            and not p.name.startswith("coding-session-")
+            p.name.endswith(".json") and not p.name.startswith("coding-session-")
             for p in acks_dir.iterdir()
             if p.is_file()
         )
@@ -897,9 +896,7 @@ def migrate_storage_cmd(project_dir: Path, yes: bool, skip_validate: bool) -> No
 
     click.echo(f"\nMigrated {len(moved)} path(s).")
     if skip_validate:
-        click.echo(
-            "Skipping `tripwire validate --strict` per `--skip-validate`."
-        )
+        click.echo("Skipping `tripwire validate --strict` per `--skip-validate`.")
         return
     if is_git_repo:
         click.echo(

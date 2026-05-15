@@ -118,7 +118,9 @@ class TestEventDelivery:
         with client.websocket_connect(f"/api/ws?project={pid}") as ws:
             # Let the observer settle before touching the filesystem.
             time.sleep(0.15)
-            (project / "instances" / "issues" / "T-1" / "issue.yaml").write_text("title: t")
+            (project / "instances" / "issues" / "T-1" / "issue.yaml").write_text(
+                "title: t"
+            )
 
             event = _poll_event(
                 ws,
@@ -158,7 +160,9 @@ class TestEventDelivery:
             # The server just swallows pong messages. Trigger a real event
             # to prove the connection is still live after the pong.
             time.sleep(0.15)
-            (project / "instances" / "issues" / "T-1" / "issue.yaml").write_text("title: t")
+            (project / "instances" / "issues" / "T-1" / "issue.yaml").write_text(
+                "title: t"
+            )
             event = _poll_event(
                 ws,
                 "file_changed",

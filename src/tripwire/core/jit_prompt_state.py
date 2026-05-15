@@ -31,9 +31,7 @@ def write_jit_prompt_ack_marker(
             "marker substantiveness check would reject an empty ack."
         )
 
-    marker = paths.ack_marker_path(
-        project_dir, workflow_id, session_id, jit_prompt_id
-    )
+    marker = paths.ack_marker_path(project_dir, workflow_id, session_id, jit_prompt_id)
     marker.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "jit_prompt_id": jit_prompt_id,

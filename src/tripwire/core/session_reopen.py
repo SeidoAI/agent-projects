@@ -149,8 +149,7 @@ def reopen_session(
         raise ValueError(f"executor refused reopen: {exc}") from exc
     if not transition.ok:
         raise ValueError(
-            f"transition to paused rejected: "
-            f"{transition.message or transition.reason}"
+            f"transition to paused rejected: {transition.message or transition.reason}"
         )
 
     # KUI-137: optional ack reset AFTER the transition so the event

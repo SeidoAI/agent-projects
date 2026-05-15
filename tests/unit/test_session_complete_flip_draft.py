@@ -193,10 +193,22 @@ class TestCompleteSessionInvokesFlip:
         from tripwire.core.session_complete import complete_session
 
         save_test_issue(tmp_path_project, "TMP-1", status="in_review")
-        (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").parent.mkdir(parents=True, exist_ok=True)
-        (tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "developer.md").write_text(
-            "# notes\n", encoding="utf-8"
-        )
+        (
+            tmp_path_project
+            / "instances"
+            / "issues"
+            / "TMP-1"
+            / "docs"
+            / "developer.md"
+        ).parent.mkdir(parents=True, exist_ok=True)
+        (
+            tmp_path_project
+            / "instances"
+            / "issues"
+            / "TMP-1"
+            / "docs"
+            / "developer.md"
+        ).write_text("# notes\n", encoding="utf-8")
         save_test_session(
             tmp_path_project,
             "s1",

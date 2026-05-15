@@ -184,7 +184,9 @@ class TestIssueStore:
         original_uuid = original.uuid
         save_issue(project_dir, original)
         # Read the raw YAML to confirm uuid is the first frontmatter field.
-        raw = (project_dir / "instances" / "issues" / "TST-1" / "issue.yaml").read_text()
+        raw = (
+            project_dir / "instances" / "issues" / "TST-1" / "issue.yaml"
+        ).read_text()
         assert raw.startswith("---\nuuid:")
         loaded = load_issue(project_dir, "TST-1")
         assert loaded.uuid == original_uuid

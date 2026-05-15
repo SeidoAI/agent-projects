@@ -54,7 +54,9 @@ class TestSaveAndLoad:
         s = AgentSession(id="api-endpoints", name="x", agent="backend-coder")
         save_session(project_dir, s)
         assert (project_dir / "instances" / "sessions" / "api-endpoints").is_dir()
-        assert (project_dir / "instances" / "sessions" / "api-endpoints" / "session.yaml").is_file()
+        assert (
+            project_dir / "instances" / "sessions" / "api-endpoints" / "session.yaml"
+        ).is_file()
 
     def test_save_then_load_round_trip(self, project_dir: Path) -> None:
         original = AgentSession(
@@ -118,7 +120,9 @@ class TestSaveAndLoad:
 
     def test_session_exists_false_for_empty_directory(self, project_dir: Path) -> None:
         """Directory without session.yaml does NOT count as an existing session."""
-        (project_dir / "instances" / "sessions" / "orphan").mkdir(parents=True, exist_ok=True)
+        (project_dir / "instances" / "sessions" / "orphan").mkdir(
+            parents=True, exist_ok=True
+        )
         assert not session_exists(project_dir, "orphan")
 
 
@@ -146,16 +150,20 @@ class TestListSessions:
         assert ids == ["proper"]
 
     def test_ignores_directories_without_session_yaml(self, project_dir: Path) -> None:
-        (project_dir / "instances" / "sessions" / "orphan").mkdir(parents=True, exist_ok=True)
+        (project_dir / "instances" / "sessions" / "orphan").mkdir(
+            parents=True, exist_ok=True
+        )
         save_session(project_dir, AgentSession(id="proper", name="x", agent="a"))
         result = list_sessions(project_dir)
         assert [s.id for s in result] == ["proper"]
 
     def test_skips_dotfiles(self, project_dir: Path) -> None:
-        (project_dir / "instances" / "sessions" / ".hidden").mkdir(parents=True, exist_ok=True)
-        (project_dir / "instances" / "sessions" / ".hidden" / "session.yaml").write_text(
-            "---\nid: hidden\nname: x\nagent: a\n---\n", encoding="utf-8"
+        (project_dir / "instances" / "sessions" / ".hidden").mkdir(
+            parents=True, exist_ok=True
         )
+        (
+            project_dir / "instances" / "sessions" / ".hidden" / "session.yaml"
+        ).write_text("---\nid: hidden\nname: x\nagent: a\n---\n", encoding="utf-8")
         save_session(project_dir, AgentSession(id="visible", name="x", agent="a"))
         result = list_sessions(project_dir)
         assert [s.id for s in result] == ["visible"]
@@ -164,7 +172,9 @@ class TestListSessions:
 class TestDelete:
     def test_delete_removes_directory(self, project_dir: Path) -> None:
         save_session(project_dir, AgentSession(id="gone", name="x", agent="a"))
-        (project_dir / "instances" / "sessions" / "gone" / "plan.md").write_text("plan\n")
+        (project_dir / "instances" / "sessions" / "gone" / "plan.md").write_text(
+            "plan\n"
+        )
         delete_session(project_dir, "gone")
         assert not (project_dir / "instances" / "sessions" / "gone").exists()
 

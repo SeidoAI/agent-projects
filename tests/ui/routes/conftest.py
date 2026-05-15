@@ -93,9 +93,7 @@ def make_project(
     # can resolve them via `build_issue_transitions`.
     issue_closure_block = ""
     if issue_routes:
-        statuses_in_play = sorted(
-            {s for route in issue_routes for s in route}
-        )
+        statuses_in_play = sorted({s for route in issue_routes for s in route})
         routes_yaml = "".join(
             f"      - id: ic-{idx}-{f}-to-{t}\n"
             f"        actor: pm-agent\n"
@@ -104,9 +102,7 @@ def make_project(
             f"        kind: forward\n"
             for idx, (f, t) in enumerate(issue_routes)
         )
-        statuses_yaml = "".join(
-            f"      - id: {s}\n" for s in statuses_in_play
-        )
+        statuses_yaml = "".join(f"      - id: {s}\n" for s in statuses_in_play)
         issue_closure_block = (
             "  issue-closure:\n"
             "    actor: pm-agent\n"
@@ -115,8 +111,7 @@ def make_project(
             "      storage_path: instances/issues/{instance_id}/issue.yaml\n"
             "      status_field: status\n"
             f"      status_enum: {statuses_in_play}\n"
-            "    statuses:\n" + statuses_yaml
-            + "    routes:\n" + routes_yaml
+            "    statuses:\n" + statuses_yaml + "    routes:\n" + routes_yaml
         )
 
     # v0.13: UI action service routes session transitions through
@@ -207,8 +202,7 @@ def make_project(
         "        actor: pm-agent\n"
         "        from: executing\n"
         "        to: abandoned\n"
-        "        kind: side\n"
-        + issue_closure_block
+        "        kind: side\n" + issue_closure_block
     )
     return project_dir
 

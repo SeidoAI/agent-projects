@@ -2162,9 +2162,7 @@ def session_complete_cmd(
         try:
             session_for_prep = load_session(resolved, session_id)
         except FileNotFoundError as exc:
-            raise click.ClickException(
-                f"session '{session_id}' not found"
-            ) from exc
+            raise click.ClickException(f"session '{session_id}' not found") from exc
         from tripwire.core.session_complete import _flip_drafts_to_ready
         from tripwire.core.status_contract import sweep_issues
 
@@ -3211,9 +3209,7 @@ def session_normalise_branch_cmd(session_id: str, project_dir: Path) -> None:
     default=".",
     show_default=True,
 )
-def session_followup_stub_cmd(
-    session_id: str, reason: str, project_dir: Path
-) -> None:
+def session_followup_stub_cmd(session_id: str, reason: str, project_dir: Path) -> None:
     """Append the canonical PM follow-up stub to the session's plan.md.
 
     Resolves the plan path via :func:`paths.session_plan_path` (the
@@ -3299,8 +3295,7 @@ def session_prepare_for_completion_cmd(session_id: str, project_dir: Path) -> No
     _filter_report_by_selector(report, resolved, session_id)
     if report.errors:
         click.echo(
-            f"validate failed for session {session_id}: "
-            f"{len(report.errors)} error(s)",
+            f"validate failed for session {session_id}: {len(report.errors)} error(s)",
             err=True,
         )
         for err in report.errors:
@@ -3308,9 +3303,7 @@ def session_prepare_for_completion_cmd(session_id: str, project_dir: Path) -> No
             if err.field:
                 location = f"{location}:{err.field}" if location else err.field
             click.echo(f"  [{err.code}] {location} — {err.message}", err=True)
-        raise click.ClickException(
-            f"validate gate blocked completion for {session_id}"
-        )
+        raise click.ClickException(f"validate gate blocked completion for {session_id}")
     click.echo(f"validate clean for session {session_id}")
 
     # Step 2: flip drafts to ready
@@ -3386,9 +3379,7 @@ def session_prepare_for_completion_cmd(session_id: str, project_dir: Path) -> No
         )
         for b in blockers:
             click.echo(f"  {b}", err=True)
-        raise click.ClickException(
-            f"PRs blocking completion for session {session_id}"
-        )
+        raise click.ClickException(f"PRs blocking completion for session {session_id}")
 
     click.echo(f"session {session_id}: ready for completion")
 
@@ -3476,14 +3467,10 @@ def session_prepare_for_abandon_cmd(session_id: str, project_dir: Path) -> None:
                 failures.append(f"remove-worktrees: {wt.worktree_path}: {exc}")
         for wt_path in removed:
             click.echo(f"removed worktree: {wt_path}")
-        if not removed and not any(
-            f.startswith("remove-worktrees") for f in failures
-        ):
+        if not removed and not any(f.startswith("remove-worktrees") for f in failures):
             click.echo(f"session {session_id}: no worktrees to remove")
     else:
-        click.echo(
-            f"session {session_id}: no recorded worktrees for remove-worktrees"
-        )
+        click.echo(f"session {session_id}: no recorded worktrees for remove-worktrees")
 
     if failures:
         click.echo(
@@ -3587,6 +3574,4 @@ def session_sweep_issues_forward_cmd(session_id: str, project_dir: Path) -> None
             f"sweep-issues-forward rejected {len(rejected)} issue(s) for {session_id}"
         )
 
-    click.echo(
-        f"session {session_id}: swept {len(advanced)} issue(s) → {target}"
-    )
+    click.echo(f"session {session_id}: swept {len(advanced)} issue(s) → {target}")

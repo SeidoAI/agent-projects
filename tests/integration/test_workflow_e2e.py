@@ -145,7 +145,9 @@ def test_full_lifecycle_drives_via_transition_only(
         )
 
     # Session reached `completed`.
-    session_yaml = (pd / "instances" / "sessions" / "e2e-session" / "session.yaml").read_text()
+    session_yaml = (
+        pd / "instances" / "sessions" / "e2e-session" / "session.yaml"
+    ).read_text()
     assert "status: completed" in session_yaml
     assert "coding-session:e2e-session:completed:1" in session_yaml
 

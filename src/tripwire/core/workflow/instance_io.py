@@ -169,8 +169,7 @@ def _parse_instance_text(text: str) -> dict[str, Any]:
     data = yaml.safe_load(text) or {}
     if not isinstance(data, dict):
         raise ValueError(
-            f"instance file must parse to a YAML mapping, got "
-            f"{type(data).__name__}"
+            f"instance file must parse to a YAML mapping, got {type(data).__name__}"
         )
     return data
 
@@ -216,8 +215,7 @@ def load_instance(
     path = _render_storage_path(project_dir, shape, instance_id)
     if not path.is_file():
         raise InstanceNotFoundError(
-            f"instance {instance_id!r} for workflow {workflow_id!r} "
-            f"not found at {path}"
+            f"instance {instance_id!r} for workflow {workflow_id!r} not found at {path}"
         )
     return _parse_instance_text(path.read_text(encoding="utf-8"))
 

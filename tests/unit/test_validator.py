@@ -118,9 +118,8 @@ def write_workflow_yaml(
     # `has_inbound`. Without this nudge any helper-built workflow
     # whose first sorted status isn't the start state fires
     # `workflow/unreachable_status` on the real start state.
-    statuses = (
-        (["planned"] if "planned" in all_statuses else [])
-        + sorted(s for s in all_statuses if s != "planned")
+    statuses = (["planned"] if "planned" in all_statuses else []) + sorted(
+        s for s in all_statuses if s != "planned"
     )
     if not statuses:
         return
@@ -202,8 +201,10 @@ def write_workflow_yaml(
         "      storage_path: instances/issues/{instance_id}/issue.yaml\n"
         "      status_field: status\n"
         f"      status_enum: {statuses}\n"
-        "    statuses:\n" + statuses_yaml
-        + "    routes:\n" + (routes_yaml or "      []\n"),
+        "    statuses:\n"
+        + statuses_yaml
+        + "    routes:\n"
+        + (routes_yaml or "      []\n"),
         encoding="utf-8",
     )
 
@@ -505,7 +506,9 @@ class TestUuidPresence:
             },
             "## Context\n[[user-model]]\n\n## Implements\nx\n\n## Repo scope\nx\n\n## Requirements\nx\n\n## Execution constraints\nstop and ask.\n\n## Acceptance criteria\n- [ ] x\n\n## Test plan\nx\n\n## Dependencies\nnone\n\n## Definition of Done\n- [ ] done\n",
         )
-        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(text)
+        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(
+            text
+        )
         report = validate_project(empty_project)
         assert "uuid/missing" in codes(report)
 
@@ -839,7 +842,9 @@ class TestIdCollisions:
         write_issue(empty_project, "TST-1")
         # Simulate a collision: a second issue directory with a different
         # name but the same `id` field in its frontmatter.
-        original = (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").read_text()
+        original = (
+            empty_project / "instances" / "issues" / "TST-1" / "issue.yaml"
+        ).read_text()
         new_uuid = str(_uuid.uuid4())
         lines = original.splitlines()
         for i, line in enumerate(lines):
@@ -956,14 +961,18 @@ class TestAutoFix:
             },
             body,
         )
-        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(text)
+        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(
+            text
+        )
         write_node(empty_project, "user-model")
 
         report = validate_project(empty_project, fix=True)
         # Fix recorded
         assert "uuid/missing" in [f.code for f in report.fixed]
         # File now has a uuid
-        new_text = (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").read_text()
+        new_text = (
+            empty_project / "instances" / "issues" / "TST-1" / "issue.yaml"
+        ).read_text()
         assert new_text.startswith("---\nuuid:")
 
     def test_fix_sequence_drift(self, empty_project: Path) -> None:
@@ -1520,7 +1529,9 @@ class TestAutoFixIdempotency:
             },
             body,
         )
-        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(text)
+        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(
+            text
+        )
         write_node(empty_project, "user-model")
 
         validate_project(empty_project, fix=True)

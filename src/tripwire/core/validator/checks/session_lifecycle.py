@@ -319,8 +319,7 @@ def _issue_artifacts_for_session(
                 paths.issue_docs_dir(ctx.project_dir, issue_key) / entry.file
             )
             rel_path = (
-                f"{paths.ISSUES_DIR}/{issue_key}/"
-                f"{paths.ISSUE_DOCS_SUBDIR}/{entry.file}"
+                f"{paths.ISSUES_DIR}/{issue_key}/{paths.ISSUE_DOCS_SUBDIR}/{entry.file}"
             )
             if artifact_path.is_file():
                 continue
@@ -334,9 +333,7 @@ def _issue_artifacts_for_session(
                         f"is at-or-past {entry.required_at_status!r} but is missing "
                         f"required artifact {entry.file!r}."
                     ),
-                    fix_hint=(
-                        f"Write {rel_path} from {entry.template}."
-                    ),
+                    fix_hint=(f"Write {rel_path} from {entry.template}."),
                 )
             )
     return results

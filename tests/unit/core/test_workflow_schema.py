@@ -1484,6 +1484,4 @@ def test_template_declares_instance_on_all_12_workflows() -> None:
         assert wf.instance is not None, f"workflow {wf_id!r} has no instance: block"
         assert wf.instance.storage_path
         assert wf.instance.status_field
-        assert wf.instance.status_enum, (
-            f"workflow {wf_id!r} has empty status_enum"
-        )
+        assert wf.instance.status_enum, f"workflow {wf_id!r} has empty status_enum"

@@ -198,9 +198,9 @@ def test_execute_inject_follow_up_idempotent(tmp_project: Path):
     )
     executor.execute(action)
     executor.execute(action)
-    plan_text = (tmp_project / "instances" / "sessions" / "s1" / "artifacts" / "plan.md").read_text(
-        encoding="utf-8"
-    )
+    plan_text = (
+        tmp_project / "instances" / "sessions" / "s1" / "artifacts" / "plan.md"
+    ).read_text(encoding="utf-8")
     assert plan_text.count("## PM follow-up — cost overrun") == 1
 
 
