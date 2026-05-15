@@ -15,11 +15,15 @@ runner = CliRunner()
 
 @pytest.fixture(autouse=True)
 def _redirect_default_config(tmp_path: Path, monkeypatch):
-    """Point ~/.tripwire/config.yaml at a tmp file for the duration of each test."""
-    target = tmp_path / "config.yaml"
-    monkeypatch.setattr("tripwire.ui.config._DEFAULT_CONFIG_PATH", target)
-    monkeypatch.setattr("tripwire.cli.config._DEFAULT_CONFIG_PATH", target)
-    yield target
+    """Point ~/.tripwire/config.yaml at a tmp file for the duration of each test.
+
+    v0.13.1: ``_default_config_path()`` is now a function that reads
+    ``TRIPWIRE_CONFIG_DIR`` lazily, so we redirect via env-var override
+    (the same path real production deployments use) rather than patching
+    a module constant.
+    """
+    monkeypatch.setenv("TRIPWIRE_CONFIG_DIR", str(tmp_path))
+    yield tmp_path / "config.yaml"
 
 
 class TestShow:
