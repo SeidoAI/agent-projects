@@ -13,7 +13,7 @@ import click
 import yaml
 
 from tripwire.ui.config import (
-    _DEFAULT_CONFIG_PATH,
+    _default_config_path,
     load_user_config,
     save_user_config,
 )
@@ -36,7 +36,7 @@ def config_show_cmd(config_path: Path | None) -> None:
     """Print the resolved user config as YAML."""
     config = load_user_config(config_path)
     payload = config.model_dump(mode="json", exclude_none=True)
-    target = config_path if config_path is not None else _DEFAULT_CONFIG_PATH
+    target = config_path if config_path is not None else _default_config_path()
     click.echo(f"# {target}")
     click.echo(yaml.safe_dump(payload, sort_keys=True).rstrip())
 
@@ -104,7 +104,7 @@ def config_add_cmd(key: str, path: Path) -> None:
 @config_cmd.command("path")
 def config_path_cmd() -> None:
     """Print the path tripwire reads its config from."""
-    click.echo(str(_DEFAULT_CONFIG_PATH))
+    click.echo(str(_default_config_path()))
 
 
 __all__ = ["config_cmd"]

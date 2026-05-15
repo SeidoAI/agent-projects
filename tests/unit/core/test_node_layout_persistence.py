@@ -20,7 +20,7 @@ from tripwire.models import ConceptNode, NodeLayout
 
 @pytest.fixture
 def project_dir(tmp_path: Path) -> Path:
-    (tmp_path / "nodes").mkdir(parents=True)
+    (tmp_path / "instances" / "nodes").mkdir(parents=True)
     return tmp_path
 
 
@@ -53,7 +53,7 @@ class TestNodeLayoutField:
 
     def test_layout_omitted_from_yaml_when_none(self, project_dir: Path) -> None:
         save_node(project_dir, _node())
-        raw = (project_dir / "nodes" / "user-model.yaml").read_text()
+        raw = (project_dir / "instances" / "nodes" / "user-model.yaml").read_text()
         assert "layout:" not in raw
 
     def test_layout_rejects_non_numeric(self) -> None:

@@ -213,9 +213,8 @@ def _compute_critical_path(ids: set[str], edges: list[GraphEdge]) -> list[str]:
 # ============================================================================
 
 
-# v0.9.4: canonical names + legacy aliases mapped to the same colors
-# so dep-graph rendering stays consistent regardless of which name a
-# project's data is at.
+# Canonical status names mapped to colors so dep-graph rendering stays
+# consistent regardless of which name a project's data is at.
 _STATUS_COLORS = {
     "planned": "#cccccc",
     "queued": "#9cb3ff",

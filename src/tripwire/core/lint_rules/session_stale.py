@@ -39,7 +39,7 @@ def _check(ctx):
                 f"session {session.id} has been in {session.status} for "
                 f"{age.days} days (threshold {STALE_DAYS})."
             ),
-            file=f"sessions/{session.id}/session.yaml",
+            file=f"instances/sessions/{session.id}/session.yaml",
             fix_hint=(
                 "Check session progress; consider splitting the work or "
                 "re-engaging the agent."

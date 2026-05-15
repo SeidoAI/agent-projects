@@ -163,8 +163,8 @@ def load_enum(project_dir: Path, enum_name: str) -> list[str]:
     Lookup order:
       1. `<project_dir>/enums/<enum_name>.yaml` (project override)
       2. `src/tripwire/templates/enums/<enum_name>.yaml` (packaged default)
-      3. `DEFAULT_ENUMS[enum_name]` (StrEnum fallback, for enums without a YAML
-         template — e.g. legacy enums)
+      3. `DEFAULT_ENUMS[enum_name]` (StrEnum fallback, for enums without
+         a YAML template)
 
     Raises FileNotFoundError if none of the above exist.
     """

@@ -286,8 +286,10 @@ def validate_issue(project_dir: Path, key: str) -> ValidationReport:
     about. The report's summary counts, exit code, and durations are
     recomputed from the filtered findings.
     """
+    from tripwire.core import paths
+
     report = validate_project(project_dir, strict=False, fix=False)
-    prefix = f"issues/{key}/"
+    prefix = f"{paths.ISSUES_DIR}/{key}/"
 
     def _matches(finding_file: str | None) -> bool:
         if finding_file is None:

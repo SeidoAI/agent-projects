@@ -43,10 +43,13 @@ class TestListNodes:
         assert [n.id for n in result] == ["beta"]
 
     def test_filter_by_status(self, tmp_path_project: Path, save_test_node):
+        # v0.13.1 (B9): node lifecycle is active → stale → archived per
+        # the concept-freshness workflow's instance.status_enum. The old
+        # `deprecated` value was rolled into `archived`.
         save_test_node(tmp_path_project, "alpha", status="active")
-        save_test_node(tmp_path_project, "beta", status="deprecated")
+        save_test_node(tmp_path_project, "beta", status="archived")
 
-        result = list_nodes(tmp_path_project, status="deprecated")
+        result = list_nodes(tmp_path_project, status="archived")
         assert [n.id for n in result] == ["beta"]
 
     def test_ref_count_from_cache(

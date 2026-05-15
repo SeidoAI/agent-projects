@@ -19,6 +19,8 @@ from tripwire.cli.config import config_cmd
 from tripwire.cli.drift import drift_cmd
 from tripwire.cli.enums import enums_cmd
 from tripwire.cli.events import events_cmd
+from tripwire.cli.gh import gh_cmd
+from tripwire.cli.git import git_cmd
 from tripwire.cli.graph import graph_cmd
 from tripwire.cli.heuristic import heuristic_cmd
 from tripwire.cli.hooks import hook_cmd, hooks_cmd
@@ -136,6 +138,8 @@ cli.add_command(prompt_check_cmd)
 cli.add_command(events_cmd)
 cli.add_command(transition_cmd)
 cli.add_command(drift_cmd)
+cli.add_command(git_cmd)
+cli.add_command(gh_cmd)
 
 
 if __name__ == "__main__":

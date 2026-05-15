@@ -35,7 +35,7 @@ def _write_session_artifacts(
 ) -> None:
     """Write filled-in artifacts for a session so each test can isolate
     one tripwire under test from interference by the others."""
-    sess_dir = project_dir / "sessions" / session_id
+    sess_dir = project_dir / "instances" / "sessions" / session_id
     artifacts_dir = sess_dir / "artifacts"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     if plan:
@@ -188,6 +188,7 @@ class TestPlanUnfilled:
         # Overwrite plan.md with placeholder content from the scaffold template.
         (
             tmp_path_project
+            / "instances"
             / "sessions"
             / "session-plan-placeholder"
             / "artifacts"
@@ -214,6 +215,7 @@ class TestPlanUnfilled:
         # "What to read, what to understand" reveals an unfilled plan.
         (
             tmp_path_project
+            / "instances"
             / "sessions"
             / "session-plan-scaffold-string"
             / "artifacts"
@@ -240,6 +242,7 @@ class TestPlanUnfilled:
         )
         (
             tmp_path_project
+            / "instances"
             / "sessions"
             / "session-plan-short"
             / "artifacts"
@@ -284,6 +287,7 @@ class TestChecklistUnfilled:
         # Scaffolded task-checklist: every row pending, comments are em-dashes.
         (
             tmp_path_project
+            / "instances"
             / "sessions"
             / "session-checklist-empty"
             / "task-checklist.md"
@@ -311,6 +315,7 @@ class TestChecklistUnfilled:
         )
         (
             tmp_path_project
+            / "instances"
             / "sessions"
             / "session-checklist-commented"
             / "task-checklist.md"
@@ -344,6 +349,7 @@ class TestVerificationUnfilled:
         )
         (
             tmp_path_project
+            / "instances"
             / "sessions"
             / "session-verif-empty"
             / "verification-checklist.md"
@@ -610,6 +616,7 @@ class TestAggregate:
         # Drop plan.md to a placeholder.
         (
             tmp_path_project
+            / "instances"
             / "sessions"
             / "session-clean-aggregate"
             / "artifacts"

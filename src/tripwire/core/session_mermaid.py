@@ -26,8 +26,8 @@ from typing import Any, Protocol, runtime_checkable
 UNFINISHED_THRESHOLD = 30
 
 # Sessions in these statuses are treated as "finished" for truncation
-# purposes. `completed` is the terminal-success state (KUI-110, the
-# legacy `done` value was dropped from SessionStatus); `abandoned` is
+# purposes. `completed` is the terminal-success state (KUI-110, an
+# earlier `done` value was dropped from SessionStatus); `abandoned` is
 # the explicit cancel terminal.
 _FINISHED_STATUSES: frozenset[str] = frozenset({"completed", "abandoned"})
 

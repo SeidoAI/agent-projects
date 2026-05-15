@@ -81,7 +81,7 @@ def test_insights_apply_new_node_writes_file(tmp_path_project: Path, save_test_s
         ],
     )
     assert result.exit_code == 0, result.output
-    assert (tmp_path_project / "nodes" / "pg-tuning.yaml").is_file()
+    assert (tmp_path_project / "instances" / "nodes" / "pg-tuning.yaml").is_file()
     assert "type=decision" in result.output
 
     # Node has the proposed type, not a hardcoded default.
@@ -134,9 +134,9 @@ def test_insights_apply_update_node_appends_delta(
     )
     assert result.exit_code == 0, result.output
 
-    node_text = (tmp_path_project / "nodes" / "auth-system.yaml").read_text(
-        encoding="utf-8"
-    )
+    node_text = (
+        tmp_path_project / "instances" / "nodes" / "auth-system.yaml"
+    ).read_text(encoding="utf-8")
     assert "Original description" in node_text
     assert "added refresh token rotation" in node_text
     assert "## Updated" in node_text
@@ -183,7 +183,9 @@ def test_insights_reject_records_rejection(tmp_path_project: Path, save_test_ses
     assert remaining.proposals == []
 
     # Rejection recorded
-    rej_path = tmp_path_project / "sessions" / "s1" / "insights.rejected.yaml"
+    rej_path = (
+        tmp_path_project / "instances" / "sessions" / "s1" / "insights.rejected.yaml"
+    )
     assert rej_path.is_file()
     assert "meh-node" in rej_path.read_text(encoding="utf-8")
 

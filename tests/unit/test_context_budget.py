@@ -121,10 +121,25 @@ def test_total_templates_under_budget() -> None:
     verification-checklist template + matching SCHEMA_ISSUES /
     WORKFLOWS_CODE_REVIEW additions + sixth mortal sin in PM SKILL.md
     + filled-in example. Total markdown delta ~2KB.
+
+    v0.13.1 bumps to 430KB to restore the 10 reference workflows
+    (pm-scoping, pm-triage, pm-incremental-update, project-maintenance,
+    pm-monitor, code-review, inbox-handling, pr-lifecycle,
+    phase-advancement, issue-closure, concept-freshness) into
+    workflow.yaml.j2 with `instance:` blocks declaring the runtime
+    instance shape per workflow. Step 7 of the v0.13 plan.
+
+    v0.13.1 bumps to 440KB to expand the shipped `issue-closure`
+    workflow from the 2-status placeholder (closing/closed) to the
+    full 8-status canonical issue lifecycle (planned → queued →
+    executing → in_review → verified → completed, plus abandoned and
+    deferred) with 17 routes. Without this, the `check_status_transitions`
+    validator surfaced `status/unreachable` for any issue not in
+    `planned`. Net delta: ~4KB.
     """
     total = _total_chars(TEMPLATES_DIR)
-    assert total < 415_000, (
-        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 415KB."
+    assert total < 440_000, (
+        f"Total templates are {total:,} chars ({total / 1024:.0f} KB). Budget is 440KB."
     )
 
 

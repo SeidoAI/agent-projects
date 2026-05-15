@@ -194,7 +194,7 @@ class TestPatchConceptLayout:
         self, populated_client, graph_project, graph_project_id
     ):
         # The whole point: layout updates must not modify content YAML.
-        node_path = graph_project / "nodes" / "user-model.yaml"
+        node_path = graph_project / "instances" / "nodes" / "user-model.yaml"
         before = node_path.read_text(encoding="utf-8")
         r = populated_client.patch(
             f"/api/projects/{graph_project_id}/graph/concept/layout",

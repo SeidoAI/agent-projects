@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
 from pydantic import ValidationError
 
 from tripwire.core import paths
 from tripwire.core.graph.refs import extract_references
 from tripwire.core.parser import ParseError, parse_frontmatter_body
-from tripwire.core.status import is_status_reachable
+from tripwire.core.status import build_issue_transitions, is_status_reachable
 from tripwire.core.validator._types import CheckResult, ValidationContext
 from tripwire.models.issue import Issue
 from tripwire.models.session import AgentSession
@@ -137,13 +138,25 @@ def _section(body: str, heading: str) -> str | None:
 
 
 def check_status_transitions(ctx: ValidationContext) -> list[CheckResult]:
-    """Every issue's status must be reachable from the project's start state."""
+    """Every issue's status must be reachable via the issue-closure workflow.
+
+    Reachability is derived from ``workflow.yaml``'s ``issue-closure``
+    workflow routes.
+
+    Projects without an ``issue-closure`` workflow get the
+    "trivially reachable" fallback (every declared status counts), so
+    the check is a no-op rather than failing every issue.
+    """
     if ctx.project_config is None:
         return []
+    transitions = build_issue_transitions(ctx.project_dir)
+    declared = list(ctx.project_config.statuses)
     results: list[CheckResult] = []
     for entity in ctx.issues:
         issue: Issue = entity.model
-        if not is_status_reachable(ctx.project_config, issue.status):
+        if not is_status_reachable(
+            transitions, issue.status, declared_statuses=declared
+        ):
             results.append(
                 CheckResult(
                     code="status/unreachable",
@@ -152,9 +165,13 @@ def check_status_transitions(ctx: ValidationContext) -> list[CheckResult]:
                     field="status",
                     message=(
                         f"Issue status {issue.status!r} is not reachable from "
-                        f"the start state via project.yaml.status_transitions."
+                        f"the start state via the issue-closure workflow "
+                        f"routes in workflow.yaml."
                     ),
-                    fix_hint="Check status_transitions in project.yaml.",
+                    fix_hint=(
+                        "Check the issue-closure workflow's `routes:` block "
+                        "in workflow.yaml or fix the issue's status."
+                    ),
                 )
             )
     return results
@@ -329,5 +346,117 @@ def check_handoff_artifact(ctx: ValidationContext) -> list[CheckResult]:
                     message=str(exc),
                 )
             )
+
+    return results
+
+
+def check_instance_shape_conforms(ctx: ValidationContext) -> list[CheckResult]:
+    """Every materialised instance must match its workflow's declared shape.
+
+    For each workflow that declares an ``instance:`` block in
+    ``workflow.yaml``, walk the disk via :func:`list_instances` and
+    confirm that each instance file:
+
+    - carries every entry in ``required_fields``
+      (missing → ``instance/missing_required_field``);
+    - carries a value at ``status_field`` that's in ``status_enum``
+      (out-of-enum → ``instance/invalid_status_value``).
+
+    Workflows without an ``instance:`` block are skipped silently;
+    that gap is already reported by ``workflow/instance_missing``
+    inside :func:`check_workflow_well_formed`. A workflow.yaml that
+    fails to parse is also skipped silently — the parse error
+    surfaces through ``v_workflow_well_formed``.
+    """
+    # Local imports keep the validator/workflow circular surface minimal.
+    from tripwire.core.workflow.instance_io import (
+        InstanceNotFoundError,
+        list_instances,
+        load_instance,
+    )
+    from tripwire.core.workflow.loader import load_workflows
+
+    results: list[CheckResult] = []
+    try:
+        spec = load_workflows(ctx.project_dir)
+    except yaml.YAMLError:
+        # workflow.yaml parse errors are reported by
+        # ``check_workflow_well_formed`` — no point double-reporting.
+        return results
+
+    for workflow_id, workflow in spec.workflows.items():
+        shape = workflow.instance
+        if shape is None:
+            # Missing-block warning is owned by the workflow validator;
+            # silently skip here to avoid double-reporting.
+            continue
+        try:
+            instance_ids = list_instances(ctx.project_dir, workflow_id)
+        except (LookupError, ValueError):
+            # Resolution problems already surface via workflow lints.
+            continue
+
+        status_enum = set(shape.status_enum)
+        for instance_id in instance_ids:
+            try:
+                data = load_instance(ctx.project_dir, workflow_id, instance_id)
+            except InstanceNotFoundError:
+                # Disappeared between list and load; nothing to assert.
+                continue
+            except (ValueError, ParseError):
+                # Parse errors are reported by the entity loader
+                # (e.g. ``session/parse_error``); skip silently here.
+                continue
+
+            rendered = ctx.project_dir / shape.storage_path.replace(
+                "{instance_id}", instance_id
+            )
+            try:
+                rel_path = str(rendered.relative_to(ctx.project_dir))
+            except ValueError:
+                rel_path = str(rendered)
+
+            for required in shape.required_fields:
+                if required not in data or data.get(required) in (None, ""):
+                    results.append(
+                        CheckResult(
+                            code="instance/missing_required_field",
+                            severity="error",
+                            file=rel_path,
+                            field=required,
+                            message=(
+                                f"workflow {workflow_id!r} instance "
+                                f"{instance_id!r} is missing required field "
+                                f"{required!r} declared on "
+                                f"workflow.yaml `instance.required_fields`."
+                            ),
+                            fix_hint=(f"Add `{required}: <value>` to {rel_path}."),
+                        )
+                    )
+
+            if status_enum:
+                value = data.get(shape.status_field)
+                if value is None or value not in status_enum:
+                    results.append(
+                        CheckResult(
+                            code="instance/invalid_status_value",
+                            severity="error",
+                            file=rel_path,
+                            field=shape.status_field,
+                            message=(
+                                f"workflow {workflow_id!r} instance "
+                                f"{instance_id!r} has "
+                                f"`{shape.status_field}: {value!r}` which "
+                                f"is not in the declared status_enum "
+                                f"{sorted(status_enum)}."
+                            ),
+                            fix_hint=(
+                                f"Set `{shape.status_field}` to one of "
+                                f"{sorted(status_enum)} in {rel_path}, or "
+                                f"add the value to "
+                                f"workflow.yaml `instance.status_enum`."
+                            ),
+                        )
+                    )
 
     return results

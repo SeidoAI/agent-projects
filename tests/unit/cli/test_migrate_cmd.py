@@ -12,11 +12,11 @@ from tripwire.cli.main import cli
 runner = CliRunner()
 
 
-def _make_legacy_project(root: Path) -> Path:
+def _make_flat_layout_project(root: Path) -> Path:
     """Build a pre-v0.10.0 flat-layout project at *root*."""
     root.mkdir(parents=True, exist_ok=True)
     (root / "project.yaml").write_text(
-        "name: legacy\nkey_prefix: LEG\nnext_issue_number: 1\nnext_session_number: 1\n",
+        "name: flat\nkey_prefix: FLT\nnext_issue_number: 1\nnext_session_number: 1\n",
         encoding="utf-8",
     )
     for d in (
@@ -28,7 +28,7 @@ def _make_legacy_project(root: Path) -> Path:
         "orchestration",
     ):
         (root / d).mkdir()
-        (root / d / "marker.yaml").write_text(f"# legacy {d}\n", encoding="utf-8")
+        (root / d / "marker.yaml").write_text(f"# flat {d}\n", encoding="utf-8")
     return root
 
 
@@ -50,7 +50,7 @@ def _git_init(project: Path) -> None:
 
 class TestMigrateTemplates:
     def test_dry_run_makes_no_changes(self, tmp_path: Path):
-        project = _make_legacy_project(tmp_path / "proj")
+        project = _make_flat_layout_project(tmp_path / "proj")
         result = runner.invoke(
             cli, ["migrate", "templates", "--project-dir", str(project), "--dry-run"]
         )
@@ -62,12 +62,12 @@ class TestMigrateTemplates:
         assert not (project / "templates" / "agents").exists()
 
     def test_non_git_project_uses_shutil_move(self, tmp_path: Path):
-        project = _make_legacy_project(tmp_path / "proj")
+        project = _make_flat_layout_project(tmp_path / "proj")
         result = runner.invoke(
             cli, ["migrate", "templates", "--project-dir", str(project)]
         )
         assert result.exit_code == 0, result.output
-        # Each legacy dir gone, canonical present with the marker file.
+        # Each flat-layout dir gone, canonical present with the marker file.
         for src, dest in (
             ("agents", "templates/agents"),
             ("enums", "templates/enums"),
@@ -82,7 +82,7 @@ class TestMigrateTemplates:
             )
 
     def test_git_repo_uses_git_mv(self, tmp_path: Path):
-        project = _make_legacy_project(tmp_path / "proj")
+        project = _make_flat_layout_project(tmp_path / "proj")
         _git_init(project)
         result = runner.invoke(
             cli, ["migrate", "templates", "--project-dir", str(project)]
@@ -98,11 +98,11 @@ class TestMigrateTemplates:
         )
         # Some renames may show as A+D depending on git version + similarity
         # threshold; either way, the canonical path is staged and the
-        # legacy one is gone.
+        # flat-layout one is gone.
         assert "templates/agents/marker.yaml" in status.stdout
 
     def test_idempotent_second_run_is_noop(self, tmp_path: Path):
-        project = _make_legacy_project(tmp_path / "proj")
+        project = _make_flat_layout_project(tmp_path / "proj")
         first = runner.invoke(
             cli, ["migrate", "templates", "--project-dir", str(project)]
         )
@@ -114,8 +114,8 @@ class TestMigrateTemplates:
         assert "Nothing to migrate" in second.output or "Skipped" in second.output
 
     def test_collision_with_canonical_dir_aborts(self, tmp_path: Path):
-        project = _make_legacy_project(tmp_path / "proj")
-        # Pre-create the canonical dir alongside the legacy one.
+        project = _make_flat_layout_project(tmp_path / "proj")
+        # Pre-create the canonical dir alongside the flat-layout one.
         (project / "templates").mkdir()
         (project / "templates" / "agents").mkdir(parents=True)
         (project / "templates" / "agents" / "preexisting.yaml").write_text(

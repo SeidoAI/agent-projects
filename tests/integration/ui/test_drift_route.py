@@ -135,7 +135,7 @@ def test_drift_route_includes_workflow_drift_findings_from_events_log(
     assert findings[0]["instance"] == "session-a"
 
 
-def test_drift_route_ignores_legacy_tripwire_events_log(
+def test_drift_route_ignores_stale_tripwire_events_log(
     client: TestClient, project_id: str, project_dir: Path
 ) -> None:
     """The v0.9 route must not read stale ``.tripwire/events.log``."""

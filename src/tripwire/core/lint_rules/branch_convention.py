@@ -44,7 +44,7 @@ def _check(ctx):
                 f"handoff.yaml.branch {branch!r} violates the <type>/<slug> "
                 "convention (see BRANCH_NAMING.md)."
             ),
-            file=f"sessions/{ctx.session_id}/handoff.yaml",
+            file=f"instances/sessions/{ctx.session_id}/handoff.yaml",
             fix_hint=(
                 "Run `tripwire session derive-branch <session-id>` and use "
                 "its output verbatim."

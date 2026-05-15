@@ -41,7 +41,7 @@ def test_save_session_no_emitter_is_a_no_op(tmp_path: Path) -> None:
     """No emitter passed → existing behaviour unchanged, never raises."""
     session = _make_session("s1")
     save_session(tmp_path, session)
-    assert (tmp_path / "sessions" / "s1" / "session.yaml").is_file()
+    assert (tmp_path / "instances" / "sessions" / "s1" / "session.yaml").is_file()
 
 
 def test_save_session_first_save_emits_no_transition(tmp_path: Path) -> None:

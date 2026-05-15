@@ -91,9 +91,16 @@ def test_ack_with_jit_prompt_id_targets_specific_marker(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    target = tmp_path / ".tripwire" / "acks" / "phase-transition-fixture-1.json"
+    target = (
+        tmp_path
+        / ".tripwire"
+        / "acks"
+        / "coding-session-fixture-1-phase-transition.json"
+    )
     assert target.is_file(), "phase-transition marker missing"
-    self_review_marker = tmp_path / ".tripwire" / "acks" / "self-review-fixture-1.json"
+    self_review_marker = (
+        tmp_path / ".tripwire" / "acks" / "coding-session-fixture-1-self-review.json"
+    )
     assert not self_review_marker.exists(), (
         "self-review marker leaked when --jit-prompt-id targeted phase-transition"
     )
@@ -117,7 +124,9 @@ def test_ack_default_jit_prompt_id_remains_self_review(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    assert (tmp_path / ".tripwire" / "acks" / "self-review-fixture-1.json").is_file()
+    assert (
+        tmp_path / ".tripwire" / "acks" / "coding-session-fixture-1-self-review.json"
+    ).is_file()
 
 
 def test_ack_with_fix_commits_writes_marker(tmp_path: Path) -> None:
@@ -139,7 +148,9 @@ def test_ack_with_fix_commits_writes_marker(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    marker = tmp_path / ".tripwire" / "acks" / "self-review-fixture-1.json"
+    marker = (
+        tmp_path / ".tripwire" / "acks" / "coding-session-fixture-1-self-review.json"
+    )
     assert marker.is_file()
     data = json.loads(marker.read_text(encoding="utf-8"))
     assert data["fix_commits"] == ["c4f81e2", "9b3a02d"]
@@ -161,7 +172,9 @@ def test_ack_with_declared_no_findings_writes_marker(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    marker = tmp_path / ".tripwire" / "acks" / "self-review-fixture-1.json"
+    marker = (
+        tmp_path / ".tripwire" / "acks" / "coding-session-fixture-1-self-review.json"
+    )
     assert marker.is_file()
     data = json.loads(marker.read_text(encoding="utf-8"))
     assert data["declared_no_findings"] is True

@@ -1,18 +1,18 @@
-"""Session abandon orchestration (v0.7.9 §A4).
+"""Session abandon orchestration.
 
 `abandoned` is the terminal status that does NOT claim success. It's
 the answer to "this session can't legitimately reach `done`, but I
 need to stop pretending it's still in flight." The framework's two
 terminal states are `done` (passed every gate) and `abandoned`
 (stopped, didn't pass). There is no third "done with caveats" state
-on purpose — that's what spec §A4 is rejecting.
+on purpose.
 
 Behaviour:
 - Kill the runtime handle if the session is still executing.
 - Close any OPEN PRs for the session's branches via ``gh pr close``.
   Merged PRs are left alone (closing a merged PR makes no sense).
 - Remove every worktree the session created.
-- Transition the session to ``abandoned``.
+- Transition the session to ``abandoned`` via the workflow executor.
 - Issues are NOT closed as ``done``. They stay where they are; the
   PM moves them to ``backlog`` / ``canceled`` / ``won't-do`` per case.
 
@@ -21,6 +21,10 @@ the failure in the result and proceed with the rest — abandoning is
 about state cleanup, and a failure in one step shouldn't block the
 others. The session ALWAYS transitions to ``abandoned``; that's the
 contract.
+
+``session.status`` is written exclusively by
+:func:`tripwire.core.workflow.transitions.execute_transition` —
+engagement-close housekeeping is an executor post-write hook.
 """
 
 from __future__ import annotations
@@ -28,12 +32,11 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 
+from tripwire.core.gh_helpers import GhError, gh_pr_close
 from tripwire.core.git_helpers import worktree_remove
-from tripwire.core.session_store import load_session, save_session
-from tripwire.models.enums import SessionStatus
+from tripwire.core.session_store import load_session
 
 
 class AbandonError(ValueError):
@@ -128,15 +131,33 @@ def abandon_session(
             result.errors.append(f"worktree remove failed for {wt_path}: {exc}")
 
     # 4. Transition. This step always happens — it's the contract.
-    now = datetime.now(tz=timezone.utc)
-    session.status = SessionStatus.ABANDONED
-    session.updated_at = now
-    if session.engagements:
-        last = session.engagements[-1]
-        if last.ended_at is None:
-            last.ended_at = now
-            last.outcome = "abandoned"
-    save_session(project_dir, session)
+    # Route through ``execute_transition`` — the sole writer of
+    # ``session.status``. Engagement close is a post-write hook
+    # (:func:`tripwire.core.workflow.side_effects.close_active_engagement`)
+    # that the executor fires for terminal-bound transitions.
+    from tripwire.core.workflow.transitions import (
+        TransitionError,
+        execute_transition,
+    )
+
+    try:
+        transition = execute_transition(
+            project_dir,
+            workflow_id="coding-session",
+            instance_id=session_id,
+            target_status="abandoned",
+            flags={"action": "session_abandon"},
+        )
+    except TransitionError as exc:
+        raise AbandonError(
+            "abandon/transition_error", f"executor refused: {exc}"
+        ) from exc
+    if not transition.ok:
+        raise AbandonError(
+            "abandon/transition_rejected",
+            f"transition to abandoned rejected: "
+            f"{transition.message or transition.reason}",
+        )
 
     return result
 
@@ -159,22 +180,9 @@ def _close_pr_by_url(pr_url: str, worktree_path: str) -> _PrCloseVerdict:
     """
     verdict = _PrCloseVerdict()
     try:
-        close = subprocess.run(
-            ["gh", "pr", "close", pr_url],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            cwd=worktree_path,
-        )
-    except (subprocess.SubprocessError, OSError) as exc:
-        verdict.error = f"gh pr close {pr_url} failed: {exc}"
-        return verdict
-
-    if close.returncode != 0:
-        verdict.error = (
-            f"gh pr close {pr_url} exit={close.returncode}: "
-            f"{(close.stderr or '').strip()}"
-        )
+        gh_pr_close(pr_url, cwd=worktree_path)
+    except GhError as exc:
+        verdict.error = str(exc)
         return verdict
 
     tail = pr_url.rsplit("/", 1)[-1]
@@ -238,32 +246,40 @@ def _close_pr_for_branch(branch: str, worktree_path: str) -> _PrCloseVerdict:
         if state != "OPEN":
             continue
         try:
-            close = subprocess.run(
-                [
-                    "gh",
-                    "pr",
-                    "close",
-                    str(number),
-                    "--comment",
-                    "Session abandoned (`tripwire session abandon`).",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=15,
+            gh_pr_close(
+                number,
+                comment="Session abandoned (`tripwire session abandon`).",
                 cwd=worktree_path,
             )
-            if close.returncode == 0:
-                verdict.closed_pr = number
-            else:
-                verdict.error = (
-                    f"gh pr close #{number} exit={close.returncode}: "
-                    f"{(close.stderr or '').strip()}"
-                )
-        except (subprocess.SubprocessError, OSError) as exc:
-            verdict.error = f"gh pr close #{number} failed: {exc}"
+            verdict.closed_pr = number
+        except GhError as exc:
+            verdict.error = str(exc)
         # Closing the first open PR per branch is enough; gh shouldn't
         # show two open PRs for the same head, but if it does the
         # leftover surfaces in the next abandon run.
         break
 
+    return verdict
+
+
+def _close_pr_by_num(pr_num: int, cwd: Path | str | None = None) -> _PrCloseVerdict:
+    """Close a PR by its number via ``gh pr close <num>``.
+
+    The branch-keyed and URL-keyed close paths above retain their
+    bespoke ``gh pr list`` round-trip / URL parsing; this helper exists
+    so the Layer-1 ``tripwire gh pr-close`` CLI can target a known PR
+    number directly without re-discovering it.
+
+    ``cwd`` is optional; when supplied, ``gh`` runs from that directory
+    so it picks up the correct remote when worktrees have non-default
+    origins (v0.7.4 dual-PR case). Errors are captured on the verdict
+    rather than raised — matches the rest of this module's contract.
+    """
+    verdict = _PrCloseVerdict()
+    try:
+        gh_pr_close(pr_num, cwd=cwd)
+    except GhError as exc:
+        verdict.error = str(exc)
+        return verdict
+    verdict.closed_pr = pr_num
     return verdict

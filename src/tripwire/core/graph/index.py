@@ -11,7 +11,7 @@ on-disk cache schema) and exposes a per-kind / per-type query surface
 to the new `tripwire graph query` CLI, the validator, and the drift
 report.
 
-The legacy `core.graph.concept` and `core.graph.dependency` modules
+The older `core.graph.concept` and `core.graph.dependency` modules
 keep their public APIs but read through this facade — there is no
 duplicate state.
 

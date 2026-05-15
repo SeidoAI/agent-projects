@@ -23,7 +23,7 @@ def test_session_list_json_includes_cost_usd(
     save_test_session, tmp_path_project: Path
 ) -> None:
     """``--format json`` exposes ``cost_usd`` per session."""
-    log = tmp_path_project / "sessions" / "s1" / "session.log"
+    log = tmp_path_project / "instances" / "sessions" / "s1" / "session.log"
     _write_log(
         log,
         [
@@ -55,7 +55,7 @@ def test_session_list_table_renders_cost_column(
     save_test_session, tmp_path_project: Path
 ) -> None:
     """The default table view shows a Cost column for every row."""
-    log = tmp_path_project / "sessions" / "s1" / "session.log"
+    log = tmp_path_project / "instances" / "sessions" / "s1" / "session.log"
     _write_log(
         log,
         [

@@ -41,7 +41,15 @@ test("workflow page renders against real API payload without console regressions
   await expect(page.getByTestId("workflow-flowchart")).toBeVisible();
   await expect(page.getByTestId("workflow-nav-tile-coding-session")).toBeVisible();
   await expect(page.getByTestId("workflow-band-coding-session")).toBeVisible();
-  await expect(page.getByTestId("workflow-region-executing")).toBeVisible();
+  // Scope to coding-session: issue-closure also declares an `executing` status
+  // post-v0.13.1, so the un-scoped workflow-region-executing testid resolves
+  // to two elements. The JIT prompt and workstep testids are still unique
+  // (self-review JIT and implement workstep are coding-session-only).
+  await expect(
+    page
+      .getByTestId("rf__node-band:coding-session:status:executing")
+      .getByTestId("workflow-region-executing"),
+  ).toBeVisible();
   await expect(page.getByTestId("workflow-jit-completed-self-review")).toBeVisible();
   await expect(page.getByTestId("workflow-workstep-executing-implement")).toBeVisible();
 

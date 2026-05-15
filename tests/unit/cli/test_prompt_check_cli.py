@@ -34,7 +34,7 @@ def _project_dir(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
-    session_dir = tmp_path / "sessions" / "test-session"
+    session_dir = tmp_path / "instances" / "sessions" / "test-session"
     session_dir.mkdir(parents=True)
     (session_dir / "session.yaml").write_text(
         "---\n"

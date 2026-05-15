@@ -30,6 +30,7 @@ from pathlib import Path
 
 import yaml
 
+from tripwire.core import paths
 from tripwire.core.pr_watcher import (
     PRWatcher,
     WatchedSession,
@@ -215,7 +216,9 @@ def build_watched_sessions(project_dir: Path) -> list[WatchedSession]:
                 pt_repo=pt_slug or "",
                 pt_branch=f"proj/{sess.id}",
                 pt_pr_number=sess_state.get("pt_pr_number"),
-                required_artifacts=[f"sessions/{sess.id}/{name}" for name in manifest],
+                required_artifacts=[
+                    f"{paths.SESSIONS_DIR}/{sess.id}/{name}" for name in manifest
+                ],
                 session_status=sess.status,
             )
         )

@@ -31,28 +31,50 @@ def _project_dir(tmp_path: Path) -> Path:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
                   - id: planned
-                    next: queued
                   - id: queued
-                    next: executing
                   - id: executing
-                    next: in_review
                   - id: in_review
-                    next: verified
                   - id: verified
-                    next: completed
                   - id: completed
                     terminal: true
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    kind: forward
+                  - id: queued-to-executing
+                    actor: pm-agent
+                    from: queued
+                    to: executing
+                    kind: forward
+                  - id: executing-to-in_review
+                    actor: pm-agent
+                    from: executing
+                    to: in_review
+                    kind: forward
+                  - id: in_review-to-verified
+                    actor: pm-agent
+                    from: in_review
+                    to: verified
+                    kind: forward
+                  - id: verified-to-completed
+                    actor: pm-agent
+                    from: verified
+                    to: completed
+                    kind: forward
             """
         ),
         encoding="utf-8",
     )
-    sessions_dir = tmp_path / "sessions" / "test-session"
+    sessions_dir = tmp_path / "instances" / "sessions" / "test-session"
     sessions_dir.mkdir(parents=True)
     (sessions_dir / "session.yaml").write_text(
         "---\n"
@@ -130,7 +152,9 @@ def test_transition_pass_path_advances_session(tmp_path: Path, clean_validator) 
     assert result.exit_code == 0, result.output
 
     # Session status flipped.
-    session_yaml = (pd / "sessions" / "test-session" / "session.yaml").read_text()
+    session_yaml = (
+        pd / "instances" / "sessions" / "test-session" / "session.yaml"
+    ).read_text()
     assert "status: queued" in session_yaml
     # Status-instance id present.
     assert "current_status_instance:" in session_yaml
@@ -153,19 +177,29 @@ def test_transition_uses_target_status_validators(
     (pd / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
                   - id: planned
-                    next: queued
-                    tripwires: [v_id_format]
                   - id: queued
-                    next: executing
-                    tripwires: [v_uuid_present]
                   - id: executing
                     terminal: true
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    kind: forward
+                    controls:
+                      tripwires: [v_uuid_present]
+                  - id: queued-to-executing
+                    actor: pm-agent
+                    from: queued
+                    to: executing
+                    kind: forward
             """
         ),
         encoding="utf-8",
@@ -186,29 +220,34 @@ def test_transition_uses_target_status_validators(
 def test_transition_uses_route_controls_when_routes_declared(
     tmp_path: Path, clean_validator
 ) -> None:
+    """Route controls are forwarded to validate_project. v0.13: the
+    referenced ids must be registered in the validator catalog (the
+    fail-loud unknown-tripwire check rejects otherwise), so this test
+    uses real shipped validator ids rather than fake placeholders."""
     from tripwire.cli.transition import transition_cmd
 
     pd = _project_dir(tmp_path)
     (pd / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
                   - id: planned
-                    next: queued
                   - id: queued
                     terminal: true
-                    tripwires: [v_status_only]
+                    tripwires: [v_uuid_present]
                 routes:
                   - id: planned-to-queued
                     actor: pm-agent
                     from: planned
                     to: queued
+                    kind: forward
                     controls:
-                      tripwires: [v_route_only]
+                      tripwires: [v_id_format]
             """
         ),
         encoding="utf-8",
@@ -221,7 +260,7 @@ def test_transition_uses_route_controls_when_routes_declared(
 
     assert result.exit_code == 0, result.output
     call = clean_validator.calls[-1]
-    assert call["kwargs"]["validator_ids"] == ["v_route_only"]
+    assert call["kwargs"]["validator_ids"] == ["v_id_format"]
 
 
 def test_transition_prompt_check_gate_accepts_recorded_invocation(
@@ -234,18 +273,29 @@ def test_transition_prompt_check_gate_accepts_recorded_invocation(
     (pd / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
                   - id: planned
-                    next: queued
                   - id: queued
-                    next: executing
-                    prompt_checks: [pm-session-queue]
                   - id: executing
                     terminal: true
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    kind: forward
+                    controls:
+                      prompt_checks: [pm-session-queue]
+                  - id: queued-to-executing
+                    actor: pm-agent
+                    from: queued
+                    to: executing
+                    kind: forward
             """
         ),
         encoding="utf-8",
@@ -295,7 +345,9 @@ def test_transition_rejects_disallowed_target(tmp_path: Path) -> None:
     assert "not reachable" in result.output.lower()
 
     # Session stays at planned.
-    session_yaml = (pd / "sessions" / "test-session" / "session.yaml").read_text()
+    session_yaml = (
+        pd / "instances" / "sessions" / "test-session" / "session.yaml"
+    ).read_text()
     assert "status: planned" in session_yaml
 
     # transition.rejected emitted with reason.
@@ -322,7 +374,9 @@ def test_transition_increments_status_instance_n(
         transition_cmd, ["test-session", "in_review", "--project-dir", str(pd)]
     )
 
-    session_yaml = (pd / "sessions" / "test-session" / "session.yaml").read_text()
+    session_yaml = (
+        pd / "instances" / "sessions" / "test-session" / "session.yaml"
+    ).read_text()
     assert "coding-session:test-session:in_review:1" in session_yaml
 
 
@@ -397,8 +451,8 @@ def test_transition_rejected_when_tripwires_fail(tmp_path: Path) -> None:
 
     pd = _project_dir(tmp_path)
     # Plant a bad node so validate produces an error.
-    (pd / "nodes").mkdir(parents=True, exist_ok=True)
-    (pd / "nodes" / "bad-node.yaml").write_text(
+    (pd / "instances" / "nodes").mkdir(parents=True, exist_ok=True)
+    (pd / "instances" / "nodes" / "bad-node.yaml").write_text(
         "---\nbroken: yaml syntax\n  no quotes here: oops:\n",
         encoding="utf-8",
     )
@@ -413,7 +467,9 @@ def test_transition_rejected_when_tripwires_fail(tmp_path: Path) -> None:
         r["details"].get("reason", "").startswith("tripwires_failed") for r in rows
     )
     # Session did NOT advance.
-    session_yaml = (pd / "sessions" / "test-session" / "session.yaml").read_text()
+    session_yaml = (
+        pd / "instances" / "sessions" / "test-session" / "session.yaml"
+    ).read_text()
     assert "status: planned" in session_yaml
 
 
@@ -529,7 +585,6 @@ def test_missing_consumed_artifacts_resolves_issue_key_from_session(
     from datetime import datetime, timezone
 
     from tripwire.core.workflow.schema import (
-        NextSpec,
         WorkflowArtifactRef,
         WorkflowStatus,
         WorkflowStatusArtifacts,
@@ -539,13 +594,13 @@ def test_missing_consumed_artifacts_resolves_issue_key_from_session(
 
     target = WorkflowStatus(
         id="executing",
-        next=NextSpec(kind="terminal"),
+        terminal=True,
         artifacts=WorkflowStatusArtifacts(
             consumes=[
                 WorkflowArtifactRef(
                     id="developer-doc",
                     label="developer.md",
-                    path="issues/{issue_key}/developer.md",
+                    path="instances/issues/{issue_key}/developer.md",
                 )
             ]
         ),
@@ -566,7 +621,7 @@ def test_missing_consumed_artifacts_resolves_issue_key_from_session(
     missing = _missing_consumed_artifacts(
         tmp_path, session_id="test-session", target=target, session=session
     )
-    assert missing == ["issues/SEI-42/developer.md"]
+    assert missing == ["instances/issues/SEI-42/developer.md"]
 
 
 def test_missing_consumed_artifacts_skips_unresolved_placeholders(
@@ -577,7 +632,6 @@ def test_missing_consumed_artifacts_skips_unresolved_placeholders(
     must skip such paths rather than raise.
     """
     from tripwire.core.workflow.schema import (
-        NextSpec,
         WorkflowArtifactRef,
         WorkflowStatus,
         WorkflowStatusArtifacts,
@@ -586,14 +640,14 @@ def test_missing_consumed_artifacts_skips_unresolved_placeholders(
 
     target = WorkflowStatus(
         id="verified",
-        next=NextSpec(kind="terminal"),
+        terminal=True,
         artifacts=WorkflowStatusArtifacts(
             consumes=[
                 WorkflowArtifactRef(
                     id="completion-comment",
                     label="completion comment",
                     path=(
-                        "issues/{issue_key}/comments/{nnn}-completion-{yyyy-mm-dd}.yaml"
+                        "instances/issues/{issue_key}/comments/{nnn}-completion-{yyyy-mm-dd}.yaml"
                     ),
                 )
             ]
@@ -618,7 +672,6 @@ def test_missing_consumed_artifacts_handles_session_without_issues(
     from datetime import datetime, timezone
 
     from tripwire.core.workflow.schema import (
-        NextSpec,
         WorkflowArtifactRef,
         WorkflowStatus,
         WorkflowStatusArtifacts,
@@ -628,13 +681,13 @@ def test_missing_consumed_artifacts_handles_session_without_issues(
 
     target = WorkflowStatus(
         id="executing",
-        next=NextSpec(kind="terminal"),
+        terminal=True,
         artifacts=WorkflowStatusArtifacts(
             consumes=[
                 WorkflowArtifactRef(
                     id="developer-doc",
                     label="developer.md",
-                    path="issues/{issue_key}/developer.md",
+                    path="instances/issues/{issue_key}/developer.md",
                 )
             ]
         ),
@@ -654,3 +707,47 @@ def test_missing_consumed_artifacts_handles_session_without_issues(
         tmp_path, session_id="test-session", target=target, session=session
     )
     assert missing == []
+
+
+def test_transition_rejects_route_with_unknown_tripwire(
+    tmp_path: Path, clean_validator
+) -> None:
+    """If a route declares a tripwire id that isn't in the registered
+    validator catalog, the gate must fail loud rather than silently
+    skip the missing check (the v0.9 deferred-from-PR-#73 silent-skip
+    fix). This is the runtime defense-in-depth complement to the
+    load-time `workflow/unknown_tripwire` lint."""
+    from tripwire.cli.transition import transition_cmd
+
+    pd = _project_dir(tmp_path)
+    (pd / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                  - id: queued
+                    terminal: true
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    kind: forward
+                    controls:
+                      tripwires: [v_does_not_exist_xyz]
+            """
+        ),
+        encoding="utf-8",
+    )
+    result = CliRunner().invoke(
+        transition_cmd,
+        ["test-session", "queued", "--project-dir", str(pd)],
+    )
+    assert result.exit_code != 0
+    assert "unknown_tripwire" in result.output
+    assert "v_does_not_exist_xyz" in result.output

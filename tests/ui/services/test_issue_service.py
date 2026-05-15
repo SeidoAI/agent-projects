@@ -232,7 +232,7 @@ class TestValidateIssue:
         # Report is scoped to this issue's findings only.
         for finding in report.errors + report.warnings:
             if finding.file is not None:
-                assert finding.file.startswith("issues/TST-1/")
+                assert finding.file.startswith("instances/issues/TST-1/")
 
     def test_scoped_to_one_issue(
         self, tmp_path_project, save_test_issue, save_test_node

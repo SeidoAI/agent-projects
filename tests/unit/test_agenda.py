@@ -36,7 +36,7 @@ def write_project_yaml(project_dir: Path) -> None:
 
 
 def write_issue(project_dir: Path, key: str, **overrides: object) -> None:
-    idir = project_dir / "issues" / key
+    idir = project_dir / "instances" / "issues" / key
     idir.mkdir(parents=True, exist_ok=True)
     fm = {
         "uuid": str(uuid.uuid4()),
@@ -59,8 +59,8 @@ def write_issue(project_dir: Path, key: str, **overrides: object) -> None:
 @pytest.fixture
 def project(tmp_path: Path) -> Path:
     write_project_yaml(tmp_path)
-    (tmp_path / "issues").mkdir()
-    (tmp_path / "nodes").mkdir(parents=True)
+    (tmp_path / "instances" / "issues").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "instances" / "nodes").mkdir(parents=True)
     return tmp_path
 
 
@@ -114,7 +114,7 @@ class TestAgendaCollection:
         """v0.9.4 regression test: a `completed` blocker (canonical) must
         clear the dependent. Pre-v0.9.4 the check used `!= "done"` which
         spuriously flagged completed blockers as in-flight. Canonical
-        "completed" + legacy "done" alias both clear."""
+        "completed" status clears the dependent."""
         write_issue(project, "TST-1", status="completed")  # canonical
         write_issue(project, "TST-2", status="queued", blocked_by=["TST-1"])
         result = _collect_agenda(project, "status", None)

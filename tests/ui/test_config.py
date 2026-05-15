@@ -46,16 +46,22 @@ class TestLoadUserConfig:
         assert cfg.default_project == tmp_path
         assert tmp_path in cfg.project_roots
 
-    def test_tilde_expanded_in_paths(self, tmp_path: Path):
+    def test_tilde_expanded_in_paths(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        # Redirect HOME to tmp_path so the test asserts against a known,
+        # isolated value rather than the real developer's home.
+        fake_home = tmp_path / "fake-home"
+        fake_home.mkdir()
+        monkeypatch.setenv("HOME", str(fake_home))
         f = tmp_path / "config.yaml"
         f.write_text(
             "project_roots:\n  - ~/some/path\ndefault_project: ~/other/path\n",
             encoding="utf-8",
         )
         cfg = load_user_config(f)
-        home = Path.home()
-        assert cfg.project_roots[0] == home / "some" / "path"
-        assert cfg.default_project == home / "other" / "path"
+        assert cfg.project_roots[0] == fake_home / "some" / "path"
+        assert cfg.default_project == fake_home / "other" / "path"
 
     def test_invalid_yaml_returns_defaults_with_warning(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture

@@ -67,7 +67,7 @@ def _ensure_pr_review_manifest_entry(tmp_path_project: Path) -> None:
 
 
 def _seed_pr_review(project_dir: Path, sid: str, content: str) -> None:
-    sdir = project_dir / "sessions" / sid
+    sdir = project_dir / "instances" / "sessions" / sid
     sdir.mkdir(parents=True, exist_ok=True)
     (sdir / "pr-review.yaml").write_text(content, encoding="utf-8")
 
@@ -480,7 +480,7 @@ class TestPrepareReviewCmd:
         )
         assert result.exit_code == 0, result.output
 
-        target = tmp_path_project / "sessions" / "s1" / "pr-review.yaml"
+        target = tmp_path_project / "instances" / "sessions" / "s1" / "pr-review.yaml"
         assert target.is_file()
         scaffold = yaml.safe_load(target.read_text(encoding="utf-8"))
         assert scaffold["verdict"] == "approved"
@@ -519,7 +519,7 @@ class TestPrepareReviewCmd:
         assert result.exit_code != 0
         assert "already exists" in result.output
         # Original content preserved.
-        target = tmp_path_project / "sessions" / "s1" / "pr-review.yaml"
+        target = tmp_path_project / "instances" / "sessions" / "s1" / "pr-review.yaml"
         assert "existing content" in target.read_text(encoding="utf-8")
 
     def test_force_overwrites(self, tmp_path_project, save_test_session):
@@ -546,7 +546,7 @@ class TestPrepareReviewCmd:
             ],
         )
         assert result.exit_code == 0, result.output
-        target = tmp_path_project / "sessions" / "s1" / "pr-review.yaml"
+        target = tmp_path_project / "instances" / "sessions" / "s1" / "pr-review.yaml"
         assert "existing content" not in target.read_text(encoding="utf-8")
         # Newly scaffolded structure is parseable YAML with verdict.
         scaffold = yaml.safe_load(target.read_text(encoding="utf-8"))

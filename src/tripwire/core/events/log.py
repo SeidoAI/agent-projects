@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Any
 
 from tripwire.core.events.schema import Event
+from tripwire.core.jsonl_log import append_jsonl
 from tripwire.core.locks import project_lock
 
 EVENTS_DIRNAME = "events"
@@ -46,8 +47,14 @@ def events_dir(project_dir: Path) -> Path:
     return project_dir / EVENTS_DIRNAME
 
 
-def _isoformat_z(dt: datetime) -> str:
+def isoformat_z(dt: datetime) -> str:
+    """Canonical UTC timestamp format used across events, audit log, and telemetry."""
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# Backwards-compat alias for any internal caller that still references the
+# private name. Prefer ``isoformat_z`` for new code.
+_isoformat_z = isoformat_z
 
 
 def _today_filename(now: datetime) -> str:
@@ -96,12 +103,9 @@ def emit_event(
     target_dir.mkdir(parents=True, exist_ok=True)
     target = target_dir / _today_filename(when)
 
-    line = json.dumps(record.to_json(), ensure_ascii=False, sort_keys=False)
     lock_name = f"{EVENTS_DIRNAME}/.{target.name}.lock"
     with project_lock(project_dir, name=lock_name):
-        with target.open("a", encoding="utf-8") as fh:
-            fh.write(line)
-            fh.write("\n")
+        append_jsonl(target, record.to_json(), ensure_ascii=False, sort_keys=False)
     return record
 
 

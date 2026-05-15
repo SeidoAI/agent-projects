@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from tripwire.core import paths
 from tripwire.core.git_helpers import MainTreeUnavailable, list_paths_on_main
 from tripwire.core.store import PROJECT_CONFIG_FILENAME
 
@@ -71,12 +72,12 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
         sid = entity.model.id
         # Two layouts coexist in the wild; check both before reporting.
         sr_candidates = (
-            f"sessions/{sid}/{self_review_file}",
-            f"sessions/{sid}/artifacts/{self_review_file}",
+            f"{paths.SESSIONS_DIR}/{sid}/{self_review_file}",
+            f"{paths.SESSIONS_DIR}/{sid}/artifacts/{self_review_file}",
         )
         pr_candidates = (
-            f"sessions/{sid}/{pm_response_file}",
-            f"sessions/{sid}/artifacts/{pm_response_file}",
+            f"{paths.SESSIONS_DIR}/{sid}/{pm_response_file}",
+            f"{paths.SESSIONS_DIR}/{sid}/artifacts/{pm_response_file}",
         )
         if not any(p in on_main for p in sr_candidates):
             continue

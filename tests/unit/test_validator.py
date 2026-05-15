@@ -46,12 +46,17 @@ from tripwire.core.validator import (
 
 
 def write_project_yaml(project_dir: Path, **overrides: Any) -> None:
-    """Write a minimal valid project.yaml with sensible defaults."""
+    """Write a minimal valid project.yaml with sensible defaults.
+
+    v0.13.1 (B8): callers that used to pass ``status_transitions=`` have
+    it lifted into the ``issue-closure`` workflow written by
+    :func:`write_workflow_yaml`. The legacy key is stripped from
+    overrides (the field no longer exists on ProjectConfig).
+    """
     config: dict[str, Any] = {
         "name": "test",
         "key_prefix": "TST",
         "base_branch": "main",
-        # v0.9.4 canonical statuses + transitions.
         "statuses": [
             "planned",
             "queued",
@@ -62,16 +67,6 @@ def write_project_yaml(project_dir: Path, **overrides: Any) -> None:
             "abandoned",
             "deferred",
         ],
-        "status_transitions": {
-            "planned": ["queued", "abandoned"],
-            "queued": ["executing", "planned", "abandoned"],
-            "executing": ["in_review", "queued", "abandoned"],
-            "in_review": ["verified", "executing"],
-            "verified": ["completed", "in_review"],
-            "completed": [],
-            "abandoned": ["planned"],
-            "deferred": ["planned", "queued", "abandoned"],
-        },
         "next_issue_number": 1,
         "next_session_number": 1,
         "repos": {
@@ -82,9 +77,135 @@ def write_project_yaml(project_dir: Path, **overrides: Any) -> None:
             "SeidoAI/web-app-infrastructure": {"local": None},
         },
     }
+    legacy_transitions = overrides.pop("status_transitions", None)
     config.update(overrides)
     (project_dir / "project.yaml").write_text(
         yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
+    )
+    # If the caller passed legacy `status_transitions:` overrides,
+    # lift them into the workflow file. Otherwise fall back to the
+    # canonical 8-status transitions matching the v0.13.1 template.
+    if legacy_transitions is None:
+        legacy_transitions = {
+            "planned": ["queued", "deferred", "abandoned"],
+            "queued": ["executing", "planned", "deferred", "abandoned"],
+            "executing": ["in_review", "queued", "deferred", "abandoned"],
+            "in_review": ["verified", "executing", "deferred"],
+            "verified": ["completed", "in_review"],
+            "completed": [],
+            "abandoned": ["planned"],
+            "deferred": ["planned", "queued", "abandoned"],
+        }
+    write_workflow_yaml(project_dir, issue_transitions=legacy_transitions)
+
+
+def write_workflow_yaml(
+    project_dir: Path, *, issue_transitions: dict[str, list[str]] | None = None
+) -> None:
+    """Seed a minimal workflow.yaml whose ``issue-closure`` workflow
+    encodes ``issue_transitions``.
+
+    Tests that need to assert ``status/unreachable`` findings drive
+    those transitions via this helper rather than the deleted
+    ``project.yaml.status_transitions`` field.
+    """
+    issue_transitions = issue_transitions or {}
+    all_statuses = set(issue_transitions.keys()) | {
+        t for tos in issue_transitions.values() for t in tos
+    }
+    # Put `planned` first if present — the well-formedness validator
+    # treats `statuses[0]` as the canonical entry and back-fills
+    # `has_inbound`. Without this nudge any helper-built workflow
+    # whose first sorted status isn't the start state fires
+    # `workflow/unreachable_status` on the real start state.
+    statuses = (["planned"] if "planned" in all_statuses else []) + sorted(
+        s for s in all_statuses if s != "planned"
+    )
+    if not statuses:
+        return
+    # Mark statuses with no outbound edges as terminal so the well-
+    # formedness validator doesn't flag `workflow/no_terminal_status`
+    # or `workflow/trap_status` on the helper-generated workflow. Hang
+    # the full validator catalog (the ids the existing test fixtures
+    # exercise) on the canonical entry status so
+    # `_checks_for_validate` returns the full set when callers pass
+    # no explicit `validator_ids=`.
+    _validator_ids = [
+        "v_artifact_presence",
+        "v_bidirectional_related",
+        "v_comment_provenance",
+        "v_done_implies_issue_artifacts_on_main",
+        "v_done_implies_session_completed",
+        "v_enum_values",
+        "v_freshness",
+        "v_handoff_artifact",
+        "v_id_collisions",
+        "v_id_format",
+        "v_issue_artifact_presence",
+        "v_issue_body_structure",
+        "v_issue_session_status_compatibility",
+        "v_manifest_phase_ownership_consistent",
+        "v_manifest_schema",
+        "v_no_stale_pins",
+        "v_phase_requirements",
+        "v_pm_response_covers_self_review",
+        "v_pm_response_followups_resolve",
+        "v_project_repos_present",
+        "v_project_standards",
+        "v_reference_integrity",
+        "v_sequence_drift",
+        "v_session_issue_coherence",
+        "v_status_transitions",
+        "v_timestamps",
+        "v_uuid_present",
+        "v_workspace_link",
+        "v_pr_review_evidence",
+        "v_pr_review_threshold_findings",
+        "v_pr_review_external_reviewer",
+        "v_pr_review_code_review_skill",
+        "v_pr_merged_for_session",
+        "v_pr_review_approved",
+        "v_session_has_developer_md",
+        "v_session_has_verified_md",
+        "v_coverage_heuristics",
+        "v_quality_consistency",
+    ]
+    outbound = set(issue_transitions.keys())
+    first = statuses[0]
+    statuses_yaml = ""
+    for s in statuses:
+        line = f"      - id: {s}\n"
+        if s == first:
+            line += "        tripwires:\n" + "".join(
+                f"          - {v}\n" for v in _validator_ids
+            )
+        if s not in outbound or not issue_transitions.get(s):
+            line += "        terminal: true\n"
+        statuses_yaml += line
+    routes_yaml = "".join(
+        f"      - id: ic-{i}-{f}-to-{t}\n"
+        f"        actor: pm-agent\n"
+        f"        from: {f}\n"
+        f"        to: {t}\n"
+        f"        kind: forward\n"
+        for i, (f, tos) in enumerate(sorted(issue_transitions.items()))
+        for t in tos
+    )
+    (project_dir / "workflow.yaml").write_text(
+        "workflow_schema_version: 1\n"
+        "workflows:\n"
+        "  issue-closure:\n"
+        "    actor: pm-agent\n"
+        "    trigger: command.pm-issue-close\n"
+        "    instance:\n"
+        "      storage_path: instances/issues/{instance_id}/issue.yaml\n"
+        "      status_field: status\n"
+        f"      status_enum: {statuses}\n"
+        "    statuses:\n"
+        + statuses_yaml
+        + "    routes:\n"
+        + (routes_yaml or "      []\n"),
+        encoding="utf-8",
     )
 
 
@@ -95,9 +216,11 @@ def write_issue(
     body: str | None = None,
     **frontmatter_overrides: Any,
 ) -> Path:
-    """Write a syntactically valid issue to `issues/<key>/issue.yaml`
-    with all required body sections."""
-    idir = project_dir / "issues" / key
+    """Write a syntactically valid issue to
+    `instances/issues/<key>/issue.yaml` with all required body sections."""
+    from tripwire.core import paths
+
+    idir = paths.issue_dir(project_dir, key)
     idir.mkdir(parents=True, exist_ok=True)
 
     fm: dict[str, Any] = {
@@ -138,7 +261,9 @@ def write_node(
     body: str = "Description.\n",
     **frontmatter_overrides: Any,
 ) -> Path:
-    nodes_dir = project_dir / "nodes"
+    from tripwire.core import paths
+
+    nodes_dir = paths.nodes_dir(project_dir)
     nodes_dir.mkdir(parents=True, exist_ok=True)
     fm: dict[str, Any] = {
         "uuid": str(_uuid.uuid4()),
@@ -164,8 +289,10 @@ def write_session(
     **frontmatter_overrides: Any,
 ) -> Path:
     """Write a session in the canonical directory layout:
-    `sessions/<id>/session.yaml`, with an optional `plan.md`."""
-    sdir = project_dir / "sessions" / session_id
+    `instances/sessions/<id>/session.yaml`, with an optional `plan.md`."""
+    from tripwire.core import paths
+
+    sdir = paths.session_dir(project_dir, session_id)
     sdir.mkdir(parents=True, exist_ok=True)
     fm: dict[str, Any] = {
         "uuid": str(_uuid.uuid4()),
@@ -336,17 +463,17 @@ class TestLoading:
         assert any(c.startswith("schema/project") for c in codes(report))
 
     def test_unparseable_issue(self, empty_project: Path) -> None:
-        (empty_project / "issues" / "TST-1").mkdir(parents=True)
-        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(
+        (empty_project / "instances" / "issues" / "TST-1").mkdir(parents=True)
+        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(
             "no frontmatter at all"
         )
         report = validate_project(empty_project)
         assert "issue/parse_error" in codes(report)
 
     def test_schema_invalid_issue(self, empty_project: Path) -> None:
-        (empty_project / "issues" / "TST-1").mkdir(parents=True)
+        (empty_project / "instances" / "issues" / "TST-1").mkdir(parents=True)
         # Missing required fields like title, status, etc.
-        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(
+        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(
             "---\nuuid: 7c3a4b1d-9f2e-4a8c-b5d6-1e2f3a4b5c6d\nid: TST-1\n---\nbody\n"
         )
         report = validate_project(empty_project)
@@ -367,7 +494,7 @@ class TestLoading:
 class TestUuidPresence:
     def test_missing_uuid_is_error(self, empty_project: Path) -> None:
         # Hand-write an issue without uuid (bypassing the helper).
-        (empty_project / "issues" / "TST-1").mkdir(parents=True)
+        (empty_project / "instances" / "issues" / "TST-1").mkdir(parents=True)
         text = serialize_frontmatter_body(
             {
                 "id": "TST-1",
@@ -379,7 +506,9 @@ class TestUuidPresence:
             },
             "## Context\n[[user-model]]\n\n## Implements\nx\n\n## Repo scope\nx\n\n## Requirements\nx\n\n## Execution constraints\nstop and ask.\n\n## Acceptance criteria\n- [ ] x\n\n## Test plan\nx\n\n## Dependencies\nnone\n\n## Definition of Done\n- [ ] done\n",
         )
-        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(text)
+        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(
+            text
+        )
         report = validate_project(empty_project)
         assert "uuid/missing" in codes(report)
 
@@ -713,14 +842,16 @@ class TestIdCollisions:
         write_issue(empty_project, "TST-1")
         # Simulate a collision: a second issue directory with a different
         # name but the same `id` field in its frontmatter.
-        original = (empty_project / "issues" / "TST-1" / "issue.yaml").read_text()
+        original = (
+            empty_project / "instances" / "issues" / "TST-1" / "issue.yaml"
+        ).read_text()
         new_uuid = str(_uuid.uuid4())
         lines = original.splitlines()
         for i, line in enumerate(lines):
             if line.startswith("uuid:"):
                 lines[i] = f"uuid: {new_uuid}"
                 break
-        dup_dir = empty_project / "issues" / "TST-1-dup"
+        dup_dir = empty_project / "instances" / "issues" / "TST-1-dup"
         dup_dir.mkdir(parents=True)
         (dup_dir / "issue.yaml").write_text("\n".join(lines) + "\n")
 
@@ -765,7 +896,7 @@ class TestCommentProvenance:
     def test_invalid_comment_type_caught(self, empty_project: Path) -> None:
         write_node(empty_project, "user-model")
         write_issue(empty_project, "TST-1")
-        comment_dir = empty_project / "issues" / "TST-1" / "comments"
+        comment_dir = empty_project / "instances" / "issues" / "TST-1" / "comments"
         comment_dir.mkdir(parents=True)
         text = serialize_frontmatter_body(
             {
@@ -810,7 +941,7 @@ class TestProjectStandards:
 class TestAutoFix:
     def test_fix_missing_uuid(self, empty_project: Path) -> None:
         # Hand-write an issue without uuid.
-        (empty_project / "issues" / "TST-1").mkdir(parents=True)
+        (empty_project / "instances" / "issues" / "TST-1").mkdir(parents=True)
         body = (
             "## Context\n[[user-model]]\n\n## Implements\nx\n\n## Repo scope\nx\n\n"
             "## Requirements\nx\n\n## Execution constraints\nstop and ask.\n\n"
@@ -830,14 +961,18 @@ class TestAutoFix:
             },
             body,
         )
-        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(text)
+        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(
+            text
+        )
         write_node(empty_project, "user-model")
 
         report = validate_project(empty_project, fix=True)
         # Fix recorded
         assert "uuid/missing" in [f.code for f in report.fixed]
         # File now has a uuid
-        new_text = (empty_project / "issues" / "TST-1" / "issue.yaml").read_text()
+        new_text = (
+            empty_project / "instances" / "issues" / "TST-1" / "issue.yaml"
+        ).read_text()
         assert new_text.startswith("---\nuuid:")
 
     def test_fix_sequence_drift(self, empty_project: Path) -> None:
@@ -861,7 +996,7 @@ class TestAutoFix:
         report = validate_project(empty_project, fix=True)
         assert "bidi/related" in [f.code for f in report.fixed]
         # node-b's file should now contain node-a in its related list.
-        b_text = (empty_project / "nodes" / "node-b.yaml").read_text()
+        b_text = (empty_project / "instances" / "nodes" / "node-b.yaml").read_text()
         assert "node-a" in b_text
 
     def test_fix_sorted_lists(self, empty_project: Path) -> None:
@@ -873,7 +1008,7 @@ class TestAutoFix:
         report = validate_project(empty_project, fix=True)
         sorted_codes = [f.code for f in report.fixed if f.code == "sorted/list"]
         assert len(sorted_codes) >= 1
-        text = (empty_project / "nodes" / "user-model.yaml").read_text()
+        text = (empty_project / "instances" / "nodes" / "user-model.yaml").read_text()
         # alpha should come before monkey before zebra in the sorted list
         a = text.find("alpha")
         m = text.find("monkey")
@@ -1373,7 +1508,7 @@ class TestAutoFixIdempotency:
     """
 
     def test_fix_missing_uuid_idempotent(self, empty_project: Path) -> None:
-        (empty_project / "issues" / "TST-1").mkdir(parents=True)
+        (empty_project / "instances" / "issues" / "TST-1").mkdir(parents=True)
         body = (
             "## Context\n[[user-model]]\n\n## Implements\nx\n\n"
             "## Repo scope\nx\n\n## Requirements\nx\n\n"
@@ -1394,7 +1529,9 @@ class TestAutoFixIdempotency:
             },
             body,
         )
-        (empty_project / "issues" / "TST-1" / "issue.yaml").write_text(text)
+        (empty_project / "instances" / "issues" / "TST-1" / "issue.yaml").write_text(
+            text
+        )
         write_node(empty_project, "user-model")
 
         validate_project(empty_project, fix=True)

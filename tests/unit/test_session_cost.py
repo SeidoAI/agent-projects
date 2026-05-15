@@ -206,7 +206,7 @@ def test_compute_session_cost_reads_log_from_runtime_state(tmp_path: Path) -> No
     )
 
     project_dir = tmp_path / "proj"
-    (project_dir / "sessions" / "demo").mkdir(parents=True, exist_ok=True)
+    (project_dir / "instances" / "sessions" / "demo").mkdir(parents=True, exist_ok=True)
     session = AgentSession(
         id="demo",
         name="demo",
@@ -226,7 +226,7 @@ def test_compute_session_cost_no_log_path_returns_zero(tmp_path: Path) -> None:
     from tripwire.models.session import AgentSession
 
     project_dir = tmp_path / "proj"
-    (project_dir / "sessions" / "demo").mkdir(parents=True, exist_ok=True)
+    (project_dir / "instances" / "sessions" / "demo").mkdir(parents=True, exist_ok=True)
     save_session(
         project_dir,
         AgentSession(id="demo", name="demo", agent="backend-coder"),

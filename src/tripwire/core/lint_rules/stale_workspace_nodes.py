@@ -46,7 +46,7 @@ def _check(ctx):
                 message=(
                     f"node {n.id}: workspace_sha {n.workspace_sha} behind HEAD {head}"
                 ),
-                file=f"nodes/{n.id}.yaml",
+                file=f"instances/nodes/{n.id}.yaml",
                 fix_hint="Run /pm-project-sync or `tripwire workspace pull`.",
             )
 

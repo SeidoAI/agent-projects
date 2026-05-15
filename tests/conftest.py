@@ -60,8 +60,203 @@ def tmp_path_project(tmp_path: Path) -> Path:
             }
         )
     )
-    for sub in ("issues", "nodes", "sessions", "docs", "plans"):
-        (project_dir / sub).mkdir()
+    # v0.13.1: per-type subdirs sit under `instances/`. Create the
+    # `instances/` parent + the four standard children plus
+    # `plans/` (a PM working dir, unrelated to instance-entities).
+    (project_dir / "instances").mkdir()
+    for sub in ("instances/issues", "instances/nodes", "instances/sessions", "plans"):
+        (project_dir / sub).mkdir(parents=True, exist_ok=True)
+    # v0.13: workflow.yaml is required for execute_transition to resolve
+    # routes. Provide a minimal coding-session covering all SessionStatus
+    # values + the transitions the test suite exercises.
+    # Reference every implemented validator on the planned-to-queued
+    # route so `declared_validator_ids` returns the full catalog when
+    # tests call `validate_project` without `validator_ids=`. Otherwise
+    # only `v_workflow_well_formed` would run.
+    _all_validators = [
+        "v_artifact_presence",
+        "v_bidirectional_related",
+        "v_comment_provenance",
+        "v_done_implies_issue_artifacts_on_main",
+        "v_done_implies_session_completed",
+        "v_enum_values",
+        "v_freshness",
+        "v_handoff_artifact",
+        "v_id_collisions",
+        "v_id_format",
+        "v_issue_artifact_presence",
+        "v_issue_body_structure",
+        "v_issue_session_status_compatibility",
+        "v_manifest_phase_ownership_consistent",
+        "v_manifest_schema",
+        "v_no_orphan_proj_branches",
+        "v_no_stale_pins",
+        "v_phase_requirements",
+        "v_pm_response_covers_self_review",
+        "v_pm_response_followups_resolve",
+        "v_pr_merged_for_session",
+        "v_pr_review_approved",
+        "v_pr_review_code_review_skill",
+        "v_pr_review_evidence",
+        "v_pr_review_external_reviewer",
+        "v_pr_review_threshold_findings",
+        "v_project_repos_present",
+        "v_project_standards",
+        "v_reference_integrity",
+        "v_self_review_implies_pm_response",
+        "v_session_has_developer_md",
+        "v_session_has_verified_md",
+        "v_session_issue_coherence",
+        "v_status_transitions",
+        "v_timestamps",
+        "v_uuid_present",
+        "v_workflow_well_formed",
+        "v_workspace_link",
+        "v_worktree_paths_unique",
+    ]
+    _route_lines = []
+    for f, t, kind in [
+        ("planned", "queued", "forward"),
+        ("queued", "executing", "forward"),
+        ("executing", "in_review", "forward"),
+        ("in_review", "verified", "forward"),
+        ("verified", "completed", "forward"),
+        ("in_review", "executing", "revert"),
+        ("verified", "in_review", "revert"),
+        ("executing", "paused", "side"),
+        ("executing", "failed", "side"),
+        ("paused", "executing", "forward"),
+        ("failed", "executing", "forward"),
+        ("paused", "queued", "revert"),
+        ("paused", "completed", "revert"),
+        ("completed", "paused", "revert"),
+        ("planned", "abandoned", "side"),
+        ("queued", "abandoned", "side"),
+        ("executing", "abandoned", "side"),
+        ("paused", "abandoned", "side"),
+        ("failed", "abandoned", "side"),
+        ("in_review", "abandoned", "side"),
+        ("verified", "abandoned", "side"),
+    ]:
+        _route_lines.append(
+            f"      - id: {f}-to-{t}\n"
+            f"        actor: pm-agent\n"
+            f"        from: {f}\n"
+            f"        to: {t}\n"
+            f"        kind: {kind}\n"
+        )
+        if kind == "revert":
+            _route_lines.append(
+                "        preserve_fields:\n"
+                "          - runtime_state.claude_session_id\n"
+                "          - runtime_state.worktrees\n"
+            )
+        # The in_review → verified route runs the PR-review tripwires
+        # at gate time so test_transition_to_verified_blocked_by_missing_evidence
+        # exercises the right surface.
+        if (f, t) == ("in_review", "verified"):
+            _route_lines.append(
+                "        controls:\n"
+                "          tripwires:\n"
+                "            - v_pr_review_evidence\n"
+                "            - v_pr_review_threshold_findings\n"
+                "            - v_pr_review_external_reviewer\n"
+                "            - v_pr_review_code_review_skill\n"
+            )
+
+    # v0.13: reference every implemented validator on a STATUS
+    # (specifically the entry-only ``planned`` status) so
+    # ``declared_validator_ids`` (which feeds full-project validation
+    # when callers pass no ``validator_ids=``) returns the full set —
+    # WITHOUT subjecting every route to the entire catalog at gate
+    # time. The executor only fires the route's ``controls.tripwires``
+    # when a route is declared (status-level tripwires are the
+    # fallback for routeless transitions, which we don't have here).
+    _status_tripwires = "\n".join(f"          - {vid}" for vid in _all_validators)
+    # v0.13.1 (B8): the test workflow now also declares an
+    # ``issue-closure`` workflow because issue-status reachability is
+    # derived from those routes (the legacy
+    # ``project.yaml.status_transitions`` table was removed). The
+    # routes mirror the canonical 8-status issue flow so any test
+    # whose project.yaml inherits this conftest gets the same
+    # transitions the production template ships.
+    _issue_routes_data = [
+        ("planned", "queued"),
+        ("planned", "deferred"),
+        ("planned", "abandoned"),
+        ("queued", "executing"),
+        ("queued", "planned"),
+        ("queued", "deferred"),
+        ("queued", "abandoned"),
+        ("executing", "in_review"),
+        ("executing", "queued"),
+        ("executing", "deferred"),
+        ("executing", "abandoned"),
+        ("in_review", "verified"),
+        ("in_review", "executing"),
+        ("in_review", "deferred"),
+        ("verified", "completed"),
+        ("verified", "in_review"),
+        ("abandoned", "planned"),
+        ("deferred", "planned"),
+        ("deferred", "queued"),
+        ("deferred", "abandoned"),
+    ]
+    _issue_routes_yaml = "".join(
+        f"      - id: issue-{f}-to-{t}\n"
+        f"        actor: pm-agent\n"
+        f"        from: {f}\n"
+        f"        to: {t}\n"
+        f"        kind: forward\n"
+        for f, t in _issue_routes_data
+    )
+    (project_dir / "workflow.yaml").write_text(
+        "workflow_schema_version: 1\n"
+        "workflows:\n"
+        "  coding-session:\n"
+        "    actor: coding-agent\n"
+        "    trigger: session.spawn\n"
+        "    instance:\n"
+        "      storage_path: instances/sessions/{instance_id}/session.yaml\n"
+        "      status_field: status\n"
+        "      status_enum: [planned, queued, executing, in_review,\n"
+        "        verified, completed, paused, failed, abandoned]\n"
+        "    statuses:\n"
+        "      - id: planned\n"
+        "        tripwires:\n" + _status_tripwires + "\n"
+        "      - id: queued\n"
+        "      - id: executing\n"
+        "      - id: in_review\n"
+        "      - id: verified\n"
+        "      - id: completed\n"
+        "        terminal: true\n"
+        "      - id: paused\n"
+        "      - id: failed\n"
+        "      - id: abandoned\n"
+        "        terminal: true\n"
+        "    routes:\n" + "".join(_route_lines) + "  issue-closure:\n"
+        "    actor: pm-agent\n"
+        "    trigger: command.pm-issue-close\n"
+        "    instance:\n"
+        "      storage_path: instances/issues/{instance_id}/issue.yaml\n"
+        "      status_field: status\n"
+        "      status_enum: [planned, queued, executing, in_review,\n"
+        "        verified, completed, abandoned, deferred]\n"
+        "    statuses:\n"
+        "      - id: planned\n"
+        "      - id: queued\n"
+        "      - id: executing\n"
+        "      - id: in_review\n"
+        "      - id: verified\n"
+        "      - id: completed\n"
+        "        terminal: true\n"
+        # `abandoned` still has the `abandoned → planned` rehab route in
+        # the canonical 8-stage flow, so it isn't a sink. Marking it
+        # terminal would trip `workflow/terminal_with_outbound_route`.
+        "      - id: abandoned\n"
+        "      - id: deferred\n"
+        "    routes:\n" + _issue_routes_yaml
+    )
     templates = project_dir / "templates" / "artifacts"
     templates.mkdir(parents=True)
     # Minimal manifest — real one is tested separately. Matches v0.6a shape.
@@ -236,7 +431,7 @@ def fresh_project():
             "next_session_number: 1\n",
             encoding="utf-8",
         )
-        for sub in ("issues", "nodes", "sessions", "docs"):
+        for sub in ("instances/issues", "instances/nodes", "instances/sessions"):
             (proj_dir / sub).mkdir(parents=True, exist_ok=True)
         return proj_dir
 
@@ -287,9 +482,8 @@ def tmp_project_manifest(tmp_path: Path):
         (project_dir / "project.yaml").write_text(
             "name: tmp\nkey_prefix: TMP\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        (project_dir / "issues").mkdir()
-        (project_dir / "nodes").mkdir()
-        (project_dir / "sessions").mkdir()
+        for sub in ("instances/issues", "instances/nodes", "instances/sessions"):
+            (project_dir / sub).mkdir(parents=True, exist_ok=True)
         templates = project_dir / "templates" / "artifacts"
         templates.mkdir(parents=True)
         (templates / "manifest.yaml").write_text(

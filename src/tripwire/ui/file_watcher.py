@@ -107,7 +107,7 @@ def _should_ignore(path: Path, project_dir: Path | None = None) -> bool:
         rel_parts = path.parts
 
     # Self-written graph cache — must be skipped or we get infinite event loops.
-    if rel_parts == ("nodes", "tripwire-graph-index.yaml"):
+    if rel_parts == ("instances", "nodes", "tripwire-graph-index.yaml"):
         return True
 
     # Whitelist `.tripwire/events/` so FileEmitter writes survive the
@@ -156,44 +156,38 @@ def classify(
     if rel_posix == "project.yaml":
         return _event(project_id, "project", "config", action, rel_posix)
 
-    # issues/<KEY>/issue.yaml
-    if len(parts) == 3 and parts[0] == "issues" and parts[2] == "issue.yaml":
-        return _event(project_id, "issue", parts[1], action, rel_posix)
-
-    # nodes/<id>.yaml — concept node. Skip the derived graph cache that
-    # also lives in this dir under a reserved filename.
-    if (
-        len(parts) == 2
-        and parts[0] == "nodes"
-        and suffix == ".yaml"
-        and parts[1] != "tripwire-graph-index.yaml"
-    ):
-        return _event(project_id, "node", stem, action, rel_posix)
+    # Entity files live under `instances/<type>/...`. Strip the
+    # `instances/` prefix so the parts[1:] checks below operate on the
+    # `<type>/<id>/...` tail directly.
+    if parts and parts[0] == "instances":
+        sub = parts[1:]
+        sub_suffix = suffix
+        if len(sub) == 3 and sub[0] == "issues" and sub[2] == "issue.yaml":
+            return _event(project_id, "issue", sub[1], action, rel_posix)
+        if (
+            len(sub) == 2
+            and sub[0] == "nodes"
+            and sub_suffix == ".yaml"
+            and sub[1] != "tripwire-graph-index.yaml"
+        ):
+            return _event(project_id, "node", stem, action, rel_posix)
+        if len(sub) == 3 and sub[0] == "sessions" and sub[2] == "session.yaml":
+            return _event(project_id, "session", sub[1], action, rel_posix)
+        if len(sub) == 3 and sub[0] == "sessions" and sub_suffix == ".md":
+            return _event(project_id, "artifact", f"{sub[1]}/{stem}", action, rel_posix)
+        if (
+            len(sub) == 4
+            and sub[0] == "sessions"
+            and sub[2] == "artifacts"
+            and sub_suffix == ".md"
+        ):
+            return _event(project_id, "artifact", f"{sub[1]}/{stem}", action, rel_posix)
 
     # inbox/<id>.md — PM-agent escalation entries (KUI-? phase D).
     # entity_id is the bare entry id so the frontend can invalidate
     # both the list query and the single-entry query in one shot.
     if len(parts) == 2 and parts[0] == "inbox" and suffix == ".md":
         return _event(project_id, "inbox", stem, action, rel_posix)
-
-    # sessions/<id>/session.yaml
-    if len(parts) == 3 and parts[0] == "sessions" and parts[2] == "session.yaml":
-        return _event(project_id, "session", parts[1], action, rel_posix)
-
-    # sessions/<id>/<name>.md   (plan, task-checklist, etc. at session root).
-    # entity_id is "<session>/<name>" per the [[file-watcher]] node so the
-    # frontend can invalidate per-artifact queries, not the whole session.
-    if len(parts) == 3 and parts[0] == "sessions" and suffix == ".md":
-        return _event(project_id, "artifact", f"{parts[1]}/{stem}", action, rel_posix)
-
-    # sessions/<id>/artifacts/<name>.md
-    if (
-        len(parts) == 4
-        and parts[0] == "sessions"
-        and parts[2] == "artifacts"
-        and suffix == ".md"
-    ):
-        return _event(project_id, "artifact", f"{parts[1]}/{stem}", action, rel_posix)
 
     # plans/artifacts/<name>.md
     if (

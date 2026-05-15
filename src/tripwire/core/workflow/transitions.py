@@ -1,35 +1,49 @@
-"""Transition-token runtime — the workflow gate runner (KUI-159).
+"""Workflow executor — the SOLE writer of ``session.status`` in v0.13.
 
-A transition is a request to move a session from its current status
-to a target status. The runtime:
+In the v0.13 atomic-primitive model :func:`execute_transition` is a
+thin commit primitive. A transition is a request to move an entity
+(session today; issue / pr / pm-task tomorrow) from its current status
+to a target status via a declared route in ``workflow.yaml``. The
+executor:
 
-1. Loads ``<project>/workflow.yaml``, finds the workflow the session
-   belongs to (``coding-session`` for v0.9; future workflows look up
-   by ``trigger:`` against the spawn event).
-2. Verifies the target status is reachable from the current status
-   (single-id ``next:`` matches, or one of the conditional branches
-   resolves to it).
-3. Runs the target-status entry gate from ``workflow.yaml``:
+1. Acquires a per-instance transition lock.
+2. Loads ``<project>/workflow.yaml``, resolves the workflow by
+   ``workflow_id``.
+3. Reads fresh state inside the lock and resolves the route from
+   ``(current_status, target_status)``. No route declared = transition
+   is rejected as ``transition_not_reachable``.
+4. Runs the route's entry gate, in order:
+   a. **Tripwires** — validators listed on the route's controls.
+   b. **JIT prompts** — every ``controls.jit_prompts`` must be acked.
+   c. **Prompt-checks** — every ``controls.prompt_checks`` must be
+      invoked since the status was entered.
+   d. **Artifacts** — every required consumed artifact must exist.
+5. Captures pre-values for ``route.preserve_fields``; applies
+   ``route.clear_fields`` (sets the path to ``None``).
+6. Flips the instance's status field, bumps ``current_status_instance``,
+   saves the instance. The coding-session workflow round-trips through
+   the typed :class:`AgentSession` model; every other workflow round-
+   trips through the generic dict loader/saver in :mod:`instance_io`.
+7. Runs four best-effort post-write hooks inline. Each is guarded to
+   no-op gracefully for non-coding-session instances (engagement close
+   requires ``engagements``; telemetry requires session cost tracking):
+   - Close the active engagement on terminal transitions.
+   - Append audit record to ``.tripwire/audit.jsonl``.
+   - Append telemetry row.
+   - Reset session acks when ``flags["reset_acks"]`` is set.
+8. Emits ``transition.completed``, returns ``TransitionResult.ok=True``.
 
-   a. **Validators** — run only the validators listed on the target
-      status with ``strict=True``. Any error fails the gate.
-   b. **JIT prompts** — for every JIT prompt listed on the target
-      status, confirm :meth:`JitPrompt.is_acknowledged` returns True.
-      An unack'd blocking JIT prompt fails the gate.
-   c. **Prompt-checks** — for every prompt-check listed on the target
-      status, query the events log to verify it was invoked before
-      entering that status.
-   d. **Artifacts** — required consumed artifacts with concrete paths
-      must exist before entering the target status.
+There is no orchestration of external side-effects (sweep issues,
+rebase PT, kill runtime, etc.) — those live as Layer-1 CLI wrappers
+and direct-mutation cli paths now. There is also no rollback machinery:
+the gate either rejects before the write (no state mutated) or commits
+the write (the four post-write hooks are best-effort and never fail
+the transition).
 
-4. On pass: session.status = target, ``current_status_instance``
-   bumped, ``transition.completed`` emitted.
-5. On fail: ``transition.rejected`` emitted with a structured
-   ``reason``; session stays put.
-
-Concurrency: per-session lockfile under
-``.tripwire/locks/transition-<sid>.lock`` serialises concurrent
-transitions on the same session.
+Concurrency: per-(workflow, instance) lockfile under
+``.tripwire/locks/transition-<workflow>-<instance>.lock`` serialises
+concurrent transitions on the same entity — the execute path is the
+single serialization point for ``session.status`` mutations.
 """
 
 from __future__ import annotations
@@ -38,13 +52,20 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
-from tripwire.core.events.log import emit_event, read_events
+from tripwire.core import paths
+from tripwire.core.events.log import emit_event, isoformat_z, read_events
 from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.session_store import load_session, save_session
+from tripwire.core.workflow.instance_io import (
+    InstanceNotFoundError,
+    WorkflowMissingInstanceBlockError,
+    load_instance,
+    save_instance,
+)
 from tripwire.core.workflow.loader import load_workflows
 from tripwire.core.workflow.schema import (
-    NextSpec,
     Workflow,
     WorkflowRoute,
     WorkflowRouteControls,
@@ -56,8 +77,134 @@ from tripwire.models.session import AgentSession
 
 logger = logging.getLogger(__name__)
 
+# The single workflow id that materialises as a typed pydantic model
+# (``AgentSession``). Every other workflow id flows through the generic
+# dict-based instance loader. Centralised here so the dispatch sites
+# below read the same constant.
+_CODING_SESSION_WORKFLOW_ID = "coding-session"
 
-WORKFLOW_ID = "coding-session"
+
+def _load_workflow_instance(
+    project_dir: Path,
+    workflow_id: str,
+    instance_id: str,
+    *,
+    workflow: Workflow | None = None,
+) -> Any:
+    """Load an instance for *workflow_id*.
+
+    Dispatches on the workflow id: ``coding-session`` returns the typed
+    :class:`AgentSession` via :func:`load_session`; every other workflow
+    returns a plain dict via :func:`load_instance`. The caller uses
+    :func:`_get_status` / :func:`_set_status` to read/write the status
+    field uniformly across both shapes.
+
+    *workflow* is the pre-resolved :class:`Workflow` (the executor parses
+    ``workflow.yaml`` once at the top of :func:`execute_transition` and
+    threads the result here). When provided the generic dict loader
+    skips its internal :func:`load_workflows` call — the executor's two
+    instance loads per transition (pre-lock + in-lock) thus reuse the
+    single parse.
+
+    Raises :class:`TransitionError` for missing instance files so the
+    legacy "session not found" error contract is preserved for the
+    coding-session path while non-coding-session callers see a parallel
+    structured error.
+    """
+    if workflow_id == _CODING_SESSION_WORKFLOW_ID:
+        try:
+            return load_session(project_dir, instance_id)
+        except FileNotFoundError as exc:
+            raise TransitionError(f"session {instance_id!r} not found") from exc
+    try:
+        return load_instance(project_dir, workflow_id, instance_id, workflow=workflow)
+    except InstanceNotFoundError as exc:
+        raise TransitionError(
+            f"instance {instance_id!r} for workflow {workflow_id!r} not found"
+        ) from exc
+    except WorkflowMissingInstanceBlockError as exc:
+        # The workflow exists but its `instance:` block was never
+        # declared, so the generic loader has no storage_path to resolve.
+        # Surface as a transition error so the gate fails loud rather
+        # than silently routing to a fallback path.
+        raise TransitionError(str(exc)) from exc
+
+
+def _save_workflow_instance(
+    project_dir: Path,
+    workflow_id: str,
+    instance_id: str,
+    obj: Any,
+    *,
+    workflow: Workflow | None = None,
+) -> None:
+    """Persist an instance loaded by :func:`_load_workflow_instance`.
+
+    Mirror of the loader: ``coding-session`` round-trips through the
+    typed :func:`save_session`, every other workflow round-trips through
+    the generic :func:`save_instance` (writes the dict back to its
+    declared ``storage_path``). Pass *workflow* to skip the redundant
+    ``workflow.yaml`` parse — see :func:`_load_workflow_instance`.
+    """
+    if workflow_id == _CODING_SESSION_WORKFLOW_ID:
+        save_session(project_dir, obj)
+    else:
+        save_instance(project_dir, workflow_id, instance_id, obj, workflow=workflow)
+
+
+def _get_status(obj: Any, workflow: Workflow) -> str:
+    """Read the current status from a typed model or a dict.
+
+    The workflow's ``instance.status_field`` names the field; for the
+    coding-session path the typed ``AgentSession`` returns a
+    :class:`SessionStatus` enum (``StrEnum``) which we coerce to its
+    string value for uniform comparison against ``statuses_by_id``.
+    Workflows without an ``instance:`` block default the field name to
+    ``status`` (only the coding-session bootstrap fixture hits this in
+    tests today; production workflows declare the block).
+    """
+    field_name = workflow.instance.status_field if workflow.instance else "status"
+    if isinstance(obj, dict):
+        value = obj.get(field_name, "")
+        return value if isinstance(value, str) else str(value)
+    value = getattr(obj, field_name, "")
+    # StrEnum values render as their string value via ``.value``; fall
+    # back to ``str()`` so plain strings flow through unchanged.
+    return getattr(value, "value", value) if value is not None else ""
+
+
+def _set_status(obj: Any, workflow: Workflow, value: str) -> None:
+    """Write the status field on a typed model or a dict.
+
+    For dicts we write the raw string verbatim — the generic instance
+    loader does no enum coercion. For typed ``AgentSession`` we wrap in
+    :class:`SessionStatus` to match the model's declared type (pydantic
+    would coerce strings too, but the explicit enum keeps existing
+    behaviour bit-identical).
+    """
+    field_name = workflow.instance.status_field if workflow.instance else "status"
+    if isinstance(obj, dict):
+        obj[field_name] = value
+        return
+    if field_name == "status" and isinstance(obj, AgentSession):
+        setattr(obj, field_name, SessionStatus(value))
+    else:
+        setattr(obj, field_name, value)
+
+
+def _maybe_close_active_engagement(
+    instance: Any, route: WorkflowRoute, *, now: datetime
+) -> bool:
+    """Run :func:`close_active_engagement` only when the instance is a
+    coding-session — i.e. has the ``engagements`` attribute. Returns the
+    underlying modified flag, or False for instances without engagements
+    (the hook is a no-op for issue/project/etc. instances).
+    """
+    if not hasattr(instance, "engagements"):
+        return False
+    from tripwire.core.workflow.side_effects import close_active_engagement
+
+    return close_active_engagement(instance, route, now=now)
 
 
 @dataclass(frozen=True)
@@ -74,34 +221,14 @@ class TransitionError(Exception):
     """Raised for unrecoverable input errors (unknown session/status)."""
 
 
-def _isoformat_z(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _resolve_workflow(spec: WorkflowSpec) -> Workflow:
-    """Return the canonical workflow for v0.9 — only ``coding-session``
-    is materialised. Raises :class:`TransitionError` if missing."""
-    wf = spec.workflows.get(WORKFLOW_ID)
+def _resolve_workflow(spec: WorkflowSpec, workflow_id: str) -> Workflow:
+    """Return the workflow named ``workflow_id`` or raise."""
+    wf = spec.workflows.get(workflow_id)
     if wf is None:
         raise TransitionError(
-            f"workflow {WORKFLOW_ID!r} is not declared in workflow.yaml"
+            f"workflow {workflow_id!r} is not declared in workflow.yaml"
         )
     return wf
-
-
-def _is_reachable(current: str, target: str, next_spec: NextSpec) -> bool:
-    """True iff ``target`` is reachable from ``current`` via ``next_spec``."""
-    if next_spec.kind == "single":
-        return next_spec.single == target
-    if next_spec.kind == "conditional":
-        if next_spec.conditional is None:
-            return False
-        # Equality predicates are evaluated against an empty context
-        # for now — the runtime context is built by the gate runner
-        # later. We accept any branch whose `then` matches the target
-        # since reachability ≠ what-actually-happens-at-runtime.
-        return any(branch.then == target for branch in next_spec.conditional)
-    return False  # terminal — nothing reachable
 
 
 def _next_status_instance_n(
@@ -122,28 +249,52 @@ def _next_status_instance_n(
     return n + 1
 
 
-def request_transition(
+def execute_transition(
     project_dir: Path,
     *,
-    session_id: str,
+    workflow_id: str = "coding-session",
+    session_id: str | None = None,
+    instance_id: str | None = None,
     target_status: str,
+    flags: dict | None = None,
     now: datetime | None = None,
 ) -> TransitionResult:
-    """Run the gate and apply the transition.
+    """Run the gate, atomically write status, fire post-write hooks.
 
     Always emits ``transition.requested`` first, then either
     ``transition.completed`` (pass) or ``transition.rejected`` (fail).
     Raises :class:`TransitionError` for input errors that don't
-    correspond to a gate verdict (unknown session / status).
+    correspond to a gate verdict (unknown workflow / session / status).
+
+    ``workflow_id`` selects the workflow declared in ``workflow.yaml``.
+    ``coding-session`` round-trips through the typed
+    :class:`AgentSession` model; every other declared workflow flows
+    through the generic dict loader in
+    :mod:`tripwire.core.workflow.instance_io`. Unknown workflow ids
+    still raise :class:`TransitionError` at load.
+
+    ``instance_id`` (or the legacy positional ``session_id``) names the
+    entity being transitioned. For the coding-session workflow this is
+    the session id; for other workflows it is whatever the workflow's
+    ``instance.storage_path`` template renders against (issue key,
+    project name, etc.).
+
+    ``flags`` carries caller-local options:
+    - ``reset_acks: True`` — clear session acks (used by reopen).
+    - ``reason: str`` — human-readable reason recorded to the audit log.
+    - ``action: str`` — overrides ``action`` field on the audit record.
     """
     when = now or datetime.now(tz=timezone.utc)
+    instance = instance_id or session_id
+    if not instance:
+        raise TransitionError("instance_id (or session_id) is required")
 
     spec = load_workflows(project_dir)
-    workflow = _resolve_workflow(spec)
+    workflow = _resolve_workflow(spec, workflow_id)
     statuses_by_id = workflow.statuses_by_id
     if target_status not in statuses_by_id:
         raise TransitionError(
-            f"unknown status {target_status!r} in workflow {WORKFLOW_ID!r}; "
+            f"unknown status {target_status!r} in workflow {workflow_id!r}; "
             f"valid statuses: {sorted(statuses_by_id)}"
         )
 
@@ -151,45 +302,54 @@ def request_transition(
     # `from_status` field with the caller's perspective. The gate
     # body re-loads inside the lock to evaluate against fresh state
     # (see codex P1 on PR #73 — concurrent transitions could otherwise
-    # both validate against the same stale snapshot).
-    try:
-        pre_lock_session = load_session(project_dir, session_id)
-    except FileNotFoundError as exc:
-        raise TransitionError(f"session {session_id!r} not found") from exc
-
-    pre_lock_status = pre_lock_session.status.value
+    # both validate against the same stale snapshot). Pass the
+    # pre-resolved workflow so the generic dict loader skips re-parsing
+    # ``workflow.yaml``.
+    pre_lock_instance = _load_workflow_instance(
+        project_dir, workflow_id, instance, workflow=workflow
+    )
+    pre_lock_status = _get_status(pre_lock_instance, workflow)
 
     # Always emit `transition.requested` first.
     emit_event(
         project_dir,
-        workflow=WORKFLOW_ID,
-        instance=session_id,
+        workflow=workflow_id,
+        instance=instance,
         status=target_status,
         event="transition.requested",
         details={"from_status": pre_lock_status, "to_status": target_status},
         now=when,
     )
 
-    lock_name = f".tripwire/locks/transition-{session_id}.lock"
+    lock_path = paths.transition_lock_path(project_dir, workflow_id, instance)
+    lock_name = str(lock_path.relative_to(project_dir))
     try:
         with project_lock(project_dir, name=lock_name):
-            # Re-read session state INSIDE the lock — stale snapshots
+            # Re-read instance state INSIDE the lock — stale snapshots
             # before the lock could let two concurrent transitions
             # validate against the same source status and both emit
             # `transition.completed`. Fresh read here is the
-            # serialization point.
-            session = load_session(project_dir, session_id)
-            current_status = session.status.value
+            # serialization point. The pre-resolved workflow is still
+            # the right shape: workflow.yaml does not change mid-
+            # transition (per-instance lock has no bearing on the
+            # workflow file), so re-parsing it would be pure waste.
+            instance_obj = _load_workflow_instance(
+                project_dir, workflow_id, instance, workflow=workflow
+            )
+            current_status = _get_status(instance_obj, workflow)
             current = statuses_by_id.get(current_status)
             return _run_gate(
                 project_dir,
-                session=session,
+                workflow_id=workflow_id,
+                instance=instance,
+                session=instance_obj,
                 workflow=workflow,
                 current=current,
                 current_status=current_status,
                 target_status=target_status,
                 statuses_by_id=statuses_by_id,
                 when=when,
+                flags=dict(flags or {}),
             )
     except LockTimeout as exc:
         result = TransitionResult(
@@ -200,8 +360,8 @@ def request_transition(
         )
         emit_event(
             project_dir,
-            workflow=WORKFLOW_ID,
-            instance=session_id,
+            workflow=workflow_id,
+            instance=instance,
             status=target_status,
             event="transition.rejected",
             details={"reason": result.reason, "message": result.message},
@@ -213,6 +373,8 @@ def request_transition(
 def _run_gate(
     project_dir: Path,
     *,
+    workflow_id: str,
+    instance: str,
     session,
     workflow: Workflow,
     current,
@@ -220,27 +382,25 @@ def _run_gate(
     target_status: str,
     statuses_by_id: dict[str, WorkflowStatus],
     when: datetime,
+    flags: dict,
 ) -> TransitionResult:
-    """The gate body. Caller holds the per-session transition lock."""
-    session_id = session.id
+    """The gate body. Caller holds the per-instance transition lock."""
     # 1. Reachability.
     if current is None:
         return _reject(
             project_dir,
-            session_id,
+            workflow_id,
+            instance,
             target_status,
             reason=f"transition_not_reachable: current status "
             f"{current_status!r} is not declared in workflow.yaml",
         )
     route = _route_between(workflow, current_status, target_status)
-    if workflow.routes:
-        reachable = route is not None
-    else:
-        reachable = _is_reachable(current_status, target_status, current.next)
-    if not reachable:
+    if route is None:
         return _reject(
             project_dir,
-            session_id,
+            workflow_id,
+            instance,
             target_status,
             reason=f"transition_not_reachable: cannot move from "
             f"{current_status!r} to {target_status!r} via declared workflow route",
@@ -250,22 +410,48 @@ def _run_gate(
     controls = _controls_for_transition(route, target)
 
     # 2. Tripwires — target-status entry gate from workflow.yaml.
+    #
+    # Fail-loud on unknown validator ids: the load-time
+    # `workflow/unknown_tripwire` lint already catches typos at load,
+    # but if the catalog drifts from the workflow.yaml between load and
+    # transition (e.g. a validator was deleted in code while the YAML
+    # still references it), `validate_project` would silently skip the
+    # missing id and the gate would pass against fewer checks than the
+    # route declared. Surface that as a structured rejection here so
+    # the gate is honest about which tripwires actually ran.
     from tripwire.cli.transition import validate_project
+    from tripwire.core.workflow.registry import validator_catalog
+
+    catalog_ids = set(validator_catalog())
+    unknown_tripwires = [tid for tid in controls.tripwires if tid not in catalog_ids]
+    if unknown_tripwires:
+        return _reject(
+            project_dir,
+            workflow_id,
+            instance,
+            target_status,
+            reason=(
+                f"unknown_tripwire: route declares validator id(s) "
+                f"{sorted(unknown_tripwires)} that are not registered in "
+                f"the validator catalog — refusing to run a partial gate"
+            ),
+        )
 
     report = validate_project(
         project_dir,
         strict=True,
         fix=False,
-        session_id=session_id,
+        session_id=instance,
         validator_ids=controls.tripwires,
-        workflow=WORKFLOW_ID,
+        workflow=workflow_id,
         status=target_status,
     )
     if report.errors:
         first = report.errors[0]
         return _reject(
             project_dir,
-            session_id,
+            workflow_id,
+            instance,
             target_status,
             reason=f"tripwires_failed: {first.code}: {first.message}",
         )
@@ -277,12 +463,13 @@ def _run_gate(
 
         registry = load_jit_prompt_registry(project_dir)
         unacked = _unacked_status_jit_prompts(
-            project_dir, registry, session_id=session_id, want_ids=set(jit_prompt_ids)
+            project_dir, registry, session_id=instance, want_ids=set(jit_prompt_ids)
         )
         if unacked:
             return _reject(
                 project_dir,
-                session_id,
+                workflow_id,
+                instance,
                 target_status,
                 reason=f"jit_prompts_not_acknowledged: {sorted(unacked)}",
             )
@@ -291,44 +478,95 @@ def _run_gate(
     required_pcs = list(controls.prompt_checks)
     if required_pcs:
         invoked = _invoked_prompt_checks_at_status(
-            project_dir, instance=session_id, status=target_status
+            project_dir, instance=instance, status=target_status
         )
         missing = [pc for pc in required_pcs if pc not in invoked]
         if missing:
             return _reject(
                 project_dir,
-                session_id,
+                workflow_id,
+                instance,
                 target_status,
                 reason=f"prompt_checks_missing: {missing}",
             )
 
-    # 5. Artifacts — target-status consumed paths must exist.
+    # 5. Artifacts — target-status consumed paths must exist. The
+    # artifact resolver reads ``session.issues`` for the ``{issue_key}``
+    # placeholder, which only exists on typed AgentSession. For
+    # dict-backed instances we skip the issues-derived context — the
+    # workflow's declared artifacts for those instances either don't
+    # use the placeholder or settle at write-time.
+    artifact_owner = session if isinstance(session, AgentSession) else None
     missing_artifacts = _missing_consumed_artifacts(
         project_dir,
-        session_id=session_id,
+        session_id=instance,
         target=target,
-        session=session,
+        session=artifact_owner,
     )
     if missing_artifacts:
         return _reject(
             project_dir,
-            session_id,
+            workflow_id,
+            instance,
             target_status,
             reason=f"artifacts_missing: {missing_artifacts}",
         )
 
-    # 6. Pass — assign status-instance id, save session, emit completed.
-    n = _next_status_instance_n(project_dir, WORKFLOW_ID, session_id, target_status)
-    status_instance = f"{WORKFLOW_ID}:{session_id}:{target_status}:{n}"
-    session.status = SessionStatus(target_status)
-    session.current_status_instance = status_instance
-    session.updated_at = when
-    save_session(project_dir, session)
+    # 6. Capture pre-state for preserve/clear semantics. Only the
+    # coding-session model declares these fields today (dotted paths
+    # against ``AgentSession``); guarding the whole block keeps the
+    # dict-loader path simple and avoids inventing dotted-path
+    # semantics on dicts for a feature no other workflow uses yet.
+    is_coding_session = workflow_id == _CODING_SESSION_WORKFLOW_ID
+    preserved: dict[str, object] = {}
+    if is_coding_session:
+        preserved = {path: _read_path(session, path) for path in route.preserve_fields}
+        for path in route.clear_fields:
+            _write_path(session, path, None)
 
+    # 7. Flip status, assign status-instance id, save.
+    n = _next_status_instance_n(project_dir, workflow_id, instance, target_status)
+    status_instance = f"{workflow_id}:{instance}:{target_status}:{n}"
+    _set_status(session, workflow, target_status)
+    if isinstance(session, dict):
+        session["current_status_instance"] = status_instance
+        # ``updated_at`` is conventional but optional on dict instances —
+        # write an ISO string so YAML round-trips cleanly.
+        session["updated_at"] = isoformat_z(when)
+    else:
+        session.current_status_instance = status_instance
+        session.updated_at = when
+
+    # 8. Re-assert preserved fields against accidental clearing.
+    if is_coding_session:
+        for path, prior_value in preserved.items():
+            current_value = _read_path(session, path)
+            if current_value != prior_value:
+                _write_path(session, path, prior_value)
+    _save_workflow_instance(
+        project_dir, workflow_id, instance, session, workflow=workflow
+    )
+
+    # 9. Best-effort post-write hooks. None of these may roll back the
+    #    transition — the status write above is the commit point. Each
+    #    is wrapped to swallow exceptions so housekeeping never blocks.
+    _apply_post_write_hooks(
+        project_dir,
+        workflow_id=workflow_id,
+        instance_id=instance,
+        instance_obj=session,
+        workflow=workflow,
+        route=route,
+        from_status=current_status,
+        flags=flags,
+        when=when,
+    )
+
+    # 10. Emit transition.completed.
     emit_event(
         project_dir,
-        workflow=WORKFLOW_ID,
-        instance=session_id,
+        workflow=workflow_id,
+        instance=instance,
         status=target_status,
         event="transition.completed",
         details={
@@ -346,17 +584,140 @@ def _run_gate(
     )
 
 
+def _apply_post_write_hooks(
+    project_dir: Path,
+    *,
+    workflow_id: str,
+    instance_id: str,
+    instance_obj: Any,
+    workflow: Workflow,
+    route: WorkflowRoute,
+    from_status: str,
+    flags: dict,
+    when: datetime,
+) -> None:
+    """Run the four inline best-effort hooks after the status flip.
+
+    Order is fixed: close engagement, audit, telemetry, reset acks.
+    ``close_active_engagement`` must run before ``append_telemetry``
+    so duration_min derives from a closed engagement on terminal
+    transitions. Any exception is caught and logged — housekeeping
+    failures never roll back the (already-committed) status write.
+
+    Per-hook coding-session-ness:
+
+    - ``close_active_engagement`` requires ``instance_obj.engagements``;
+      guarded via :func:`_maybe_close_active_engagement` (no-op for
+      dict-backed instances that have no engagement tracking).
+    - ``append_audit_record`` and ``append_telemetry_record`` read
+      session-specific fields (``session.id``, ``compute_session_cost``)
+      that don't exist on other instances; both are scoped to the
+      coding-session path. Other workflows get their own audit trail via
+      ``transition.completed`` events on the standard events log.
+    - ``reset_acks_if_requested`` is a coding-session-only flag (the
+      reopen route sets it); guarded with the same workflow-id check
+      since it reaches into per-session ack files.
+    """
+    from tripwire.core.workflow.side_effects import (
+        append_audit_record,
+        append_telemetry_record,
+        reset_acks_if_requested,
+    )
+
+    is_coding_session = workflow_id == _CODING_SESSION_WORKFLOW_ID
+
+    try:
+        engagement_modified = _maybe_close_active_engagement(
+            instance_obj, route, now=when
+        )
+        if engagement_modified:
+            _save_workflow_instance(
+                project_dir,
+                workflow_id,
+                instance_id,
+                instance_obj,
+                workflow=workflow,
+            )
+    except Exception:
+        logger.exception(
+            "post-write hook close_active_engagement failed for instance %s",
+            instance_id,
+        )
+
+    if is_coding_session:
+        try:
+            append_audit_record(
+                project_dir,
+                session=instance_obj,
+                route=route,
+                from_status=from_status,
+                flags=flags,
+                now=when,
+            )
+        except Exception:
+            logger.exception(
+                "post-write hook append_audit_record failed for session %s",
+                instance_id,
+            )
+
+        try:
+            append_telemetry_record(project_dir, session=instance_obj)
+        except Exception:
+            logger.exception(
+                "post-write hook append_telemetry_record failed for session %s",
+                instance_id,
+            )
+
+        try:
+            reset_acks_if_requested(project_dir, session=instance_obj, flags=flags)
+        except Exception:
+            logger.exception(
+                "post-write hook reset_acks_if_requested failed for session %s",
+                instance_id,
+            )
+
+
+def _read_path(obj: object, path: str) -> object | None:
+    """Walk a dot-path on a Pydantic-or-attribute object. ``None`` if
+    any segment is missing."""
+    cur: object | None = obj
+    for part in path.split("."):
+        if cur is None:
+            return None
+        cur = getattr(cur, part, None)
+    return cur
+
+
+def _write_path(obj: object, path: str, value: object) -> bool:
+    """Write a value to the leaf of a dot-path. Returns False if any
+    intermediate segment is missing (no-op then)."""
+    parts = path.split(".")
+    cur: object | None = obj
+    for part in parts[:-1]:
+        if cur is None:
+            return False
+        cur = getattr(cur, part, None)
+    if cur is None:
+        return False
+    try:
+        setattr(cur, parts[-1], value)
+    except (AttributeError, TypeError):
+        return False
+    return True
+
+
 def _reject(
     project_dir: Path,
-    session_id: str,
+    workflow_id: str,
+    instance: str,
     target_status: str,
     *,
     reason: str,
 ) -> TransitionResult:
     emit_event(
         project_dir,
-        workflow=WORKFLOW_ID,
-        instance=session_id,
+        workflow=workflow_id,
+        instance=instance,
         status=target_status,
         event="transition.rejected",
         details={"reason": reason},
@@ -497,8 +858,7 @@ def _missing_consumed_artifacts(
 
 
 __all__ = [
-    "WORKFLOW_ID",
     "TransitionError",
     "TransitionResult",
-    "request_transition",
+    "execute_transition",
 ]

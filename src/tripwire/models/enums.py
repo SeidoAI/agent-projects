@@ -111,10 +111,23 @@ DEFINITIONAL_NODE_TYPES: frozenset[str] = frozenset(
 
 
 class NodeStatus(StrEnum):
+    """Legal values of ``ConceptNode.status``.
+
+    Aligned with the ``concept-freshness`` workflow's
+    ``instance.status_enum`` declaration in ``workflow.yaml.j2``. The
+    lifecycle is ``active → stale → archived``: nodes start ``active``
+    (no pre-active state) and ``archived`` is the only terminal state
+    (no separate ``deprecated``).
+
+    Nodes carrying a value outside this enum fail to load with a
+    pydantic ValidationError pointing at the file. There is no
+    auto-migration; manual remap is expected when adopting this enum
+    on an older project.
+    """
+
     ACTIVE = "active"
-    PLANNED = "planned"
-    DEPRECATED = "deprecated"
     STALE = "stale"
+    ARCHIVED = "archived"
 
 
 class SessionStatus(StrEnum):

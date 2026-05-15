@@ -50,7 +50,7 @@ def _seed_session_with_log(
     Returns the absolute path to the log so the runtime_state.log_path
     field can carry it.
     """
-    sdir = project_dir / "sessions" / session_id
+    sdir = project_dir / "instances" / "sessions" / session_id
     sdir.mkdir(parents=True, exist_ok=True)
     log_path = sdir / "claude.log"
 
@@ -125,7 +125,7 @@ def test_three_variations_present() -> None:
         assert "validate" in v.lower() or "write" in v.lower()
 
 
-def test_count_writes_only_counts_edit_tools() -> None:
+def test_count_writes_only_counts_edit_tools(tmp_path: Path) -> None:
     """Only Edit/Write/NotebookEdit tool_use events count."""
     log_lines = [
         json.dumps(
@@ -153,7 +153,7 @@ def test_count_writes_only_counts_edit_tools() -> None:
             }
         ),
     ]
-    log_path = Path("/tmp/_write_count_test.jsonl")
+    log_path = tmp_path / "_write_count_test.jsonl"
     log_path.write_text("\n".join(log_lines), encoding="utf-8")
     assert _count_writes(log_path) == 2
 
@@ -243,7 +243,7 @@ def test_read_threshold_uses_extra_params(tmp_path: Path) -> None:
 def test_silent_when_log_path_missing(tmp_path: Path) -> None:
     """No runtime_state.log_path → silent (session never spawned)."""
     _seed_project(tmp_path)
-    sdir = tmp_path / "sessions" / "alpha"
+    sdir = tmp_path / "instances" / "sessions" / "alpha"
     sdir.mkdir(parents=True)
     body = {
         "id": "alpha",

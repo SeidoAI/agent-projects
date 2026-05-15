@@ -52,6 +52,6 @@ def _check(ctx):
                     f"node {n.id} is local-origin with scope=workspace "
                     "— promotion candidate."
                 ),
-                file=f"nodes/{n.id}.yaml",
+                file=f"instances/nodes/{n.id}.yaml",
                 fix_hint=fix_hint,
             )

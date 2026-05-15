@@ -6,6 +6,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from tripwire.core import paths
+
 
 def write_jit_prompt_ack_marker(
     *,
@@ -14,8 +16,14 @@ def write_jit_prompt_ack_marker(
     jit_prompt_id: str,
     fix_commits: list[str],
     declared_no_findings: bool,
+    workflow_id: str = "coding-session",
 ) -> Path:
-    """Write the JIT prompt ack marker, validating substantiveness."""
+    """Write the JIT prompt ack marker, validating substantiveness.
+
+    ``workflow_id`` defaults to ``coding-session`` because that is the
+    only workflow that produces JIT prompt fires today; future
+    workflows pass their id explicitly when they begin firing prompts.
+    """
     if not fix_commits and not declared_no_findings:
         raise ValueError(
             "JIT prompt ack requires substance: pass at least one "
@@ -23,7 +31,7 @@ def write_jit_prompt_ack_marker(
             "marker substantiveness check would reject an empty ack."
         )
 
-    marker = project_dir / ".tripwire" / "acks" / f"{jit_prompt_id}-{session_id}.json"
+    marker = paths.ack_marker_path(project_dir, workflow_id, session_id, jit_prompt_id)
     marker.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "jit_prompt_id": jit_prompt_id,

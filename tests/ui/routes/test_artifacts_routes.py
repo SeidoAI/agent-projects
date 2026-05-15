@@ -78,7 +78,12 @@ def artifact_client(
     save_test_session(artifact_project, "TST-S1", plan=True)
     # Write the plan artifact on disk (plan=True creates plan.md under artifacts/).
     (
-        artifact_project / "sessions" / "session-a" / "artifacts" / "task-checklist.md"
+        artifact_project
+        / "instances"
+        / "sessions"
+        / "session-a"
+        / "artifacts"
+        / "task-checklist.md"
     ).write_text("| # | | |\n|---|---|---|\n| 1 | task | done |\n")
     return TestClient(create_app(dev_mode=True))
 
@@ -156,7 +161,14 @@ class TestGetArtifact:
         artifact_project,
     ):
         # Remove the file on disk; manifest still lists it.
-        plan = artifact_project / "sessions" / "session-a" / "artifacts" / "plan.md"
+        plan = (
+            artifact_project
+            / "instances"
+            / "sessions"
+            / "session-a"
+            / "artifacts"
+            / "plan.md"
+        )
         plan.unlink()
         r = artifact_client.get(
             f"/api/projects/{artifact_project_id}/sessions/session-a/artifacts/plan"
@@ -199,7 +211,13 @@ class TestApproveArtifact:
         assert body["approval"] is not None
         assert body["approval"]["approved"] is True
         # Sidecar file on disk.
-        sidecar = artifact_project / "sessions" / "session-a" / "plan.approval.yaml"
+        sidecar = (
+            artifact_project
+            / "instances"
+            / "sessions"
+            / "session-a"
+            / "plan.approval.yaml"
+        )
         assert sidecar.exists()
 
     def test_accepts_uppercase_sequential_session_key(
@@ -215,7 +233,13 @@ class TestApproveArtifact:
         )
 
         assert r.status_code == 200
-        sidecar = artifact_project / "sessions" / "TST-S1" / "plan.approval.yaml"
+        sidecar = (
+            artifact_project
+            / "instances"
+            / "sessions"
+            / "TST-S1"
+            / "plan.approval.yaml"
+        )
         assert sidecar.exists()
 
     def test_no_feedback_body_ok(

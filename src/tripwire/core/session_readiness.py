@@ -138,8 +138,8 @@ def check_readiness(
                 )
             )
             continue
-        # `complete_session` writes status=`completed` (KUI-110). The
-        # legacy `done` value was dropped from `SessionStatus`. `verified`
+        # `complete_session` writes status=`completed` (KUI-110). An
+        # earlier `done` value was dropped from `SessionStatus`. `verified`
         # is the post-review, pre-`completed` slot — accept it too so a
         # session that ships its work but the operator hasn't run
         # `tripwire session complete` yet is still treated as a

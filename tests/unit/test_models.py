@@ -373,18 +373,21 @@ class TestProjectConfig:
         assert p.repos["SeidoAI/web-app-backend"].local == "~/Code/seido/web-app"
         assert p.repos["SeidoAI/web-app-frontend"].local is None
 
-    def test_status_transitions(self) -> None:
-        p = ProjectConfig(
-            name="x",
-            key_prefix="X",
-            statuses=["planned", "queued", "done"],
-            status_transitions={
-                "planned": ["queued"],
-                "queued": ["done"],
-                "done": [],
-            },
-        )
-        assert p.status_transitions["queued"] == ["done"]
+    def test_status_transitions_field_removed(self) -> None:
+        """v0.13.1 (B8): the hand-rolled ``status_transitions:`` block was
+        deleted from ProjectConfig. Issue transitions are now driven by
+        the ``issue-closure`` workflow declared in workflow.yaml. The
+        model now rejects the legacy key (``extra="forbid"``).
+        """
+        import pydantic
+
+        with pytest.raises(pydantic.ValidationError, match="status_transitions"):
+            ProjectConfig(
+                name="x",
+                key_prefix="X",
+                statuses=["planned", "queued", "done"],
+                status_transitions={"planned": ["queued"]},  # type: ignore[call-arg]
+            )
 
 
 class TestGraphEdge:

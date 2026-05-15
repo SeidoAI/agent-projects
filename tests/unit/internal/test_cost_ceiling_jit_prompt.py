@@ -45,7 +45,7 @@ def _seed_session(
     *,
     log_path: str | None = None,
 ) -> None:
-    sdir = project_dir / "sessions" / session_id
+    sdir = project_dir / "instances" / "sessions" / session_id
     sdir.mkdir(parents=True, exist_ok=True)
     body: dict = {
         "id": session_id,

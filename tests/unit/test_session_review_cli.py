@@ -60,7 +60,9 @@ def test_review_with_issue_writes_verified(
         0,
         1,
     ), result.output  # may emit notes due to zero PR files
-    verified = tmp_path_project / "issues" / "TMP-1" / "verified.md"
+    verified = (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "verified.md"
+    )
     assert verified.is_file()
     text = verified.read_text(encoding="utf-8")
     assert "Verified by" in text
@@ -83,7 +85,7 @@ def test_review_writes_review_json(tmp_path_project: Path, save_test_session):
         )
     # Exit 0 when no issues / no PR files — report is "approved".
     assert result.exit_code == 0, result.output
-    review_path = tmp_path_project / "sessions" / "s1" / "review.json"
+    review_path = tmp_path_project / "instances" / "sessions" / "s1" / "review.json"
     assert review_path.is_file()
     import json as _json
 
@@ -112,7 +114,9 @@ def test_review_verified_md_rendered_from_template(
             ],
         )
     assert result.exit_code in (0, 1), result.output
-    verified = tmp_path_project / "issues" / "TMP-1" / "verified.md"
+    verified = (
+        tmp_path_project / "instances" / "issues" / "TMP-1" / "docs" / "verified.md"
+    )
     assert verified.is_file()
     text = verified.read_text(encoding="utf-8")
     # Header from the template.

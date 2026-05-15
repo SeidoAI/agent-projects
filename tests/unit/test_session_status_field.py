@@ -30,8 +30,9 @@ def test_session_status_invalid_string_raises() -> None:
         AgentSession.model_validate({**_BASE, "status": "nonsense_value"})
 
 
-def test_session_status_legacy_done_rejected() -> None:
-    """`status: done` is the legacy spelling — must be rejected post-rip.
+def test_session_status_done_rejected() -> None:
+    """`status: done` was the pre-v0.9.4 spelling — must be rejected
+    post-rip.
 
     `completed` is the canonical terminal-success.
     """

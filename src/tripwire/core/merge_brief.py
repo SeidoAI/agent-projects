@@ -206,6 +206,7 @@ def list_pending_briefs(project_dir: Path) -> list[str]:
 
 def _yaml_safe(value: Any) -> Any:
     """Recursively coerce types yaml.safe_dump can't handle into portable forms."""
+    from enum import Enum as _Enum
     from uuid import UUID as _UUID
 
     if isinstance(value, dict):
@@ -218,4 +219,8 @@ def _yaml_safe(value: Any) -> Any:
         return value.isoformat()
     if isinstance(value, _UUID):
         return str(value)
+    if isinstance(value, _Enum):
+        # NodeStatus (and any other StrEnum field) → its string value
+        # so the merge brief stays yaml.safe_dump compatible.
+        return value.value
     return value

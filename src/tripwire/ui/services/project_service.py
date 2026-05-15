@@ -90,7 +90,10 @@ class ProjectDetail(ProjectSummary):
     environments: list[str]
     repos: dict[str, dict]
     statuses: list[str]
-    status_transitions: dict[str, list[str]]
+    # Issue transitions travel through the `issue-closure` workflow
+    # declared in workflow.yaml. UI consumers should fetch the workflow
+    # spec via the workflow API rather than expecting a
+    # `status_transitions` field on this object.
     label_categories: dict[str, list[str]]
     graph: dict
     orchestration: dict
@@ -116,7 +119,9 @@ def _project_id(abs_dir: Path) -> str:
 
 
 def _count_issues(project_dir: Path) -> int:
-    issues = project_dir / "issues"
+    from tripwire.core import paths
+
+    issues = paths.issues_dir(project_dir)
     if not issues.is_dir():
         return 0
     return sum(
@@ -125,16 +130,19 @@ def _count_issues(project_dir: Path) -> int:
 
 
 def _count_nodes(project_dir: Path) -> int:
+    from tripwire.core import paths
     from tripwire.core.paths import GRAPH_INDEX_FILENAME
 
-    nodes = project_dir / "nodes"
+    nodes = paths.nodes_dir(project_dir)
     if not nodes.is_dir():
         return 0
     return sum(1 for p in nodes.glob("*.yaml") if p.name != GRAPH_INDEX_FILENAME)
 
 
 def _count_sessions(project_dir: Path) -> int:
-    sessions = project_dir / "sessions"
+    from tripwire.core import paths
+
+    sessions = paths.sessions_dir(project_dir)
     if not sessions.is_dir():
         return 0
     return sum(1 for p in sessions.iterdir() if p.is_dir())
@@ -493,7 +501,6 @@ def get_project(project_id: str) -> ProjectDetail:
         environments=list(config.environments),
         repos=config_data.get("repos", {}),
         statuses=list(config.statuses),
-        status_transitions=dict(config.status_transitions),
         label_categories=config_data.get("label_categories", {}),
         graph=config_data.get("graph", {}),
         orchestration=config_data.get("orchestration", {}),

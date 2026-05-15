@@ -32,6 +32,7 @@ from typing import Any
 
 import yaml
 
+from tripwire.core import paths
 from tripwire.core.validator._types import CheckResult, ValidationContext
 
 _PLACEHOLDER_PATTERNS = [
@@ -116,7 +117,7 @@ def check_pr_review_evidence(ctx: ValidationContext) -> list[CheckResult]:
         if not _at_or_past(ctx, str(entity.model.status), threshold):
             continue
 
-        session_dir = ctx.project_dir / "sessions" / sid
+        session_dir = paths.session_dir(ctx.project_dir, sid)
         data = _load_pr_review(session_dir, file)
         if data is None:
             # Presence is enforced by check_artifact_presence; parse errors
@@ -136,7 +137,7 @@ def check_pr_review_evidence(ctx: ValidationContext) -> list[CheckResult]:
                         CheckResult(
                             code="pr_review/missing_evidence",
                             severity="error",
-                            file=f"sessions/{sid}/{file}",
+                            file=f"{paths.SESSIONS_DIR}/{sid}/{file}",
                             field=f"issues[{issue_key}].acs[{idx}].verified_by",
                             message=(
                                 f"Session {sid!r}, issue {issue_key!r}, AC #{idx} "
@@ -155,7 +156,7 @@ def check_pr_review_evidence(ctx: ValidationContext) -> list[CheckResult]:
                             CheckResult(
                                 code="pr_review/missing_evidence",
                                 severity="error",
-                                file=f"sessions/{sid}/{file}",
+                                file=f"{paths.SESSIONS_DIR}/{sid}/{file}",
                                 field=f"issues[{issue_key}].acs[{idx}].verified_by[{j}]",
                                 message=(
                                     f"Session {sid!r}, issue {issue_key!r}, AC #{idx} "
@@ -188,7 +189,7 @@ def check_pr_review_threshold_findings(ctx: ValidationContext) -> list[CheckResu
         if not _at_or_past(ctx, str(entity.model.status), threshold):
             continue
 
-        session_dir = ctx.project_dir / "sessions" / sid
+        session_dir = paths.session_dir(ctx.project_dir, sid)
         data = _load_pr_review(session_dir, file)
         if data is None:
             continue
@@ -208,7 +209,7 @@ def check_pr_review_threshold_findings(ctx: ValidationContext) -> list[CheckResu
                 CheckResult(
                     code="pr_review/threshold_findings_unaddressed",
                     severity="error",
-                    file=f"sessions/{sid}/{file}",
+                    file=f"{paths.SESSIONS_DIR}/{sid}/{file}",
                     field=f"threshold_findings.unaddressed[{idx}]",
                     message=(
                         f"Session {sid!r}: unaddressed finding "
@@ -260,7 +261,7 @@ def check_pr_review_external_reviewer(ctx: ValidationContext) -> list[CheckResul
         if not _at_or_past(ctx, str(entity.model.status), threshold):
             continue
 
-        session_dir = ctx.project_dir / "sessions" / sid
+        session_dir = paths.session_dir(ctx.project_dir, sid)
         data = _load_pr_review(session_dir, file)
         if data is None:
             continue
@@ -274,7 +275,7 @@ def check_pr_review_external_reviewer(ctx: ValidationContext) -> list[CheckResul
             CheckResult(
                 code="pr_review/external_reviewer_missing",
                 severity="error",
-                file=f"sessions/{sid}/{file}",
+                file=f"{paths.SESSIONS_DIR}/{sid}/{file}",
                 field="external_reviews.codex.comment_url",
                 message=(
                     f"Session {sid!r}: project requires external-reviewer mention "
@@ -314,7 +315,7 @@ def check_pr_review_code_review_skill(ctx: ValidationContext) -> list[CheckResul
         if not _at_or_past(ctx, str(entity.model.status), threshold):
             continue
 
-        session_dir = ctx.project_dir / "sessions" / sid
+        session_dir = paths.session_dir(ctx.project_dir, sid)
         data = _load_pr_review(session_dir, file)
         if data is None:
             continue
@@ -328,7 +329,7 @@ def check_pr_review_code_review_skill(ctx: ValidationContext) -> list[CheckResul
             CheckResult(
                 code="pr_review/code_review_skill_missing",
                 severity="error",
-                file=f"sessions/{sid}/{file}",
+                file=f"{paths.SESSIONS_DIR}/{sid}/{file}",
                 field="external_reviews.code_review_skill.invoked_at",
                 message=(
                     f"Session {sid!r}: project requires code-review skill "

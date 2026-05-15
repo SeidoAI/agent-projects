@@ -2,7 +2,7 @@
 
 When a session is abandoned, any draft PRs opened at session-start are
 closed via ``gh pr close`` so they don't pile up as orphan drafts on
-the remote. Worktrees without ``draft_pr_url`` (legacy or no-remote
+the remote. Worktrees without ``draft_pr_url`` (pre-v0.7.5 or no-remote
 sessions) are skipped silently.
 """
 

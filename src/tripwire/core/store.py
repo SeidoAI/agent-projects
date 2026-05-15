@@ -36,18 +36,18 @@ COMMENTS_DIRNAME = paths.COMMENTS_SUBDIR
 
 
 # Pre-v0.9.4 → canonical issue status rewrites. Used here purely to
-# decide whether a ValidationError on `status` was a legacy value (so
-# the wrapper can point users at `migrate status-values`) and to
+# decide whether a ValidationError on `status` was a pre-v0.9.4 value
+# (so the wrapper can point users at `migrate status-values`) and to
 # document the mapping; the actual rewrite happens in the migrate
 # command.
-_LEGACY_ISSUE_STATUSES: frozenset[str] = frozenset(
+_PRE_V094_ISSUE_STATUSES: frozenset[str] = frozenset(
     {"backlog", "todo", "in_progress", "done", "canceled"}
 )
 
 
-class LegacyIssueStatusError(ValueError):
-    """Raised by :func:`load_issue` when a legacy ``status:`` value is
-    detected on disk.
+class OutdatedIssueStatusError(ValueError):
+    """Raised by :func:`load_issue` when a pre-v0.9.4 ``status:`` value
+    is detected on disk.
 
     Wraps the originating :class:`pydantic.ValidationError` and points
     the user at ``tripwire migrate status-values``.
@@ -58,17 +58,17 @@ class LegacyIssueStatusError(ValueError):
         self.status = status
         super().__init__(
             f"{path} carries a pre-v0.9.4 `status: {status}` value. "
-            f"Run `tripwire migrate status-values` to rewrite legacy "
+            f"Run `tripwire migrate status-values` to rewrite "
             f"issue and session statuses to the canonical taxonomy."
         )
 
 
-def _legacy_issue_status(exc: ValidationError, frontmatter: dict) -> str | None:
-    """Return the legacy status string if *exc* is the enum-rejection
+def _pre_v094_issue_status(exc: ValidationError, frontmatter: dict) -> str | None:
+    """Return the pre-v0.9.4 status string if *exc* is the enum-rejection
     for `status`, else None.
     """
     status = frontmatter.get("status")
-    if not isinstance(status, str) or status not in _LEGACY_ISSUE_STATUSES:
+    if not isinstance(status, str) or status not in _PRE_V094_ISSUE_STATUSES:
         return None
     for err in exc.errors():
         loc = err.get("loc") or ()
@@ -103,6 +103,12 @@ def load_project(project_dir: Path) -> ProjectConfig:
         raise ValueError(
             f"project.yaml must be a YAML mapping, got {type(raw).__name__}"
         )
+    # Drop any lingering `status_transitions:` block — the
+    # `issue-closure` workflow in workflow.yaml is the source of truth
+    # for issue lifecycle now. Stripping at load (rather than failing
+    # pydantic's `extra="forbid"`) lets older project.yaml files keep
+    # loading until the project is re-rendered from the template.
+    raw.pop("status_transitions", None)
     return ProjectConfig.model_validate(raw)
 
 
@@ -132,8 +138,8 @@ def issue_path(project_dir: Path, key: str) -> Path:
 def load_issue(project_dir: Path, key: str) -> Issue:
     """Load `<project_dir>/issues/<key>.yaml` into an Issue model.
 
-    Raises :class:`LegacyIssueStatusError` (subclass of ``ValueError``)
-    if the on-disk ``status:`` field is a pre-v0.9.4 legacy value
+    Raises :class:`OutdatedIssueStatusError` (subclass of ``ValueError``)
+    if the on-disk ``status:`` field is a pre-v0.9.4 value
     (``backlog``/``todo``/``in_progress``/``done``/``canceled``).
     Generic :class:`pydantic.ValidationError` is left to propagate
     untouched for any other schema problem.
@@ -149,9 +155,9 @@ def load_issue(project_dir: Path, key: str) -> Issue:
     try:
         return Issue.model_validate({**frontmatter, "body": body})
     except ValidationError as exc:
-        legacy = _legacy_issue_status(exc, frontmatter)
-        if legacy is not None:
-            raise LegacyIssueStatusError(path, legacy) from exc
+        outdated = _pre_v094_issue_status(exc, frontmatter)
+        if outdated is not None:
+            raise OutdatedIssueStatusError(path, outdated) from exc
         raise
 
 
@@ -189,7 +195,7 @@ def list_issues(project_dir: Path) -> list[Issue]:
     whether to skip them. The validator should be the gate that catches
     invalid files at scan time.
 
-    Raises :class:`LegacyIssueStatusError` (subclass of ``ValueError``)
+    Raises :class:`OutdatedIssueStatusError` (subclass of ``ValueError``)
     if any issue file holds a pre-v0.9.4 ``status:`` value, pointing
     the user at ``tripwire migrate status-values``.
     """
@@ -208,9 +214,9 @@ def list_issues(project_dir: Path) -> list[Issue]:
         try:
             issues.append(Issue.model_validate({**frontmatter, "body": body}))
         except ValidationError as exc:
-            legacy = _legacy_issue_status(exc, frontmatter)
-            if legacy is not None:
-                raise LegacyIssueStatusError(yaml_path, legacy) from exc
+            outdated = _pre_v094_issue_status(exc, frontmatter)
+            if outdated is not None:
+                raise OutdatedIssueStatusError(yaml_path, outdated) from exc
             raise
     return issues
 

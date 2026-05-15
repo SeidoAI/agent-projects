@@ -33,7 +33,7 @@ def _write_manifest(project_dir: Path, artifacts: list[dict[str, Any]]) -> None:
 
 
 def _session_dir(project_dir: Path, session_id: str) -> Path:
-    sdir = project_dir / "sessions" / session_id
+    sdir = project_dir / "instances" / "sessions" / session_id
     sdir.mkdir(parents=True, exist_ok=True)
     return sdir
 
@@ -196,7 +196,7 @@ class TestListSessionArtifacts:
         (project / "project.yaml").write_text(
             "name: t\nkey_prefix: T\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
-        (project / "sessions" / "s1").mkdir(parents=True)
+        (project / "instances" / "sessions" / "s1").mkdir(parents=True)
         assert list_session_artifacts(project, "s1") == []
 
 
@@ -248,7 +248,13 @@ class TestApproveArtifact:
         status = approve_artifact(
             project_with_manifest, "s1", "plan", feedback="looks good"
         )
-        sidecar = project_with_manifest / "sessions" / "s1" / "plan.approval.yaml"
+        sidecar = (
+            project_with_manifest
+            / "instances"
+            / "sessions"
+            / "s1"
+            / "plan.approval.yaml"
+        )
         assert sidecar.is_file()
         raw = yaml.safe_load(sidecar.read_text(encoding="utf-8"))
         assert raw["approved"] is True
@@ -289,7 +295,13 @@ class TestRejectArtifact:
         status = reject_artifact(
             project_with_manifest, "s1", "plan", feedback="needs rework"
         )
-        sidecar = project_with_manifest / "sessions" / "s1" / "plan.approval.yaml"
+        sidecar = (
+            project_with_manifest
+            / "instances"
+            / "sessions"
+            / "s1"
+            / "plan.approval.yaml"
+        )
         raw = yaml.safe_load(sidecar.read_text(encoding="utf-8"))
         assert raw["approved"] is False
         assert raw["feedback"] == "needs rework"
@@ -323,12 +335,18 @@ class TestAtomicSidecarWrite:
         approve_artifact(project_with_manifest, "s1", "plan", feedback="first")
         reject_artifact(project_with_manifest, "s1", "plan", feedback="changed mind")
 
-        sidecar = project_with_manifest / "sessions" / "s1" / "plan.approval.yaml"
+        sidecar = (
+            project_with_manifest
+            / "instances"
+            / "sessions"
+            / "s1"
+            / "plan.approval.yaml"
+        )
         raw = yaml.safe_load(sidecar.read_text(encoding="utf-8"))
         assert raw["approved"] is False
         assert raw["feedback"] == "changed mind"
         # No temp-file debris.
-        sdir = project_with_manifest / "sessions" / "s1"
+        sdir = project_with_manifest / "instances" / "sessions" / "s1"
         assert sorted(p.name for p in sdir.iterdir()) == ["plan.approval.yaml"]
 
 

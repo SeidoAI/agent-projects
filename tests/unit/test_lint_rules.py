@@ -10,6 +10,7 @@ class TestGapAnalysisRowDensity:
     def test_flags_low_density(self, save_test_issue, tmp_path_project):
         """Gap analysis with fewer rows than issue count triggers warning."""
         # Write a thin gap-analysis table (1 data row).
+        (tmp_path_project / "docs").mkdir(parents=True, exist_ok=True)
         (tmp_path_project / "docs" / "gap-analysis.md").write_text(
             "| Deliverable | Gap |\n|---|---|\n| A | x |\n",
             encoding="utf-8",
@@ -67,7 +68,7 @@ class TestBranchConvention:
     ):
         save_test_issue(tmp_path_project, key="TMP-1", kind="feat", title="X")
         save_test_session(tmp_path_project, session_id="session-x", issues=["TMP-1"])
-        sess = tmp_path_project / "sessions" / "session-x"
+        sess = tmp_path_project / "instances" / "sessions" / "session-x"
         (sess / "handoff.yaml").write_text(
             """---
 uuid: 11111111-1111-4111-8111-111111111111

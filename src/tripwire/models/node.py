@@ -19,6 +19,8 @@ from pydantic import (
     model_validator,
 )
 
+from tripwire.models.enums import NodeStatus
+
 NODE_ID_PATTERN = re.compile(r"^[a-z][a-z0-9-]*$")
 
 NodeOrigin = Literal["workspace", "local"]
@@ -95,7 +97,11 @@ class ConceptNode(BaseModel):
     related: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
 
-    status: str = "active"
+    # Typed as ``NodeStatus`` (not free-form ``str``) so the loader
+    # rejects values outside the ``concept-freshness`` workflow's
+    # declared ``instance.status_enum``. The pydantic load surfaces the
+    # offending node file in the ValidationError message.
+    status: NodeStatus = NodeStatus.ACTIVE
 
     created_at: datetime | None = None
     updated_at: datetime | None = None

@@ -29,7 +29,7 @@ def test_falls_back_to_packaged_defaults_when_no_enums_dir(tmp_path: Path) -> No
     issue_status = registry.get("issue_status")
     assert issue_status is not None
     assert issue_status.source == "default"
-    # v0.9.4: canonical names replace legacy.
+    # v0.9.4: canonical names replace the pre-v0.9.4 taxonomy.
     assert "queued" in issue_status.value_ids()
     assert "executing" in issue_status.value_ids()
 

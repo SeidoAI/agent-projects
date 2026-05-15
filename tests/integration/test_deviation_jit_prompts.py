@@ -49,7 +49,7 @@ def _seed_session(
     key_files: list[str] | None = None,
     log_path: str | None = None,
 ) -> None:
-    sdir = project_dir / "sessions" / session_id
+    sdir = project_dir / "instances" / "sessions" / session_id
     sdir.mkdir(parents=True, exist_ok=True)
     body: dict = {
         "id": session_id,
@@ -74,7 +74,7 @@ def _seed_issue(
     status: str,
     labels: list[str] | None = None,
 ) -> None:
-    idir = project_dir / "issues" / issue_id
+    idir = project_dir / "instances" / "issues" / issue_id
     idir.mkdir(parents=True, exist_ok=True)
     body = {
         "id": issue_id,
@@ -92,7 +92,7 @@ def _seed_issue(
 
 
 def _seed_pm_response(project_dir: Path, session_id: str, items: list[dict]) -> None:
-    artifacts = project_dir / "sessions" / session_id / "artifacts"
+    artifacts = project_dir / "instances" / "sessions" / session_id / "artifacts"
     artifacts.mkdir(parents=True, exist_ok=True)
     (artifacts / "pm-response.yaml").write_text(
         yaml.safe_dump(
@@ -105,7 +105,12 @@ def _seed_pm_response(project_dir: Path, session_id: str, items: list[dict]) -> 
 
 def _ack(project_dir: Path, jit_prompt_id: str, session_id: str) -> Path:
     """Write a substantive ack marker so ``is_acknowledged`` returns True."""
-    marker = project_dir / ".tripwire" / "acks" / f"{jit_prompt_id}-{session_id}.json"
+    marker = (
+        project_dir
+        / ".tripwire"
+        / "acks"
+        / f"coding-session-{session_id}-{jit_prompt_id}.json"
+    )
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text(json.dumps({"fix_commits": ["abcd1234"]}), encoding="utf-8")
     return marker

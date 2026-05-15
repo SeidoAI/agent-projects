@@ -33,8 +33,8 @@ def write_project_yaml(project_dir: Path) -> None:
 class TestRefreshCommand:
     def test_fresh_cache_is_noop(self, tmp_path: Path) -> None:
         write_project_yaml(tmp_path)
-        (tmp_path / "issues").mkdir()
-        (tmp_path / "nodes").mkdir(parents=True)
+        (tmp_path / "instances" / "issues").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "instances" / "nodes").mkdir(parents=True)
 
         # First call builds
         assert ensure_fresh(tmp_path) is True
@@ -43,8 +43,8 @@ class TestRefreshCommand:
 
     def test_stale_cache_rebuilds(self, tmp_path: Path) -> None:
         write_project_yaml(tmp_path)
-        (tmp_path / "issues").mkdir()
-        (tmp_path / "nodes").mkdir(parents=True)
+        (tmp_path / "instances" / "issues").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "instances" / "nodes").mkdir(parents=True)
 
         ensure_fresh(tmp_path)
         idx = load_index(tmp_path)
@@ -67,7 +67,7 @@ class TestRefreshCommand:
             "updated_at": "2026-04-10T10:00:00",
         }
         body = "## Context\nTest.\n"
-        idir = tmp_path / "issues" / "TST-1"
+        idir = tmp_path / "instances" / "issues" / "TST-1"
         idir.mkdir(parents=True, exist_ok=True)
         (idir / "issue.yaml").write_text(
             serialize_frontmatter_body(fm, body), encoding="utf-8"

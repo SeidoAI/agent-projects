@@ -446,7 +446,7 @@ def test_session_complete_with_artifacts_no_action(tmp_path):
     monitor.process_event(final)
     with patch(
         "tripwire.runtimes.monitor._committed_paths_in_branch",
-        return_value={"sessions/s1/self-review.md"},
+        return_value={"instances/sessions/s1/self-review.md"},
     ):
         actions = monitor.on_process_exit(exit_code=0)
     assert not any(

@@ -1,6 +1,6 @@
 """``tripwire transition`` — workflow gate runner CLI (KUI-159).
 
-Submits a transition request to move a session from its current
+Submits a transition request to move an entity from its current
 workflow status to a target status. The gate runs validators →
 tripwires → required prompt-checks (in that order); on pass the
 session advances and a status-instance id is assigned, on fail the
@@ -9,7 +9,11 @@ events log.
 
 Usage::
 
-    tripwire transition <session-id> <target-status>
+    # Two-arg form (legacy): implies coding-session workflow
+    tripwire transition <instance-id> <target-status>
+
+    # Three-arg form: explicit workflow id
+    tripwire transition <workflow-id> <instance-id> <target-status>
 
 Exits 0 on pass, non-zero with a printed rejection on fail.
 
@@ -30,32 +34,54 @@ from tripwire.cli._utils import require_project as _require_project
 from tripwire.core.validator import validate_project
 from tripwire.core.workflow.transitions import (
     TransitionError,
-    request_transition,
+    execute_transition,
 )
 
 
-@click.command(name="transition")
-@click.argument("session_id")
-@click.argument("target_status")
+@click.command(
+    name="transition",
+    context_settings={"ignore_unknown_options": False},
+)
+@click.argument("args", nargs=-1, required=True)
 @click.option(
     "--project-dir",
     type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
     default=".",
     show_default=True,
 )
-def transition_cmd(session_id: str, target_status: str, project_dir: Path) -> None:
-    """Run the gate to move SESSION_ID to TARGET_STATUS.
+def transition_cmd(args: tuple[str, ...], project_dir: Path) -> None:
+    """Run the gate to advance an entity through ``workflow.yaml``.
+
+    Two-argument form: ``transition <instance-id> <target-status>``
+    targets the ``coding-session`` workflow (back-compat with v0.12).
+
+    Three-argument form: ``transition <workflow-id> <instance-id>
+    <target-status>`` explicitly names the workflow — used by
+    ``session sweep-issues-forward`` to drive issues through the
+    ``issue-closure`` workflow.
 
     Pass: prints the new status-instance id, exits 0.
     Reject: prints the reason, exits 1.
     """
+    if len(args) == 2:
+        workflow_id = "coding-session"
+        instance_id, target_status = args
+    elif len(args) == 3:
+        workflow_id, instance_id, target_status = args
+    else:
+        raise click.UsageError(
+            "transition takes 2 or 3 positional args: "
+            "[<workflow-id>] <instance-id> <target-status>"
+        )
+
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
     try:
-        result = request_transition(
+        result = execute_transition(
             resolved,
-            session_id=session_id,
+            workflow_id=workflow_id,
+            instance_id=instance_id,
             target_status=target_status,
         )
     except TransitionError as exc:
@@ -66,7 +92,7 @@ def transition_cmd(session_id: str, target_status: str, project_dir: Path) -> No
 
     if result.ok:
         click.echo(
-            f"transition: {session_id} → {target_status} ({result.status_instance})"
+            f"transition: {instance_id} → {target_status} ({result.status_instance})"
         )
     else:
         message = result.message or result.reason or "rejected"

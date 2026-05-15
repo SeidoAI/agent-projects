@@ -36,28 +36,50 @@ def _project_dir(tmp_path: Path) -> Path:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
                   - id: planned
-                    next: queued
                   - id: queued
-                    next: executing
                   - id: executing
-                    next: in_review
                   - id: in_review
-                    next: verified
                   - id: verified
-                    next: completed
                   - id: completed
                     terminal: true
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    kind: forward
+                  - id: queued-to-executing
+                    actor: pm-agent
+                    from: queued
+                    to: executing
+                    kind: forward
+                  - id: executing-to-in_review
+                    actor: pm-agent
+                    from: executing
+                    to: in_review
+                    kind: forward
+                  - id: in_review-to-verified
+                    actor: pm-agent
+                    from: in_review
+                    to: verified
+                    kind: forward
+                  - id: verified-to-completed
+                    actor: pm-agent
+                    from: verified
+                    to: completed
+                    kind: forward
             """
         ),
         encoding="utf-8",
     )
-    sessions_dir = tmp_path / "sessions" / "e2e-session"
+    sessions_dir = tmp_path / "instances" / "sessions" / "e2e-session"
     sessions_dir.mkdir(parents=True)
     (sessions_dir / "session.yaml").write_text(
         "---\n"
@@ -123,7 +145,9 @@ def test_full_lifecycle_drives_via_transition_only(
         )
 
     # Session reached `completed`.
-    session_yaml = (pd / "sessions" / "e2e-session" / "session.yaml").read_text()
+    session_yaml = (
+        pd / "instances" / "sessions" / "e2e-session" / "session.yaml"
+    ).read_text()
     assert "status: completed" in session_yaml
     assert "coding-session:e2e-session:completed:1" in session_yaml
 
@@ -178,24 +202,48 @@ def test_drift_surfaces_when_required_step_skipped(tmp_path: Path) -> None:
     (pd / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
                   - id: planned
-                    next: queued
                   - id: queued
-                    next: executing
                   - id: executing
-                    next: in_review
                     prompt_checks: [pm-session-queue]
                   - id: in_review
-                    next: verified
                   - id: verified
-                    next: completed
                   - id: completed
                     terminal: true
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    kind: forward
+                  - id: queued-to-executing
+                    actor: pm-agent
+                    from: queued
+                    to: executing
+                    kind: forward
+                    controls:
+                      prompt_checks: [pm-session-queue]
+                  - id: executing-to-in_review
+                    actor: pm-agent
+                    from: executing
+                    to: in_review
+                    kind: forward
+                  - id: in_review-to-verified
+                    actor: pm-agent
+                    from: in_review
+                    to: verified
+                    kind: forward
+                  - id: verified-to-completed
+                    actor: pm-agent
+                    from: verified
+                    to: completed
+                    kind: forward
             """
         ),
         encoding="utf-8",

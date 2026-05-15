@@ -52,8 +52,15 @@ from tripwire.core.validator.checks.references import (
     check_no_stale_pins,
     check_reference_integrity,
 )
+from tripwire.core.validator.checks.session_lifecycle import (
+    check_pr_merged_for_session,
+    check_pr_review_approved,
+    check_session_has_developer_md,
+    check_session_has_verified_md,
+)
 from tripwire.core.validator.checks.structure import (
     check_handoff_artifact,
+    check_instance_shape_conforms,
     check_issue_body_structure,
     check_project_repos_present,
     check_status_transitions,
@@ -82,12 +89,14 @@ REFERENCE_CHECKS = [
 ]
 
 # Structure: required Markdown sections in issue bodies, status transitions,
-# handoff.yaml schema, project.yaml.repos presence.
+# handoff.yaml schema, project.yaml.repos presence, per-workflow instance
+# shape conformance.
 STRUCTURE_CHECKS = [
     check_issue_body_structure,
     check_status_transitions,
     check_handoff_artifact,
     check_project_repos_present,
+    check_instance_shape_conforms,
 ]
 
 # Artifacts: manifest schema valid, completed sessions ship required artifacts.
@@ -122,6 +131,16 @@ PR_REVIEW_CHECKS = [
     check_pr_review_code_review_skill,
 ]
 
+# Session-lifecycle: gates the verified → completed route on PR merge,
+# review approval, and the per-issue developer.md / verified.md
+# artifacts that the session's member issues are required to produce.
+SESSION_LIFECYCLE_CHECKS = [
+    check_pr_merged_for_session,
+    check_pr_review_approved,
+    check_session_has_developer_md,
+    check_session_has_verified_md,
+]
+
 # Quality: project-standards, coverage heuristics, phase requirements,
 # anti-fatigue degradation detection.
 QUALITY_CHECKS = [
@@ -140,8 +159,8 @@ WORKSPACE_CHECKS = [check_workspace_link]
 # Canonical run order: matches the pre-split ALL_CHECKS literal so finding
 # output ordering stays byte-stable. The workflow check is appended at
 # the END so it doesn't perturb the byte-stable position of any
-# pre-existing check (KUI-119 — workflow.yaml is opt-in for v0.9; ALL
-# legacy projects without one see no findings from this check).
+# pre-existing check (KUI-119 — workflow.yaml is opt-in for v0.9; older
+# projects without one see no findings from this check).
 ALL_CHECKS = [
     check_uuid_present,
     check_id_format,
@@ -177,6 +196,11 @@ ALL_CHECKS = [
     check_pr_review_threshold_findings,
     check_pr_review_external_reviewer,
     check_pr_review_code_review_skill,
+    check_pr_merged_for_session,
+    check_pr_review_approved,
+    check_session_has_developer_md,
+    check_session_has_verified_md,
+    check_instance_shape_conforms,
 ]
 
 
@@ -189,6 +213,7 @@ __all__ = [
     "PR_REVIEW_CHECKS",
     "QUALITY_CHECKS",
     "REFERENCE_CHECKS",
+    "SESSION_LIFECYCLE_CHECKS",
     "STRUCTURE_CHECKS",
     "WORKFLOW_CHECKS",
     "WORKSPACE_CHECKS",

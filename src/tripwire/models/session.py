@@ -51,9 +51,9 @@ class WorktreeEntry(BaseModel):
     branch: str  # branch checked out in the worktree
 
     # v0.7.5 — URL of the draft PR opened at session-start. ``None`` when
-    # the worktree had no remote (graceful skip; the legacy create-PR-at-
-    # complete path runs instead) or the entry was persisted before
-    # v0.7.5 landed.
+    # the worktree had no remote (graceful skip; the create-PR-at-
+    # complete fallback path runs instead) or the entry was persisted
+    # before v0.7.5 landed.
     draft_pr_url: str | None = None
 
 

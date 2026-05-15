@@ -10,7 +10,7 @@ keeps only operational state directories (`issues/`, `nodes/`,
 This file asserts the new layout shape end-to-end via the actual
 `tripwire init` command. Pre-v0.10.0 projects continue to work via
 the dual-read resolver in `core/paths.py`; that path is exercised by
-existing route + service tests that hand-build the legacy layout.
+existing route + service tests that hand-build the flat layout.
 """
 
 from __future__ import annotations
@@ -59,8 +59,8 @@ def test_init_writes_consolidated_templates_layout(tmp_path: Path):
         f"missing templates/ subdirs: {expected_under_templates - found}"
     )
 
-    # Anti-spec: legacy flat-layout siblings must NOT exist post-init.
-    legacy_siblings = (
+    # Anti-spec: pre-v0.10 flat-layout siblings must NOT exist post-init.
+    flat_layout_siblings = (
         "agent_templates",
         "comment_templates",
         "enums",
@@ -68,13 +68,19 @@ def test_init_writes_consolidated_templates_layout(tmp_path: Path):
         "session_templates",
         "orchestration",
     )
-    for legacy in legacy_siblings:
-        assert not (project / legacy).is_dir(), (
-            f"legacy {legacy}/ must not exist at project root after v0.10.0 init"
+    for sibling in flat_layout_siblings:
+        assert not (project / sibling).is_dir(), (
+            f"flat-layout {sibling}/ must not exist at project root after v0.10.0 init"
         )
 
-    # Operational state dirs still at the root (unchanged by v0.10.0).
-    for state in ("issues", "nodes", "sessions", "plans"):
+    # v0.13.1: operational state dirs live under `instances/`. Plans
+    # remain at the root (PM working dir, not an entity type).
+    for state in (
+        "instances/issues",
+        "instances/nodes",
+        "instances/sessions",
+        "plans",
+    ):
         assert (project / state).is_dir(), f"state dir {state}/ missing"
 
 

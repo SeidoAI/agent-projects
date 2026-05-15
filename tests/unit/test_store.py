@@ -36,7 +36,7 @@ def project_dir(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
-    (tmp_path / "issues").mkdir()
+    (tmp_path / "instances" / "issues").mkdir(parents=True)
     return tmp_path
 
 
@@ -64,16 +64,14 @@ class TestProject:
         assert reloaded.repos["SeidoAI/web-app-backend"].local == "~/Code/x"
 
     def test_save_full_project_config_round_trip(self, tmp_path: Path) -> None:
+        # v0.13.1 (B8): `status_transitions:` is no longer a ProjectConfig
+        # field — it moved to workflow.yaml's issue-closure routes. Pure
+        # round-trip exercises the simpler shape now.
         config = ProjectConfig(
             name="seido",
             key_prefix="SEI",
             base_branch="main",
             statuses=["planned", "queued", "done"],
-            status_transitions={
-                "planned": ["queued"],
-                "queued": ["done"],
-                "done": [],
-            },
             repos={"SeidoAI/x": RepoEntry(local="~/x")},
             next_issue_number=5,
         )
@@ -81,7 +79,7 @@ class TestProject:
         reloaded = load_project(tmp_path)
         assert reloaded.name == "seido"
         assert reloaded.next_issue_number == 5
-        assert reloaded.status_transitions["queued"] == ["done"]
+        assert reloaded.statuses == ["planned", "queued", "done"]
 
 
 # ----------------------------------------------------------------------------
@@ -119,7 +117,7 @@ class TestIssueStore:
             verifier="none",
         )
         save_issue(tmp_path, issue)
-        assert (tmp_path / "issues" / "TST-1" / "issue.yaml").exists()
+        assert (tmp_path / "instances" / "issues" / "TST-1" / "issue.yaml").exists()
 
     def test_load_missing_issue_raises(self, project_dir: Path) -> None:
         with pytest.raises(FileNotFoundError):
@@ -186,7 +184,9 @@ class TestIssueStore:
         original_uuid = original.uuid
         save_issue(project_dir, original)
         # Read the raw YAML to confirm uuid is the first frontmatter field.
-        raw = (project_dir / "issues" / "TST-1" / "issue.yaml").read_text()
+        raw = (
+            project_dir / "instances" / "issues" / "TST-1" / "issue.yaml"
+        ).read_text()
         assert raw.startswith("---\nuuid:")
         loaded = load_issue(project_dir, "TST-1")
         assert loaded.uuid == original_uuid
@@ -251,7 +251,7 @@ class TestCacheInvalidationOnSave:
 
         cache = load_index(project_dir)
         assert cache is not None, "save_issue should have created the cache"
-        assert "issues/TST-42/issue.yaml" in cache.files
+        assert "instances/issues/TST-42/issue.yaml" in cache.files
 
     def test_save_issue_with_update_cache_false_does_not_touch_cache(
         self, project_dir: Path
@@ -272,29 +272,29 @@ class TestCacheInvalidationOnSave:
         cache = load_index(project_dir)
         # Either no cache file at all, or the cache doesn't include TST-99.
         if cache is not None:
-            assert "issues/TST-99/issue.yaml" not in cache.files
+            assert "instances/issues/TST-99/issue.yaml" not in cache.files
 
 
 # ============================================================================
-# Legacy status interception (concern 1)
+# Pre-v0.9.4 status interception (concern 1)
 # ============================================================================
 
 
-class TestLegacyIssueStatus:
+class TestOutdatedIssueStatus:
     """`load_issue` / `list_issues` must intercept Pydantic's
     ValidationError when it fires on a pre-v0.9.4 ``status:`` value
     and surface a tight, actionable migration message instead.
     """
 
-    def _write_legacy(self, project_dir: Path, key: str, status: str) -> Path:
+    def _write_outdated(self, project_dir: Path, key: str, status: str) -> Path:
         from tripwire.core.parser import serialize_frontmatter_body
 
-        idir = project_dir / "issues" / key
+        idir = project_dir / "instances" / "issues" / key
         idir.mkdir(parents=True, exist_ok=True)
         fm = {
             "uuid": "11111111-2222-4333-8444-555555555555",
             "id": key,
-            "title": f"Legacy {key}",
+            "title": f"Outdated {key}",
             "status": status,
             "priority": "medium",
             "executor": "ai",
@@ -305,18 +305,18 @@ class TestLegacyIssueStatus:
         path.write_text(text, encoding="utf-8")
         return path
 
-    def test_load_issue_legacy_status_raises(self, project_dir: Path) -> None:
-        from tripwire.core.store import LegacyIssueStatusError
+    def test_load_issue_outdated_status_raises(self, project_dir: Path) -> None:
+        from tripwire.core.store import OutdatedIssueStatusError
 
-        self._write_legacy(project_dir, "TST-1", "in_progress")
-        with pytest.raises(LegacyIssueStatusError) as exc_info:
+        self._write_outdated(project_dir, "TST-1", "in_progress")
+        with pytest.raises(OutdatedIssueStatusError) as exc_info:
             load_issue(project_dir, "TST-1")
         assert exc_info.value.status == "in_progress"
         assert "tripwire migrate status-values" in str(exc_info.value)
 
-    def test_list_issues_legacy_status_raises(self, project_dir: Path) -> None:
-        from tripwire.core.store import LegacyIssueStatusError
+    def test_list_issues_outdated_status_raises(self, project_dir: Path) -> None:
+        from tripwire.core.store import OutdatedIssueStatusError
 
-        self._write_legacy(project_dir, "TST-1", "backlog")
-        with pytest.raises(LegacyIssueStatusError):
+        self._write_outdated(project_dir, "TST-1", "backlog")
+        with pytest.raises(OutdatedIssueStatusError):
             list_issues(project_dir)

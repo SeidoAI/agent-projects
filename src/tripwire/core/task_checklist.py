@@ -38,7 +38,8 @@ def parse_task_checklist(text: str) -> TaskProgress:
     as complete. Header + separator lines are skipped.
 
     Returns ``TaskProgress(done=0, total=0)`` when the file has no
-    recognisable rows (including legacy checkbox-form checklists).
+    recognisable rows (including bare checkbox-form checklists that
+    don't match the table format).
     """
     done = 0
     total = 0

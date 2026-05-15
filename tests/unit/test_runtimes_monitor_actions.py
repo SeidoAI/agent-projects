@@ -28,6 +28,99 @@ def tmp_project(tmp_path: Path, save_test_session) -> Path:
     )
     for sub in ("issues", "nodes", "sessions", "docs", "plans"):
         (tmp_path / sub).mkdir(parents=True, exist_ok=True)
+    # v0.13: ``ActionExecutor._do_transition`` routes through
+    # ``execute_transition`` which requires ``workflow.yaml``. Provide
+    # a coding-session with inbound routes covering every status.
+    (tmp_path / "workflow.yaml").write_text(
+        "workflow_schema_version: 1\n"
+        "workflows:\n"
+        "  coding-session:\n"
+        "    actor: coding-agent\n"
+        "    trigger: session.spawn\n"
+        "    instance:\n"
+        "      storage_path: sessions/{instance_id}/session.yaml\n"
+        "      status_field: status\n"
+        "      status_enum: [planned, queued, executing, in_review,\n"
+        "        verified, completed, paused, failed, abandoned]\n"
+        "    statuses:\n"
+        "      - id: planned\n"
+        "      - id: queued\n"
+        "      - id: executing\n"
+        "      - id: paused\n"
+        "      - id: failed\n"
+        "      - id: in_review\n"
+        "      - id: verified\n"
+        "      - id: completed\n"
+        "        terminal: true\n"
+        "      - id: abandoned\n"
+        "        terminal: true\n"
+        "    routes:\n"
+        "      - id: source-to-planned\n"
+        "        actor: pm-agent\n"
+        "        from: source:create\n"
+        "        to: planned\n"
+        "        kind: forward\n"
+        "      - id: planned-to-queued\n"
+        "        actor: pm-agent\n"
+        "        from: planned\n"
+        "        to: queued\n"
+        "        kind: forward\n"
+        "      - id: queued-to-executing\n"
+        "        actor: pm-agent\n"
+        "        from: queued\n"
+        "        to: executing\n"
+        "        kind: forward\n"
+        "      - id: planned-to-paused\n"
+        "        actor: pm-agent\n"
+        "        from: planned\n"
+        "        to: paused\n"
+        "        kind: side\n"
+        "      - id: planned-to-failed\n"
+        "        actor: code\n"
+        "        from: planned\n"
+        "        to: failed\n"
+        "        kind: side\n"
+        "      - id: executing-to-paused\n"
+        "        actor: pm-agent\n"
+        "        from: executing\n"
+        "        to: paused\n"
+        "        kind: side\n"
+        "      - id: paused-to-executing\n"
+        "        actor: pm-agent\n"
+        "        from: paused\n"
+        "        to: executing\n"
+        "        kind: forward\n"
+        "      - id: executing-to-failed\n"
+        "        actor: code\n"
+        "        from: executing\n"
+        "        to: failed\n"
+        "        kind: side\n"
+        "      - id: failed-to-executing\n"
+        "        actor: pm-agent\n"
+        "        from: failed\n"
+        "        to: executing\n"
+        "        kind: forward\n"
+        "      - id: executing-to-in_review\n"
+        "        actor: coding-agent\n"
+        "        from: executing\n"
+        "        to: in_review\n"
+        "        kind: forward\n"
+        "      - id: in_review-to-verified\n"
+        "        actor: pm-agent\n"
+        "        from: in_review\n"
+        "        to: verified\n"
+        "        kind: forward\n"
+        "      - id: verified-to-completed\n"
+        "        actor: pm-agent\n"
+        "        from: verified\n"
+        "        to: completed\n"
+        "        kind: forward\n"
+        "      - id: executing-to-abandoned\n"
+        "        actor: pm-agent\n"
+        "        from: executing\n"
+        "        to: abandoned\n"
+        "        kind: side\n"
+    )
     save_test_session(tmp_path, "s1", plan=True)
     return tmp_path
 
@@ -77,7 +170,7 @@ def test_execute_transition_status_appends_engagement_outcome(tmp_project: Path)
 
 
 def test_execute_inject_follow_up_appends_to_plan_md(tmp_project: Path):
-    plan = tmp_project / "sessions" / "s1" / "artifacts" / "plan.md"
+    plan = tmp_project / "instances" / "sessions" / "s1" / "artifacts" / "plan.md"
     original = plan.read_text(encoding="utf-8")
     executor = ActionExecutor(project_dir=tmp_project, session_id="s1")
     executor.execute(
@@ -105,9 +198,9 @@ def test_execute_inject_follow_up_idempotent(tmp_project: Path):
     )
     executor.execute(action)
     executor.execute(action)
-    plan_text = (tmp_project / "sessions" / "s1" / "artifacts" / "plan.md").read_text(
-        encoding="utf-8"
-    )
+    plan_text = (
+        tmp_project / "instances" / "sessions" / "s1" / "artifacts" / "plan.md"
+    ).read_text(encoding="utf-8")
     assert plan_text.count("## PM follow-up — cost overrun") == 1
 
 

@@ -1,16 +1,19 @@
 """Unit tests for ``tripwire.core.workflow.schema`` and ``loader``.
 
-Covers KUI-119: parsing the per-project ``workflow.yaml`` into a typed
-dataclass tree and well-formedness validation. The loader is read-only:
-it returns a typed model and never mutates state.
+Covers KUI-119 + the v0.13 schema convergence: parsing the per-project
+``workflow.yaml`` into a typed dataclass tree and well-formedness
+validation. The loader is read-only: it returns a typed model and
+never mutates state.
+
+Routes are the single source of structural arrows;
+``statuses[].next:`` is not a recognized key and surfaces as
+``workflow/unknown_key`` at load time.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 from textwrap import dedent
-
-import pytest
 
 # ----------------------------------------------------------------------
 # Schema: parsing happy paths
@@ -23,97 +26,34 @@ def test_loader_parses_minimal_workflow(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
                   - id: queued
-                    next: spawned
                   - id: spawned
                     terminal: true
+                routes:
+                  - id: queued-to-spawned
+                    actor: pm-agent
+                    from: queued
+                    to: spawned
+                    kind: forward
             """
         ),
         encoding="utf-8",
     )
     spec = load_workflows(tmp_path)
+    assert spec.schema_version == 1
     assert "coding-session" in spec.workflows
     wf = spec.workflows["coding-session"]
     assert wf.actor == "coding-agent"
     assert wf.trigger == "session.spawn"
     assert [s.id for s in wf.statuses] == ["queued", "spawned"]
-    assert wf.statuses[0].next.kind == "single"
-    assert wf.statuses[0].next.single == "spawned"
-    assert wf.statuses[1].next.kind == "terminal"
-
-
-def test_loader_parses_conditional_next(tmp_path: Path) -> None:
-    from tripwire.core.workflow.loader import load_workflows
-
-    (tmp_path / "workflow.yaml").write_text(
-        dedent(
-            """\
-            workflows:
-              coding-session:
-                actor: coding-agent
-                trigger: session.spawn
-                statuses:
-                  - id: executing
-                    next:
-                      - if: agent.role == frontend
-                        then: review-frontend
-                      - else: review-backend
-                  - id: review-frontend
-                    terminal: true
-                  - id: review-backend
-                    terminal: true
-            """
-        ),
-        encoding="utf-8",
-    )
-    spec = load_workflows(tmp_path)
-    nxt = spec.workflows["coding-session"].statuses[0].next
-    assert nxt.kind == "conditional"
-    assert nxt.conditional is not None
-    assert len(nxt.conditional) == 2
-    first, last = nxt.conditional
-    assert first.predicate is not None
-    assert first.predicate.field == "agent.role"
-    assert first.predicate.op == "=="
-    assert first.predicate.value == "frontend"
-    assert first.then == "review-frontend"
-    assert last.predicate is None  # else branch
-    assert last.then == "review-backend"
-
-
-def test_loader_parses_inequality_predicate(tmp_path: Path) -> None:
-    from tripwire.core.workflow.loader import load_workflows
-
-    (tmp_path / "workflow.yaml").write_text(
-        dedent(
-            """\
-            workflows:
-              w:
-                actor: a
-                trigger: t
-                statuses:
-                  - id: s1
-                    next:
-                      - if: agent.role != frontend
-                        then: s2
-                      - else: s3
-                  - id: s2
-                    terminal: true
-                  - id: s3
-                    terminal: true
-            """
-        ),
-        encoding="utf-8",
-    )
-    nxt = load_workflows(tmp_path).workflows["w"].statuses[0].next
-    assert nxt.conditional is not None
-    assert nxt.conditional[0].predicate is not None
-    assert nxt.conditional[0].predicate.op == "!="
+    assert wf.statuses[0].terminal is False
+    assert wf.statuses[1].terminal is True
 
 
 def test_loader_parses_prompt_checks_tripwires_jit_prompts(tmp_path: Path) -> None:
@@ -122,19 +62,25 @@ def test_loader_parses_prompt_checks_tripwires_jit_prompts(tmp_path: Path) -> No
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               w:
                 actor: a
                 trigger: t
                 statuses:
                   - id: s1
-                    next: s2
                     prompt_checks: [pm-session-launch]
                     tripwires: [schema-valid, refs-resolved]
                     heuristics: [quality-drift, mega-issue]
                     jit_prompts: [cost-ceiling]
                   - id: s2
                     terminal: true
+                routes:
+                  - id: s1-to-s2
+                    actor: pm-agent
+                    from: s1
+                    to: s2
+                    kind: forward
             """
         ),
         encoding="utf-8",
@@ -154,13 +100,13 @@ def test_loader_parses_route_signals_and_heuristics(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               pm-monitor:
                 actor: pm-agent
                 trigger: command.pm-monitor
                 statuses:
                   - id: scan
-                    next: dispatch
                   - id: dispatch
                     terminal: true
                 routes:
@@ -194,6 +140,7 @@ def test_loader_parses_cross_link_pm_subagent_dispatch(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               pm-monitor:
                 actor: pm-agent
@@ -226,6 +173,7 @@ def test_loader_parses_status_artifacts(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               w:
                 actor: a
@@ -258,13 +206,13 @@ def test_loader_parses_explicit_routes(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
                 statuses:
                   - id: planned
-                    next: executing
                   - id: executing
                     terminal: true
                 routes:
@@ -312,6 +260,59 @@ def test_loader_parses_explicit_routes(tmp_path: Path) -> None:
     assert route.emits.status_changes == ["executing"]
 
 
+def test_loader_parses_v013_route_fields(tmp_path: Path) -> None:
+    """v0.13: routes declare preserve_fields, clear_fields,
+    side_effects, rollback, and typed triggers."""
+    from tripwire.core.workflow.loader import load_workflows
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: completed
+                  - id: paused
+                    terminal: true
+                routes:
+                  - id: completed-to-paused-reopen
+                    actor: pm-agent
+                    from: completed
+                    to: paused
+                    kind: revert
+                    trigger:
+                      type: command
+                      name: tripwire-session-reopen
+                    preserve_fields:
+                      - runtime_state.claude_session_id
+                      - runtime_state.worktrees
+                    clear_fields: []
+                    side_effects:
+                      - flip_drafts_to_draft
+                      - append_audit_log_entry
+                    rollback: atomic
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    route = load_workflows(tmp_path).workflows["coding-session"].routes[0]
+    assert route.kind == "revert"
+    assert route.preserve_fields == [
+        "runtime_state.claude_session_id",
+        "runtime_state.worktrees",
+    ]
+    assert route.clear_fields == []
+    assert route.side_effects == ["flip_drafts_to_draft", "append_audit_log_entry"]
+    assert route.rollback == "atomic"
+    assert route.trigger_typed is not None
+    assert route.trigger_typed.type == "command"
+    assert route.trigger_typed.name == "tripwire-session-reopen"
+
+
 def test_loader_emits_no_statuses_declared_when_block_missing(tmp_path: Path) -> None:
     """Hard-migration policy: a workflow with no `statuses:` block fails
     loudly with a generic error. Stale shapes (e.g. an old `stations:`
@@ -324,6 +325,7 @@ def test_loader_emits_no_statuses_declared_when_block_missing(tmp_path: Path) ->
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               w:
                 actor: a
@@ -363,6 +365,7 @@ def test_loader_emits_unknown_key_for_each_offending_field(tmp_path: Path) -> No
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               w:
                 actor: a
@@ -399,6 +402,7 @@ def test_loader_supports_multiple_workflows(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               a:
                 actor: a
@@ -433,8 +437,8 @@ def test_loader_does_not_mutate_state(tmp_path: Path) -> None:
 
     yml = tmp_path / "workflow.yaml"
     yml.write_text(
-        "workflows:\n  w:\n    actor: a\n    trigger: t\n    statuses:\n"
-        "      - id: s\n        terminal: true\n",
+        "workflow_schema_version: 1\nworkflows:\n  w:\n    actor: a\n    trigger: t\n"
+        "    statuses:\n      - id: s\n        terminal: true\n",
         encoding="utf-8",
     )
     contents_before = yml.read_text(encoding="utf-8")
@@ -449,22 +453,28 @@ def test_loader_does_not_mutate_state(tmp_path: Path) -> None:
 # ----------------------------------------------------------------------
 
 
-def test_validator_rejects_unreferenced_station_in_next(tmp_path: Path) -> None:
+def test_validator_rejects_unknown_route_status(tmp_path: Path) -> None:
     from tripwire.core.workflow.loader import load_workflows
     from tripwire.core.workflow.schema import validate_workflow_spec
 
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               w:
                 actor: a
                 trigger: t
                 statuses:
                   - id: s1
-                    next: nonexistent
                   - id: s2
                     terminal: true
+                routes:
+                  - id: r-bad
+                    actor: pm-agent
+                    from: s1
+                    to: nonexistent
+                    kind: forward
             """
         ),
         encoding="utf-8",
@@ -478,7 +488,7 @@ def test_validator_rejects_unreferenced_station_in_next(tmp_path: Path) -> None:
         known_prompt_checks=set(),
     )
     codes = [f.code for f in findings]
-    assert "workflow/unknown_next_status" in codes
+    assert "workflow/unknown_route_status" in codes
 
 
 def test_validator_rejects_undeclared_validator_ref(tmp_path: Path) -> None:
@@ -488,6 +498,7 @@ def test_validator_rejects_undeclared_validator_ref(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               w:
                 actor: a
@@ -518,6 +529,7 @@ def test_validator_rejects_undeclared_tripwire_ref(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               w:
                 actor: a
@@ -548,6 +560,7 @@ def test_validator_rejects_undeclared_prompt_check_ref(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               w:
                 actor: a
@@ -578,13 +591,13 @@ def test_validator_rejects_bad_route_refs(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               w:
                 actor: a
                 trigger: t
                 statuses:
                   - id: planned
-                    next: completed
                   - id: completed
                     terminal: true
                 routes:
@@ -629,16 +642,19 @@ def test_validator_rejects_bad_route_refs(tmp_path: Path) -> None:
     assert "workflow/unknown_prompt_check" in codes
 
 
-def test_validator_rejects_terminal_with_next(tmp_path: Path) -> None:
-    """A status can be terminal OR declare next, never both — cyclic
-    terminal misuse means a status marked terminal that nonetheless
-    chains forward."""
+def test_validator_emits_unknown_key_for_legacy_next(  # legacy-allow: name fixed by plan
+    tmp_path: Path,
+) -> None:
+    """``statuses[].next:`` is not a recognized key. Any file declaring
+    it surfaces the generic ``workflow/unknown_key`` finding (the same
+    finding any other typo would produce)."""
     from tripwire.core.workflow.loader import load_workflows
     from tripwire.core.workflow.schema import validate_workflow_spec
 
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               w:
                 actor: a
@@ -646,9 +662,14 @@ def test_validator_rejects_terminal_with_next(tmp_path: Path) -> None:
                 statuses:
                   - id: s1
                     next: s2
-                    terminal: true
                   - id: s2
                     terminal: true
+                routes:
+                  - id: s1-to-s2
+                    actor: pm-agent
+                    from: s1
+                    to: s2
+                    kind: forward
             """
         ),
         encoding="utf-8",
@@ -661,7 +682,13 @@ def test_validator_rejects_terminal_with_next(tmp_path: Path) -> None:
         known_prompt_checks=set(),
     )
     codes = [f.code for f in findings]
-    assert "workflow/terminal_with_next" in codes
+    assert "workflow/unknown_key" in codes
+    unknown = next(
+        f
+        for f in findings
+        if f.code == "workflow/unknown_key" and "'next'" in f.message
+    )
+    assert unknown.status == "s1"
 
 
 def test_validator_rejects_duplicate_status_ids(tmp_path: Path) -> None:
@@ -671,6 +698,7 @@ def test_validator_rejects_duplicate_status_ids(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               w:
                 actor: a
@@ -703,15 +731,25 @@ def test_validator_rejects_no_terminal_status(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               w:
                 actor: a
                 trigger: t
                 statuses:
                   - id: s1
-                    next: s2
                   - id: s2
-                    next: s1
+                routes:
+                  - id: s1-to-s2
+                    actor: pm-agent
+                    from: s1
+                    to: s2
+                    kind: forward
+                  - id: s2-to-s1
+                    actor: pm-agent
+                    from: s2
+                    to: s1
+                    kind: return
             """
         ),
         encoding="utf-8",
@@ -734,27 +772,34 @@ def test_validator_clean_on_well_formed(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               coding-session:
                 actor: coding-agent
                 trigger: session.spawn
+                instance:
+                  storage_path: sessions/{instance_id}/session.yaml
+                  status_field: status
+                  status_enum: [queued, executing, verified]
                 statuses:
                   - id: queued
-                    next: executing
                     prompt_checks: [pm-session-launch]
                   - id: executing
                     tripwires: [schema-valid]
                     jit_prompts: [cost-ceiling]
-                    next:
-                      - if: agent.role == frontend
-                        then: review-frontend
-                      - else: review-backend
-                  - id: review-frontend
-                    next: verified
-                  - id: review-backend
-                    next: verified
                   - id: verified
                     terminal: true
+                routes:
+                  - id: queued-to-executing
+                    actor: pm-agent
+                    from: queued
+                    to: executing
+                    kind: forward
+                  - id: executing-to-verified
+                    actor: pm-agent
+                    from: executing
+                    to: verified
+                    kind: forward
             """
         ),
         encoding="utf-8",
@@ -770,6 +815,381 @@ def test_validator_clean_on_well_formed(tmp_path: Path) -> None:
 
 
 # ----------------------------------------------------------------------
+# v0.13 lints — schema_version, reachability, traps, recovery, reverts
+# ----------------------------------------------------------------------
+
+
+def test_validator_emits_missing_schema_version(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: s
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    codes = [f.code for f in findings]
+    assert "workflow/missing_schema_version" in codes
+
+
+def test_validator_emits_missing_schema_version_for_wrong_version(
+    tmp_path: Path,
+) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 2
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: s
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    codes = [f.code for f in findings]
+    assert "workflow/missing_schema_version" in codes
+
+
+def test_validator_rejects_unreachable_status(tmp_path: Path) -> None:
+    """A non-initial status with no inbound route is unreachable."""
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: s1
+                  - id: s2
+                    terminal: true
+                  - id: orphan
+                    terminal: true
+                routes:
+                  - id: s1-to-s2
+                    actor: pm-agent
+                    from: s1
+                    to: s2
+                    kind: forward
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    codes = [f.code for f in findings]
+    assert "workflow/unreachable_status" in codes
+    finding = next(f for f in findings if f.code == "workflow/unreachable_status")
+    assert finding.status == "orphan"
+
+
+def test_validator_rejects_trap_status(tmp_path: Path) -> None:
+    """A non-terminal status with no outbound route is a dead end."""
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: s1
+                  - id: trap
+                  - id: done
+                    terminal: true
+                routes:
+                  - id: s1-to-trap
+                    actor: pm-agent
+                    from: s1
+                    to: trap
+                    kind: forward
+                  - id: s1-to-done
+                    actor: pm-agent
+                    from: s1
+                    to: done
+                    kind: forward
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    codes = [f.code for f in findings]
+    assert "workflow/trap_status" in codes
+    finding = next(f for f in findings if f.code == "workflow/trap_status")
+    assert finding.status == "trap"
+
+
+def test_validator_rejects_no_recovery_path(tmp_path: Path) -> None:
+    """An off-path status (paused, failed) must have a route back to an
+    on-path status; if the only outbound is to abandoned that's a dead
+    end matching PM handoff #5 Gap C."""
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: queued
+                  - id: executing
+                  - id: completed
+                    terminal: true
+                  - id: paused
+                  - id: abandoned
+                    terminal: true
+                routes:
+                  - id: q-to-e
+                    actor: pm-agent
+                    from: queued
+                    to: executing
+                    kind: forward
+                  - id: e-to-c
+                    actor: pm-agent
+                    from: executing
+                    to: completed
+                    kind: forward
+                  - id: e-to-p
+                    actor: pm-agent
+                    from: executing
+                    to: paused
+                    kind: side
+                  - id: p-to-a
+                    actor: pm-agent
+                    from: paused
+                    to: abandoned
+                    kind: side
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    codes = [f.code for f in findings]
+    assert "workflow/no_recovery_path" in codes
+
+
+def test_validator_warns_on_lossy_revert(tmp_path: Path) -> None:
+    """A revert kind route with no preserve_fields throws away runtime
+    state on rollback — emit a warning."""
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: completed
+                    terminal: true
+                  - id: paused
+                    terminal: true
+                routes:
+                  - id: completed-to-paused
+                    actor: pm-agent
+                    from: completed
+                    to: paused
+                    kind: revert
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    lossy = [f for f in findings if f.code == "workflow/lossy_revert"]
+    assert len(lossy) == 1
+    assert lossy[0].severity == "warning"
+
+
+def test_validator_rejects_unknown_side_effect(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: a
+                  - id: b
+                    terminal: true
+                routes:
+                  - id: r
+                    actor: pm-agent
+                    from: a
+                    to: b
+                    kind: forward
+                    side_effects: [does_not_exist]
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+        known_side_effects={"flip_drafts_to_draft"},
+    )
+    codes = [f.code for f in findings]
+    assert "workflow/unknown_side_effect" in codes
+
+
+def test_validator_lints_unknown_side_effect_no_op_when_registry_absent(
+    tmp_path: Path,
+) -> None:
+    """Until WS2 plumbs the registry, an unknown side-effect id is
+    ignored — passing ``known_side_effects=None`` (default) skips the
+    check entirely."""
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: a
+                  - id: b
+                    terminal: true
+                routes:
+                  - id: r
+                    actor: pm-agent
+                    from: a
+                    to: b
+                    kind: forward
+                    side_effects: [does_not_exist]
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    codes = [f.code for f in findings]
+    assert "workflow/unknown_side_effect" not in codes
+
+
+def test_validator_rejects_unknown_status_field_path(tmp_path: Path) -> None:
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: a
+                  - id: b
+                    terminal: true
+                routes:
+                  - id: r
+                    actor: pm-agent
+                    from: a
+                    to: b
+                    kind: forward
+                    preserve_fields: [runtime_state.claude_session_id, bogus_top_level]
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+        known_status_field_paths={"runtime_state", "status", "engagements"},
+    )
+    codes = [f.code for f in findings]
+    assert "workflow/unknown_status_field" in codes
+
+
+# ----------------------------------------------------------------------
 # Cross-links
 # ----------------------------------------------------------------------
 
@@ -780,19 +1200,25 @@ def test_loader_parses_cross_links(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               triage:
                 actor: pm-agent
                 trigger: t
                 statuses:
                   - id: act
-                    next: done
                     cross_links:
                       - workflow: coding-session
                         status: planned
                         label: spawn coding session
                   - id: done
                     terminal: true
+                routes:
+                  - id: act-to-done
+                    actor: pm-agent
+                    from: act
+                    to: done
+                    kind: forward
               coding-session:
                 actor: coding-agent
                 trigger: t
@@ -820,6 +1246,7 @@ def test_validator_warns_on_unknown_cross_link_workflow(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               w:
                 actor: a
@@ -852,6 +1279,7 @@ def test_validator_warns_on_unknown_cross_link_status(tmp_path: Path) -> None:
     (tmp_path / "workflow.yaml").write_text(
         dedent(
             """\
+            workflow_schema_version: 1
             workflows:
               triage:
                 actor: pm-agent
@@ -884,59 +1312,176 @@ def test_validator_warns_on_unknown_cross_link_status(tmp_path: Path) -> None:
 
 
 # ----------------------------------------------------------------------
-# Predicate parsing
+# v0.13.1: `instance:` block — declared instance shape per workflow
 # ----------------------------------------------------------------------
 
 
-def test_predicate_parse_equality() -> None:
-    from tripwire.core.workflow.schema import Predicate
+def test_loader_parses_instance_block(tmp_path: Path) -> None:
+    """A workflow with an `instance:` block parses the fields into a
+    typed :class:`WorkflowInstanceShape`."""
+    from tripwire.core.workflow.loader import load_workflows
 
-    p = Predicate.parse("agent.role == frontend")
-    assert p.field == "agent.role"
-    assert p.op == "=="
-    assert p.value == "frontend"
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                instance:
+                  storage_path: sessions/{instance_id}/session.yaml
+                  status_field: status
+                  status_enum:
+                    - planned
+                    - executing
+                    - completed
+                  required_fields: [id, status]
+                  instance_id_field: id
+                statuses:
+                  - id: planned
+                  - id: completed
+                    terminal: true
+                routes:
+                  - id: planned-to-completed
+                    actor: pm-agent
+                    from: planned
+                    to: completed
+                    kind: forward
+            """
+        ),
+        encoding="utf-8",
+    )
+    wf = load_workflows(tmp_path).workflows["coding-session"]
+    assert wf.instance is not None
+    assert wf.instance.storage_path == "sessions/{instance_id}/session.yaml"
+    assert wf.instance.status_field == "status"
+    assert wf.instance.status_enum == ["planned", "executing", "completed"]
+    assert wf.instance.required_fields == ["id", "status"]
+    assert wf.instance.instance_id_field == "id"
 
 
-def test_predicate_parse_inequality() -> None:
-    from tripwire.core.workflow.schema import Predicate
+def test_loader_emits_warning_for_missing_instance_block(tmp_path: Path) -> None:
+    """A workflow without an `instance:` block surfaces a warning
+    (back-compat in v0.13.1; mandatory in v0.14)."""
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
 
-    p = Predicate.parse("session.kind != bugfix")
-    assert p.field == "session.kind"
-    assert p.op == "!="
-    assert p.value == "bugfix"
-
-
-def test_predicate_parse_rejects_unsupported_operator() -> None:
-    from tripwire.core.workflow.schema import Predicate
-
-    with pytest.raises(ValueError):
-        Predicate.parse("agent.role > frontend")
-
-
-def test_predicate_parse_rejects_missing_operator() -> None:
-    from tripwire.core.workflow.schema import Predicate
-
-    with pytest.raises(ValueError):
-        Predicate.parse("agent.role frontend")
-
-
-# ----------------------------------------------------------------------
-# Predicate evaluation
-# ----------------------------------------------------------------------
-
-
-def test_predicate_eval_equality_dot_path() -> None:
-    from tripwire.core.workflow.schema import Predicate
-
-    p = Predicate.parse("agent.role == frontend")
-    assert p.evaluate({"agent": {"role": "frontend"}}) is True
-    assert p.evaluate({"agent": {"role": "backend"}}) is False
-    assert p.evaluate({}) is False  # missing field falsy
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                statuses:
+                  - id: s
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    missing = [f for f in findings if f.code == "workflow/instance_missing"]
+    assert len(missing) == 1
+    assert missing[0].severity == "warning"
+    assert missing[0].workflow == "w"
 
 
-def test_predicate_eval_inequality_dot_path() -> None:
-    from tripwire.core.workflow.schema import Predicate
+def test_loader_emits_finding_for_unknown_instance_field(tmp_path: Path) -> None:
+    """An unknown key inside an `instance:` block fires
+    ``workflow/instance_unknown_field``."""
+    from tripwire.core.workflow.loader import load_workflows
 
-    p = Predicate.parse("agent.role != frontend")
-    assert p.evaluate({"agent": {"role": "frontend"}}) is False
-    assert p.evaluate({"agent": {"role": "backend"}}) is True
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                instance:
+                  storage_path: w/{instance_id}.yaml
+                  status_field: status
+                  status_enum: [a, b]
+                  bogus_extra_field: oops
+                statuses:
+                  - id: s
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    spec = load_workflows(tmp_path)
+    codes = [f.code for f in spec.load_findings]
+    assert "workflow/instance_unknown_field" in codes
+    finding = next(
+        f for f in spec.load_findings if f.code == "workflow/instance_unknown_field"
+    )
+    assert "bogus_extra_field" in finding.message
+    assert finding.workflow == "w"
+
+
+def test_loader_clean_when_instance_block_present(tmp_path: Path) -> None:
+    """A workflow with a valid `instance:` block produces no
+    instance-related findings."""
+    from tripwire.core.workflow.loader import load_workflows
+    from tripwire.core.workflow.schema import validate_workflow_spec
+
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              w:
+                actor: a
+                trigger: t
+                instance:
+                  storage_path: w/{instance_id}.yaml
+                  status_field: status
+                  status_enum: [s]
+                statuses:
+                  - id: s
+                    terminal: true
+            """
+        ),
+        encoding="utf-8",
+    )
+    findings = validate_workflow_spec(
+        load_workflows(tmp_path),
+        known_tripwires=set(),
+        known_heuristics=set(),
+        known_jit_prompts=set(),
+        known_prompt_checks=set(),
+    )
+    codes = [f.code for f in findings]
+    assert "workflow/instance_missing" not in codes
+    assert "workflow/instance_unknown_field" not in codes
+
+
+def test_template_declares_instance_on_all_12_workflows() -> None:
+    """The shipped template (`templates/workflow.yaml.j2`) declares an
+    `instance:` block on every workflow it declares. Foundation for
+    v0.14 mandatory enforcement."""
+    import yaml
+
+    from tripwire.core.workflow.loader import parse_workflow_spec
+
+    template = Path("src/tripwire/templates/workflow.yaml.j2").read_text(
+        encoding="utf-8"
+    )
+    spec = parse_workflow_spec(yaml.safe_load(template))
+    assert len(spec.workflows) == 12, sorted(spec.workflows)
+    for wf_id, wf in spec.workflows.items():
+        assert wf.instance is not None, f"workflow {wf_id!r} has no instance: block"
+        assert wf.instance.storage_path
+        assert wf.instance.status_field
+        assert wf.instance.status_enum, f"workflow {wf_id!r} has empty status_enum"

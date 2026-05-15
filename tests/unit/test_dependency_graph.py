@@ -152,7 +152,7 @@ class TestMermaidRendering:
         ]
         result = build_dependency_graph(issues)
         output = to_mermaid(result)
-        # v0.9.4: canonical names replace legacy ("executing" → "executing",
+        # v0.9.4: canonical names replace pre-v0.9.4 ("in_progress" → "executing",
         # "done" → "completed").
         assert "classDef status_executing" in output
         assert "classDef status_completed" in output

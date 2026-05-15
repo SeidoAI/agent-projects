@@ -22,6 +22,58 @@ def branch_exists(repo_path: Path, branch_name: str) -> bool:
     return result.returncode == 0
 
 
+def local_branches_with_prefix(repo_dir: Path, prefix: str) -> list[str]:
+    """Return local branch names matching ``refs/heads/<prefix>``.
+
+    Empty list on any failure (not a git repo, no matching branches,
+    git not installed). Read-only — never mutates the repo. Used by
+    the no-orphan-proj-branches lint and any other read-only branch
+    discovery; the §3 ("validators are passive") + §9 ("CLI codifies
+    repetitive procedure") promise requires this kind of subprocess
+    plumbing to live in helpers, not inline in validator code.
+    """
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_dir),
+            "for-each-ref",
+            "--format=%(refname:short)",
+            f"refs/heads/{prefix}",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def branch_commit_count_ahead(repo_dir: Path, branch: str, base: str) -> int | None:
+    """Return commits in ``branch`` not in ``base`` (read-only).
+
+    ``None`` on any failure — caller decides what "we can't tell" means.
+    """
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_dir),
+            "rev-list",
+            f"{base}..{branch}",
+            "--count",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    try:
+        return int(result.stdout.strip() or "0")
+    except ValueError:
+        return None
+
+
 def worktree_path_for_session(clone_path: Path, session_slug: str) -> Path:
     """Compute the worktree path for a session.
 

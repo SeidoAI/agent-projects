@@ -13,15 +13,16 @@ no fetch yet, repo isn't a git checkout), emit a single
 per-issue checks — the operator can re-run after a fetch.
 
 The session half of this rule (which gated on the deleted
-``legacy_completed`` status and checked the pre-v0.8 flat artifact
-layout) was removed in KUI-158. The modern session check is
-``check_artifact_presence`` in ``validator/__init__.py``.
+``completed`` status under the old taxonomy and checked the pre-v0.8
+flat artifact layout) was removed in KUI-158. The modern session check
+is ``check_artifact_presence`` in ``validator/__init__.py``.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from tripwire.core import paths
 from tripwire.core.git_helpers import MainTreeUnavailable, list_paths_on_main
 from tripwire.core.store import PROJECT_CONFIG_FILENAME
 
@@ -65,7 +66,7 @@ def check(ctx: ValidationContext) -> list[CheckResult]:
     for entity in done_issues:
         issue = entity.model
         for fname in manifest.issue_required:
-            rel = f"issues/{issue.id}/{fname}"
+            rel = f"{paths.ISSUES_DIR}/{issue.id}/{paths.ISSUE_DOCS_SUBDIR}/{fname}"
             if rel in on_main:
                 continue
             results.append(

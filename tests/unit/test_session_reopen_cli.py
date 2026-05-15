@@ -300,7 +300,12 @@ class TestSessionReopenResetAcks:
     so the agent re-encounters every tripwire after substantial rework."""
 
     def _write_marker(self, project_dir: Path, tripwire_id: str, sid: str) -> Path:
-        marker = project_dir / ".tripwire" / "acks" / f"{tripwire_id}-{sid}.json"
+        marker = (
+            project_dir
+            / ".tripwire"
+            / "acks"
+            / f"coding-session-{sid}-{tripwire_id}.json"
+        )
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text("{}", encoding="utf-8")
         return marker

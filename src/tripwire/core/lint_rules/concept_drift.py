@@ -641,6 +641,6 @@ def _check(ctx):
                 f"({_signal_label(c)}) but isn't covered by any node. "
                 f"Mentioned in: {where}."
             ),
-            file=f"issues/{primary}/issue.yaml",
+            file=f"instances/issues/{primary}/issue.yaml",
             fix_hint=_fix_hint(c),
         )

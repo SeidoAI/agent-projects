@@ -8,8 +8,8 @@ counterpart used by the ``PATCH /api/projects/{pid}/issues/{key}`` and
 Two public entry points:
 
 - :func:`update_issue_status` validates the requested new status against
-  ``project.yaml.status_transitions[current_status]`` and rejects any
-  transition that isn't in the allowed list.
+  the ``issue-closure`` workflow's routes in ``workflow.yaml`` and
+  rejects any transition that isn't a declared edge.
 - :func:`update_issue_fields` applies a partial
   :class:`IssuePatch` — only non-``None`` fields flow through to disk.
   Status transitions inside a patch still go through the same validator.
@@ -31,6 +31,7 @@ from pydantic import BaseModel, ConfigDict
 
 from tripwire.core.enum_loader import load_enum
 from tripwire.core.locks import project_lock
+from tripwire.core.status import build_issue_transitions
 from tripwire.core.store import load_issue, load_project, save_issue
 from tripwire.ui.services._audit import write_audit_entry
 from tripwire.ui.services.issue_service import IssueDetail, get_issue
@@ -78,12 +79,12 @@ def _validate_transition(
 ) -> None:
     """Raise ``ValueError`` if *new_status* isn't reachable from *current_status*.
 
-    Looks up the allowed next-states in ``project.yaml.status_transitions``.
-    An empty allowlist for the current state means "no transitions out of
-    this state" and blocks every change.
+    The allowed-next-states map is derived from the ``issue-closure``
+    workflow's routes in ``workflow.yaml``. An empty allowlist for the
+    current state means "no transitions out of this state" via the
+    workflow and blocks every change.
     """
-    config = load_project(project_dir)
-    transitions = config.status_transitions
+    transitions = build_issue_transitions(project_dir)
     allowed = set(transitions.get(current_status, []))
 
     if new_status == current_status:
@@ -170,8 +171,8 @@ def update_issue_status(project_dir: Path, key: str, new_status: str) -> IssueDe
 
     Raises:
         FileNotFoundError: if the issue file is missing.
-        ValueError: if the transition isn't allowed by
-            ``project.yaml.status_transitions``.
+        ValueError: if the transition isn't allowed by the
+            ``issue-closure`` workflow routes in ``workflow.yaml``.
     """
     with project_lock(project_dir):
         issue = load_issue(project_dir, key)

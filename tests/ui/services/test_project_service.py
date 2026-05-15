@@ -40,11 +40,11 @@ def _make_project(
         "next_issue_number: 1\nnext_session_number: 1\n",
         encoding="utf-8",
     )
-    for sub in ("issues", "nodes", "sessions"):
-        (root / sub).mkdir(exist_ok=True)
+    for sub in ("instances/issues", "instances/nodes", "instances/sessions"):
+        (root / sub).mkdir(parents=True, exist_ok=True)
 
     for i in range(issues):
-        issue_dir = root / "issues" / f"TST-{i + 1}"
+        issue_dir = root / "instances" / "issues" / f"TST-{i + 1}"
         issue_dir.mkdir()
         (issue_dir / "issue.yaml").write_text(
             f"---\nid: TST-{i + 1}\ntitle: Issue {i + 1}\nstatus: queued\n"
@@ -54,13 +54,13 @@ def _make_project(
         )
 
     for i in range(nodes):
-        (root / "nodes" / f"node-{i}.yaml").write_text(
+        (root / "instances" / "nodes" / f"node-{i}.yaml").write_text(
             f"id: node-{i}\ntype: model\nname: Node {i}\nstatus: active\n",
             encoding="utf-8",
         )
 
     for i in range(sessions):
-        (root / "sessions" / f"s{i}").mkdir()
+        (root / "instances" / "sessions" / f"s{i}").mkdir(parents=True, exist_ok=True)
 
     return root
 
@@ -169,7 +169,7 @@ class TestDiscoverProjects:
             "key_prefix: BRK\n"
             "next_issue_number: 1\n"
             "next_session_number: 1\n"
-            "tripwires:\n"  # legacy v0.7.4 field — rejected post-rename
+            "tripwires:\n"  # v0.7.4 field — rejected post-rename
             "  enabled: true\n",
             encoding="utf-8",
         )
@@ -477,7 +477,9 @@ def _make_rich_project(root: Path, name: str = "rich", key_prefix: str = "RCH") 
         "environments:\n  - dev\n  - prod\n"
         "repos:\n  SeidoAI/web:\n    local: /tmp/web\n"
         "statuses:\n  - queued\n  - completed\n"
-        "status_transitions:\n  queued: [completed]\n  completed: []\n"
+        # v0.13.1 (B8): `status_transitions:` was removed from
+        # ProjectConfig — issue transitions now live in workflow.yaml's
+        # issue-closure routes. Project detail no longer surfaces it.
         "label_categories:\n"
         "  executor: [ai, human]\n"
         "  verifier: [required, optional]\n"
@@ -545,7 +547,10 @@ class TestGetProject:
         assert detail.environments == ["dev", "prod"]
         assert detail.repos == {"SeidoAI/web": {"local": "/tmp/web"}}
         assert detail.statuses == ["queued", "completed"]
-        assert detail.status_transitions == {"queued": ["completed"], "completed": []}
+        # v0.13.1 (B8): `status_transitions` is no longer a ProjectDetail
+        # field; the same data lives in workflow.yaml's issue-closure
+        # workflow routes, fetched separately by the UI.
+        assert not hasattr(detail, "status_transitions")
         assert detail.label_categories["executor"] == ["ai", "human"]
         assert detail.graph["node_types"] == ["model", "decision"]
         assert detail.orchestration["default_pattern"] == "default"

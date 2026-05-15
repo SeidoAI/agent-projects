@@ -33,31 +33,31 @@ from tripwire.ui.file_watcher import (
 
 class TestClassify:
     def test_issue(self, tmp_path: Path):
-        path = tmp_path / "issues" / "KUI-42" / "issue.yaml"
+        path = tmp_path / "instances" / "issues" / "KUI-42" / "issue.yaml"
         ev = classify("p", tmp_path, path, "modified")
         assert isinstance(ev, FileChangedEvent)
         assert ev.entity_type == "issue"
         # entity_id is the directory stem, not the filename (KUI-42 rule).
         assert ev.entity_id == "KUI-42"
-        assert ev.path == "issues/KUI-42/issue.yaml"
+        assert ev.path == "instances/issues/KUI-42/issue.yaml"
         assert ev.project_id == "p"
 
     def test_node(self, tmp_path: Path):
-        path = tmp_path / "nodes" / "file-watcher.yaml"
+        path = tmp_path / "instances" / "nodes" / "file-watcher.yaml"
         ev = classify("p", tmp_path, path, "created")
         assert ev is not None
         assert ev.entity_type == "node"
         assert ev.entity_id == "file-watcher"
 
     def test_session(self, tmp_path: Path):
-        path = tmp_path / "sessions" / "backend-realtime" / "session.yaml"
+        path = tmp_path / "instances" / "sessions" / "backend-realtime" / "session.yaml"
         ev = classify("p", tmp_path, path, "modified")
         assert ev is not None
         assert ev.entity_type == "session"
         assert ev.entity_id == "backend-realtime"
 
     def test_session_root_markdown_is_artifact(self, tmp_path: Path):
-        path = tmp_path / "sessions" / "backend-realtime" / "plan.md"
+        path = tmp_path / "instances" / "sessions" / "backend-realtime" / "plan.md"
         ev = classify("p", tmp_path, path, "modified")
         assert ev is not None
         assert ev.entity_type == "artifact"
@@ -67,6 +67,7 @@ class TestClassify:
     def test_session_artifacts_subdir_is_artifact(self, tmp_path: Path):
         path = (
             tmp_path
+            / "instances"
             / "sessions"
             / "backend-realtime"
             / "artifacts"
@@ -133,23 +134,25 @@ class TestShouldIgnore:
         assert _should_ignore(tmp_path / ".claude" / "settings.json", tmp_path)
 
     def test_ds_store(self, tmp_path: Path):
-        assert _should_ignore(tmp_path / "issues" / ".DS_Store", tmp_path)
+        assert _should_ignore(tmp_path / "instances" / "issues" / ".DS_Store", tmp_path)
 
     def test_swap_file(self, tmp_path: Path):
-        assert _should_ignore(tmp_path / "issues" / "x.yaml.swp", tmp_path)
+        assert _should_ignore(
+            tmp_path / "instances" / "issues" / "x.yaml.swp", tmp_path
+        )
 
     def test_trailing_tilde(self, tmp_path: Path):
-        assert _should_ignore(tmp_path / "issues" / "x.yaml~", tmp_path)
+        assert _should_ignore(tmp_path / "instances" / "issues" / "x.yaml~", tmp_path)
 
     def test_emacs_lock_file(self, tmp_path: Path):
-        assert _should_ignore(tmp_path / "issues" / ".#x.yaml", tmp_path)
+        assert _should_ignore(tmp_path / "instances" / "issues" / ".#x.yaml", tmp_path)
 
     def test_lock_file(self, tmp_path: Path):
         assert _should_ignore(tmp_path / ".tripwire.lock", tmp_path)
 
     def test_graph_index_self_write(self, tmp_path: Path):
         assert _should_ignore(
-            tmp_path / "nodes" / "tripwire-graph-index.yaml", tmp_path
+            tmp_path / "instances" / "nodes" / "tripwire-graph-index.yaml", tmp_path
         )
 
     def test_concept_layout_sidecar_ignored(self, tmp_path: Path):
@@ -165,7 +168,7 @@ class TestShouldIgnore:
 
     def test_normal_issue_not_ignored(self, tmp_path: Path):
         assert not _should_ignore(
-            tmp_path / "issues" / "KUI-1" / "issue.yaml", tmp_path
+            tmp_path / "instances" / "issues" / "KUI-1" / "issue.yaml", tmp_path
         )
 
     def test_normal_project_yaml_not_ignored(self, tmp_path: Path):
@@ -265,7 +268,7 @@ class TestProjectFileHandler:
     def _mkproj(self, tmp_path: Path) -> Path:
         p = tmp_path / "proj"
         p.mkdir()
-        (p / "issues" / "KUI-1").mkdir(parents=True)
+        (p / "instances" / "issues" / "KUI-1").mkdir(parents=True)
         return p
 
     def test_skips_directories(self, tmp_path: Path, loop_in_thread):
@@ -274,7 +277,9 @@ class TestProjectFileHandler:
         handler = ProjectFileHandler(
             "p", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
-        handler.on_any_event(DirCreatedEvent(str(project / "issues" / "KUI-2")))
+        handler.on_any_event(
+            DirCreatedEvent(str(project / "instances" / "issues" / "KUI-2"))
+        )
         time.sleep(0.05)
         assert q.qsize() == 0
 
@@ -286,7 +291,9 @@ class TestProjectFileHandler:
         )
         handler.on_any_event(FileModifiedEvent(str(project / ".git" / "HEAD")))
         handler.on_any_event(
-            FileModifiedEvent(str(project / "nodes" / "tripwire-graph-index.yaml"))
+            FileModifiedEvent(
+                str(project / "instances" / "nodes" / "tripwire-graph-index.yaml")
+            )
         )
         time.sleep(0.05)
         assert q.qsize() == 0
@@ -298,7 +305,9 @@ class TestProjectFileHandler:
             "pid", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
         handler.on_any_event(
-            FileModifiedEvent(str(project / "issues" / "KUI-1" / "issue.yaml"))
+            FileModifiedEvent(
+                str(project / "instances" / "issues" / "KUI-1" / "issue.yaml")
+            )
         )
         time.sleep(0.08)
 
@@ -315,7 +324,7 @@ class TestProjectFileHandler:
         handler = ProjectFileHandler(
             "p", project, q, loop_in_thread, debouncer=Debouncer(window_ms=40)
         )
-        target = project / "issues" / "KUI-1" / "issue.yaml"
+        target = project / "instances" / "issues" / "KUI-1" / "issue.yaml"
         for _ in range(10):
             handler.on_any_event(FileModifiedEvent(str(target)))
         time.sleep(0.15)
@@ -327,7 +336,9 @@ class TestProjectFileHandler:
         handler = ProjectFileHandler(
             "p", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
-        handler.on_any_event(FileDeletedEvent(str(project / "nodes" / "foo.yaml")))
+        handler.on_any_event(
+            FileDeletedEvent(str(project / "instances" / "nodes" / "foo.yaml"))
+        )
         time.sleep(0.05)
         fut = asyncio.run_coroutine_threadsafe(q.get(), loop_in_thread)
         event = fut.result(timeout=1)
@@ -343,8 +354,8 @@ class TestProjectFileHandler:
         handler = ProjectFileHandler(
             "p", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
-        src = project / "issues" / "KUI-1" / "issue.yaml.tmp"
-        dest = project / "issues" / "KUI-1" / "issue.yaml"
+        src = project / "instances" / "issues" / "KUI-1" / "issue.yaml.tmp"
+        dest = project / "instances" / "issues" / "KUI-1" / "issue.yaml"
         handler.on_any_event(FileMovedEvent(str(src), str(dest)))
         time.sleep(0.05)
         fut = asyncio.run_coroutine_threadsafe(q.get(), loop_in_thread)
@@ -363,7 +374,9 @@ class TestProjectFileHandler:
         handler = ProjectFileHandler(
             "p", project, q, loop_in_thread, debouncer=Debouncer(window_ms=15)
         )
-        handler.on_any_event(FileCreatedEvent(str(project / "nodes" / "new.yaml")))
+        handler.on_any_event(
+            FileCreatedEvent(str(project / "instances" / "nodes" / "new.yaml"))
+        )
         time.sleep(0.05)
         fut = asyncio.run_coroutine_threadsafe(q.get(), loop_in_thread)
         event = fut.result(timeout=1)
@@ -378,7 +391,7 @@ class TestProjectFileHandler:
 class TestStartWatchingE2E:
     def test_touch_file_emits_event(self, tmp_path: Path, loop_in_thread):
         project = tmp_path / "proj"
-        (project / "issues" / "KUI-1").mkdir(parents=True)
+        (project / "instances" / "issues" / "KUI-1").mkdir(parents=True)
         q: asyncio.Queue = asyncio.Queue()
         shared = Debouncer(window_ms=40)
 
@@ -387,7 +400,7 @@ class TestStartWatchingE2E:
         )
         try:
             time.sleep(0.1)  # let the observer settle
-            (project / "issues" / "KUI-1" / "issue.yaml").write_text("x")
+            (project / "instances" / "issues" / "KUI-1" / "issue.yaml").write_text("x")
 
             fut = asyncio.run_coroutine_threadsafe(q.get(), loop_in_thread)
             event = fut.result(timeout=2)

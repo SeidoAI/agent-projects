@@ -2,12 +2,26 @@
 
 Gates session close-out behind: (a) session in a completable status,
 (b) every worktree branch has a merged PR, (c) every required issue
-artifact present, (d) most recent review exit_code ≤ 1. Then closes
-issues, transitions the session to `completed`, and removes worktrees.
+artifact present, (d) most recent review exit_code ≤ 1. Then transitions
+the session to `completed` via the workflow executor.
 
-v0.7.9 §A4: every gate is mandatory. There are no bypass flags. A
-session that can't pass these gates should be `tripwire session
-abandon`-ed, which is a terminal status that does not claim success.
+Every gate is mandatory — there are no bypass flags. A session that
+can't pass these gates should be `tripwire session abandon`-ed, which
+is a terminal status that does not claim success.
+
+Side-effects (flip drafts, sweep issues, remove worktrees, append
+telemetry, close engagement) live elsewhere:
+
+- ``flip_drafts_to_ready`` → Layer-1 CLI ``tripwire session flip-drafts-ready``
+  (chained from ``tripwire session prepare-for-completion``).
+- ``sweep_issues`` → Layer-1 ``tripwire session sweep-issues-forward``.
+- ``remove_worktrees`` → Layer-1 ``tripwire session remove-worktrees``.
+- ``append_telemetry_row`` → executor post-write hook
+  (:func:`tripwire.core.workflow.side_effects.append_telemetry_record`).
+- ``close_active_engagement`` → executor post-write hook.
+
+This helper verifies the gates, then calls ``execute_transition`` —
+the sole writer of ``session.status``.
 
 Insights application is out-of-scope here — the PM's
 `/pm-session-complete` runs `tripwire session insights apply/reject`
@@ -19,17 +33,20 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 
 from tripwire.core import paths
+from tripwire.core.gh_helpers import (
+    GhError,
+    get_merged_pr_for_branch,
+    gh_pr_ready,
+)
 from tripwire.core.issue_artifact_store import (
     load_issue_artifact_manifest,
     status_at_or_past,
 )
-from tripwire.core.session_store import load_session, save_session
+from tripwire.core.session_store import load_session
 from tripwire.core.store import load_issue
-from tripwire.models.enums import SessionStatus
 
 
 class CompleteError(ValueError):
@@ -55,9 +72,9 @@ def complete_session(
     *,
     dry_run: bool = False,
 ) -> CompleteResult:
-    """Run the close-out gates then transition the session to `done`.
+    """Run the close-out gates then transition the session to `completed`.
 
-    Gates per spec §11.2 (v0.7.9 §A4: no bypass flags):
+    Gates per spec §11.2 (no bypass flags):
       1. Status in {in_review, verified}.
       2. Every worktree branch has a merged PR.
       3. Per-issue required artifacts present.
@@ -66,11 +83,18 @@ def complete_session(
     If a session can't pass these gates, the right move is
     ``tripwire session abandon`` (terminal status that does not claim
     success), not a bypass flag.
+
+    The status flip routes through
+    :func:`tripwire.core.workflow.transitions.execute_transition` (sole
+    writer of ``session.status``). Side-effects (flip drafts, sweep
+    issues, worktree cleanup, telemetry, engagement close) live in the
+    executor's post-write hooks and in Layer-1 CLI wrappers invoked
+    before/after this helper.
     """
     session = load_session(project_dir, session_id)
     result = CompleteResult(session_id=session_id)
 
-    # Spec §11.2 step 1 — narrow status gate. `in_progress`, `executing`,
+    # Spec §11.2 — narrow status gate. `in_progress`, `executing`,
     # `active` must go through /pm-session-review first.
     completable = {"in_review", "verified"}
     if session.status not in completable:
@@ -82,12 +106,6 @@ def complete_session(
             "`tripwire session abandon` instead.",
         )
 
-    # v0.7.5 — flip session-start draft PRs to ready so the operator can
-    # merge without toggling state in the GH UI. Idempotent: `gh pr
-    # ready` on a non-draft or merged PR is swallowed by ``check=False``.
-    # Always runs (v0.7.9 §A4: no bypass flags).
-    _flip_drafts_to_ready(session)
-
     _verify_pr_merged(session)
     _verify_issue_artifacts(project_dir, session)
     _verify_review_ok(project_dir, session)
@@ -97,54 +115,32 @@ def complete_session(
     if dry_run:
         return result
 
-    # v0.9.4: route through the canonical sweep helper. This advances any
-    # member issue that's behind the "completed" target on the lifecycle
-    # without backsliding ones that are already past it (e.g. a `deferred`
-    # issue stays deferred). Tests that previously asserted "every member
-    # issue ends at done" now assert "every on-path member issue ends at
-    # completed".
-    from tripwire.core.status_contract import sweep_issues
+    # Route the status flip through the workflow executor — the sole
+    # writer of ``session.status``. Engagement close + telemetry +
+    # audit are post-write hooks fired inside ``execute_transition``.
+    from tripwire.core.workflow.transitions import (
+        TransitionError,
+        execute_transition,
+    )
 
-    result.issues_closed = sweep_issues(project_dir, session, "completed")
-
-    now = datetime.now(tz=timezone.utc)
-    session.status = SessionStatus.COMPLETED
-    session.updated_at = now
-    if session.engagements:
-        last = session.engagements[-1]
-        if last.ended_at is None:
-            last.ended_at = now
-            last.outcome = "completed"
-    save_session(project_dir, session)
-
-    # KUI-96 §E4 — append a row to the project's routing telemetry log
-    # so analyze-routing can compare $/merged-PR per route over time.
-    # Cost computation reads the session's stream-json log; failure is
-    # non-fatal — telemetry is observability, not part of the gate.
     try:
-        from tripwire.core.routing_telemetry import (
-            append_telemetry_row,
-            build_telemetry_row,
+        transition = execute_transition(
+            project_dir,
+            workflow_id="coding-session",
+            instance_id=session_id,
+            target_status="completed",
+            flags={"action": "session_complete"},
         )
-        from tripwire.core.session_cost import compute_session_cost
-
-        cost = compute_session_cost(project_dir, session_id).total_usd
-        row = build_telemetry_row(project_dir, session, cost_usd=cost)
-        append_telemetry_row(project_dir, row)
-    except OSError:
-        # Worst case: cost log moved or telemetry file is unwritable.
-        # The session-complete gates have already passed; surfacing
-        # this as a hard failure would block a legitimate done.
-        pass
-
-    from tripwire.core.git_helpers import worktree_remove
-
-    for wt in session.runtime_state.worktrees:
-        try:
-            worktree_remove(Path(wt.clone_path), Path(wt.worktree_path))
-            result.worktrees_removed.append(wt.worktree_path)
-        except (subprocess.SubprocessError, OSError):
-            pass
+    except TransitionError as exc:
+        raise CompleteError(
+            "complete/transition_error", f"executor refused: {exc}"
+        ) from exc
+    if not transition.ok:
+        raise CompleteError(
+            "complete/transition_rejected",
+            f"transition to completed rejected: "
+            f"{transition.message or transition.reason}",
+        )
 
     return result
 
@@ -158,23 +154,27 @@ def _flip_drafts_to_ready(session) -> None:
     intentionally pass ``check=False`` so a noisy "PR is not draft"
     warning doesn't fail the whole complete.
 
-    Worktrees without a ``draft_pr_url`` (legacy in-flight sessions
-    that started before v0.7.5 landed) fall back to ``gh pr create
-    --fill`` so a PR exists to merge against. The fallback is best-
-    effort — if the agent's exit protocol already opened the PR, gh
-    errors with "a PR already exists" which we swallow.
+    Worktrees without a ``draft_pr_url`` (in-flight sessions that
+    started before v0.7.5 landed and still lack the recorded URL) fall
+    back to ``gh pr create --fill`` so a PR exists to merge against.
+    The fallback is best-effort — if the agent's exit protocol already
+    opened the PR, gh errors with "a PR already exists" which we swallow.
     """
     for wt in session.runtime_state.worktrees:
         if wt.draft_pr_url:
-            subprocess.run(
-                ["gh", "pr", "ready", wt.draft_pr_url],
-                cwd=wt.worktree_path,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
+            # Fail-quiet by contract: an already-ready or merged PR
+            # returns non-zero from gh, but we don't want a noisy warning
+            # to fail the whole complete. Swallow ``GhError`` here.
+            try:
+                gh_pr_ready(wt.draft_pr_url, cwd=wt.worktree_path)
+            except GhError:
+                pass
         else:
+            # Fallback path (pre-v0.7.5 sessions) — open a fresh PR.
+            # ``gh pr create`` is not a candidate for ``gh_helpers``
+            # because it carries a much larger arg surface than the
+            # three top-level operations we centralised; inlining the
+            # subprocess call here is fine.
             subprocess.run(
                 [
                     "gh",
@@ -195,8 +195,14 @@ def _flip_drafts_to_ready(session) -> None:
 def _verify_pr_merged(session) -> None:
     """Require every worktree branch to have a merged PR; raise
     :class:`CompleteError` naming the unmerged branch(es) otherwise.
-    ``gh`` is invoked from inside each worktree so it picks up the
-    correct remote when worktrees have different origins.
+    ``gh`` is invoked from inside each worktree (via
+    :func:`tripwire.core.gh_helpers.get_merged_pr_for_branch`) so it
+    picks up the correct remote when worktrees have different origins.
+
+    Fail-quiet on gh subprocess failure: treat "gh errored / not
+    installed / timed out / returned garbage" as "not merged" — the
+    operator re-runs once the environment is healthy, or runs
+    ``tripwire session abandon`` if the session genuinely shouldn't ship.
     """
     worktrees = list(session.runtime_state.worktrees)
     if not worktrees:
@@ -206,38 +212,11 @@ def _verify_pr_merged(session) -> None:
         )
     unmerged: list[str] = []
     for wt in worktrees:
-        merged = False
         try:
-            result = subprocess.run(
-                [
-                    "gh",
-                    "pr",
-                    "list",
-                    "--head",
-                    wt.branch,
-                    "--state",
-                    "merged",
-                    "--json",
-                    "number",
-                    "--limit",
-                    "1",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                cwd=wt.worktree_path,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                prs = json.loads(result.stdout)
-                if prs:
-                    merged = True
-        except (subprocess.SubprocessError, OSError, json.JSONDecodeError):
-            # Treat "gh errored / timed out / returned garbage" as "not
-            # merged" — conservative: operator re-runs once the
-            # environment is healthy, or `tripwire session abandon` if
-            # the session genuinely shouldn't ship.
-            pass
-        if not merged:
+            pr = get_merged_pr_for_branch(wt.branch, cwd=wt.worktree_path)
+        except GhError:
+            pr = None
+        if pr is None:
             unmerged.append(wt.branch)
     if unmerged:
         raise CompleteError(
@@ -300,9 +279,9 @@ def _verify_issue_artifacts(project_dir: Path, session) -> None:
                 issue.status, entry.required_at_status, project_dir
             ):
                 continue
-            file_path = paths.issue_dir(project_dir, issue_key) / entry.file
+            file_path = paths.issue_docs_dir(project_dir, issue_key) / entry.file
             if not file_path.is_file():
-                missing.append(f"{issue_key}/{entry.file}")
+                missing.append(f"{issue_key}/{paths.ISSUE_DOCS_SUBDIR}/{entry.file}")
     if missing:
         raise CompleteError(
             "complete/missing_artifacts",

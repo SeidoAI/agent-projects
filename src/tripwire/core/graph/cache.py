@@ -68,7 +68,7 @@ COMMENTS_SUBDIR = paths.COMMENTS_SUBDIR
 # Silently filtering would cause `_REFERENCING_EDGE_TYPES` (now collapsed
 # to ``("refs", "depends_on")``) to drop edges whose `referenced_by`
 # entries the UI and CLI rely on.
-_LEGACY_EDGE_TYPE_STRINGS: frozenset[str] = frozenset(
+_PRE_V09_EDGE_TYPE_STRINGS: frozenset[str] = frozenset(
     {
         "references",
         "related",
@@ -80,18 +80,18 @@ _LEGACY_EDGE_TYPE_STRINGS: frozenset[str] = frozenset(
 )
 
 
-class LegacyCacheError(RuntimeError):
+class OutdatedGraphCacheError(RuntimeError):
     """Raised by :func:`load_index` when the cache holds pre-v0.9 edge types.
 
-    Carries the offending file path and the legacy strings encountered
+    Carries the offending file path and the pre-v0.9 strings encountered
     so callers can produce a user-facing message that points the user
     at ``tripwire migrate graph-edges``.
     """
 
-    def __init__(self, cache_path: Path, legacy_types: list[str]) -> None:
+    def __init__(self, cache_path: Path, outdated_types: list[str]) -> None:
         self.cache_path = cache_path
-        self.legacy_types = legacy_types
-        joined = ", ".join(sorted(set(legacy_types)))
+        self.outdated_types = outdated_types
+        joined = ", ".join(sorted(set(outdated_types)))
         super().__init__(
             f"{cache_path} contains pre-v0.9 edge type(s): {joined}. "
             f"Run `tripwire migrate graph-edges` to rewrite them, or "
@@ -158,12 +158,13 @@ def load_index(project_dir: Path) -> GraphIndex | None:
     `ensure_fresh`) will then trigger a full rebuild. This is intentional:
     a corrupt cache is trivially recoverable by rebuilding from the files.
 
-    Pre-v0.9 caches that still carry legacy edge ``type:`` strings raise
-    :class:`LegacyCacheError` instead of returning None. Silently treating
-    them as missing would mask under-reported `referenced_by` tables —
-    the v0.9 collapse of `_REFERENCING_EDGE_TYPES` to
-    ``("refs", "depends_on")`` would simply drop legacy-typed edges. The
-    user must run ``tripwire migrate graph-edges`` to rewrite the cache.
+    Pre-v0.9 caches that still carry outdated edge ``type:`` strings
+    raise :class:`OutdatedGraphCacheError` instead of returning None.
+    Silently treating them as missing would mask under-reported
+    `referenced_by` tables — the v0.9 collapse of
+    `_REFERENCING_EDGE_TYPES` to ``("refs", "depends_on")`` would simply
+    drop pre-v0.9-typed edges. The user must run
+    ``tripwire migrate graph-edges`` to rewrite the cache.
     """
     path = project_dir / INDEX_REL_PATH
     if not path.exists():
@@ -177,20 +178,20 @@ def load_index(project_dir: Path) -> GraphIndex | None:
     if raw.get("version") != CACHE_VERSION:
         return None
 
-    # Refuse to load legacy-typed edges. Detected before pydantic
-    # validation so the clearer message wins even if the legacy edges
+    # Refuse to load pre-v0.9-typed edges. Detected before pydantic
+    # validation so the clearer message wins even if the pre-v0.9 edges
     # also fail schema validation on a future EdgeKind tightening.
-    legacy_found: list[str] = []
+    outdated_found: list[str] = []
     edges = raw.get("edges") or []
     if isinstance(edges, list):
         for edge in edges:
             if not isinstance(edge, dict):
                 continue
             etype = edge.get("type")
-            if isinstance(etype, str) and etype in _LEGACY_EDGE_TYPE_STRINGS:
-                legacy_found.append(etype)
-    if legacy_found:
-        raise LegacyCacheError(path, legacy_found)
+            if isinstance(etype, str) and etype in _PRE_V09_EDGE_TYPE_STRINGS:
+                outdated_found.append(etype)
+    if outdated_found:
+        raise OutdatedGraphCacheError(path, outdated_found)
 
     try:
         return GraphIndex.model_validate(raw)
@@ -284,7 +285,8 @@ def session_id_from_rel_path(rel_path: str) -> str | None:
 
 
 def comment_id_from_rel_path(rel_path: str) -> str | None:
-    """Synthesize a comment id from `issues/<KEY>/comments/<stem>.yaml`.
+    """Synthesize a comment id from
+    `instances/issues/<KEY>/comments/<stem>.yaml`.
 
     The Comment model has no `id` field — only a UUID. The unified
     index uses `<issue-key>:<filename-stem>` so the id is stable
@@ -297,11 +299,15 @@ def comment_id_from_rel_path(rel_path: str) -> str | None:
     p = Path(rel_path)
     if p.suffix != ".yaml":
         return None
-    # parts: ["issues", "<KEY>", "comments", "<stem>.yaml"]
-    parts = p.parts
-    if len(parts) < 4:
+    # Strip the canonical ISSUES_PREFIX so the issue key is the first
+    # remaining segment regardless of how many ancestors that prefix
+    # contains. The prefix is `instances/issues/` (two segments) under
+    # the current layout.
+    relative = rel_path[len(ISSUES_PREFIX) :]
+    sub_parts = Path(relative).parts
+    if len(sub_parts) < 3:
         return None
-    issue_key = parts[1]
+    issue_key = sub_parts[0]
     stem = p.stem
     return f"{issue_key}:{stem}"
 
@@ -444,7 +450,7 @@ def _session_edges(
     """Emit edges sourced from a single session file.
 
     KUI-132 / A7. Session → issue edges land under canonical `refs`
-    (per the legacy→canonical mapping in `core.graph.index`), so the
+    (per the alias→canonical mapping in `core.graph.index`), so the
     unified `tripwire graph query downstream <issue>` returns sessions
     that work on that issue.
     """
@@ -1029,7 +1035,7 @@ __all__ = [
     "CACHE_VERSION",
     "INDEX_REL_PATH",
     "LOCK_REL_PATH",
-    "LegacyCacheError",
+    "OutdatedGraphCacheError",
     "ensure_fresh",
     "full_rebuild",
     "issue_key_from_rel_path",

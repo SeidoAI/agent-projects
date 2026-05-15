@@ -153,7 +153,11 @@ class TestCheckNodeFreshness:
         return clone_dir, project
 
     def test_no_source_status(self) -> None:
-        node = ConceptNode(id="planned-x", type="endpoint", name="x", status="planned")
+        # A node without `source:` always reports NO_SOURCE regardless of
+        # its lifecycle status. Use the v0.13.1 default `active` value.
+        node = ConceptNode(
+            id="sourceless-x", type="endpoint", name="x", status="active"
+        )
         result = check_node_freshness(node, ProjectConfig(name="t", key_prefix="T"))
         assert result.status == FreshnessStatus.NO_SOURCE
 
@@ -240,12 +244,15 @@ class TestCheckAllNodes:
             key_prefix="T",
             repos={"x/y": RepoEntry(local=str(clone_dir))},
         )
+        # v0.13.1 (B9): NodeStatus is now {active, stale, archived}; use
+        # `archived` (was: `planned`) as the not-active marker to assert
+        # the skip-non-active path.
         nodes = [
             ConceptNode(
-                id="planned-thing",
+                id="archived-thing",
                 type="endpoint",
                 name="x",
-                status="planned",
+                status="archived",
                 source=NodeSource(repo="x/y", path="src/x.py"),
             ),
             ConceptNode(

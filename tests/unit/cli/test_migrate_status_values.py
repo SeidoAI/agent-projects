@@ -25,7 +25,7 @@ def _make_project(root: Path) -> Path:
 
 def _write_issue(project: Path, key: str, status: str) -> Path:
     """Write an issue.yaml with a hand-set ``status:`` value."""
-    idir = project / "issues" / key
+    idir = project / "instances" / "issues" / key
     idir.mkdir(parents=True, exist_ok=True)
     fm = {
         "uuid": "11111111-2222-4333-8444-555555555555",
@@ -44,7 +44,7 @@ def _write_issue(project: Path, key: str, status: str) -> Path:
 
 def _write_session(project: Path, sid: str, status: str) -> Path:
     """Write a session.yaml with a hand-set ``status:`` value."""
-    sdir = project / "sessions" / sid
+    sdir = project / "instances" / "sessions" / sid
     sdir.mkdir(parents=True, exist_ok=True)
     fm = {
         "uuid": "11111111-2222-4333-8444-555555555556",
@@ -67,7 +67,7 @@ def _read_status(path: Path) -> str:
 
 
 class TestMigrateStatusValues:
-    def test_rewrites_legacy_issue_statuses(self, tmp_path: Path) -> None:
+    def test_rewrites_pre_v094_issue_statuses(self, tmp_path: Path) -> None:
         project = _make_project(tmp_path / "p")
         a = _write_issue(project, "SM-1", "backlog")
         b = _write_issue(project, "SM-2", "in_progress")
@@ -86,7 +86,7 @@ class TestMigrateStatusValues:
         assert _read_status(e) == "abandoned"
         assert "5 file(s) rewritten" in result.output
 
-    def test_rewrites_legacy_session_statuses(self, tmp_path: Path) -> None:
+    def test_rewrites_pre_v094_session_statuses(self, tmp_path: Path) -> None:
         project = _make_project(tmp_path / "p")
         a = _write_session(project, "sess-1", "active")
         b = _write_session(project, "sess-2", "waiting_for_ci")
@@ -173,7 +173,7 @@ class TestMigrateStatusValues:
     def test_unparseable_files_skipped(self, tmp_path: Path) -> None:
         """Garbage files don't crash the command — just skipped."""
         project = _make_project(tmp_path / "p")
-        idir = project / "issues" / "SM-1"
+        idir = project / "instances" / "issues" / "SM-1"
         idir.mkdir(parents=True)
         (idir / "issue.yaml").write_text("no frontmatter at all", encoding="utf-8")
         # And a real one that needs rewriting

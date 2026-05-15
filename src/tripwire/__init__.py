@@ -8,4 +8,4 @@ Agents create issues, nodes, and sessions by writing files directly.
 See https://github.com/SeidoAI/tripwire-workspace/blob/main/docs/tripwire-plan.md for the full design.
 """
 
-__version__ = "0.12.2"
+__version__ = "0.13.1"

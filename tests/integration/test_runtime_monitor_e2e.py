@@ -40,6 +40,88 @@ def project(tmp_path: Path, save_test_session) -> Path:
     )
     for sub in ("issues", "nodes", "sessions", "docs", "plans"):
         (tmp_path / sub).mkdir(parents=True, exist_ok=True)
+    # v0.13: monitor's status flip routes through ``execute_transition``
+    # which requires ``workflow.yaml``.
+    (tmp_path / "workflow.yaml").write_text(
+        "workflow_schema_version: 1\n"
+        "workflows:\n"
+        "  coding-session:\n"
+        "    actor: coding-agent\n"
+        "    trigger: session.spawn\n"
+        "    instance:\n"
+        "      storage_path: sessions/{instance_id}/session.yaml\n"
+        "      status_field: status\n"
+        "      status_enum: [planned, queued, executing, in_review,\n"
+        "        verified, completed, paused, failed, abandoned]\n"
+        "    statuses:\n"
+        "      - id: planned\n"
+        "      - id: queued\n"
+        "      - id: executing\n"
+        "      - id: paused\n"
+        "      - id: failed\n"
+        "      - id: in_review\n"
+        "      - id: verified\n"
+        "      - id: completed\n"
+        "        terminal: true\n"
+        "      - id: abandoned\n"
+        "        terminal: true\n"
+        "    routes:\n"
+        "      - id: source-to-planned\n"
+        "        actor: pm-agent\n"
+        "        from: source:create\n"
+        "        to: planned\n"
+        "        kind: forward\n"
+        "      - id: planned-to-queued\n"
+        "        actor: pm-agent\n"
+        "        from: planned\n"
+        "        to: queued\n"
+        "        kind: forward\n"
+        "      - id: queued-to-executing\n"
+        "        actor: pm-agent\n"
+        "        from: queued\n"
+        "        to: executing\n"
+        "        kind: forward\n"
+        "      - id: executing-to-paused\n"
+        "        actor: pm-agent\n"
+        "        from: executing\n"
+        "        to: paused\n"
+        "        kind: side\n"
+        "      - id: executing-to-failed\n"
+        "        actor: code\n"
+        "        from: executing\n"
+        "        to: failed\n"
+        "        kind: side\n"
+        "      - id: paused-to-executing\n"
+        "        actor: pm-agent\n"
+        "        from: paused\n"
+        "        to: executing\n"
+        "        kind: forward\n"
+        "      - id: failed-to-executing\n"
+        "        actor: pm-agent\n"
+        "        from: failed\n"
+        "        to: executing\n"
+        "        kind: forward\n"
+        "      - id: executing-to-in_review\n"
+        "        actor: coding-agent\n"
+        "        from: executing\n"
+        "        to: in_review\n"
+        "        kind: forward\n"
+        "      - id: in_review-to-verified\n"
+        "        actor: pm-agent\n"
+        "        from: in_review\n"
+        "        to: verified\n"
+        "        kind: forward\n"
+        "      - id: verified-to-completed\n"
+        "        actor: pm-agent\n"
+        "        from: verified\n"
+        "        to: completed\n"
+        "        kind: forward\n"
+        "      - id: executing-to-abandoned\n"
+        "        actor: pm-agent\n"
+        "        from: executing\n"
+        "        to: abandoned\n"
+        "        kind: side\n"
+    )
     save_test_session(tmp_path, "s1", plan=True, status="executing")
     return tmp_path
 
@@ -119,7 +201,9 @@ def test_cost_overrun_e2e_sigterms_real_subprocess_and_pauses_session(
         session = load_session(project, "s1")
         assert session.status == "paused"
         # 3. plan.md has the follow-up block.
-        plan_text = (project / "sessions" / "s1" / "artifacts" / "plan.md").read_text()
+        plan_text = (
+            project / "instances" / "sessions" / "s1" / "artifacts" / "plan.md"
+        ).read_text()
         assert "cost overrun" in plan_text.lower()
         assert "monitor:tripwire=monitor/cost_overrun" in plan_text
     finally:
@@ -154,7 +238,9 @@ def test_post_pr_watcher_e2e_reengages_on_missing_pt_pr_after_10_min(
     )
     # Plan.md must already exist for the inject to land. The fixture
     # writes a one-line stub.
-    plan_path = project / "sessions" / "s_active" / "artifacts" / "plan.md"
+    plan_path = (
+        project / "instances" / "sessions" / "s_active" / "artifacts" / "plan.md"
+    )
 
     from tripwire.core.pr_watcher import PRState
     from tripwire.core.pr_watcher_daemon import (

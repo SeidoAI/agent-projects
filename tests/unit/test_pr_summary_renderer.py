@@ -132,7 +132,7 @@ def _all_sections_summary() -> PrSummary:
         ),
         concept_graph=ConceptGraphSection(
             nodes_added=["fastapi-app", "auth"],
-            nodes_removed=["legacy-x"],
+            nodes_removed=["obsolete-x"],
             nodes_promoted=["payment-flow"],
             base_orphan_refs=3,
             head_orphan_refs=1,
@@ -181,7 +181,7 @@ def test_all_sections_concept_graph_shows_added_removed_promoted():
     assert "Added (2)" in out
     assert "`fastapi-app`" in out
     assert "Removed (1)" in out
-    assert "`legacy-x`" in out
+    assert "`obsolete-x`" in out
     assert "Promoted to workspace (1)" in out
     assert "`payment-flow`" in out
 

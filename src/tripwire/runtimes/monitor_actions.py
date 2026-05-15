@@ -23,7 +23,6 @@ from pathlib import Path
 from tripwire.core import paths
 from tripwire.core.process_helpers import send_sigcont, send_sigstop, send_sigterm
 from tripwire.core.session_store import load_session, save_session
-from tripwire.models.enums import SessionStatus
 from tripwire.runtimes.monitor import (
     InjectFollowUp,
     LogWarning,
@@ -70,7 +69,7 @@ def _all_checks_completed(payload: dict) -> bool:
     for run in runs:
         status = (run.get("status") or "").upper()
         # GitHub Actions reports COMPLETED with a conclusion; the
-        # legacy commit-status API returns just a state — treat
+        # older commit-status API returns just a state — treat
         # SUCCESS / FAILURE / ERROR as terminal there too.
         if status in {"COMPLETED", "SUCCESS", "FAILURE", "ERROR"}:
             continue
@@ -152,13 +151,38 @@ class ActionExecutor:
             )
             return
         previous = session.status
-        # Coerce the action's string status into the typed enum so the
-        # serialiser doesn't warn (KUI-110 Phase 2.1). Invalid values
-        # raise ValueError here rather than silently writing yaml that
-        # then fails to load.
-        session.status = SessionStatus(action.new_status)
-        session.updated_at = datetime.now(tz=timezone.utc)
-        save_session(self.project_dir, session)
+        # Route through the workflow executor — sole writer of
+        # ``session.status``. The runtime monitor path is a dumb status
+        # flip driven by observed runtime state and does NOT run prep
+        # helpers — the agent / PM handles those separately.
+        from tripwire.core.workflow.transitions import (
+            TransitionError,
+            execute_transition,
+        )
+
+        try:
+            result = execute_transition(
+                self.project_dir,
+                workflow_id="coding-session",
+                instance_id=self.session_id,
+                target_status=action.new_status,
+                flags={"action": "monitor_transition"},
+            )
+        except TransitionError:
+            logger.exception(
+                "monitor: execute_transition errored for '%s' → %s",
+                self.session_id,
+                action.new_status,
+            )
+            return
+        if not result.ok:
+            logger.warning(
+                "monitor: transition rejected for '%s' → %s: %s",
+                self.session_id,
+                action.new_status,
+                result.message or result.reason,
+            )
+            return
         self._append_monitor_log(
             action.tripwire_id,
             f"status {previous} → {action.new_status}: {action.reason}",

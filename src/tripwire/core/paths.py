@@ -31,14 +31,29 @@ CLAUDE_MD = "CLAUDE.md"
 # Entity directories (source of truth — written by agents)
 # ---------------------------------------------------------------------------
 
-ISSUES_DIR = "issues"
+# Every materialised workflow instance lives under
+# `instances/<workflow-type>/<instance-id>/` so the on-disk layout
+# mirrors the workflow.yaml instance.storage_path contract. The
+# top-level `instances/` directory is the single anchor for all
+# entity types. ``tripwire migrate storage`` rewrites projects on the
+# flat layout (top-level ``sessions/``/``issues/``/``nodes/``) into
+# this layout in a single commit; there is no dual-read fallback.
+INSTANCES_DIR = "instances"
+
+ISSUES_DIR = "instances/issues"
 
 # Concept nodes are source entities — peers of issues and sessions.
-# The derived graph cache lives separately at `nodes/tripwire-graph-index.yaml`.
-NODES_DIR = "nodes"
+# The derived graph cache lives separately at
+# `instances/nodes/tripwire-graph-index.yaml`.
+NODES_DIR = "instances/nodes"
 
 INBOX_DIR = "inbox"
-SESSIONS_DIR = "sessions"
+SESSIONS_DIR = "instances/sessions"
+
+# Per-issue docs (developer.md, verified.md, comments) live under
+# `instances/issues/<KEY>/docs/` — colocated with the issue YAML
+# rather than in a parallel `docs/issues/<KEY>/` tree.
+ISSUE_DOCS_SUBDIR = "docs"
 
 # v0.10.0 — agents and enums are template/config, not state. Both moved
 # under `templates/` to consolidate the project-root layout.
@@ -154,26 +169,36 @@ def issues_dir(project_dir: Path) -> Path:
 
 
 def issue_dir(project_dir: Path, key: str) -> Path:
-    """Per-issue directory: `issues/<key>/`. Contains `issue.yaml`,
-    `comments/`, `developer.md`, `verified.md`."""
+    """Per-issue directory: `instances/issues/<key>/`. Contains
+    `issue.yaml`, plus a `docs/` subdir holding `comments/`,
+    `developer.md`, and `verified.md`."""
     return project_dir / ISSUES_DIR / key
 
 
 def issue_path(project_dir: Path, key: str) -> Path:
-    """Path to the issue YAML file at `issues/<key>/issue.yaml`."""
+    """Path to the issue YAML file at
+    `instances/issues/<key>/issue.yaml`."""
     return issue_dir(project_dir, key) / ISSUE_FILENAME
 
 
+def issue_docs_dir(project_dir: Path, key: str) -> Path:
+    """Per-issue docs subdirectory: `instances/issues/<key>/docs/`.
+
+    Holds developer.md, verified.md, comments/, and any other
+    document artifacts attached to the issue."""
+    return issue_dir(project_dir, key) / ISSUE_DOCS_SUBDIR
+
+
 def comments_dir(project_dir: Path, key: str) -> Path:
-    return issue_dir(project_dir, key) / COMMENTS_SUBDIR
+    return issue_docs_dir(project_dir, key) / COMMENTS_SUBDIR
 
 
 def developer_md_path(project_dir: Path, key: str) -> Path:
-    return issue_dir(project_dir, key) / DEVELOPER_FILENAME
+    return issue_docs_dir(project_dir, key) / DEVELOPER_FILENAME
 
 
 def verified_md_path(project_dir: Path, key: str) -> Path:
-    return issue_dir(project_dir, key) / VERIFIED_FILENAME
+    return issue_docs_dir(project_dir, key) / VERIFIED_FILENAME
 
 
 def nodes_dir(project_dir: Path) -> Path:
@@ -324,6 +349,47 @@ def concept_layout_path(project_dir: Path) -> Path:
 
 def concept_layout_lock_path(project_dir: Path) -> Path:
     return project_dir / CONCEPT_LAYOUT_LOCK
+
+
+# ---------------------------------------------------------------------------
+# Workflow runtime locks + JIT prompt ack markers
+# ---------------------------------------------------------------------------
+#
+# The executor serialises transitions per (workflow, instance) via a
+# lockfile under `.tripwire/locks/`. JIT prompt ack markers live under
+# `.tripwire/acks/` keyed by (workflow, instance, prompt).
+#
+# The workflow segment in both names disambiguates a same-named instance
+# id appearing under multiple workflows (issue-closure, concept-freshness,
+# coding-session, …) so they can coexist without collision.
+
+LOCKS_SUBDIR = ".tripwire/locks"
+ACKS_SUBDIR = ".tripwire/acks"
+
+
+def transition_lock_path(project_dir: Path, workflow_id: str, instance_id: str) -> Path:
+    """Per-(workflow, instance) transition lock path.
+
+    `.tripwire/locks/transition-<workflow>-<instance>.lock`. The
+    workflow segment disambiguates a same-named instance id appearing
+    under multiple workflows (e.g. an issue id and a session id that
+    happen to match)."""
+    return project_dir / LOCKS_SUBDIR / f"transition-{workflow_id}-{instance_id}.lock"
+
+
+def ack_marker_path(
+    project_dir: Path,
+    workflow_id: str,
+    instance_id: str,
+    prompt_id: str,
+) -> Path:
+    """JIT prompt ack marker path keyed by (workflow, instance, prompt).
+
+    `.tripwire/acks/<workflow>-<instance>-<prompt>.json`. The workflow
+    segment leads so glob filters by workflow (and reset-by-workflow
+    operations) are straightforward.
+    """
+    return project_dir / ACKS_SUBDIR / f"{workflow_id}-{instance_id}-{prompt_id}.json"
 
 
 def resolve_command_path(project_dir: Path, command_name: str) -> Path:

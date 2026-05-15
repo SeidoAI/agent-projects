@@ -17,13 +17,13 @@ from tripwire.cli.session import session_cmd
 
 
 def _write_self_review(project_dir: Path, sid: str, body: str) -> None:
-    sdir = project_dir / "sessions" / sid
+    sdir = project_dir / "instances" / "sessions" / sid
     sdir.mkdir(parents=True, exist_ok=True)
     (sdir / "self-review.md").write_text(body, encoding="utf-8")
 
 
 def _write_pm_response(project_dir: Path, sid: str, body: str) -> None:
-    sdir = project_dir / "sessions" / sid
+    sdir = project_dir / "instances" / "sessions" / sid
     sdir.mkdir(parents=True, exist_ok=True)
     (sdir / "pm-response.yaml").write_text(body, encoding="utf-8")
 

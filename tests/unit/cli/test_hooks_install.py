@@ -111,7 +111,7 @@ def test_install_force_overwrites_existing_hooks_block(tmp_path: Path) -> None:
             "PostToolUse": [
                 {
                     "matcher": "Bash",
-                    "hooks": [{"type": "command", "command": "echo legacy"}],
+                    "hooks": [{"type": "command", "command": "echo stale-hook"}],
                 }
             ]
         },
@@ -127,7 +127,7 @@ def test_install_force_overwrites_existing_hooks_block(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     merged = _read_settings(tmp_path)
     assert merged["env"] == {"FOO": "bar"}
-    # Force replaces the hooks block — legacy entry is gone, ours is in
+    # Force replaces the hooks block — the prior entry is gone, ours is in
     pth = merged["hooks"]["PostToolUse"]
-    assert all("echo legacy" not in str(b) for b in pth)
+    assert all("echo stale-hook" not in str(b) for b in pth)
     assert _hook_entry_present(merged)

@@ -55,7 +55,7 @@ def gated_project(tmp_path: Path) -> tuple[Path, str]:
     for sub in ("issues", "nodes", "sessions"):
         (project_dir / sub).mkdir(exist_ok=True)
     sid = "s1"
-    (project_dir / "sessions" / sid).mkdir()
+    (project_dir / "instances" / "sessions" / sid).mkdir(parents=True, exist_ok=True)
 
     _write_manifest(
         project_dir,
@@ -109,8 +109,8 @@ def test_reject_artifact_default_emitter_no_op(
 def test_reject_artifact_emitter_kw_only(
     gated_project: tuple[Path, str],
 ) -> None:
-    """`emitter` is keyword-only — the legacy positional 4-arg shape is
-    unchanged so existing callers keep compiling."""
+    """`emitter` is keyword-only — the established positional 4-arg
+    shape is unchanged so existing callers keep compiling."""
     project_dir, sid = gated_project
     # Positional args: project_dir, session_id, name, feedback
     reject_artifact(project_dir, sid, "plan", "concise feedback")

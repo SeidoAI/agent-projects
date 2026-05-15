@@ -62,23 +62,23 @@ def _hook_input(tool_input: dict | None, *, cwd: Path | str = ".") -> str:
     "rel_path, expected",
     [
         # tripwire artifacts
-        ("sessions/foo/session.yaml", True),
-        ("sessions/foo/pm-response.yaml", True),
-        ("sessions/foo/developer.md", True),
-        ("sessions/foo/verified.md", True),
-        ("sessions/foo/self-review.md", True),
-        ("sessions/foo/decisions.md", True),
-        ("issues/KUI-1/issue.yaml", True),
-        ("nodes/user-model.yaml", True),
+        ("instances/sessions/foo/session.yaml", True),
+        ("instances/sessions/foo/pm-response.yaml", True),
+        ("instances/sessions/foo/developer.md", True),
+        ("instances/sessions/foo/verified.md", True),
+        ("instances/sessions/foo/self-review.md", True),
+        ("instances/sessions/foo/decisions.md", True),
+        ("instances/issues/KUI-1/issue.yaml", True),
+        ("instances/nodes/user-model.yaml", True),
         ("graph/nodes/user-model.yaml", True),
         ("project.yaml", True),
-        ("nodes/tripwire-graph-index.yaml", True),
+        ("instances/nodes/tripwire-graph-index.yaml", True),
         # not tripwire artifacts — must skip silently
         ("src/tripwire/cli/init.py", False),
         ("README.md", False),
         ("docs/some-doc.md", False),
-        ("sessions/foo/scratch.md", False),  # not in the allowlist
-        ("issues/KUI-1/notes.md", False),
+        ("instances/sessions/foo/scratch.md", False),  # not in the allowlist
+        ("instances/issues/KUI-1/notes.md", False),
         ("plans/some-plan.md", False),
     ],
 )
@@ -97,7 +97,7 @@ def test_finds_project_root_from_nested_path(tmp_path: Path) -> None:
     from tripwire.cli.hooks import _find_project_root
 
     _write_minimal_project(tmp_path)
-    nested = tmp_path / "sessions" / "abc"
+    nested = tmp_path / "instances" / "sessions" / "abc"
     nested.mkdir(parents=True, exist_ok=True)
     (nested / "session.yaml").write_text("---\n", encoding="utf-8")
 
@@ -135,7 +135,7 @@ def test_hook_skips_silently_for_non_tripwire_path(tmp_path: Path) -> None:
 def test_hook_skips_silently_with_no_project_root(tmp_path: Path) -> None:
     """No project.yaml above the edited file → exit 0 silent."""
     runner = CliRunner()
-    f = tmp_path / "sessions" / "foo" / "session.yaml"
+    f = tmp_path / "instances" / "sessions" / "foo" / "session.yaml"
     f.parent.mkdir(parents=True)
     f.write_text("---\n", encoding="utf-8")
 
@@ -168,7 +168,7 @@ def test_hook_passes_silently_on_clean_validate(tmp_path: Path) -> None:
     """Editing a session.yaml in a clean project → exit 0, stdout empty."""
     _write_minimal_project(tmp_path)
     runner = CliRunner()
-    sess_dir = tmp_path / "sessions" / "ok"
+    sess_dir = tmp_path / "instances" / "sessions" / "ok"
     sess_dir.mkdir(parents=True)
     sess_path = sess_dir / "session.yaml"
     sess_path.write_text("---\n", encoding="utf-8")
@@ -191,7 +191,7 @@ def test_hook_emits_block_json_on_validate_failure(tmp_path: Path) -> None:
     """Failing validate → stdout has decision:'block' + reason; exit 0."""
     _write_minimal_project(tmp_path)
     runner = CliRunner()
-    sess_dir = tmp_path / "sessions" / "fail"
+    sess_dir = tmp_path / "instances" / "sessions" / "fail"
     sess_dir.mkdir(parents=True)
     sess_path = sess_dir / "session.yaml"
     sess_path.write_text("---\n", encoding="utf-8")
@@ -203,7 +203,7 @@ def test_hook_emits_block_json_on_validate_failure(tmp_path: Path) -> None:
         finding = CheckResult(
             code="status/invalid_enum",
             severity="error",
-            file="sessions/fail/session.yaml",
+            file="instances/sessions/fail/session.yaml",
             field="status",
             message="status 'nonsense' is not in SessionStatus",
         )
@@ -224,7 +224,7 @@ def test_hook_handles_notebook_path(tmp_path: Path) -> None:
     """`tool_input.notebook_path` is treated like `file_path`."""
     _write_minimal_project(tmp_path)
     runner = CliRunner()
-    sess_dir = tmp_path / "sessions" / "nb"
+    sess_dir = tmp_path / "instances" / "sessions" / "nb"
     sess_dir.mkdir(parents=True)
     sess_path = sess_dir / "session.yaml"
     sess_path.write_text("---\n", encoding="utf-8")
@@ -250,7 +250,7 @@ def test_hook_swallows_internal_exception(tmp_path: Path) -> None:
     """validate_project raising an unexpected exception → exit 0 silent."""
     _write_minimal_project(tmp_path)
     runner = CliRunner()
-    sess_dir = tmp_path / "sessions" / "boom"
+    sess_dir = tmp_path / "instances" / "sessions" / "boom"
     sess_dir.mkdir(parents=True)
     sess_path = sess_dir / "session.yaml"
     sess_path.write_text("---\n", encoding="utf-8")
@@ -268,7 +268,7 @@ def test_hook_timeout_exits_silent(tmp_path: Path) -> None:
     """Validation that takes >timeout seconds → exit 0 silent."""
     _write_minimal_project(tmp_path)
     runner = CliRunner()
-    sess_dir = tmp_path / "sessions" / "slow"
+    sess_dir = tmp_path / "instances" / "sessions" / "slow"
     sess_dir.mkdir(parents=True)
     sess_path = sess_dir / "session.yaml"
     sess_path.write_text("---\n", encoding="utf-8")

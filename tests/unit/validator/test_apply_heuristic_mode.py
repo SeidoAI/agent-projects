@@ -31,7 +31,7 @@ def _ctx(tmp_path: Path) -> ValidationContext:
 def _heuristic_finding(
     code: str = "stale_concept/referenced",
     message: str = "node X is stale",
-    file: str = "nodes/x.yaml",
+    file: str = "instances/nodes/x.yaml",
 ) -> CheckResult:
     return CheckResult(code=code, severity="warning", message=message, file=file)
 
@@ -63,7 +63,7 @@ def test_surface_writes_marker_for_heuristic_finding(tmp_path: Path):
     )
     # Heuristic for stale_concept is entity=node — no entity match in the
     # empty context, so falls back to the path-hash uuid.
-    expected_uuid = f"path:{condition_hash('nodes/x.yaml')}"
+    expected_uuid = f"path:{condition_hash('instances/nodes/x.yaml')}"
     assert has_marker(tmp_path, MarkerKey("v_stale_concept", expected_uuid, chash))
 
 
@@ -86,7 +86,7 @@ def test_quiet_suppresses_finding_with_existing_marker(tmp_path: Path):
     chash = condition_hash(
         finding.code, finding.message, finding.file or "", finding.field or ""
     )
-    expected_uuid = f"path:{condition_hash('nodes/x.yaml')}"
+    expected_uuid = f"path:{condition_hash('instances/nodes/x.yaml')}"
     write_marker(tmp_path, MarkerKey("v_stale_concept", expected_uuid, chash))
 
     out = _apply_heuristic_mode(
@@ -174,7 +174,7 @@ def test_as_tripwires_ignores_existing_marker(tmp_path: Path):
     chash = condition_hash(
         finding.code, finding.message, finding.file or "", finding.field or ""
     )
-    expected_uuid = f"path:{condition_hash('nodes/x.yaml')}"
+    expected_uuid = f"path:{condition_hash('instances/nodes/x.yaml')}"
     write_marker(tmp_path, MarkerKey("v_stale_concept", expected_uuid, chash))
 
     out = _apply_heuristic_mode(
@@ -201,7 +201,7 @@ def test_as_tripwires_does_not_write_markers(tmp_path: Path):
     chash = condition_hash(
         finding.code, finding.message, finding.file or "", finding.field or ""
     )
-    expected_uuid = f"path:{condition_hash('nodes/x.yaml')}"
+    expected_uuid = f"path:{condition_hash('instances/nodes/x.yaml')}"
     key = MarkerKey("v_stale_concept", expected_uuid, chash)
 
     assert not has_marker(tmp_path, key)
@@ -226,7 +226,7 @@ def test_project_singleton_uuid_for_project_scoped_heuristic(tmp_path: Path):
     finding = _heuristic_finding(
         code="sequence_drift/out_of_order",
         message="sequence drifted",
-        file="issues/X-1/issue.yaml",
+        file="instances/issues/X-1/issue.yaml",
     )
     _apply_heuristic_mode(
         [finding], project_dir=tmp_path, ctx=_ctx(tmp_path), mode="surface"
@@ -256,7 +256,7 @@ def test_entity_uuid_resolves_from_loaded_entity(tmp_path: Path):
     ctx = _ctx(tmp_path)
     ctx.nodes.append(
         LoadedEntity(
-            rel_path="nodes/x.yaml",
+            rel_path="instances/nodes/x.yaml",
             raw_frontmatter={"uuid": "node-uuid-1"},
             body="",
             model=None,

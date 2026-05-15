@@ -40,8 +40,8 @@ def _ws(**kw) -> WatchedSession:
         "pt_branch": "proj/s1",
         "pt_pr_number": None,
         "required_artifacts": [
-            "sessions/s1/self-review.md",
-            "sessions/s1/insights.yaml",
+            "instances/sessions/s1/self-review.md",
+            "instances/sessions/s1/insights.yaml",
         ],
         "session_status": "executing",
     }
@@ -178,7 +178,7 @@ def test_pt_pr_missing_artifact_emits_comment_and_reengage():
 
     def fetch_pr_files(repo, pr_number, token=None):
         if pr_number == 99:
-            return [{"filename": "sessions/s1/self-review.md"}]
+            return [{"filename": "instances/sessions/s1/self-review.md"}]
         return []
 
     watcher = PRWatcher(fetch_pr=fetch_pr, fetch_pr_files=fetch_pr_files)
@@ -190,7 +190,7 @@ def test_pt_pr_missing_artifact_emits_comment_and_reengage():
         and a.tripwire_id == "watcher/pt_pr_missing_artifacts"
     ]
     assert len(comments) == 1
-    assert "sessions/s1/insights.yaml" in comments[0].body
+    assert "instances/sessions/s1/insights.yaml" in comments[0].body
     assert comments[0].pr_number == 99
     assert comments[0].repo == "ExampleOrg/example-project"
     assert any(isinstance(a, ReengageAgent) for a in actions)
@@ -206,8 +206,8 @@ def test_pt_pr_complete_artifacts_no_action():
     def fetch_pr_files(repo, pr_number, token=None):
         if pr_number == 99:
             return [
-                {"filename": "sessions/s1/self-review.md"},
-                {"filename": "sessions/s1/insights.yaml"},
+                {"filename": "instances/sessions/s1/self-review.md"},
+                {"filename": "instances/sessions/s1/insights.yaml"},
             ]
         return []
 
@@ -228,7 +228,7 @@ def test_pt_pr_missing_artifact_fires_once_per_pr():
         return _state(state="open", merged=False)
 
     def fetch_pr_files(repo, pr_number, token=None):
-        return [{"filename": "sessions/s1/self-review.md"}]
+        return [{"filename": "instances/sessions/s1/self-review.md"}]
 
     watcher = PRWatcher(fetch_pr=fetch_pr, fetch_pr_files=fetch_pr_files)
     first = watcher.tick([ws], now=now)

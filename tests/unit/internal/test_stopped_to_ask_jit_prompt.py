@@ -43,7 +43,7 @@ def _seed_session(
     *,
     key_files: list[str],
 ) -> None:
-    sdir = project_dir / "sessions" / session_id
+    sdir = project_dir / "instances" / "sessions" / session_id
     sdir.mkdir(parents=True, exist_ok=True)
     body = {
         "id": session_id,
@@ -60,7 +60,7 @@ def _seed_session(
 
 
 def _seed_plan(project_dir: Path, session_id: str, body: str) -> None:
-    artifacts = project_dir / "sessions" / session_id / "artifacts"
+    artifacts = project_dir / "instances" / "sessions" / session_id / "artifacts"
     artifacts.mkdir(parents=True, exist_ok=True)
     (artifacts / "plan.md").write_text(body, encoding="utf-8")
 
@@ -71,7 +71,7 @@ def _seed_comment(
     name: str,
     body: dict,
 ) -> None:
-    comments_dir = project_dir / "sessions" / session_id / "comments"
+    comments_dir = project_dir / "instances" / "sessions" / session_id / "comments"
     comments_dir.mkdir(parents=True, exist_ok=True)
     (comments_dir / f"{name}.yaml").write_text(
         yaml.safe_dump(body, sort_keys=False), encoding="utf-8"

@@ -34,7 +34,7 @@ from tripwire.models.session import (
 
 def test_telemetry_path_lives_under_sessions(tmp_path: Path) -> None:
     """Telemetry log lives at ``<project>/sessions/.routing_telemetry.jsonl``."""
-    expected = tmp_path / "sessions" / ".routing_telemetry.jsonl"
+    expected = tmp_path / "instances" / "sessions" / ".routing_telemetry.jsonl"
     assert telemetry_path(tmp_path) == expected
 
 
@@ -174,7 +174,10 @@ def test_complete_session_appends_routing_row(
     save_test_session(
         tmp_path_project,
         session_id="sx",
-        status="in_review",
+        # v0.13: only ``verified → completed`` is declared in the
+        # conftest workflow; start the session there so the executor
+        # can route the close-out transition.
+        status="verified",
         spawn_config=SpawnConfig(
             config={"task_kind": "agentic_loop", "model": "opus", "effort": "xhigh"}
         ),

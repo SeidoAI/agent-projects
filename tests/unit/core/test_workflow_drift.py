@@ -250,7 +250,7 @@ def test_drift_detects_unexpected_transition(tmp_path: Path) -> None:
     pd = _project_dir(tmp_path)
     # Last transition.completed was queued → executing. session.yaml
     # claims status: completed (skipping in_review and verified).
-    sessions_dir = pd / "sessions" / "test-session"
+    sessions_dir = pd / "instances" / "sessions" / "test-session"
     sessions_dir.mkdir(parents=True)
     (sessions_dir / "session.yaml").write_text(
         "---\n"

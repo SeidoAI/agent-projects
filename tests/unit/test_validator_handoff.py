@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def _write_session_yaml(project_dir: Path, session_id: str, status: str) -> None:
-    sess = project_dir / "sessions" / session_id
+    sess = project_dir / "instances" / "sessions" / session_id
     sess.mkdir(parents=True)
     (sess / "session.yaml").write_text(
         f"""---
@@ -48,7 +48,7 @@ def test_handoff_schema_branch_format(tmp_project_manifest):
 
     project_dir = tmp_project_manifest([])
     _write_session_yaml(project_dir, "session-x", "queued")
-    handoff = project_dir / "sessions" / "session-x" / "handoff.yaml"
+    handoff = project_dir / "instances" / "sessions" / "session-x" / "handoff.yaml"
     handoff.write_text(
         """---
 uuid: 22222222-2222-4222-8222-222222222222
@@ -69,7 +69,7 @@ def test_handoff_schema_valid_handoff_no_findings(tmp_project_manifest):
 
     project_dir = tmp_project_manifest([])
     _write_session_yaml(project_dir, "session-x", "queued")
-    handoff = project_dir / "sessions" / "session-x" / "handoff.yaml"
+    handoff = project_dir / "instances" / "sessions" / "session-x" / "handoff.yaml"
     handoff.write_text(
         """---
 uuid: 33333333-3333-4333-8333-333333333333

@@ -31,19 +31,21 @@ def _redirect_audit_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
 
 @pytest.fixture
 def project_with_transitions(tmp_path_project: Path):
-    """Overlay a project.yaml with a realistic status_transitions map."""
+    """Overlay project.yaml + workflow.yaml so the issue-closure routes
+    drive the realistic queued → executing → in_review → completed flow
+    this module exercises.
+
+    v0.13.1 (B8): the legacy ``project.yaml.status_transitions`` block
+    no longer exists; the workflow.yaml's ``issue-closure`` routes are
+    the source of truth. This fixture writes both so the mutation
+    service can resolve transitions via the workflow.
+    """
     data: dict[str, Any] = {
         "name": "tmp",
         "key_prefix": "TMP",
         "next_issue_number": 1,
         "next_session_number": 1,
         "statuses": ["queued", "executing", "in_review", "completed"],
-        "status_transitions": {
-            "queued": ["executing"],
-            "executing": ["in_review", "queued"],
-            "in_review": ["completed", "executing"],
-            "completed": [],
-        },
         "label_categories": {
             "executor": [],
             "verifier": [],
@@ -53,6 +55,41 @@ def project_with_transitions(tmp_path_project: Path):
     }
     (tmp_path_project / "project.yaml").write_text(
         yaml.safe_dump(data, sort_keys=False), encoding="utf-8"
+    )
+    # Workflow with only the routes this module's tests exercise.
+    _routes = [
+        ("queued", "executing"),
+        ("executing", "in_review"),
+        ("executing", "queued"),
+        ("in_review", "completed"),
+        ("in_review", "executing"),
+    ]
+    routes_yaml = "".join(
+        f"      - id: issue-{f}-to-{t}\n"
+        f"        actor: pm-agent\n"
+        f"        from: {f}\n"
+        f"        to: {t}\n"
+        f"        kind: forward\n"
+        for f, t in _routes
+    )
+    (tmp_path_project / "workflow.yaml").write_text(
+        "workflow_schema_version: 1\n"
+        "workflows:\n"
+        "  issue-closure:\n"
+        "    actor: pm-agent\n"
+        "    trigger: command.pm-issue-close\n"
+        "    instance:\n"
+        "      storage_path: instances/issues/{instance_id}/issue.yaml\n"
+        "      status_field: status\n"
+        "      status_enum: [queued, executing, in_review, completed]\n"
+        "    statuses:\n"
+        "      - id: queued\n"
+        "      - id: executing\n"
+        "      - id: in_review\n"
+        "      - id: completed\n"
+        "        terminal: true\n"
+        "    routes:\n" + routes_yaml,
+        encoding="utf-8",
     )
     return tmp_path_project
 

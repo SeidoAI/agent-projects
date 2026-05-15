@@ -24,14 +24,21 @@ class JitPromptContext:
     project_dir: Path
     session_id: str
     project_id: str
+    workflow_id: str = "coding-session"
 
     def ack_path(self, jit_prompt_id: str) -> Path:
-        """Marker file path for an ack from this context."""
-        return (
-            self.project_dir
-            / ".tripwire"
-            / "acks"
-            / f"{jit_prompt_id}-{self.session_id}.json"
+        """Marker file path for an ack from this context.
+
+        Marker names are keyed by (workflow, instance, prompt) so each
+        workflow's acks are namespaced. Today the only firing workflow
+        is ``coding-session`` (the context's default)."""
+        from tripwire.core import paths
+
+        return paths.ack_marker_path(
+            self.project_dir,
+            self.workflow_id,
+            self.session_id,
+            jit_prompt_id,
         )
 
     def variation_index(self, n_variations: int) -> int:

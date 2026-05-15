@@ -40,7 +40,7 @@ def _scaffold(tmp_path: Path) -> Path:
         ),
         encoding="utf-8",
     )
-    sd = tmp_path / "sessions" / "demo"
+    sd = tmp_path / "instances" / "sessions" / "demo"
     sd.mkdir(parents=True)
     (sd / "session.yaml").write_text(
         "---\nid: demo\nstatus: in_review\n---\n", encoding="utf-8"
@@ -94,7 +94,7 @@ def test_pr_status_no_review_yet(tmp_path):
         "repos: {}\nnext_issue_number: 1\nnext_session_number: 1\n",
         encoding="utf-8",
     )
-    sd = tmp_path / "sessions" / "demo"
+    sd = tmp_path / "instances" / "sessions" / "demo"
     sd.mkdir(parents=True)
     (sd / "session.yaml").write_text(
         "---\nid: demo\nstatus: in_review\n---\n", encoding="utf-8"

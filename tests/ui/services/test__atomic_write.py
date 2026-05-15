@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tripwire.core.jsonl_log import append_jsonl
 from tripwire.ui.services._atomic_write import (
-    append_jsonl,
     atomic_write_text,
     atomic_write_yaml,
 )
@@ -88,11 +88,13 @@ class TestAppendJsonl:
         assert target.is_file()
 
     def test_encodes_non_json_values_as_strings(self, tmp_path: Path):
-        """datetimes and other non-JSON types coerce via ``default=str``."""
+        """datetimes and other non-JSON types coerce when caller passes
+        ``default=str``. (v0.13.1: the helper no longer bakes in
+        ``default=str`` — each caller picks its dumps options.)"""
         from datetime import datetime, timezone
 
         target = tmp_path / "audit.jsonl"
         moment = datetime(2026, 4, 14, 12, 0, 0, tzinfo=timezone.utc)
-        append_jsonl(target, {"when": moment})
+        append_jsonl(target, {"when": moment}, default=str)
         record = json.loads(target.read_text(encoding="utf-8"))
         assert record["when"].startswith("2026-04-14")
