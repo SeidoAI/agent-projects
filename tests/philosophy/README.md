@@ -19,13 +19,12 @@ to add a forbidden pattern.
 End-to-end behaviour tests. Each test maps to one philosophy claim.
 The docstring names the section. The body proves it.
 
-Example claims that need a test:
+Claims currently covered:
 
 - §9: "Agents extend tripwire by editing YAML. No Python knowledge
   needed." → `test_custom_workflow_lifecycle.py`
-- §3: "Tripwires don't auto-create inbox entries." → a route layer test
-- §9: "`tripwire validate` is the single accountability surface." → a
-  test that hits every workflow's invariants via one `validate` call
+- §9: "`tripwire validate` is the single accountability surface." →
+  `test_validate_is_single_accountability_surface.py`
 
 ### `architecture/` — fitness functions
 
@@ -33,12 +32,24 @@ Tests that scan the **source code itself** for forbidden patterns.
 They don't run the system — they grep, parse, or AST-walk the tree
 and assert structural invariants.
 
-Examples:
+Claims currently covered:
 
-- No direct `instance.status = …` assignment outside `transitions.py`
-- No `script:` / `cmd:` / `exec:` keys in `workflow.yaml.j2`
-- No `Path.write_text(...)` for files that should use atomic helpers
-- Every workflow in `workflow.yaml.j2` declares an `instance:` block
+- §9 C1-C3: No direct `instance.status = SomeEnum.…` outside the
+  executor → `test_single_writer_guarantee.py`
+- §9: No imperative keys (`script:`, `cmd:`, `exec:`, `if:`, …) and
+  no script bodies in `command:` values; every workflow has an
+  `instance:` block → `test_no_imperative_in_workflow_yaml.py`
+- §9 rule 3: No new per-workflow Python class scaffolding — model
+  files are frozen to the allowlisted set →
+  `test_no_per_workflow_python_class.py`
+- §6: PM agent is the only inbox author; framework code does not
+  write to `inbox/<id>.md` → `test_pm_only_inbox_authoring.py`
+- §3 + §6: Validators don't reference the inbox authoring surface →
+  `test_validators_do_not_write_inbox.py`
+- §6: The HTTP route layer has no POST-create for inbox →
+  `test_inbox_route_has_no_post_create.py`
+- §7: Audit log writes go through the atomic helper, never raw
+  `write_text` → `test_audit_log_uses_atomic_helpers.py`
 
 These prevent agent drift at the source — an agent that adds a
 forbidden pattern is caught immediately, not after a behaviour

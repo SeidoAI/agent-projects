@@ -127,6 +127,98 @@ def _scenario_missing_instance(project_dir):
     }
 
 
+def _scenario_workflow_without_instance_block(project_dir):
+    """Workflow declared without an ``instance:`` block — the executor
+    can't materialise on-disk state and must surface that loud.
+    """
+    no_instance = {
+        "release-tracking": {
+            "actor": "pm-agent",
+            "trigger": "release.declare",
+            # …no `instance:` block.
+            "statuses": [
+                {"id": "drafting"},
+                {"id": "published", "terminal": True},
+            ],
+            "routes": [
+                {
+                    "id": "drafting-to-published",
+                    "actor": "pm-agent",
+                    "from": "drafting",
+                    "to": "published",
+                    "kind": "forward",
+                }
+            ],
+        }
+    }
+    write_workflow_yaml(project_dir, no_instance)
+    return {
+        "workflow_id": "release-tracking",
+        "instance_id": "anything",
+        "target_status": "published",
+    }
+
+
+def _scenario_trap_status_workflow(project_dir):
+    """A non-terminal status with an inbound route but no outbound is
+    a "trap" — work that enters can't leave. The transition gate (via
+    the workflow tripwire) catches it.
+
+    Note the fixture shape: ``dead_end`` has an inbound (from
+    ``drafting``) so it doesn't trip ``workflow/unreachable_status``,
+    and ``published`` has its own inbound (from ``drafting``) so the
+    terminal status is reachable. The ONLY remaining issue is
+    ``dead_end`` having no outbound while being non-terminal — pure
+    trap.
+    """
+    trap_workflow = {
+        "release-tracking": {
+            "actor": "pm-agent",
+            "trigger": "release.declare",
+            "instance": {
+                "storage_path": "instances/releases/{instance_id}/release.yaml",
+                "status_field": "status",
+                "status_enum": ["drafting", "dead_end", "published"],
+                "required_fields": ["id", "status"],
+                "instance_id_field": "id",
+            },
+            "statuses": [
+                {"id": "drafting"},
+                {"id": "dead_end"},  # non-terminal, no outbound = trap
+                {"id": "published", "terminal": True},
+            ],
+            "routes": [
+                {
+                    "id": "drafting-to-dead-end",
+                    "actor": "pm-agent",
+                    "from": "drafting",
+                    "to": "dead_end",
+                    "kind": "forward",
+                },
+                {
+                    "id": "drafting-to-published",
+                    "actor": "pm-agent",
+                    "from": "drafting",
+                    "to": "published",
+                    "kind": "forward",
+                },
+            ],
+        }
+    }
+    write_workflow_yaml(project_dir, trap_workflow)
+    write_instance_file(
+        project_dir,
+        "instances/releases/{instance_id}/release.yaml",
+        "v1.0",
+        {"id": "v1.0", "status": "drafting"},
+    )
+    return {
+        "workflow_id": "release-tracking",
+        "instance_id": "v1.0",
+        "target_status": "dead_end",
+    }
+
+
 # ----- the matrix ------------------------------------------------------------
 #
 # Each row: (scenario name, setup callable, expectation kind, expected match).
@@ -167,6 +259,18 @@ MATRIX: list[MatrixRow] = [
         _scenario_missing_instance,
         "raises",
         "not found",
+    ),
+    (
+        "workflow without instance block",
+        _scenario_workflow_without_instance_block,
+        "raises",
+        "instance",  # error mentions the missing instance shape
+    ),
+    (
+        "trap status (non-terminal, no outbound)",
+        _scenario_trap_status_workflow,
+        "rejects",
+        "trap_status",
     ),
 ]
 
