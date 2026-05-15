@@ -95,15 +95,12 @@ def reachable_statuses(
     if not transitions:
         return set(declared_statuses or [])
 
-    start = (
-        DEFAULT_START_STATE
-        if DEFAULT_START_STATE in transitions
-        else (
-            (declared_statuses[0] if declared_statuses else DEFAULT_START_STATE)
-            if declared_statuses
-            else DEFAULT_START_STATE
-        )
-    )
+    if DEFAULT_START_STATE in transitions:
+        start = DEFAULT_START_STATE
+    elif declared_statuses:
+        start = declared_statuses[0]
+    else:
+        start = DEFAULT_START_STATE
 
     reachable: set[str] = {start}
     queue: deque[str] = deque([start])

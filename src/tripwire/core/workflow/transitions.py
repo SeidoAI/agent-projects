@@ -55,7 +55,7 @@ from pathlib import Path
 from typing import Any
 
 from tripwire.core import paths
-from tripwire.core.events.log import emit_event, read_events
+from tripwire.core.events.log import emit_event, isoformat_z, read_events
 from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.session_store import load_session, save_session
 from tripwire.core.workflow.instance_io import (
@@ -202,10 +202,6 @@ class TransitionResult:
 
 class TransitionError(Exception):
     """Raised for unrecoverable input errors (unknown session/status)."""
-
-
-def _isoformat_z(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _resolve_workflow(spec: WorkflowSpec, workflow_id: str) -> Workflow:
@@ -510,7 +506,7 @@ def _run_gate(
         session["current_status_instance"] = status_instance
         # ``updated_at`` is conventional but optional on dict instances —
         # write an ISO string so YAML round-trips cleanly.
-        session["updated_at"] = _isoformat_z(when)
+        session["updated_at"] = isoformat_z(when)
     else:
         session.current_status_instance = status_instance
         session.updated_at = when

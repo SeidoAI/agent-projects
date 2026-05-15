@@ -87,50 +87,51 @@ def append_audit_record(
     flags: dict,
     now: datetime | None = None,
 ) -> None:
-    """Append a JSON line to ``.tripwire/audit.jsonl``. Best-effort.
+    """Append a JSON line to ``.tripwire/audit.jsonl``.
 
     ``flags["action"]`` overrides the default ``transition`` action
     (e.g. ``session_reopen`` writes ``action: session_reopen``).
-    """
-    try:
-        from tripwire.core.session_reopen import _audit_path
-        from tripwire.ui.services._atomic_write import append_jsonl
 
-        when = now or datetime.now(tz=timezone.utc)
-        audit = _audit_path(project_dir)
-        audit.parent.mkdir(parents=True, exist_ok=True)
-        append_jsonl(
-            audit,
-            {
-                "timestamp": when.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "action": flags.get("action", "transition"),
-                "session_id": session.id,
-                "route_id": route.id,
-                "from_status": from_status,
-                "to_status": route.to_ref,
-                "reason": flags.get("reason"),
-            },
-        )
-    except Exception:
-        pass
+    Exceptions propagate. The executor wraps each post-write hook in a
+    logged try/except — swallowing here too would silently hide bugs.
+    """
+    from tripwire.core.events.log import isoformat_z
+    from tripwire.core.session_reopen import _audit_path
+    from tripwire.ui.services._atomic_write import append_jsonl
+
+    when = now or datetime.now(tz=timezone.utc)
+    audit = _audit_path(project_dir)
+    audit.parent.mkdir(parents=True, exist_ok=True)
+    append_jsonl(
+        audit,
+        {
+            "timestamp": isoformat_z(when),
+            "action": flags.get("action", "transition"),
+            "session_id": session.id,
+            "route_id": route.id,
+            "from_status": from_status,
+            "to_status": route.to_ref,
+            "reason": flags.get("reason"),
+        },
+    )
 
 
 def append_telemetry_record(project_dir: Path, *, session: AgentSession) -> None:
-    """Append a routing-telemetry row. Best-effort; telemetry must never
-    block a transition. ``close_active_engagement`` must run first so
-    ``duration_min`` derives from a closed engagement on terminals."""
-    try:
-        from tripwire.core.routing_telemetry import (
-            append_telemetry_row,
-            build_telemetry_row,
-        )
-        from tripwire.core.session_cost import compute_session_cost
+    """Append a routing-telemetry row. ``close_active_engagement`` must
+    run first so ``duration_min`` derives from a closed engagement on
+    terminals.
 
-        cost = compute_session_cost(project_dir, session.id).total_usd
-        row = build_telemetry_row(project_dir, session, cost_usd=cost)
-        append_telemetry_row(project_dir, row)
-    except Exception:
-        pass
+    Exceptions propagate. The executor's wrapper logs and continues.
+    """
+    from tripwire.core.routing_telemetry import (
+        append_telemetry_row,
+        build_telemetry_row,
+    )
+    from tripwire.core.session_cost import compute_session_cost
+
+    cost = compute_session_cost(project_dir, session.id).total_usd
+    row = build_telemetry_row(project_dir, session, cost_usd=cost)
+    append_telemetry_row(project_dir, row)
 
 
 def reset_acks_if_requested(

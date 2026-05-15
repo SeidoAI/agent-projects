@@ -46,8 +46,14 @@ def events_dir(project_dir: Path) -> Path:
     return project_dir / EVENTS_DIRNAME
 
 
-def _isoformat_z(dt: datetime) -> str:
+def isoformat_z(dt: datetime) -> str:
+    """Canonical UTC timestamp format used across events, audit log, and telemetry."""
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# Backwards-compat alias for any internal caller that still references the
+# private name. Prefer ``isoformat_z`` for new code.
+_isoformat_z = isoformat_z
 
 
 def _today_filename(now: datetime) -> str:

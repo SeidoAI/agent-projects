@@ -35,8 +35,6 @@ a single dict.
 
 from __future__ import annotations
 
-import os
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -49,6 +47,7 @@ from tripwire.core.parser import (
 )
 from tripwire.core.workflow.loader import load_workflows
 from tripwire.core.workflow.schema import Workflow, WorkflowInstanceShape
+from tripwire.ui.services._atomic_write import atomic_write_text
 
 
 class WorkflowMissingInstanceBlockError(LookupError):
@@ -119,35 +118,6 @@ def _render_storage_path(
             f"unsupported placeholder; only {{instance_id}} is recognised"
         )
     return project_dir / rendered
-
-
-def _atomic_write_text(path: Path, text: str) -> None:
-    """Write *text* to *path* via a same-directory tmp file + ``os.replace``.
-
-    Mirrors :func:`tripwire.ui.services._atomic_write.atomic_write_text`
-    so the v0.13 executor primitives don't reach into a UI module. The
-    pattern is the classic write-to-temp + rename: ``os.replace`` is
-    guaranteed atomic on POSIX and on NTFS (Python 3.3+), so a concurrent
-    reader either sees the prior file or the complete new one.
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-        dir=str(path.parent),
-    )
-    try:
-        with os.fdopen(fd, "wb") as fh:
-            fh.write(text.encode("utf-8"))
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.replace(tmp_name, path)
-    except BaseException:
-        try:
-            os.unlink(tmp_name)
-        except FileNotFoundError:
-            pass
-        raise
 
 
 def _parse_instance_text(text: str) -> dict[str, Any]:
@@ -240,7 +210,7 @@ def save_instance(
     """
     _, shape = _resolve_instance_shape(project_dir, workflow_id)
     path = _render_storage_path(project_dir, shape, instance_id)
-    _atomic_write_text(path, _serialise_instance_data(data))
+    atomic_write_text(path, _serialise_instance_data(data))
 
 
 def list_instances(project_dir: Path, workflow_id: str) -> list[str]:

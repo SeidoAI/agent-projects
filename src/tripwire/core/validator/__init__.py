@@ -799,11 +799,6 @@ ALL_CHECKS = [
 _DEFAULT_VALIDATE_SESSION_ID = "_cli_validate"
 
 
-def _isoformat_z(dt: datetime) -> str:
-    """RFC-3339 / ISO-8601 with `Z` suffix — matches the events spec."""
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def _emit_check_result(
     *,
     emitter: EventEmitter,
@@ -823,12 +818,13 @@ def _emit_check_result(
     """
     if isinstance(emitter, NullEmitter):
         return
+    from tripwire.core.events.log import isoformat_z
     from tripwire.core.workflow.registry import validator_id_for
 
     validator_id = validator_id_for(check_fn)
     slug = validator_id.removeprefix("v_")
     has_error = any(r.severity == "error" for r in results)
-    fired_at = _isoformat_z(datetime.now(timezone.utc))
+    fired_at = isoformat_z(datetime.now(timezone.utc))
     kind = "validator_fail" if has_error else "validator_pass"
     event_id = f"evt-{fired_at}-{kind}-{slug}-{session_id}"
     payload: dict[str, Any] = {
