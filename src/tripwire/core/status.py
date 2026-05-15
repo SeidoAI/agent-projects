@@ -1,17 +1,13 @@
-"""Issue-status reachability — workflow-driven (v0.13.1 / B8).
+"""Issue-status reachability — workflow-driven.
 
-Previously this module computed reachability from
-``project.yaml.status_transitions`` — a hand-rolled adjacency table. The
-v0.13.1 promotion moves that contract into the ``issue-closure`` workflow
-declared in ``workflow.yaml``. Reachability now consults the workflow's
-declared ``instance.status_enum`` (legal status values) and its ``routes``
-(legal transitions between them).
+Reachability consults the ``issue-closure`` workflow declared in
+``workflow.yaml``: its ``instance.status_enum`` (legal status values)
+and its ``routes`` (legal transitions between them).
 
-The functions retain their pre-v0.13.1 signatures so the structure
+Callers build the adjacency map once via :func:`build_issue_transitions`
+and pass it into the predicate / reachability helpers — the structure
 validator (``check_status_transitions``) and the UI mutation service
-keep working. They now take an explicit transitions map sourced from
-the workflow, which the caller builds once via
-:func:`build_issue_transitions`.
+both rely on this shape.
 """
 
 from __future__ import annotations
@@ -36,8 +32,8 @@ def build_issue_transitions(project_dir: Path) -> dict[str, list[str]]:
     """Return ``{from_status: [to_status, ...]}`` from the issue-closure workflow.
 
     Reads ``workflow.yaml``'s ``issue-closure`` workflow declaration and
-    collapses its ``routes:`` block into the legacy adjacency-list shape
-    so the rest of this module can stay route-table-shaped.
+    collapses its ``routes:`` block into an adjacency-list so the rest
+    of this module can stay route-table-shaped.
 
     Routes whose endpoints are boundary ports (``source:...`` /
     ``sink:...``) are skipped — they aren't status-to-status edges.

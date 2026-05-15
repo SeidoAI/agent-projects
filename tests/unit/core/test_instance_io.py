@@ -211,3 +211,135 @@ class TestListInstances:
         # Stray subdir with no demo.yaml inside.
         (tmp_path / "instances" / "demos" / "stray").mkdir(parents=True)
         assert list_instances(tmp_path, "demo") == ["real"]
+
+
+# ---------------------------------------------------------------------------
+# Pre-resolved workflow short-circuit (KUI: redundant-parse elimination)
+# ---------------------------------------------------------------------------
+
+
+class TestPreResolvedWorkflow:
+    """The ``workflow=`` kwarg lets a caller pay for ``load_workflows``
+    once and reuse the result. The executor uses this to avoid 3-5
+    redundant ``workflow.yaml`` parses per transition.
+    """
+
+    def test_load_instance_with_pre_resolved_workflow_skips_load_workflows(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_workflow_simple(tmp_path)
+        save_instance(tmp_path, "demo", "d1", {"id": "d1", "status": "planned"})
+
+        # Resolve the workflow once.
+        from tripwire.core.workflow import instance_io as io_mod
+        from tripwire.core.workflow.loader import load_workflows
+
+        spec = load_workflows(tmp_path)
+        workflow = spec.workflows["demo"]
+
+        calls = {"n": 0}
+
+        def _spy(project_dir):
+            calls["n"] += 1
+            return spec
+
+        monkeypatch.setattr(io_mod, "load_workflows", _spy)
+
+        # Threading the pre-resolved workflow should NOT call
+        # load_workflows again.
+        loaded = load_instance(tmp_path, "demo", "d1", workflow=workflow)
+        assert loaded == {"id": "d1", "status": "planned"}
+        assert calls["n"] == 0
+
+    def test_save_instance_with_pre_resolved_workflow_skips_load_workflows(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_workflow_simple(tmp_path)
+
+        from tripwire.core.workflow import instance_io as io_mod
+        from tripwire.core.workflow.loader import load_workflows
+
+        spec = load_workflows(tmp_path)
+        workflow = spec.workflows["demo"]
+
+        calls = {"n": 0}
+
+        def _spy(project_dir):
+            calls["n"] += 1
+            return spec
+
+        monkeypatch.setattr(io_mod, "load_workflows", _spy)
+
+        save_instance(
+            tmp_path,
+            "demo",
+            "d1",
+            {"id": "d1", "status": "planned"},
+            workflow=workflow,
+        )
+        assert calls["n"] == 0
+        # And the file was actually written.
+        assert (tmp_path / "instances" / "demos" / "d1" / "demo.yaml").is_file()
+
+    def test_list_instances_with_pre_resolved_workflow_skips_load_workflows(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _write_workflow_simple(tmp_path)
+        # Pre-seed an instance.
+        save_instance(tmp_path, "demo", "d1", {"id": "d1", "status": "planned"})
+
+        from tripwire.core.workflow import instance_io as io_mod
+        from tripwire.core.workflow.loader import load_workflows
+
+        spec = load_workflows(tmp_path)
+        workflow = spec.workflows["demo"]
+
+        calls = {"n": 0}
+
+        def _spy(project_dir):
+            calls["n"] += 1
+            return spec
+
+        monkeypatch.setattr(io_mod, "load_workflows", _spy)
+
+        ids = list_instances(tmp_path, "demo", workflow=workflow)
+        assert ids == ["d1"]
+        assert calls["n"] == 0
+
+    def test_load_instance_without_workflow_falls_back_to_resolve(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Backwards compat: callers that don't pass ``workflow=`` hit
+        the original resolve path (one ``load_workflows`` call)."""
+        _write_workflow_simple(tmp_path)
+        save_instance(tmp_path, "demo", "d1", {"id": "d1", "status": "planned"})
+
+        from tripwire.core.workflow import instance_io as io_mod
+        from tripwire.core.workflow.loader import load_workflows
+
+        real_loader = load_workflows
+        calls = {"n": 0}
+
+        def _spy(project_dir):
+            calls["n"] += 1
+            return real_loader(project_dir)
+
+        monkeypatch.setattr(io_mod, "load_workflows", _spy)
+
+        loaded = load_instance(tmp_path, "demo", "d1")
+        assert loaded == {"id": "d1", "status": "planned"}
+        assert calls["n"] == 1
+
+    def test_mismatched_pre_resolved_workflow_raises(self, tmp_path: Path) -> None:
+        """Passing a workflow whose id doesn't match ``workflow_id`` is a
+        caller bug — surface it loudly rather than silently using the
+        wrong shape."""
+        _write_workflow_simple(tmp_path)
+
+        from tripwire.core.workflow.loader import load_workflows
+
+        spec = load_workflows(tmp_path)
+        workflow = spec.workflows["demo"]
+
+        with pytest.raises(WorkflowNotFoundError):
+            load_instance(tmp_path, "different-id", "d1", workflow=workflow)

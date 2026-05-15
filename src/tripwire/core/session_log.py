@@ -3,7 +3,7 @@
 Reads ``.tripwire/events/jit_prompt_firings/<sid>/*.json`` (written by
 ``FileEmitter`` from the registry) and joins each entry against the
 per-JIT-prompt ack marker at
-``.tripwire/acks/<workflow>-<sid>-<prompt_id>.json`` (v0.13.1).
+``.tripwire/acks/<workflow>-<sid>-<prompt_id>.json``.
 
 The CLI wrapper at ``cli/session.py:session_log_cmd`` calls
 :func:`enumerate_fires` and renders each :class:`FireEntry` to stdout.

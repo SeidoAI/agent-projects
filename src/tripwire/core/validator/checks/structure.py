@@ -140,10 +140,8 @@ def _section(body: str, heading: str) -> str | None:
 def check_status_transitions(ctx: ValidationContext) -> list[CheckResult]:
     """Every issue's status must be reachable via the issue-closure workflow.
 
-    v0.13.1 (B8): reachability is now derived from ``workflow.yaml``'s
-    ``issue-closure`` workflow routes — the hand-rolled
-    ``project.yaml.status_transitions`` table this used to consult was
-    deleted.
+    Reachability is derived from ``workflow.yaml``'s ``issue-closure``
+    workflow routes.
 
     Projects without an ``issue-closure`` workflow get the
     "trivially reachable" fallback (every declared status counts), so
@@ -390,7 +388,7 @@ def check_instance_shape_conforms(ctx: ValidationContext) -> list[CheckResult]:
         shape = workflow.instance
         if shape is None:
             # Missing-block warning is owned by the workflow validator;
-            # silently skip per the v0.13.1 design.
+            # silently skip here to avoid double-reporting.
             continue
         try:
             instance_ids = list_instances(ctx.project_dir, workflow_id)

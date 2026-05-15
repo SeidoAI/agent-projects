@@ -1,4 +1,4 @@
-# Per-project workflow definitions (v0.13 schema).
+# Per-project workflow definitions.
 #
 # Routes are the single source of structural arrows. Status nodes
 # declare territory (artifacts produced/consumed, controls fired on
@@ -10,12 +10,12 @@
 # Conditional triggers are equality only (`==`, `!=`). Predicate
 # fields are dot-paths into the workflow context.
 #
-# v0.13.1 adds the `instance:` block on every workflow, declaring the
-# runtime instance shape (storage path, status field, status enum,
-# required fields). `tripwire validate` enforces these contracts
-# uniformly. Only `coding-session` is executor-driven today; the other
-# workflow declarations are reference shapes for the PM-conversational
-# routes catalogued in `docs/WORKFLOW_ACTIONS.md`.
+# Each workflow carries an `instance:` block declaring the runtime
+# instance shape (storage path, status field, status enum, required
+# fields). `tripwire validate` enforces these contracts uniformly.
+# Only `coding-session` is executor-driven today; the other workflow
+# declarations are reference shapes for the PM-conversational routes
+# catalogued in `docs/WORKFLOW_ACTIONS.md`.
 
 workflow_schema_version: 1
 
@@ -544,7 +544,7 @@ workflows:
           - remove_worktrees
 
   # ------------------------------------------------------------------
-  # Reference-only workflows (no executor coverage in v0.13).
+  # Reference-only workflows (no executor coverage).
   #
   # The blocks below declare the PM/review/ops process shape so
   # `tripwire validate` can lint them and the renderer can draw them.

@@ -111,20 +111,18 @@ DEFINITIONAL_NODE_TYPES: frozenset[str] = frozenset(
 
 
 class NodeStatus(StrEnum):
-    """Legal values of ``ConceptNode.status`` (v0.13.1 / B9).
+    """Legal values of ``ConceptNode.status``.
 
     Aligned with the ``concept-freshness`` workflow's
     ``instance.status_enum`` declaration in ``workflow.yaml.j2``. The
-    pre-v0.13.1 values (``planned``, ``deprecated``) were collapsed:
-    the lifecycle is now ``active → stale → archived``, with no
-    pre-active state (nodes start ``active``) and no separate
-    ``deprecated`` (rolled into ``archived``).
+    lifecycle is ``active → stale → archived``: nodes start ``active``
+    (no pre-active state) and ``archived`` is the only terminal state
+    (no separate ``deprecated``).
 
-    Existing nodes carrying a removed value (e.g. ``deprecated``) fail
-    to load on upgrade with a clear pydantic ValidationError pointing
-    at the file. Project migration handles the remap manually for now
-    — v0.13.1 does not auto-migrate. ``tripwire migrate storage`` may
-    grow a remapper in a follow-up.
+    Nodes carrying a value outside this enum fail to load with a
+    pydantic ValidationError pointing at the file. There is no
+    auto-migration; manual remap is expected when adopting this enum
+    on an older project.
     """
 
     ACTIVE = "active"

@@ -156,10 +156,9 @@ def classify(
     if rel_posix == "project.yaml":
         return _event(project_id, "project", "config", action, rel_posix)
 
-    # v0.13.1: entity files live under `instances/<type>/...`.  The
-    # legacy top-level patterns (e.g. `issues/<KEY>/issue.yaml`) are
-    # gone; callers expect the new prefix. Strip the first segment so
-    # the parts[1:] checks below mirror the historical structure.
+    # Entity files live under `instances/<type>/...`. Strip the
+    # `instances/` prefix so the parts[1:] checks below operate on the
+    # `<type>/<id>/...` tail directly.
     if parts and parts[0] == "instances":
         sub = parts[1:]
         sub_suffix = suffix

@@ -1,6 +1,6 @@
 """Inline post-write hooks invoked by the workflow executor.
 
-The v0.13 executor is an atomic primitive — no side-effect registry, no
+The executor is an atomic primitive — no side-effect registry, no
 dispatch. ``execute_transition`` calls four best-effort hooks here
 inline after the status write: close engagement, audit, telemetry,
 reset acks. External effects (sweep, rebase, kill, draft flips, PR

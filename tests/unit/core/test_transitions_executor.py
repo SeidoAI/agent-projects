@@ -587,3 +587,138 @@ def test_project_config_carries_current_status_instance_field() -> None:
     assert config.current_status_instance is None
     config.current_status_instance = "phase-advancement:t:scoped:1"
     assert config.current_status_instance == "phase-advancement:t:scoped:1"
+
+
+def test_executor_resolves_workflow_once(
+    project_with_workflow: Path, fake_validate, monkeypatch
+) -> None:
+    """``execute_transition`` must parse ``workflow.yaml`` exactly once.
+
+    Pre-refactor: pre-lock load, in-lock load, save, and (optionally) the
+    engagement-close save each called ``load_workflows`` via the generic
+    dict loader — 3-5 parses per transition. The executor now threads
+    the pre-resolved :class:`Workflow` through ``_load_workflow_instance``
+    and ``_save_workflow_instance`` so the single parse at the top of
+    :func:`execute_transition` is the only one.
+
+    The coding-session path round-trips through the typed session store
+    (not :func:`load_instance`), so for this path the only loader call
+    is the executor's own at the top. We assert that, and pair it with a
+    parallel non-coding-session check in the second body of the test.
+    """
+    from tripwire.core.workflow import transitions as transitions_mod
+    from tripwire.core.workflow.transitions import execute_transition
+
+    real_loader = transitions_mod.load_workflows
+    calls = {"n": 0}
+
+    def _spy(project_dir):
+        calls["n"] += 1
+        return real_loader(project_dir)
+
+    monkeypatch.setattr(transitions_mod, "load_workflows", _spy)
+
+    result = execute_transition(
+        project_with_workflow,
+        instance_id="test-session",
+        target_status="queued",
+    )
+    assert result.ok is True
+    # Exactly one parse: the executor's own at the top.
+    assert calls["n"] == 1, (
+        f"expected load_workflows to be called once per transition, got {calls['n']}"
+    )
+
+
+def test_executor_resolves_workflow_once_for_dict_instance(
+    tmp_path: Path, fake_validate, monkeypatch
+) -> None:
+    """As above, but for a non-coding-session workflow whose instance
+    round-trips through the generic dict loader/saver. This is the path
+    where pre-refactor we paid for 3+ ``load_workflows`` calls:
+    pre-lock ``load_instance`` (1), in-lock ``load_instance`` (1), and
+    the final ``save_instance`` (1). All three must now reuse the
+    pre-resolved workflow.
+    """
+    # Plant a minimal dict-backed workflow with one route + one instance.
+    (tmp_path / "project.yaml").write_text(
+        "name: test\nkey_prefix: TST\nbase_branch: main\nstatuses: [planned]\n"
+        "status_transitions:\n  planned: []\nrepos: {}\nnext_issue_number: 1\n"
+        "next_session_number: 1\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              demo:
+                actor: pm-agent
+                trigger: demo.start
+                instance:
+                  storage_path: instances/demos/{instance_id}/demo.yaml
+                  status_field: status
+                  status_enum: [planned, queued]
+                  required_fields: [id, status]
+                statuses:
+                  - id: planned
+                  - id: queued
+                    terminal: true
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    kind: forward
+            """
+        ),
+        encoding="utf-8",
+    )
+    instance_dir = tmp_path / "instances" / "demos" / "d1"
+    instance_dir.mkdir(parents=True)
+    (instance_dir / "demo.yaml").write_text(
+        "id: d1\nstatus: planned\n", encoding="utf-8"
+    )
+
+    from tripwire.core.workflow import transitions as transitions_mod
+    from tripwire.core.workflow.transitions import execute_transition
+
+    real_loader = transitions_mod.load_workflows
+    calls = {"n": 0}
+
+    def _spy(project_dir):
+        calls["n"] += 1
+        return real_loader(project_dir)
+
+    monkeypatch.setattr(transitions_mod, "load_workflows", _spy)
+
+    # Also patch the loader as seen by instance_io — that's the module
+    # we're guarding against re-parsing. A pre-resolved workflow should
+    # mean instance_io never reaches the spy.
+    from tripwire.core.workflow import instance_io as io_mod
+
+    io_calls = {"n": 0}
+
+    def _io_spy(project_dir):
+        io_calls["n"] += 1
+        return real_loader(project_dir)
+
+    monkeypatch.setattr(io_mod, "load_workflows", _io_spy)
+
+    result = execute_transition(
+        tmp_path,
+        workflow_id="demo",
+        instance_id="d1",
+        target_status="queued",
+    )
+    assert result.ok is True
+    # The executor parses workflow.yaml exactly once at the top.
+    assert calls["n"] == 1, (
+        f"expected transitions.load_workflows to be called once, got {calls['n']}"
+    )
+    # And instance_io must NOT re-parse it — the pre-resolved workflow
+    # is threaded through every load/save.
+    assert io_calls["n"] == 0, (
+        f"expected instance_io.load_workflows to be called zero times when "
+        f"executor threads a pre-resolved workflow, got {io_calls['n']}"
+    )

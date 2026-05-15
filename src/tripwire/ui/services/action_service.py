@@ -325,10 +325,10 @@ def pause_session(project_dir: Path, session_id: str) -> SessionResult:
         now = datetime.now(tz=timezone.utc)
         pid = session.runtime_state.pid
         if pid and not is_alive(pid):
-            # v0.13: route through the workflow executor — sole writer
-            # of ``session.status``. UI pause path does not auto-run
-            # prep helpers; killing processes / closing PRs is an
-            # explicit user action elsewhere.
+            # Route through the workflow executor — sole writer of
+            # ``session.status``. UI pause path does not auto-run prep
+            # helpers; killing processes / closing PRs is an explicit
+            # user action elsewhere.
             try:
                 transition = execute_transition(
                     project_dir,

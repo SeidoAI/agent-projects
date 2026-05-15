@@ -29,10 +29,9 @@ class JitPromptContext:
     def ack_path(self, jit_prompt_id: str) -> Path:
         """Marker file path for an ack from this context.
 
-        v0.13.1: the marker name is keyed by (workflow, instance,
-        prompt) so each workflow's acks are namespaced. Today the
-        only firing workflow is ``coding-session`` (the context's
-        default)."""
+        Marker names are keyed by (workflow, instance, prompt) so each
+        workflow's acks are namespaced. Today the only firing workflow
+        is ``coding-session`` (the context's default)."""
         from tripwire.core import paths
 
         return paths.ack_marker_path(

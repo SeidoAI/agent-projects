@@ -262,11 +262,10 @@ class ProjectConfig(BaseModel):
     repos: dict[str, RepoEntry] = Field(default_factory=dict)
 
     statuses: list[str] = Field(default_factory=list)
-    # v0.13.1 (B8): the hand-rolled `status_transitions:` state machine
-    # was deleted. Issue transitions now travel through the workflow
-    # executor against the ``issue-closure`` workflow's routes declared
-    # in ``workflow.yaml``. See ``tripwire transition issue-closure
-    # <key> <target>``.
+    # Issue transitions travel through the workflow executor against
+    # the ``issue-closure`` workflow's routes declared in
+    # ``workflow.yaml``. See ``tripwire transition issue-closure <key>
+    # <target>``.
 
     label_categories: LabelCategories = Field(default_factory=LabelCategories)
 
@@ -281,16 +280,15 @@ class ProjectConfig(BaseModel):
     next_issue_number: int = 1
     next_session_number: int = 1
 
-    # Workflow phase — drives phase-aware validation checks. As of
-    # v0.13.1 (B10) the project itself is the runtime instance of the
-    # ``phase-advancement`` workflow; this field is the workflow's
-    # ``status_field``. Legal values match its ``instance.status_enum``
-    # (scoping, scoped, executing, reviewing) — enforced by
-    # ``ProjectPhase``.
+    # Workflow phase — drives phase-aware validation checks. The
+    # project is the runtime instance of the ``phase-advancement``
+    # workflow; this field is the workflow's ``status_field``. Legal
+    # values match its ``instance.status_enum`` (scoping, scoped,
+    # executing, reviewing) — enforced by ``ProjectPhase``.
     phase: ProjectPhase = ProjectPhase.scoping
 
-    # v0.13.1 (B10): workflow status-instance id for the
-    # ``phase-advancement`` workflow, format
+    # Workflow status-instance id for the ``phase-advancement``
+    # workflow, format
     # ``phase-advancement:{project.name}:{phase}:{n}``. Bumped by the
     # executor each time the project enters a new phase; absent on
     # projects that have not yet transitioned through the executor

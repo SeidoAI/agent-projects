@@ -1152,19 +1152,19 @@ def session_reopen_cmd(
     """Move a completed session back to ``paused`` for PR-fix iteration.
 
     Thin wrapper — see :func:`tripwire.core.session_reopen.reopen_session`
-    for the side-effect contract. v0.13: the ready→draft PR flip moved
-    to the Layer-1 ``tripwire session flip-drafts-draft`` command; we
-    invoke it in-process here before calling the lifecycle helper so the
-    end-to-end CLI behaviour is preserved.
+    for the side-effect contract. The ready→draft PR flip is a separate
+    Layer-1 command (``tripwire session flip-drafts-draft``); we invoke
+    it in-process here before calling the lifecycle helper so the
+    end-to-end CLI behaviour is single-command.
     """
     from tripwire.core.session_reopen import reopen_session
 
     resolved = project_dir.expanduser().resolve()
     _require_project(resolved)
 
-    # v0.13 in-process prep: flip recorded draft PRs ready → draft. The
-    # daemon paths skip this; the CLI wrapper does it to preserve the
-    # pre-v0.13 user-facing surface.
+    # In-process prep: flip recorded draft PRs ready → draft. The daemon
+    # paths skip this; the CLI wrapper does it so a single command does
+    # the user-visible work.
     try:
         session_for_prep = load_session(resolved, session_id)
     except FileNotFoundError as exc:
@@ -2151,12 +2151,11 @@ def session_complete_cmd(
                 click.echo(prompt)
             raise SystemExit(1)
 
-    # v0.13: pre-flight side-effects that used to run inline inside
-    # ``complete_session()`` — flip drafts to ready, sweep member issues
-    # forward. The agent procedure now runs ``tripwire session
-    # prepare-for-completion`` as a separate step; do the same work
-    # in-process here so the ``tripwire session complete`` CLI behaviour
-    # is preserved end-to-end. Skipped in dry-run (no mutations).
+    # Pre-flight side-effects: flip drafts to ready, sweep member
+    # issues forward. The agent procedure runs ``tripwire session
+    # prepare-for-completion`` as a separate step; we replay the same
+    # work in-process here so the ``tripwire session complete`` CLI
+    # behaviour is single-command. Skipped in dry-run (no mutations).
     sweep_closed: list[str] = []
     if not dry_run:
         try:
@@ -2840,7 +2839,7 @@ def session_insights_reject_cmd(
 
 
 # ----------------------------------------------------------------------
-# v0.13 Layer-1 wrappers around side-effect handler bodies.
+# Layer-1 wrappers around side-effect handler bodies.
 # ----------------------------------------------------------------------
 #
 # These commands let an operator replay one side-effect at a time
@@ -3247,7 +3246,7 @@ def session_followup_stub_cmd(session_id: str, reason: str, project_dir: Path) -
 
 
 # ----------------------------------------------------------------------
-# v0.13 Layer-2 chained commands.
+# Layer-2 chained commands.
 # ----------------------------------------------------------------------
 #
 # These compose the Layer-1 wrappers above into the "common combos" an
@@ -3504,13 +3503,12 @@ def session_sweep_issues_forward_cmd(session_id: str, project_dir: Path) -> None
     are no-ops; off-path issues (``deferred``, ``abandoned``) are left
     alone — same contract as the ``sweep_issues_forward`` side-effect.
 
-    Approach (b) per the v0.13 step-3 spec: shell out to
-    ``tripwire transition issue-closure <key> <target>`` per issue. As
-    of v0.13.1 the executor accepts non-coding-session workflows via the
-    generic instance loader, so this shell-out now resolves cleanly — no
-    more "session not found" stub failures. Exit code is inherited
-    per-issue: any non-zero subprocess exit becomes a structured
-    per-issue rejection in the summary.
+    Approach: shell out to ``tripwire transition issue-closure <key>
+    <target>`` per issue. The executor accepts non-coding-session
+    workflows via the generic instance loader, so each invocation
+    routes through the same write path as the per-issue commands.
+    Exit code is inherited per-issue: any non-zero subprocess exit
+    becomes a structured per-issue rejection in the summary.
     """
     from tripwire.core.status_contract import sweep_target_for
 

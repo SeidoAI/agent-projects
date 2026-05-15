@@ -10,10 +10,10 @@ re-engage the agent. Side-effects (each best-effort):
   ``$TRIPWIRE_LOG_DIR/<project-slug>/audit.jsonl`` (or
   ``~/.tripwire/logs/...`` when unset) recording the reason + timestamp.
 
-v0.13: The ``ready→draft`` flip for recorded draft PRs is now a
-separate Layer-1 step (``tripwire session flip-drafts-draft``), which
-the CLI wrapper invokes before this helper. Ack reset is fired by the
-executor's ``reset_acks_if_requested`` post-write hook (via the
+The ``ready→draft`` flip for recorded draft PRs is a separate Layer-1
+step (``tripwire session flip-drafts-draft``) that the CLI wrapper
+invokes before this helper. Ack reset is fired by the executor's
+``reset_acks_if_requested`` post-write hook (via the
 ``flags['reset_acks']`` flag).
 
 The CLI wrapper at ``cli/session.py:session_reopen_cmd`` parses args,
@@ -43,9 +43,8 @@ class ReopenResult:
     audit_path: Path
     plan_updated: bool
     draft_prs_flipped: list[str] = field(default_factory=list)
-    # KUI-137 (B3): count of `.tripwire/acks/*-<sid>.json` markers
-    # deleted when the caller passed `reset_acks=True`. Always 0 in
-    # the default-flag case.
+    # Count of `.tripwire/acks/*-<sid>.json` markers deleted when the
+    # caller passed `reset_acks=True`. Always 0 in the default-flag case.
     acks_reset_count: int = 0
 
 
@@ -77,10 +76,10 @@ def reopen_session(
             f"'completed' to reopen"
         )
 
-    # v0.13: the ready→draft flip moved to the Layer-1 CLI
-    # ``tripwire session flip-drafts-draft``; the CLI wrapper for
-    # reopen invokes it before us. Keep an empty list so the result
-    # shape is unchanged for the CLI's summary block.
+    # The ready→draft flip lives in Layer-1
+    # ``tripwire session flip-drafts-draft``; the reopen CLI wrapper
+    # invokes it before us. Keep an empty list so the result shape
+    # matches what the CLI's summary block expects.
     flipped: list[str] = []
 
     # Append a `## PM follow-up` stub to plan.md when missing so the
@@ -126,7 +125,7 @@ def reopen_session(
             )
             plan_updated = True
 
-    # v0.13: status flip goes through ``execute_transition`` — the sole
+    # The status flip routes through ``execute_transition`` — the sole
     # writer of ``session.status``. The executor's post-write hooks
     # take care of the audit log row (``action`` and ``reason`` come
     # from the flags below) so we don't write a separate row here.
@@ -173,9 +172,9 @@ def reopen_session(
 def _reset_session_acks(project_dir: Path, session_id: str, reason: str) -> int:
     """Delete `<project_dir>/.tripwire/acks/<workflow>-<session_id>-*.json` markers.
 
-    v0.13.1 the marker name is keyed by (workflow, instance, prompt);
-    matching by the ``-<session_id>-`` infix selects every prompt's
-    ack across all workflows for this instance.
+    Marker names are keyed by (workflow, instance, prompt); matching by
+    the ``-<session_id>-`` infix selects every prompt's ack across all
+    workflows for this instance.
 
     Returns the count of markers deleted. Also emits one
     ``session_acks_reset`` event (skipped when zero markers existed —
@@ -194,7 +193,7 @@ def _reset_session_acks(project_dir: Path, session_id: str, reason: str) -> int:
             # session id must be the middle segment, sandwiched
             # between two hyphens. An infix substring match is enough
             # because workflow ids and prompt ids never embed dashes
-            # adjacent to the session id boundary in v0.13.1.
+            # adjacent to the session id boundary.
             if infix in marker.name:
                 try:
                     marker.unlink()

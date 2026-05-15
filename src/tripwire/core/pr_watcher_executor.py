@@ -190,9 +190,10 @@ class WatcherActionExecutor:
     # --- handlers -------------------------------------------------------
 
     def _do_transition(self, action: TransitionStatus) -> None:
-        # Pre-check session existence so the warning message matches
-        # the pre-v0.13 contract ("session file not found" rather than
-        # the executor's structured TransitionError).
+        # Pre-check session existence so the warning message is the
+        # plain "session file not found" rather than the executor's
+        # structured TransitionError (the daemon's caller expects the
+        # bare form).
         try:
             load_session(self.project_dir, action.session_id)
         except FileNotFoundError:
@@ -201,7 +202,7 @@ class WatcherActionExecutor:
                 action.session_id,
             )
             return
-        # v0.13: route through the workflow executor — sole writer of
+        # Route through the workflow executor — sole writer of
         # ``session.status``. The daemon path is a dumb status flip
         # driven by observed PR state and does NOT run prep helpers
         # (flip drafts, sweep issues, kill runtime, etc.) — the agent /

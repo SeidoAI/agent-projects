@@ -1,4 +1,4 @@
-"""Typed schema for ``workflow.yaml`` (v0.13).
+"""Typed schema for ``workflow.yaml``.
 
 The shape:
 
@@ -49,8 +49,9 @@ Four-primitive control model (locked):
 - ``jit_prompt`` — hidden ack-required prompt
 - ``prompt_check`` — required slash-command invocation
 
-Routes are the SINGLE source of structural arrows; ``statuses[].next:``
-is removed in v0.13. Terminal-ness is an explicit boolean on the status.
+Routes are the SINGLE source of structural arrows; there is no
+``statuses[].next:`` field. Terminal-ness is an explicit boolean on
+the status.
 
 The schema lives here as plain dataclasses (not Pydantic) — the loader
 parses raw YAML into these structures so we control coercion and
@@ -96,18 +97,16 @@ class WorkflowStatusArtifacts:
 
 @dataclass(frozen=True)
 class WorkflowInstanceShape:
-    """Declared instance shape for a workflow (v0.13.1).
+    """Declared instance shape for a workflow.
 
     Each workflow's runtime instances (sessions, issues, scoping runs,
     etc.) live somewhere on disk and carry a status field. This block
     declares that contract so ``tripwire validate`` can enforce it
     uniformly across every workflow.
 
-    ``storage_path`` is the disk layout for an instance file. It is a
-    string template with ``{instance_id}`` substituted at runtime; in
-    v0.13 the path uses the current flat layout (e.g.
-    ``sessions/{instance_id}/session.yaml``). Step 7a rewrites these
-    to ``instances/<type>/``.
+    ``storage_path`` is the disk layout for an instance file — a string
+    template with ``{instance_id}`` substituted at runtime (e.g.
+    ``instances/sessions/{instance_id}/session.yaml``).
 
     ``status_field`` is the dot-path of the status field on the
     instance model. ``status_enum`` enumerates the legal values.
@@ -116,7 +115,7 @@ class WorkflowInstanceShape:
     names the field that holds the id used to render ``storage_path``;
     almost always ``id``.
 
-    The block is optional in v0.13.1 — a missing block surfaces a
+    The block is currently optional — a missing block surfaces a
     ``workflow/instance_missing`` warning but doesn't fail load. It
     becomes mandatory in v0.14.
     """
@@ -206,7 +205,7 @@ class WorkflowRouteEmits:
 
 @dataclass(frozen=True)
 class WorkflowRouteTrigger:
-    """Typed trigger for a route (v0.13).
+    """Typed trigger for a route.
 
     ``type`` is one of ``command``, ``event``, ``runtime_event``, or
     ``condition``. ``name`` is the typed handle (e.g. command id or
@@ -233,8 +232,8 @@ class WorkflowRoute:
     loop to wire dispatch routes back to their source signals.
 
     ``preserve_fields`` / ``clear_fields`` / ``side_effects`` /
-    ``rollback`` are the v0.13 executor contract: the dispatcher reads
-    them to drive the transition.
+    ``rollback`` are the executor contract: the dispatcher reads them
+    to drive the transition.
     """
 
     id: str
@@ -294,7 +293,7 @@ class WorkflowFinding:
 
 @dataclass(frozen=True)
 class WorkflowSpec:
-    """The parsed contents of ``workflow.yaml`` (v0.13).
+    """The parsed contents of ``workflow.yaml``.
 
     Empty (``workflows == {}``) when the file is missing or absent.
 
@@ -452,10 +451,9 @@ def _check_cross_links(spec: WorkflowSpec) -> list[WorkflowFinding]:
 
 def _check_workflow(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
     out: list[WorkflowFinding] = []
-    # v0.13.1: workflows should declare an `instance:` block describing
-    # the runtime instance shape (storage path, status field, status
-    # enum). Missing is a warning in v0.13.1 for back-compat; mandatory
-    # in v0.14.
+    # Workflows should declare an `instance:` block describing the
+    # runtime instance shape (storage path, status field, status enum).
+    # Missing is currently a warning for back-compat; mandatory in v0.14.
     if wf.instance is None:
         out.append(
             WorkflowFinding(
@@ -467,7 +465,7 @@ def _check_workflow(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
                     f"workflow {wf_id!r} declares no `instance:` block — "
                     f"add storage_path, status_field, status_enum so "
                     f"`tripwire validate` can enforce instance shape "
-                    f"(warning in v0.13.1, mandatory in v0.14)"
+                    f"(currently a warning; mandatory in v0.14)"
                 ),
             )
         )
@@ -600,8 +598,8 @@ def _check_trap_statuses(wf_id: str, wf: Workflow) -> list[WorkflowFinding]:
     out: list[WorkflowFinding] = []
     declared = {s.id for s in wf.statuses}
     # Track outbound routes by kind. Revert-kind exits from a terminal
-    # status are the documented v0.13 reopen pattern (completed → paused)
-    # — they do not violate terminal-ness.
+    # status are the documented reopen pattern (completed → paused) —
+    # they do not violate terminal-ness.
     has_outbound: dict[str, bool] = dict.fromkeys(declared, False)
     has_non_revert_outbound: dict[str, bool] = dict.fromkeys(declared, False)
     for route in wf.routes:

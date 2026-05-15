@@ -301,8 +301,8 @@ def comment_id_from_rel_path(rel_path: str) -> str | None:
         return None
     # Strip the canonical ISSUES_PREFIX so the issue key is the first
     # remaining segment regardless of how many ancestors that prefix
-    # contains. v0.13.1 the prefix is `instances/issues/` (two
-    # segments); pre-v0.13.1 it was `issues/` (one segment).
+    # contains. The prefix is `instances/issues/` (two segments) under
+    # the current layout.
     relative = rel_path[len(ISSUES_PREFIX) :]
     sub_parts = Path(relative).parts
     if len(sub_parts) < 3:

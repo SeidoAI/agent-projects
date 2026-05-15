@@ -553,13 +553,13 @@ def migrate_status_values_cmd(project_dir: Path, dry_run: bool) -> None:
 
 
 # ---------------------------------------------------------------------------
-# storage migration — move pre-v0.13.1 flat entity dirs under `instances/`
+# storage migration — move flat entity dirs under `instances/`
 # ---------------------------------------------------------------------------
 
 # Source (flat) → destination (under `instances/`) mapping for the
-# v0.13.1 layout cutover. Each entry is a top-level directory whose
-# entire subtree relocates wholesale. The docs/issues/* directories
-# merge into the corresponding `instances/issues/<KEY>/docs/` subtree.
+# layout cutover. Each entry is a top-level directory whose entire
+# subtree relocates wholesale. The docs/issues/* directories merge
+# into the corresponding `instances/issues/<KEY>/docs/` subtree.
 _STORAGE_TOP_RENAMES: tuple[tuple[str, str], ...] = (
     ("sessions", paths.SESSIONS_DIR),  # → instances/sessions
     ("issues", paths.ISSUES_DIR),  # → instances/issues
@@ -605,10 +605,9 @@ def _migrate_issue_docs(
 ) -> None:
     """Relocate ``docs/issues/<KEY>/*`` → ``instances/issues/<KEY>/docs/*``.
 
-    Pre-v0.13.1 PM agents wrote developer.md / verified.md / comments/
-    under ``docs/issues/<KEY>/`` (per the CLAUDE.md convention). Those
-    files now live under ``instances/issues/<KEY>/docs/`` alongside the
-    canonical issue.yaml.
+    Older PM agents wrote developer.md / verified.md / comments/ under
+    ``docs/issues/<KEY>/``. Those files now live under
+    ``instances/issues/<KEY>/docs/`` alongside the canonical issue.yaml.
 
     For each ``docs/issues/<KEY>/*`` source entry, move the entry into
     the issue's ``docs/`` subdir. Existing files at the destination are
@@ -649,12 +648,12 @@ def _migrate_lock_acks(
     is_git_repo: bool,
     moved: list[tuple[str, str]],
 ) -> None:
-    """Rename transition lockfiles + ack markers to the v0.13.1 scheme.
+    """Rename transition lockfiles + ack markers to the workflow-namespaced scheme.
 
-    Pre-v0.13.1: ``.tripwire/locks/transition-<sid>.lock`` and
-    ``.tripwire/acks/<prompt>-<sid>.json``. Post: lock gets a workflow
-    segment (always ``coding-session`` for migrating projects, the
-    only firing workflow today); ack swaps the order to put workflow
+    Old shape: ``.tripwire/locks/transition-<sid>.lock`` and
+    ``.tripwire/acks/<prompt>-<sid>.json``. New shape: lock gets a
+    workflow segment (always ``coding-session`` for migrating projects,
+    the only firing workflow today); ack swaps the order to put workflow
     first. Both directories live entirely under ``.tripwire/`` which
     is gitignored, so plain ``shutil.move`` is appropriate — git
     needn't track these renames.
@@ -700,14 +699,13 @@ def _migrate_lock_acks(
             # coding-session.
             if stem.startswith("coding-session-"):
                 continue
-            # Pre-v0.13.1 name shape: ``<prompt>-<sid>.json``. We don't
-            # know where prompt ends and sid begins from the filename
-            # alone (both may contain hyphens). The pre-cutover
-            # convention is `<prompt>-<sid>` where both segments are
-            # opaque strings. We migrate by lifting the entire stem
-            # into the new shape ``coding-session-<stem>.json`` — the
-            # readers do exact filename match so the migration is
-            # only required to be consistent, not parseable.
+            # Old name shape: ``<prompt>-<sid>.json``. We don't know
+            # where prompt ends and sid begins from the filename alone
+            # (both may contain hyphens) — both segments are opaque
+            # strings. Migrate by lifting the entire stem into the new
+            # shape ``coding-session-<stem>.json`` — readers do exact
+            # filename match so the migration is only required to be
+            # consistent, not parseable.
             #
             # A better cutover would require an external list of sids
             # to disambiguate; in practice every prompt id is shorter
@@ -750,7 +748,7 @@ def _migrate_lock_acks(
     ),
 )
 def migrate_storage_cmd(project_dir: Path, yes: bool, skip_validate: bool) -> None:
-    """Move a pre-v0.13.1 project to the consolidated `instances/` layout.
+    """Move a project to the consolidated `instances/` layout.
 
     Relocates the entity directories:
 
@@ -760,7 +758,7 @@ def migrate_storage_cmd(project_dir: Path, yes: bool, skip_validate: bool) -> No
       nodes/               → instances/nodes/
       docs/issues/<KEY>/*  → instances/issues/<KEY>/docs/*
 
-    And renames runtime markers under .tripwire/ to the v0.13.1 names:
+    And renames runtime markers under .tripwire/ to the workflow-namespaced names:
 
       \b
       .tripwire/locks/transition-<sid>.lock
@@ -776,8 +774,8 @@ def migrate_storage_cmd(project_dir: Path, yes: bool, skip_validate: bool) -> No
     validation fails, prints findings and exits non-zero. Does NOT
     auto-roll-back — recommend ``git reset --hard`` to undo.
 
-    Idempotent: a project already on the v0.13.1 layout exits 0 with
-    "nothing to migrate".
+    Idempotent: a project already on the consolidated layout exits 0
+    with "nothing to migrate".
     """
     project_dir = project_dir.expanduser().resolve()
     if not (project_dir / "project.yaml").is_file():
@@ -788,9 +786,9 @@ def migrate_storage_cmd(project_dir: Path, yes: bool, skip_validate: bool) -> No
 
     is_git_repo = (project_dir / ".git").exists()
 
-    # Detect pre-v0.13.1 layout via the presence of any top-level
-    # entity dir. If none present, the project is already migrated
-    # (or never had any entities) — exit 0.
+    # Detect the flat layout via the presence of any top-level entity
+    # dir. If none present, the project is already migrated (or never
+    # had any entities) — exit 0.
     pre_layout_present = [
         src_rel
         for src_rel, _dest_rel in _STORAGE_TOP_RENAMES
@@ -817,7 +815,7 @@ def migrate_storage_cmd(project_dir: Path, yes: bool, skip_validate: bool) -> No
         )
         if not has_legacy_lock and not has_legacy_ack:
             click.echo(
-                "Project already on v0.13.1 storage layout — nothing to migrate."
+                "Project already on consolidated storage layout — nothing to migrate."
             )
             return
 
@@ -879,7 +877,7 @@ def migrate_storage_cmd(project_dir: Path, yes: bool, skip_validate: bool) -> No
     # 2. Relocate docs/issues/<KEY>/* → instances/issues/<KEY>/docs/*
     _migrate_issue_docs(project_dir, is_git_repo, moved)
 
-    # 3. Rename transition lockfiles + ack markers to the v0.13.1 scheme.
+    # 3. Rename transition lockfiles + ack markers to workflow-namespaced names.
     _migrate_lock_acks(project_dir, is_git_repo, moved)
 
     # 4. Summary.

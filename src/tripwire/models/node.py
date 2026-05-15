@@ -97,8 +97,8 @@ class ConceptNode(BaseModel):
     related: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
 
-    # v0.13.1 (B9): tightened from free-form ``str`` to ``NodeStatus`` so
-    # the loader rejects values outside the ``concept-freshness`` workflow's
+    # Typed as ``NodeStatus`` (not free-form ``str``) so the loader
+    # rejects values outside the ``concept-freshness`` workflow's
     # declared ``instance.status_enum``. The pydantic load surfaces the
     # offending node file in the ValidationError message.
     status: NodeStatus = NodeStatus.ACTIVE

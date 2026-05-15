@@ -85,7 +85,11 @@ _CODING_SESSION_WORKFLOW_ID = "coding-session"
 
 
 def _load_workflow_instance(
-    project_dir: Path, workflow_id: str, instance_id: str
+    project_dir: Path,
+    workflow_id: str,
+    instance_id: str,
+    *,
+    workflow: Workflow | None = None,
 ) -> Any:
     """Load an instance for *workflow_id*.
 
@@ -94,6 +98,13 @@ def _load_workflow_instance(
     returns a plain dict via :func:`load_instance`. The caller uses
     :func:`_get_status` / :func:`_set_status` to read/write the status
     field uniformly across both shapes.
+
+    *workflow* is the pre-resolved :class:`Workflow` (the executor parses
+    ``workflow.yaml`` once at the top of :func:`execute_transition` and
+    threads the result here). When provided the generic dict loader
+    skips its internal :func:`load_workflows` call — the executor's two
+    instance loads per transition (pre-lock + in-lock) thus reuse the
+    single parse.
 
     Raises :class:`TransitionError` for missing instance files so the
     legacy "session not found" error contract is preserved for the
@@ -106,7 +117,7 @@ def _load_workflow_instance(
         except FileNotFoundError as exc:
             raise TransitionError(f"session {instance_id!r} not found") from exc
     try:
-        return load_instance(project_dir, workflow_id, instance_id)
+        return load_instance(project_dir, workflow_id, instance_id, workflow=workflow)
     except InstanceNotFoundError as exc:
         raise TransitionError(
             f"instance {instance_id!r} for workflow {workflow_id!r} not found"
@@ -120,19 +131,25 @@ def _load_workflow_instance(
 
 
 def _save_workflow_instance(
-    project_dir: Path, workflow_id: str, instance_id: str, obj: Any
+    project_dir: Path,
+    workflow_id: str,
+    instance_id: str,
+    obj: Any,
+    *,
+    workflow: Workflow | None = None,
 ) -> None:
     """Persist an instance loaded by :func:`_load_workflow_instance`.
 
     Mirror of the loader: ``coding-session`` round-trips through the
     typed :func:`save_session`, every other workflow round-trips through
     the generic :func:`save_instance` (writes the dict back to its
-    declared ``storage_path``).
+    declared ``storage_path``). Pass *workflow* to skip the redundant
+    ``workflow.yaml`` parse — see :func:`_load_workflow_instance`.
     """
     if workflow_id == _CODING_SESSION_WORKFLOW_ID:
         save_session(project_dir, obj)
     else:
-        save_instance(project_dir, workflow_id, instance_id, obj)
+        save_instance(project_dir, workflow_id, instance_id, obj, workflow=workflow)
 
 
 def _get_status(obj: Any, workflow: Workflow) -> str:
@@ -285,8 +302,12 @@ def execute_transition(
     # `from_status` field with the caller's perspective. The gate
     # body re-loads inside the lock to evaluate against fresh state
     # (see codex P1 on PR #73 — concurrent transitions could otherwise
-    # both validate against the same stale snapshot).
-    pre_lock_instance = _load_workflow_instance(project_dir, workflow_id, instance)
+    # both validate against the same stale snapshot). Pass the
+    # pre-resolved workflow so the generic dict loader skips re-parsing
+    # ``workflow.yaml``.
+    pre_lock_instance = _load_workflow_instance(
+        project_dir, workflow_id, instance, workflow=workflow
+    )
     pre_lock_status = _get_status(pre_lock_instance, workflow)
 
     # Always emit `transition.requested` first.
@@ -308,8 +329,13 @@ def execute_transition(
             # before the lock could let two concurrent transitions
             # validate against the same source status and both emit
             # `transition.completed`. Fresh read here is the
-            # serialization point.
-            instance_obj = _load_workflow_instance(project_dir, workflow_id, instance)
+            # serialization point. The pre-resolved workflow is still
+            # the right shape: workflow.yaml does not change mid-
+            # transition (per-instance lock has no bearing on the
+            # workflow file), so re-parsing it would be pure waste.
+            instance_obj = _load_workflow_instance(
+                project_dir, workflow_id, instance, workflow=workflow
+            )
             current_status = _get_status(instance_obj, workflow)
             current = statuses_by_id.get(current_status)
             return _run_gate(
@@ -517,7 +543,9 @@ def _run_gate(
             current_value = _read_path(session, path)
             if current_value != prior_value:
                 _write_path(session, path, prior_value)
-    _save_workflow_instance(project_dir, workflow_id, instance, session)
+    _save_workflow_instance(
+        project_dir, workflow_id, instance, session, workflow=workflow
+    )
 
     # 9. Best-effort post-write hooks. None of these may roll back the
     #    transition — the status write above is the commit point. Each
@@ -527,6 +555,7 @@ def _run_gate(
         workflow_id=workflow_id,
         instance_id=instance,
         instance_obj=session,
+        workflow=workflow,
         route=route,
         from_status=current_status,
         flags=flags,
@@ -561,6 +590,7 @@ def _apply_post_write_hooks(
     workflow_id: str,
     instance_id: str,
     instance_obj: Any,
+    workflow: Workflow,
     route: WorkflowRoute,
     from_status: str,
     flags: dict,
@@ -601,7 +631,13 @@ def _apply_post_write_hooks(
             instance_obj, route, now=when
         )
         if engagement_modified:
-            _save_workflow_instance(project_dir, workflow_id, instance_id, instance_obj)
+            _save_workflow_instance(
+                project_dir,
+                workflow_id,
+                instance_id,
+                instance_obj,
+                workflow=workflow,
+            )
     except Exception:
         logger.exception(
             "post-write hook close_active_engagement failed for instance %s",

@@ -71,19 +71,37 @@ class InstanceNotFoundError(FileNotFoundError):
 
 
 def _resolve_instance_shape(
-    project_dir: Path, workflow_id: str
+    project_dir: Path,
+    workflow_id: str,
+    *,
+    workflow: Workflow | None = None,
 ) -> tuple[Workflow, WorkflowInstanceShape]:
     """Return ``(workflow, instance_shape)`` for *workflow_id*.
+
+    If *workflow* is provided the caller has already paid for parsing
+    ``workflow.yaml``; we trust it and skip a redundant
+    :func:`load_workflows` call. The id is still checked to honour the
+    documented error contract: passing a mismatched ``(workflow_id,
+    workflow)`` pair surfaces as :class:`WorkflowNotFoundError` rather
+    than silently using the wrong shape.
 
     Raises :class:`WorkflowNotFoundError` if the workflow id is unknown
     and :class:`WorkflowMissingInstanceBlockError` if the workflow
     declares no ``instance:`` block.
     """
-    spec = load_workflows(project_dir)
-    workflow = spec.workflows.get(workflow_id)
     if workflow is None:
+        spec = load_workflows(project_dir)
+        workflow = spec.workflows.get(workflow_id)
+        if workflow is None:
+            raise WorkflowNotFoundError(
+                f"workflow {workflow_id!r} is not declared in workflow.yaml"
+            )
+    elif workflow.id != workflow_id:
+        # Caller passed a pre-resolved workflow that doesn't match the
+        # id. Don't silently use the wrong shape.
         raise WorkflowNotFoundError(
-            f"workflow {workflow_id!r} is not declared in workflow.yaml"
+            f"pre-resolved workflow has id {workflow.id!r}, "
+            f"caller asked for {workflow_id!r}"
         )
     if workflow.instance is None:
         raise WorkflowMissingInstanceBlockError(
@@ -166,7 +184,11 @@ def _serialise_instance_data(data: dict[str, Any]) -> str:
 
 
 def load_instance(
-    project_dir: Path, workflow_id: str, instance_id: str
+    project_dir: Path,
+    workflow_id: str,
+    instance_id: str,
+    *,
+    workflow: Workflow | None = None,
 ) -> dict[str, Any]:
     """Read a workflow instance's YAML file per its declared storage_path.
 
@@ -175,13 +197,19 @@ def load_instance(
     dict — frontmatter+body files are flattened with the body surfaced
     under the ``body`` key.
 
+    If *workflow* is provided the caller has already parsed
+    ``workflow.yaml`` and we trust the pre-resolved object instead of
+    re-reading the file. This is the hot path for the executor, which
+    parses ``workflow.yaml`` once per transition and threads the result
+    through load/save.
+
     Raises:
         WorkflowNotFoundError: workflow_id not declared in workflow.yaml.
         WorkflowMissingInstanceBlockError: workflow has no ``instance:`` block.
         InstanceNotFoundError: rendered storage path doesn't exist on disk.
         ValueError: file exists but failed to parse.
     """
-    _, shape = _resolve_instance_shape(project_dir, workflow_id)
+    _, shape = _resolve_instance_shape(project_dir, workflow_id, workflow=workflow)
     path = _render_storage_path(project_dir, shape, instance_id)
     if not path.is_file():
         raise InstanceNotFoundError(
@@ -195,6 +223,8 @@ def save_instance(
     workflow_id: str,
     instance_id: str,
     data: dict[str, Any],
+    *,
+    workflow: Workflow | None = None,
 ) -> None:
     """Atomically write a workflow instance's YAML.
 
@@ -204,16 +234,25 @@ def save_instance(
     Markdown half. Without a ``body`` key the dict is dumped as pure
     YAML.
 
+    If *workflow* is provided we skip the redundant
+    :func:`load_workflows` resolution — see :func:`load_instance` for
+    the rationale.
+
     Raises:
         WorkflowNotFoundError: workflow_id not declared in workflow.yaml.
         WorkflowMissingInstanceBlockError: workflow has no ``instance:`` block.
     """
-    _, shape = _resolve_instance_shape(project_dir, workflow_id)
+    _, shape = _resolve_instance_shape(project_dir, workflow_id, workflow=workflow)
     path = _render_storage_path(project_dir, shape, instance_id)
     atomic_write_text(path, _serialise_instance_data(data))
 
 
-def list_instances(project_dir: Path, workflow_id: str) -> list[str]:
+def list_instances(
+    project_dir: Path,
+    workflow_id: str,
+    *,
+    workflow: Workflow | None = None,
+) -> list[str]:
     """Enumerate instance ids for a workflow by walking the storage_path.
 
     The declared ``storage_path`` template (e.g.
@@ -221,6 +260,10 @@ def list_instances(project_dir: Path, workflow_id: str) -> list[str]:
     ``{instance_id}``: the prefix names the parent directory to scan and
     the suffix names the expected child path inside each instance dir.
     An instance is "present" iff the rendered file exists.
+
+    If *workflow* is provided we skip the redundant
+    :func:`load_workflows` resolution — see :func:`load_instance` for
+    the rationale.
 
     Returns a sorted list of instance ids. An empty list is returned
     when the parent directory does not exist (a fresh project before
@@ -231,7 +274,7 @@ def list_instances(project_dir: Path, workflow_id: str) -> list[str]:
         WorkflowMissingInstanceBlockError: workflow has no ``instance:`` block.
         ValueError: storage_path doesn't contain ``{instance_id}``.
     """
-    _, shape = _resolve_instance_shape(project_dir, workflow_id)
+    _, shape = _resolve_instance_shape(project_dir, workflow_id, workflow=workflow)
     template = shape.storage_path
     placeholder = "{instance_id}"
     if placeholder not in template:

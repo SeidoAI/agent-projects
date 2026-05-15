@@ -131,10 +131,9 @@ PR_REVIEW_CHECKS = [
     check_pr_review_code_review_skill,
 ]
 
-# Session-lifecycle (v0.13 — promoted from side-effect handlers): gates
-# the verified → completed route on PR merge, review approval, and the
-# per-issue developer.md / verified.md artifacts that the session's
-# member issues are required to produce.
+# Session-lifecycle: gates the verified → completed route on PR merge,
+# review approval, and the per-issue developer.md / verified.md
+# artifacts that the session's member issues are required to produce.
 SESSION_LIFECYCLE_CHECKS = [
     check_pr_merged_for_session,
     check_pr_review_approved,

@@ -5,12 +5,12 @@ Gates session close-out behind: (a) session in a completable status,
 artifact present, (d) most recent review exit_code ≤ 1. Then transitions
 the session to `completed` via the workflow executor.
 
-v0.7.9 §A4: every gate is mandatory. There are no bypass flags. A
-session that can't pass these gates should be `tripwire session
-abandon`-ed, which is a terminal status that does not claim success.
+Every gate is mandatory — there are no bypass flags. A session that
+can't pass these gates should be `tripwire session abandon`-ed, which
+is a terminal status that does not claim success.
 
-v0.13 (KUI-…): the inline side-effects (flip drafts, sweep issues,
-remove worktrees, append telemetry, close engagement) have moved out:
+Side-effects (flip drafts, sweep issues, remove worktrees, append
+telemetry, close engagement) live elsewhere:
 
 - ``flip_drafts_to_ready`` → Layer-1 CLI ``tripwire session flip-drafts-ready``
   (chained from ``tripwire session prepare-for-completion``).
@@ -20,8 +20,8 @@ remove worktrees, append telemetry, close engagement) have moved out:
   (:func:`tripwire.core.workflow.side_effects.append_telemetry_record`).
 - ``close_active_engagement`` → executor post-write hook.
 
-This helper now: verifies gates, then calls ``execute_transition``
-which is the sole writer of ``session.status``.
+This helper verifies the gates, then calls ``execute_transition`` —
+the sole writer of ``session.status``.
 
 Insights application is out-of-scope here — the PM's
 `/pm-session-complete` runs `tripwire session insights apply/reject`
@@ -69,7 +69,7 @@ def complete_session(
 ) -> CompleteResult:
     """Run the close-out gates then transition the session to `completed`.
 
-    Gates per spec §11.2 (v0.7.9 §A4: no bypass flags):
+    Gates per spec §11.2 (no bypass flags):
       1. Status in {in_review, verified}.
       2. Every worktree branch has a merged PR.
       3. Per-issue required artifacts present.
@@ -79,18 +79,17 @@ def complete_session(
     ``tripwire session abandon`` (terminal status that does not claim
     success), not a bypass flag.
 
-    v0.13: the status flip routes through
+    The status flip routes through
     :func:`tripwire.core.workflow.transitions.execute_transition` (sole
-    writer of ``session.status``). Inline side-effects (flip drafts,
-    sweep issues, worktree cleanup, telemetry, engagement close) have
-    moved out — the executor handles the housekeeping hooks and the
-    agent procedure invokes the Layer-1 CLI wrappers before/after this
-    helper.
+    writer of ``session.status``). Side-effects (flip drafts, sweep
+    issues, worktree cleanup, telemetry, engagement close) live in the
+    executor's post-write hooks and in Layer-1 CLI wrappers invoked
+    before/after this helper.
     """
     session = load_session(project_dir, session_id)
     result = CompleteResult(session_id=session_id)
 
-    # Spec §11.2 step 1 — narrow status gate. `in_progress`, `executing`,
+    # Spec §11.2 — narrow status gate. `in_progress`, `executing`,
     # `active` must go through /pm-session-review first.
     completable = {"in_review", "verified"}
     if session.status not in completable:
@@ -111,8 +110,8 @@ def complete_session(
     if dry_run:
         return result
 
-    # v0.13: route the status flip through the workflow executor — the
-    # sole writer of ``session.status``. Engagement close + telemetry +
+    # Route the status flip through the workflow executor — the sole
+    # writer of ``session.status``. Engagement close + telemetry +
     # audit are post-write hooks fired inside ``execute_transition``.
     from tripwire.core.workflow.transitions import (
         TransitionError,

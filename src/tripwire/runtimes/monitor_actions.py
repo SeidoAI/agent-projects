@@ -151,7 +151,7 @@ class ActionExecutor:
             )
             return
         previous = session.status
-        # v0.13: route through the workflow executor — sole writer of
+        # Route through the workflow executor — sole writer of
         # ``session.status``. The runtime monitor path is a dumb status
         # flip driven by observed runtime state and does NOT run prep
         # helpers — the agent / PM handles those separately.

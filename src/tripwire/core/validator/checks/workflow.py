@@ -114,7 +114,7 @@ def _known_skills(project_dir):  # type: ignore[no-untyped-def]
 
 
 def _known_side_effects() -> set[str]:
-    """Return registered side-effect ids (v0.13)."""
+    """Return registered side-effect ids."""
     from tripwire.core.workflow.side_effects import known_ids
 
     return known_ids()
@@ -123,7 +123,7 @@ def _known_side_effects() -> set[str]:
 def _known_status_field_paths() -> set[str]:
     """Return top-level field names on ``AgentSession``.
 
-    Used by the v0.13 ``workflow/unknown_status_field`` lint to validate
+    Used by the ``workflow/unknown_status_field`` lint to validate
     ``preserve_fields:``/``clear_fields:`` paths. Only the head of each
     dot-path is checked — deep validation against nested Pydantic
     models is left for a future workstream once a real workflow needs

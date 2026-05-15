@@ -9,8 +9,7 @@ Two public entry points:
 
 - :func:`update_issue_status` validates the requested new status against
   the ``issue-closure`` workflow's routes in ``workflow.yaml`` and
-  rejects any transition that isn't a declared edge (v0.13.1 / B8 —
-  the legacy ``project.yaml.status_transitions`` table was removed).
+  rejects any transition that isn't a declared edge.
 - :func:`update_issue_fields` applies a partial
   :class:`IssuePatch` — only non-``None`` fields flow through to disk.
   Status transitions inside a patch still go through the same validator.
@@ -80,11 +79,10 @@ def _validate_transition(
 ) -> None:
     """Raise ``ValueError`` if *new_status* isn't reachable from *current_status*.
 
-    v0.13.1 (B8): the allowed-next-states map is derived from the
-    ``issue-closure`` workflow's routes in ``workflow.yaml`` rather than
-    the deleted ``project.yaml.status_transitions`` table. An empty
-    allowlist for the current state means "no transitions out of this
-    state" via the workflow and blocks every change.
+    The allowed-next-states map is derived from the ``issue-closure``
+    workflow's routes in ``workflow.yaml``. An empty allowlist for the
+    current state means "no transitions out of this state" via the
+    workflow and blocks every change.
     """
     transitions = build_issue_transitions(project_dir)
     allowed = set(transitions.get(current_status, []))

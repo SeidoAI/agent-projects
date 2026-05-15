@@ -1,11 +1,11 @@
-"""Session abandon orchestration (v0.7.9 §A4).
+"""Session abandon orchestration.
 
 `abandoned` is the terminal status that does NOT claim success. It's
 the answer to "this session can't legitimately reach `done`, but I
 need to stop pretending it's still in flight." The framework's two
 terminal states are `done` (passed every gate) and `abandoned`
 (stopped, didn't pass). There is no third "done with caveats" state
-on purpose — that's what spec §A4 is rejecting.
+on purpose.
 
 Behaviour:
 - Kill the runtime handle if the session is still executing.
@@ -22,10 +22,9 @@ about state cleanup, and a failure in one step shouldn't block the
 others. The session ALWAYS transitions to ``abandoned``; that's the
 contract.
 
-v0.13: ``session.status`` is written exclusively by
+``session.status`` is written exclusively by
 :func:`tripwire.core.workflow.transitions.execute_transition` —
-including the engagement-close housekeeping (now an executor
-post-write hook).
+engagement-close housekeeping is an executor post-write hook.
 """
 
 from __future__ import annotations
@@ -131,10 +130,10 @@ def abandon_session(
             result.errors.append(f"worktree remove failed for {wt_path}: {exc}")
 
     # 4. Transition. This step always happens — it's the contract.
-    # v0.13: route through ``execute_transition`` — the sole writer of
-    # ``session.status``. Engagement close is now a post-write hook
+    # Route through ``execute_transition`` — the sole writer of
+    # ``session.status``. Engagement close is a post-write hook
     # (:func:`tripwire.core.workflow.side_effects.close_active_engagement`)
-    # which the executor fires for terminal-bound transitions.
+    # that the executor fires for terminal-bound transitions.
     from tripwire.core.workflow.transitions import (
         TransitionError,
         execute_transition,

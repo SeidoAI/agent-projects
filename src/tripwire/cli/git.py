@@ -1,9 +1,9 @@
 """``tripwire git`` CLI — Layer-1 wrappers around :mod:`tripwire.core.git_helpers`.
 
 Each subcommand is a thin click wrapper that lifts one side-effect's
-body into a directly-invocable command. The workflow executor (v0.13)
-still owns orchestration; these CLIs exist so an operator can replay
-or rehearse any single step without spinning a transition.
+body into a directly-invocable command. The workflow executor still
+owns orchestration; these CLIs exist so an operator can replay or
+rehearse any single step without spinning a transition.
 
 Subcommands:
 

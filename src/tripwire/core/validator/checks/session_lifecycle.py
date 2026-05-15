@@ -1,26 +1,9 @@
-"""v0.13 — session-lifecycle tripwires promoted from side-effect handlers.
-
-Four validators that gate the verified → completed route. They replace
-the gating semantics of three legacy side-effect handlers in
-``core/workflow/side_effects.py``:
-
-- ``verify_prs_merged``       → ``v_pr_merged_for_session``
-- ``verify_review_ok``        → ``v_pr_review_approved``
-- ``verify_issue_artifacts``  → ``v_session_has_developer_md`` +
-                                ``v_session_has_verified_md`` (split per
-                                artifact type so failures point at one
-                                file kind, not a mixed list)
-
-The original side-effect handlers stay registered in ``side_effects.py``
-until the executor refactor (v0.13 step 4) deletes them. They are dead
-code as of this commit — the canonical wiring is the route's
-``controls.tripwires:`` list.
+"""Session-lifecycle tripwires that gate the verified → completed route.
 
 All four are session-scoped: they iterate ``ctx.sessions`` and gate
 each session on its current status (read via the ``session_status``
-enum). The gates mirror the moment in the lifecycle where the original
-side-effect would have fired against the executor's verified →
-completed route:
+enum). The canonical wiring is the route's ``controls.tripwires:``
+list.
 
 - ``v_pr_merged_for_session``     gates ``verified`` (about to flip to
                                    completed → PRs must already be
@@ -31,6 +14,9 @@ completed route:
                                    manifest's ``required_at_status``).
 - ``v_session_has_verified_md``   gates each session-member issue at
                                    ``verified``.
+
+The first two are split out from a single artifact gate so failures
+point at one file kind rather than a mixed list.
 
 Codes (severity=error):
 
