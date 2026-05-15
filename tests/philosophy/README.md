@@ -93,8 +93,25 @@ Claims currently covered:
 - §7: Audit log writes go through the atomic helper, never raw
   `write_text` → `test_audit_log_uses_atomic_helpers.py`
 - §7: `src/tripwire/` imports no database / persistence-service
-  client — filesystem-native →
-  `test_filesystem_native.py`
+  client — filesystem-native → `test_filesystem_native.py`
+- §9 + C1-C3: AST-based single-writer check catches the
+  setattr/dict bypass shapes the regex companion misses →
+  `test_single_writer_ast.py`
+- Test hygiene: tests don't anchor to `Path.home()` /
+  `os.environ["HOME"]` (AST scan) →
+  `test_tests_write_only_to_tmp_path.py`
+- §7: every `~/.tripwire/...` path in src/ has an env-var override
+  for test isolation →
+  `test_home_anchored_paths_have_env_overrides.py`
+- Schema sanity: route ids are unique within each workflow →
+  `test_workflow_route_ids_unique.py`
+- §9: every registered CLI command has non-empty help text →
+  `test_cli_commands_have_docstrings.py`
+- Schema sanity: each workflow's `instance` block is internally
+  consistent (status_field in required_fields; non-singleton has
+  `{instance_id}`; executor-driven workflows have status_enum
+  matching the statuses block) →
+  `test_workflow_instance_shape_consistency.py`
 
 These prevent agent drift at the source — an agent that adds a
 forbidden pattern is caught immediately, not after a behaviour

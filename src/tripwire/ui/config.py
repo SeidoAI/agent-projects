@@ -8,6 +8,7 @@ back to defaults.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 import yaml
@@ -15,7 +16,18 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 
 logger = logging.getLogger("tripwire.ui.config")
 
-_DEFAULT_CONFIG_PATH = Path.home() / ".tripwire" / "config.yaml"
+
+def _default_config_path() -> Path:
+    """Return ``~/.tripwire/config.yaml`` (or ``$TRIPWIRE_CONFIG_DIR/config.yaml``
+    when the env var is set).
+
+    The override exists so tests can redirect the path to ``tmp_path``
+    via ``monkeypatch.setenv``. Computed lazily so a test's ``setenv``
+    is honoured even after this module is imported.
+    """
+    override = os.environ.get("TRIPWIRE_CONFIG_DIR")
+    root = Path(override) if override else Path.home() / ".tripwire"
+    return root / "config.yaml"
 
 
 class UserConfig(BaseModel):
@@ -48,7 +60,7 @@ def load_user_config(path: Path | None = None) -> UserConfig:
     Returns ``UserConfig()`` with defaults when the file is missing or
     contains invalid content.
     """
-    config_path = path if path is not None else _DEFAULT_CONFIG_PATH
+    config_path = path if path is not None else _default_config_path()
 
     if not config_path.exists():
         return UserConfig()
@@ -95,7 +107,7 @@ def save_user_config(config: UserConfig, path: Path | None = None) -> Path:
     on every CLI write. Round-trips cleanly because ``load_user_config``
     re-applies defaults at read time.
     """
-    config_path = path if path is not None else _DEFAULT_CONFIG_PATH
+    config_path = path if path is not None else _default_config_path()
     config_path.parent.mkdir(parents=True, exist_ok=True)
     payload = config.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
     config_path.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")

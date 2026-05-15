@@ -125,7 +125,7 @@ def test_three_variations_present() -> None:
         assert "validate" in v.lower() or "write" in v.lower()
 
 
-def test_count_writes_only_counts_edit_tools() -> None:
+def test_count_writes_only_counts_edit_tools(tmp_path: Path) -> None:
     """Only Edit/Write/NotebookEdit tool_use events count."""
     log_lines = [
         json.dumps(
@@ -153,7 +153,7 @@ def test_count_writes_only_counts_edit_tools() -> None:
             }
         ),
     ]
-    log_path = Path("/tmp/_write_count_test.jsonl")
+    log_path = tmp_path / "_write_count_test.jsonl"
     log_path.write_text("\n".join(log_lines), encoding="utf-8")
     assert _count_writes(log_path) == 2
 

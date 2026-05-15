@@ -115,6 +115,20 @@ class WorkflowInstanceShape:
     names the field that holds the id used to render ``storage_path``;
     almost always ``id``.
 
+    ``singleton`` (default False): when True, the workflow has exactly
+    one instance per project — ``storage_path`` is treated as a literal
+    path with no ``{instance_id}`` substitution. ``phase-advancement``
+    is the canonical example: it tracks ``project.yaml``'s ``phase``
+    field, and there's only one project.yaml per project.
+
+    ``reference_only`` (default False): when True, the workflow's
+    declarations are documentation only — there's no executor wired
+    up to advance instances through its routes. The PM agent drives
+    these conversationally. The presence of the block lets
+    ``tripwire validate`` lint cross-links and shape uniformly across
+    workflow ids that are agent-only. See
+    ``docs/workflows/reference-only-workflows.md``.
+
     The block is currently optional — a missing block surfaces a
     ``workflow/instance_missing`` warning but doesn't fail load. It
     becomes mandatory in v0.14.
@@ -125,6 +139,8 @@ class WorkflowInstanceShape:
     status_enum: list[str]
     required_fields: list[str] = field(default_factory=list)
     instance_id_field: str = "id"
+    singleton: bool = False
+    reference_only: bool = False
 
 
 @dataclass(frozen=True)

@@ -568,6 +568,7 @@ workflows:
       status_enum: [queued, drafting, refining, ready, abandoned]
       required_fields: [id, status]
       instance_id_field: id
+      reference_only: true  # PM agent drives this; no executor wiring
     statuses:
       - id: intake
         work_steps:
@@ -672,6 +673,7 @@ workflows:
       status_enum: [queued, triaging, resolved, escalated, dismissed]
       required_fields: [id, status]
       instance_id_field: id
+      reference_only: true  # PM agent drives this; no executor wiring
     statuses:
       - id: intake
         work_steps:
@@ -757,6 +759,7 @@ workflows:
       status_enum: [proposed, applied, rejected]
       required_fields: [id, status]
       instance_id_field: id
+      reference_only: true  # PM agent drives this; no executor wiring
     statuses:
       - id: inspect
         work_steps:
@@ -860,6 +863,7 @@ workflows:
       status_enum: [scheduled, running, done, failed]
       required_fields: [id, status]
       instance_id_field: id
+      reference_only: true  # PM agent drives this; no executor wiring
     statuses:
       - id: inspect
         heuristics:
@@ -942,6 +946,7 @@ workflows:
       status_enum: [running, done, failed]
       required_fields: [id, status]
       instance_id_field: id
+      reference_only: true  # PM agent drives this; no executor wiring
     statuses:
       - id: scan
         tripwires:
@@ -1119,6 +1124,7 @@ workflows:
         - completed
       required_fields: [id, status]
       instance_id_field: id
+      reference_only: true  # PM agent drives this; no executor wiring
     statuses:
       - id: received
         tripwires:
@@ -1295,6 +1301,7 @@ workflows:
       status_enum: [pending, triaged, resolved]
       required_fields: [id, status]
       instance_id_field: id
+      reference_only: true  # PM agent drives this; no executor wiring
     statuses:
       - id: pending
         heuristics:
@@ -1366,6 +1373,7 @@ workflows:
         - closed
       required_fields: [id, status]
       instance_id_field: id
+      reference_only: true  # GitHub-driven; tripwire only mirrors
     statuses:
       - id: draft
         work_steps:
@@ -1483,6 +1491,7 @@ workflows:
       status_enum: [scoping, scoped, executing, reviewing]
       required_fields: [phase]
       instance_id_field: name
+      singleton: true  # one project.yaml per project; storage_path is literal
     statuses:
       - id: scoping
         work_steps:
@@ -1765,6 +1774,7 @@ workflows:
       status_enum: [active, stale, archived]
       required_fields: [id, status]
       instance_id_field: id
+      reference_only: true  # PM agent drives node freshness; no executor wiring
     statuses:
       - id: detected
         heuristics:

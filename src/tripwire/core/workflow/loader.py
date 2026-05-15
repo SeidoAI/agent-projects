@@ -64,6 +64,8 @@ _RECOGNIZED_INSTANCE_KEYS = frozenset(
         "status_enum",
         "required_fields",
         "instance_id_field",
+        "singleton",
+        "reference_only",
     }
 )
 _RECOGNIZED_STATUS_KEYS = frozenset(
@@ -448,6 +450,8 @@ def _parse_instance(value: Any) -> WorkflowInstanceShape | None:
         status_enum=_str_list(value.get("status_enum")),
         required_fields=_str_list(value.get("required_fields")),
         instance_id_field=str(value.get("instance_id_field") or "id").strip(),
+        singleton=bool(value.get("singleton", False)),
+        reference_only=bool(value.get("reference_only", False)),
     )
 
 

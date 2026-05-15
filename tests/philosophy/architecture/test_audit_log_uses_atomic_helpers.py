@@ -51,9 +51,7 @@ ALLOWED_RAW_APPEND_SITES = {
 # being opened (any arg before mode) mentions `.jsonl` literally. This
 # is intentionally narrow — we want to catch raw JSONL appends, not
 # every `open` in the tree.
-RAW_JSONL_APPEND = re.compile(
-    r"\.open\(\s*[\"\']a[\"\']", re.IGNORECASE
-)
+RAW_JSONL_APPEND = re.compile(r"\.open\(\s*[\"\']a[\"\']", re.IGNORECASE)
 
 
 def _line_targets_jsonl(line: str) -> bool:
@@ -97,7 +95,7 @@ def test_no_raw_open_a_on_jsonl_paths():
                 violations.append(f"  {rel}:{line_no}: {line.strip()}")
 
     assert not violations, (
-        "Philosophy §7 violation — raw `open(..., \"a\")` on a JSONL log.\n"
+        'Philosophy §7 violation — raw `open(..., "a")` on a JSONL log.\n'
         "All three of audit / events / telemetry route through one helper:\n"
         "`tripwire.core.jsonl_log.append_jsonl`. A new raw-append site is\n"
         "duplication that drifts (per-call-site json.dumps options,\n"
@@ -105,7 +103,7 @@ def test_no_raw_open_a_on_jsonl_paths():
         "\n"
         "Offending sites:\n" + "\n".join(violations) + "\n"
         "\n"
-        "Fix: replace `with path.open(\"a\")` with\n"
+        'Fix: replace `with path.open("a")` with\n'
         "  from tripwire.core.jsonl_log import append_jsonl\n"
         "  append_jsonl(path, record, **dumps_kwargs)"
     )
