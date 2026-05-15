@@ -42,14 +42,34 @@ Claims currently covered:
 - §9 rule 3: No new per-workflow Python class scaffolding — model
   files are frozen to the allowlisted set →
   `test_no_per_workflow_python_class.py`
+- §9: `instance_io.py` is workflow-agnostic — no specific workflow
+  id appears in its source →
+  `test_instance_io_is_workflow_agnostic.py`
+- §9: No validator filename matches a specific workflow id —
+  validators are named by concern, not by workflow →
+  `test_no_per_workflow_validator_filename.py`
+- §9 + skill markdown: Every `tripwire <cmd>` mention in
+  `templates/skills/**/*.md` resolves to a registered CLI →
+  `test_skill_markdown_cli_references.py`
+- §9 + docs: Same cross-reference for `docs/WORKFLOW_ACTIONS.md` →
+  `test_workflow_actions_cli_references.py`
 - §6: PM agent is the only inbox author; framework code does not
   write to `inbox/<id>.md` → `test_pm_only_inbox_authoring.py`
 - §3 + §6: Validators don't reference the inbox authoring surface →
   `test_validators_do_not_write_inbox.py`
+- §3 stricter: `validator/checks/` and `validator/lint/` subdirs
+  perform NO filesystem mutation — `apply_fixes` in the top-level
+  module is the only allowed mutator →
+  `test_validator_checks_are_pure_read.py`
 - §6: The HTTP route layer has no POST-create for inbox →
   `test_inbox_route_has_no_post_create.py`
+- §5: InboxBucket Literal is exactly `{blocked, fyi}` →
+  `test_inbox_two_buckets_only.py`
 - §7: Audit log writes go through the atomic helper, never raw
   `write_text` → `test_audit_log_uses_atomic_helpers.py`
+- §7: `src/tripwire/` imports no database / persistence-service
+  client — filesystem-native →
+  `test_filesystem_native.py`
 
 These prevent agent drift at the source — an agent that adds a
 forbidden pattern is caught immediately, not after a behaviour
