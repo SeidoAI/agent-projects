@@ -271,19 +271,36 @@ the routes with their tripwires.
 
 | Status | Terminal | Routes out |
 |---|---|---|
-| closing | no | closed |
-| closed | yes | — |
+| planned | no | queued, deferred, abandoned |
+| queued | no | executing, deferred, abandoned |
+| executing | no | in_review, deferred, abandoned |
+| in_review | no | verified, executing (return), abandoned |
+| verified | no | completed, in_review (return), abandoned |
+| completed | yes | — |
+| abandoned | yes | — |
+| deferred | no | planned, abandoned |
 
 | Route id | from → to | Kind | CLI |
 |---|---|---|---|
-| `issue-close` | source:issue → closing | forward | conversational (`/pm-issue-close`) |
-| `issue-finalize` | closing → closed | forward | conversational |
+| `issue-plan-to-queue` | planned → queued | forward | conversational |
+| `issue-queue-to-execute` | queued → executing | forward | conversational |
+| `issue-execute-to-review` | executing → in_review | forward | conversational |
+| `issue-review-to-verified` | in_review → verified | forward | conversational |
+| `issue-verified-to-completed` | verified → completed | forward | conversational (`/pm-issue-close`) |
+| `issue-review-back-to-execute` | in_review → executing | return | conversational |
+| `issue-verified-back-to-review` | verified → in_review | return | conversational |
+| `issue-abandon-from-*` (5 routes) | {planned, queued, executing, in_review, verified} → abandoned | terminal | conversational |
+| `issue-defer-from-*` (3 routes) | {planned, queued, executing} → deferred | side | conversational |
+| `issue-deferred-back-to-planned` | deferred → planned | forward | conversational |
+| `issue-deferred-to-abandoned` | deferred → abandoned | terminal | conversational |
 
 Note: although `issue-closure` is reference-only as a self-contained
 workflow, `tripwire transition issue-closure <key> <target>` is used
 by `tripwire session sweep-issues-forward` to drive issues through
-their status field. That command exists; the surrounding workflow
-declaration does not yet have full executor coverage.
+their status field. The 8-status enum + 17 routes here mirror the
+canonical issue lifecycle; it is also the source of truth for
+`tripwire validate`'s `status/unreachable` check
+(`core/status.build_issue_transitions`).
 
 ---
 

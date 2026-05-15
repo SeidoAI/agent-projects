@@ -796,7 +796,7 @@ workflows:
             label: incremental update spawns session
             kind: triggers
           - workflow: issue-closure
-            status: closing
+            status: verified
             label: pm-issue-close path
             kind: triggers
         work_steps:
@@ -1560,41 +1560,197 @@ workflows:
       required_fields: [id, status]
       instance_id_field: id
     statuses:
-      - id: closing
+      - id: planned
+        tripwires:
+          - v_done_implies_issue_artifacts_on_main
+        work_steps:
+          - id: ready
+            actor: pm-agent
+            label: declare the issue ready
+            skills: [project-manager]
+      - id: queued
+        work_steps:
+          - id: enqueue
+            actor: pm-agent
+            label: queue for execution
+            skills: [project-manager]
+      - id: executing
+        work_steps:
+          - id: execute
+            actor: coding-agent
+            label: code the issue
+            skills: [backend-development]
+      - id: in_review
+        tripwires:
+          - v_issue_artifact_presence
+        work_steps:
+          - id: review
+            actor: pm-agent
+            label: review the code
+            skills: [verification]
+      - id: verified
+        tripwires:
+          - v_issue_artifact_presence
+        work_steps:
+          - id: verified
+            actor: pm-agent
+            label: verification complete
+            skills: [verification]
+      - id: completed
+        terminal: true
         tripwires:
           - v_done_implies_issue_artifacts_on_main
           - v_done_implies_session_completed
-          - v_issue_artifact_presence
-        prompt_checks: [pm-issue-close]
         work_steps:
-          - id: close-checks
-            actor: pm-agent
-            label: run close-time checks
-            skills: [project-manager]
-      - id: closed
-        terminal: true
-        work_steps:
-          - id: emit-closure
+          - id: closed
             actor: pm-agent
             label: emit closure event
             skills: [project-manager]
+      - id: abandoned
+        terminal: true
+        work_steps:
+          - id: abandon
+            actor: pm-agent
+            label: abandon the issue
+            skills: [project-manager]
+      - id: deferred
+        work_steps:
+          - id: defer
+            actor: pm-agent
+            label: defer the issue
+            skills: [project-manager]
     routes:
-      - id: issue-close
+      # Forward path
+      - id: issue-plan-to-queue
+        actor: pm-agent
+        from: planned
+        to: queued
+        kind: forward
+        label: queue
+        skills: [project-manager]
+      - id: issue-queue-to-execute
+        actor: pm-agent
+        from: queued
+        to: executing
+        kind: forward
+        label: begin execution
+        skills: [project-manager]
+      - id: issue-execute-to-review
+        actor: coding-agent
+        from: executing
+        to: in_review
+        kind: forward
+        label: send to review
+        skills: [project-manager]
+      - id: issue-review-to-verified
+        actor: pm-agent
+        from: in_review
+        to: verified
+        kind: forward
+        label: pass review
+        skills: [verification]
+      - id: issue-verified-to-completed
         actor: pm-agent
         command: pm-issue-close
         trigger: command.pm-issue-close
-        from: source:issue
-        to: closing
+        from: verified
+        to: completed
         kind: forward
-        label: begin close
+        label: close issue
         skills: [project-manager]
-      - id: issue-finalize
+        controls:
+          prompt_checks: [pm-issue-close]
+
+      # Reverse / loop / side edges
+      - id: issue-review-back-to-execute
         actor: pm-agent
-        trigger: close.checks_passed
-        from: closing
-        to: closed
+        from: in_review
+        to: executing
+        kind: return
+        label: changes requested
+        skills: [project-manager]
+      - id: issue-verified-back-to-review
+        actor: pm-agent
+        from: verified
+        to: in_review
+        kind: return
+        label: re-review
+        skills: [project-manager]
+
+      # Abandon edges (any non-terminal status)
+      - id: issue-abandon-from-planned
+        actor: pm-agent
+        from: planned
+        to: abandoned
+        kind: terminal
+        label: abandon (planned)
+        skills: [project-manager]
+      - id: issue-abandon-from-queued
+        actor: pm-agent
+        from: queued
+        to: abandoned
+        kind: terminal
+        label: abandon (queued)
+        skills: [project-manager]
+      - id: issue-abandon-from-executing
+        actor: pm-agent
+        from: executing
+        to: abandoned
+        kind: terminal
+        label: abandon (executing)
+        skills: [project-manager]
+      - id: issue-abandon-from-review
+        actor: pm-agent
+        from: in_review
+        to: abandoned
+        kind: terminal
+        label: abandon (in_review)
+        skills: [project-manager]
+      - id: issue-abandon-from-verified
+        actor: pm-agent
+        from: verified
+        to: abandoned
+        kind: terminal
+        label: abandon (verified)
+        skills: [project-manager]
+
+      # Defer edges
+      - id: issue-defer-from-planned
+        actor: pm-agent
+        from: planned
+        to: deferred
+        kind: side
+        label: defer
+        skills: [project-manager]
+      - id: issue-defer-from-queued
+        actor: pm-agent
+        from: queued
+        to: deferred
+        kind: side
+        label: defer
+        skills: [project-manager]
+      - id: issue-defer-from-executing
+        actor: pm-agent
+        from: executing
+        to: deferred
+        kind: side
+        label: defer
+        skills: [project-manager]
+
+      # Resume from deferred
+      - id: issue-deferred-back-to-planned
+        actor: pm-agent
+        from: deferred
+        to: planned
         kind: forward
-        label: finalize
+        label: resume
+        skills: [project-manager]
+      - id: issue-deferred-to-abandoned
+        actor: pm-agent
+        from: deferred
+        to: abandoned
+        kind: terminal
+        label: abandon (deferred)
         skills: [project-manager]
 
   # concept-freshness — periodic node-staleness sweep. Mostly handled

@@ -3505,12 +3505,12 @@ def session_sweep_issues_forward_cmd(session_id: str, project_dir: Path) -> None
     alone — same contract as the ``sweep_issues_forward`` side-effect.
 
     Approach (b) per the v0.13 step-3 spec: shell out to
-    ``tripwire transition issue-closure <key> <target>`` per issue. The
-    ``execute_transition`` Python entry point is hardcoded to the
-    ``coding-session`` workflow today (step 4 generalises it), so the
-    shell hop keeps this CLI decoupled from that change. Exit code is
-    inherited per-issue: any non-zero subprocess exit becomes a
-    structured per-issue rejection in the summary.
+    ``tripwire transition issue-closure <key> <target>`` per issue. As
+    of v0.13.1 the executor accepts non-coding-session workflows via the
+    generic instance loader, so this shell-out now resolves cleanly — no
+    more "session not found" stub failures. Exit code is inherited
+    per-issue: any non-zero subprocess exit becomes a structured
+    per-issue rejection in the summary.
     """
     from tripwire.core.status_contract import sweep_target_for
 

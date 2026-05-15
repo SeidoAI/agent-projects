@@ -83,3 +83,118 @@ workflows:
         to: completed
         kind: forward
         label: complete
+
+  issue-closure:
+    actor: pm-agent
+    trigger: command.pm-issue-close
+    instance:
+      storage_path: instances/issues/{instance_id}/issue.yaml
+      status_field: status
+      status_enum:
+        - planned
+        - queued
+        - executing
+        - in_review
+        - verified
+        - completed
+        - abandoned
+        - deferred
+      required_fields: [id, status]
+      instance_id_field: id
+    statuses:
+      - id: planned
+      - id: queued
+      - id: executing
+      - id: in_review
+      - id: verified
+      - id: completed
+        terminal: true
+      - id: abandoned
+        terminal: true
+      - id: deferred
+    routes:
+      - id: ic-plan-to-queue
+        actor: pm-agent
+        from: planned
+        to: queued
+        kind: forward
+      - id: ic-queue-to-execute
+        actor: pm-agent
+        from: queued
+        to: executing
+        kind: forward
+      - id: ic-execute-to-review
+        actor: pm-agent
+        from: executing
+        to: in_review
+        kind: forward
+      - id: ic-review-to-verified
+        actor: pm-agent
+        from: in_review
+        to: verified
+        kind: forward
+      - id: ic-verified-to-completed
+        actor: pm-agent
+        from: verified
+        to: completed
+        kind: forward
+      - id: ic-review-back-to-execute
+        actor: pm-agent
+        from: in_review
+        to: executing
+        kind: return
+      - id: ic-verified-back-to-review
+        actor: pm-agent
+        from: verified
+        to: in_review
+        kind: return
+      - id: ic-abandon-from-planned
+        actor: pm-agent
+        from: planned
+        to: abandoned
+        kind: terminal
+      - id: ic-abandon-from-queued
+        actor: pm-agent
+        from: queued
+        to: abandoned
+        kind: terminal
+      - id: ic-abandon-from-executing
+        actor: pm-agent
+        from: executing
+        to: abandoned
+        kind: terminal
+      - id: ic-abandon-from-review
+        actor: pm-agent
+        from: in_review
+        to: abandoned
+        kind: terminal
+      - id: ic-abandon-from-verified
+        actor: pm-agent
+        from: verified
+        to: abandoned
+        kind: terminal
+      - id: ic-defer-from-planned
+        actor: pm-agent
+        from: planned
+        to: deferred
+        kind: side
+      - id: ic-defer-from-queued
+        actor: pm-agent
+        from: queued
+        to: deferred
+        kind: side
+      - id: ic-defer-from-executing
+        actor: pm-agent
+        from: executing
+        to: deferred
+        kind: side
+      - id: ic-deferred-back-to-planned
+        actor: pm-agent
+        from: deferred
+        to: planned
+        kind: forward
+      - id: ic-deferred-to-abandoned
+        actor: pm-agent
+        from: deferred
+        to: abandoned
+        kind: terminal

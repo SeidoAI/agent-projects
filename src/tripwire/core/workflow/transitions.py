@@ -20,10 +20,13 @@ executor:
    d. **Artifacts** — every required consumed artifact must exist.
 5. Captures pre-values for ``route.preserve_fields``; applies
    ``route.clear_fields`` (sets the path to ``None``).
-6. Flips ``session.status``, bumps ``current_status_instance``,
-   saves the session.
-7. Runs four best-effort post-write hooks inline (coding-session
-   workflow only — other workflows get no hooks until step 7-8):
+6. Flips the instance's status field, bumps ``current_status_instance``,
+   saves the instance. The coding-session workflow round-trips through
+   the typed :class:`AgentSession` model; every other workflow round-
+   trips through the generic dict loader/saver in :mod:`instance_io`.
+7. Runs four best-effort post-write hooks inline. Each is guarded to
+   no-op gracefully for non-coding-session instances (engagement close
+   requires ``engagements``; telemetry requires session cost tracking):
    - Close the active engagement on terminal transitions.
    - Append audit record to ``.tripwire/audit.jsonl``.
    - Append telemetry row.
@@ -49,11 +52,18 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from tripwire.core import paths
 from tripwire.core.events.log import emit_event, read_events
 from tripwire.core.locks import LockTimeout, project_lock
 from tripwire.core.session_store import load_session, save_session
+from tripwire.core.workflow.instance_io import (
+    InstanceNotFoundError,
+    WorkflowMissingInstanceBlockError,
+    load_instance,
+    save_instance,
+)
 from tripwire.core.workflow.loader import load_workflows
 from tripwire.core.workflow.schema import (
     Workflow,
@@ -66,6 +76,118 @@ from tripwire.models.enums import SessionStatus
 from tripwire.models.session import AgentSession
 
 logger = logging.getLogger(__name__)
+
+# The single workflow id that materialises as a typed pydantic model
+# (``AgentSession``). Every other workflow id flows through the generic
+# dict-based instance loader. Centralised here so the dispatch sites
+# below read the same constant.
+_CODING_SESSION_WORKFLOW_ID = "coding-session"
+
+
+def _load_workflow_instance(
+    project_dir: Path, workflow_id: str, instance_id: str
+) -> Any:
+    """Load an instance for *workflow_id*.
+
+    Dispatches on the workflow id: ``coding-session`` returns the typed
+    :class:`AgentSession` via :func:`load_session`; every other workflow
+    returns a plain dict via :func:`load_instance`. The caller uses
+    :func:`_get_status` / :func:`_set_status` to read/write the status
+    field uniformly across both shapes.
+
+    Raises :class:`TransitionError` for missing instance files so the
+    legacy "session not found" error contract is preserved for the
+    coding-session path while non-coding-session callers see a parallel
+    structured error.
+    """
+    if workflow_id == _CODING_SESSION_WORKFLOW_ID:
+        try:
+            return load_session(project_dir, instance_id)
+        except FileNotFoundError as exc:
+            raise TransitionError(f"session {instance_id!r} not found") from exc
+    try:
+        return load_instance(project_dir, workflow_id, instance_id)
+    except InstanceNotFoundError as exc:
+        raise TransitionError(
+            f"instance {instance_id!r} for workflow {workflow_id!r} not found"
+        ) from exc
+    except WorkflowMissingInstanceBlockError as exc:
+        # The workflow exists but its `instance:` block was never
+        # declared, so the generic loader has no storage_path to resolve.
+        # Surface as a transition error so the gate fails loud rather
+        # than silently routing to a fallback path.
+        raise TransitionError(str(exc)) from exc
+
+
+def _save_workflow_instance(
+    project_dir: Path, workflow_id: str, instance_id: str, obj: Any
+) -> None:
+    """Persist an instance loaded by :func:`_load_workflow_instance`.
+
+    Mirror of the loader: ``coding-session`` round-trips through the
+    typed :func:`save_session`, every other workflow round-trips through
+    the generic :func:`save_instance` (writes the dict back to its
+    declared ``storage_path``).
+    """
+    if workflow_id == _CODING_SESSION_WORKFLOW_ID:
+        save_session(project_dir, obj)
+    else:
+        save_instance(project_dir, workflow_id, instance_id, obj)
+
+
+def _get_status(obj: Any, workflow: Workflow) -> str:
+    """Read the current status from a typed model or a dict.
+
+    The workflow's ``instance.status_field`` names the field; for the
+    coding-session path the typed ``AgentSession`` returns a
+    :class:`SessionStatus` enum (``StrEnum``) which we coerce to its
+    string value for uniform comparison against ``statuses_by_id``.
+    Workflows without an ``instance:`` block default the field name to
+    ``status`` (only the coding-session bootstrap fixture hits this in
+    tests today; production workflows declare the block).
+    """
+    field_name = workflow.instance.status_field if workflow.instance else "status"
+    if isinstance(obj, dict):
+        value = obj.get(field_name, "")
+        return value if isinstance(value, str) else str(value)
+    value = getattr(obj, field_name, "")
+    # StrEnum values render as their string value via ``.value``; fall
+    # back to ``str()`` so plain strings flow through unchanged.
+    return getattr(value, "value", value) if value is not None else ""
+
+
+def _set_status(obj: Any, workflow: Workflow, value: str) -> None:
+    """Write the status field on a typed model or a dict.
+
+    For dicts we write the raw string verbatim — the generic instance
+    loader does no enum coercion. For typed ``AgentSession`` we wrap in
+    :class:`SessionStatus` to match the model's declared type (pydantic
+    would coerce strings too, but the explicit enum keeps existing
+    behaviour bit-identical).
+    """
+    field_name = workflow.instance.status_field if workflow.instance else "status"
+    if isinstance(obj, dict):
+        obj[field_name] = value
+        return
+    if field_name == "status" and isinstance(obj, AgentSession):
+        setattr(obj, field_name, SessionStatus(value))
+    else:
+        setattr(obj, field_name, value)
+
+
+def _maybe_close_active_engagement(
+    instance: Any, route: WorkflowRoute, *, now: datetime
+) -> bool:
+    """Run :func:`close_active_engagement` only when the instance is a
+    coding-session — i.e. has the ``engagements`` attribute. Returns the
+    underlying modified flag, or False for instances without engagements
+    (the hook is a no-op for issue/project/etc. instances).
+    """
+    if not hasattr(instance, "engagements"):
+        return False
+    from tripwire.core.workflow.side_effects import close_active_engagement
+
+    return close_active_engagement(instance, route, now=now)
 
 
 @dataclass(frozen=True)
@@ -132,14 +254,17 @@ def execute_transition(
     correspond to a gate verdict (unknown workflow / session / status).
 
     ``workflow_id`` selects the workflow declared in ``workflow.yaml``.
-    Today only ``coding-session`` materialises at runtime (the loader
-    reads only ``AgentSession`` for any workflow id) — other workflow
-    ids will raise ``TransitionError`` at load until step 7-8 plumbs
-    them in.
+    ``coding-session`` round-trips through the typed
+    :class:`AgentSession` model; every other declared workflow flows
+    through the generic dict loader in
+    :mod:`tripwire.core.workflow.instance_io`. Unknown workflow ids
+    still raise :class:`TransitionError` at load.
 
     ``instance_id`` (or the legacy positional ``session_id``) names the
     entity being transitioned. For the coding-session workflow this is
-    the session id.
+    the session id; for other workflows it is whatever the workflow's
+    ``instance.storage_path`` template renders against (issue key,
+    project name, etc.).
 
     ``flags`` carries caller-local options:
     - ``reset_acks: True`` — clear session acks (used by reopen).
@@ -165,12 +290,8 @@ def execute_transition(
     # body re-loads inside the lock to evaluate against fresh state
     # (see codex P1 on PR #73 — concurrent transitions could otherwise
     # both validate against the same stale snapshot).
-    try:
-        pre_lock_session = load_session(project_dir, instance)
-    except FileNotFoundError as exc:
-        raise TransitionError(f"session {instance!r} not found") from exc
-
-    pre_lock_status = pre_lock_session.status.value
+    pre_lock_instance = _load_workflow_instance(project_dir, workflow_id, instance)
+    pre_lock_status = _get_status(pre_lock_instance, workflow)
 
     # Always emit `transition.requested` first.
     emit_event(
@@ -187,19 +308,19 @@ def execute_transition(
     lock_name = str(lock_path.relative_to(project_dir))
     try:
         with project_lock(project_dir, name=lock_name):
-            # Re-read session state INSIDE the lock — stale snapshots
+            # Re-read instance state INSIDE the lock — stale snapshots
             # before the lock could let two concurrent transitions
             # validate against the same source status and both emit
             # `transition.completed`. Fresh read here is the
             # serialization point.
-            session = load_session(project_dir, instance)
-            current_status = session.status.value
+            instance_obj = _load_workflow_instance(project_dir, workflow_id, instance)
+            current_status = _get_status(instance_obj, workflow)
             current = statuses_by_id.get(current_status)
             return _run_gate(
                 project_dir,
                 workflow_id=workflow_id,
                 instance=instance,
-                session=session,
+                session=instance_obj,
                 workflow=workflow,
                 current=current,
                 current_status=current_status,
@@ -347,12 +468,18 @@ def _run_gate(
                 reason=f"prompt_checks_missing: {missing}",
             )
 
-    # 5. Artifacts — target-status consumed paths must exist.
+    # 5. Artifacts — target-status consumed paths must exist. The
+    # artifact resolver reads ``session.issues`` for the ``{issue_key}``
+    # placeholder, which only exists on typed AgentSession. For
+    # dict-backed instances we skip the issues-derived context — the
+    # workflow's declared artifacts for those instances either don't
+    # use the placeholder or settle at write-time.
+    artifact_owner = session if isinstance(session, AgentSession) else None
     missing_artifacts = _missing_consumed_artifacts(
         project_dir,
         session_id=instance,
         target=target,
-        session=session,
+        session=artifact_owner,
     )
     if missing_artifacts:
         return _reject(
@@ -363,39 +490,52 @@ def _run_gate(
             reason=f"artifacts_missing: {missing_artifacts}",
         )
 
-    # 6. Capture pre-state for preserve/clear semantics.
-    preserved: dict[str, object] = {
-        path: _read_path(session, path) for path in route.preserve_fields
-    }
-    for path in route.clear_fields:
-        _write_path(session, path, None)
+    # 6. Capture pre-state for preserve/clear semantics. Only the
+    # coding-session model declares these fields today (dotted paths
+    # against ``AgentSession``); guarding the whole block keeps the
+    # dict-loader path simple and avoids inventing dotted-path
+    # semantics on dicts for a feature no other workflow uses yet.
+    is_coding_session = workflow_id == _CODING_SESSION_WORKFLOW_ID
+    preserved: dict[str, object] = {}
+    if is_coding_session:
+        preserved = {path: _read_path(session, path) for path in route.preserve_fields}
+        for path in route.clear_fields:
+            _write_path(session, path, None)
 
     # 7. Flip status, assign status-instance id, save.
     n = _next_status_instance_n(project_dir, workflow_id, instance, target_status)
     status_instance = f"{workflow_id}:{instance}:{target_status}:{n}"
-    session.status = SessionStatus(target_status)
-    session.current_status_instance = status_instance
-    session.updated_at = when
+    _set_status(session, workflow, target_status)
+    if isinstance(session, dict):
+        session["current_status_instance"] = status_instance
+        # ``updated_at`` is conventional but optional on dict instances —
+        # write an ISO string so YAML round-trips cleanly.
+        session["updated_at"] = _isoformat_z(when)
+    else:
+        session.current_status_instance = status_instance
+        session.updated_at = when
 
     # 8. Re-assert preserved fields against accidental clearing.
-    for path, prior_value in preserved.items():
-        current_value = _read_path(session, path)
-        if current_value != prior_value:
-            _write_path(session, path, prior_value)
-    save_session(project_dir, session)
+    if is_coding_session:
+        for path, prior_value in preserved.items():
+            current_value = _read_path(session, path)
+            if current_value != prior_value:
+                _write_path(session, path, prior_value)
+    _save_workflow_instance(project_dir, workflow_id, instance, session)
 
     # 9. Best-effort post-write hooks. None of these may roll back the
     #    transition — the status write above is the commit point. Each
     #    is wrapped to swallow exceptions so housekeeping never blocks.
-    if workflow_id == "coding-session":
-        _apply_post_write_hooks(
-            project_dir,
-            session=session,
-            route=route,
-            from_status=current_status,
-            flags=flags,
-            when=when,
-        )
+    _apply_post_write_hooks(
+        project_dir,
+        workflow_id=workflow_id,
+        instance_id=instance,
+        instance_obj=session,
+        route=route,
+        from_status=current_status,
+        flags=flags,
+        when=when,
+    )
 
     # 10. Emit transition.completed.
     emit_event(
@@ -422,7 +562,9 @@ def _run_gate(
 def _apply_post_write_hooks(
     project_dir: Path,
     *,
-    session: AgentSession,
+    workflow_id: str,
+    instance_id: str,
+    instance_obj: Any,
     route: WorkflowRoute,
     from_status: str,
     flags: dict,
@@ -435,53 +577,72 @@ def _apply_post_write_hooks(
     so duration_min derives from a closed engagement on terminal
     transitions. Any exception is caught and logged — housekeeping
     failures never roll back the (already-committed) status write.
+
+    Per-hook coding-session-ness:
+
+    - ``close_active_engagement`` requires ``instance_obj.engagements``;
+      guarded via :func:`_maybe_close_active_engagement` (no-op for
+      dict-backed instances that have no engagement tracking).
+    - ``append_audit_record`` and ``append_telemetry_record`` read
+      session-specific fields (``session.id``, ``compute_session_cost``)
+      that don't exist on other instances; both are scoped to the
+      coding-session path. Other workflows get their own audit trail via
+      ``transition.completed`` events on the standard events log.
+    - ``reset_acks_if_requested`` is a coding-session-only flag (the
+      reopen route sets it); guarded with the same workflow-id check
+      since it reaches into per-session ack files.
     """
     from tripwire.core.workflow.side_effects import (
         append_audit_record,
         append_telemetry_record,
-        close_active_engagement,
         reset_acks_if_requested,
     )
 
+    is_coding_session = workflow_id == _CODING_SESSION_WORKFLOW_ID
+
     try:
-        engagement_modified = close_active_engagement(session, route, now=when)
+        engagement_modified = _maybe_close_active_engagement(
+            instance_obj, route, now=when
+        )
         if engagement_modified:
-            save_session(project_dir, session)
+            _save_workflow_instance(project_dir, workflow_id, instance_id, instance_obj)
     except Exception:
         logger.exception(
-            "post-write hook close_active_engagement failed for session %s",
-            session.id,
+            "post-write hook close_active_engagement failed for instance %s",
+            instance_id,
         )
 
-    try:
-        append_audit_record(
-            project_dir,
-            session=session,
-            route=route,
-            from_status=from_status,
-            flags=flags,
-            now=when,
-        )
-    except Exception:
-        logger.exception(
-            "post-write hook append_audit_record failed for session %s", session.id
-        )
+    if is_coding_session:
+        try:
+            append_audit_record(
+                project_dir,
+                session=instance_obj,
+                route=route,
+                from_status=from_status,
+                flags=flags,
+                now=when,
+            )
+        except Exception:
+            logger.exception(
+                "post-write hook append_audit_record failed for session %s",
+                instance_id,
+            )
 
-    try:
-        append_telemetry_record(project_dir, session=session)
-    except Exception:
-        logger.exception(
-            "post-write hook append_telemetry_record failed for session %s",
-            session.id,
-        )
+        try:
+            append_telemetry_record(project_dir, session=instance_obj)
+        except Exception:
+            logger.exception(
+                "post-write hook append_telemetry_record failed for session %s",
+                instance_id,
+            )
 
-    try:
-        reset_acks_if_requested(project_dir, session=session, flags=flags)
-    except Exception:
-        logger.exception(
-            "post-write hook reset_acks_if_requested failed for session %s",
-            session.id,
-        )
+        try:
+            reset_acks_if_requested(project_dir, session=instance_obj, flags=flags)
+        except Exception:
+            logger.exception(
+                "post-write hook reset_acks_if_requested failed for session %s",
+                instance_id,
+            )
 
 
 def _read_path(obj: object, path: str) -> object | None:

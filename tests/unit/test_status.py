@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from textwrap import dedent
+from typing import ClassVar
 
 from tripwire.core.status import (
     build_issue_transitions,
@@ -80,6 +81,47 @@ class TestIsStatusReachable:
     def test_unreachable(self) -> None:
         t = {"planned": ["queued"], "queued": ["done"], "done": [], "orphan": []}
         assert not is_status_reachable(t, "orphan")
+
+
+class TestShippedTemplateCanonicalLifecycle:
+    """The shipped `workflow.yaml.j2` issue-closure block must reach
+    every status the project enum declares from the `planned` start
+    state — otherwise the structure validator's
+    ``check_status_transitions`` raises `status/unreachable` for any
+    issue not in `planned`.
+
+    Regression for v0.13.1 (B8): the original consolidation shipped a
+    2-status (closing/closed) workflow that broke reachability for the
+    8-status flow projects actually use.
+    """
+
+    CANONICAL_STATUSES: ClassVar[set[str]] = {
+        "planned",
+        "queued",
+        "executing",
+        "in_review",
+        "verified",
+        "completed",
+        "abandoned",
+        "deferred",
+    }
+
+    def test_shipped_template_reaches_all_canonical_statuses(
+        self, tmp_path: Path
+    ) -> None:
+        # Plant the shipped template verbatim into a temp project dir,
+        # then exercise the same reachability pipeline the validator uses.
+        template = Path("src/tripwire/templates/workflow.yaml.j2").read_text(
+            encoding="utf-8"
+        )
+        (tmp_path / "workflow.yaml").write_text(template, encoding="utf-8")
+        t = build_issue_transitions(tmp_path)
+        reachable = reachable_statuses(
+            t, declared_statuses=sorted(self.CANONICAL_STATUSES)
+        )
+        assert self.CANONICAL_STATUSES <= reachable, sorted(
+            self.CANONICAL_STATUSES - reachable
+        )
 
 
 class TestBuildIssueTransitions:

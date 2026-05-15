@@ -374,25 +374,26 @@ def test_instance_id_alias_accepts_legacy_session_id_kwarg(
 # ---------------------------------------------------------------------------
 
 
-def test_phase_advancement_transition_today_raises_on_load(
+def test_phase_advancement_transition_flips_project_phase(
     tmp_path: Path, fake_validate
 ) -> None:
-    """Document v0.13.1 behaviour for non-coding-session transitions.
+    """End-to-end happy path for a non-coding-session workflow.
 
-    The B10 promotion adds ``ProjectConfig.current_status_instance`` so
-    the project itself can be a phase-advancement instance. The
-    executor's pipeline is already workflow-agnostic at the gate level
-    (status/route lookups go through ``workflow_id``) — but the
-    instance loader is still ``load_session``. Driving
-    ``phase-advancement`` requires step 8's generic instance loader.
+    The phase-advancement workflow declares ``project.yaml`` as its
+    instance storage. Driving the executor with
+    ``workflow_id='phase-advancement'`` must flip the project's
+    ``phase`` field via the generic dict-based loader/saver — no
+    AgentSession plumbing involved.
 
-    Until that lands, calling ``execute_transition`` with
-    ``workflow_id="phase-advancement"`` falls through to
-    ``load_session`` and surfaces a structured ``TransitionError`` for
-    the missing session — pinning the current ceiling so a regression
-    that silently mutates the wrong file would surface here.
+    This replaces an earlier test that pinned the legacy "load_session
+    fails for non-coding-session workflows" behaviour. Now that step 8
+    wires :mod:`instance_io` into the executor, that legacy contract is
+    intentionally broken; this test asserts the new working contract.
     """
-    # Minimal project with phase-advancement declared but no session.
+    import yaml
+
+    # Minimal project with phase-advancement declared. No session
+    # required — the workflow's instance is project.yaml itself.
     (tmp_path / "project.yaml").write_text(
         "name: test\nkey_prefix: TST\nbase_branch: main\nstatuses: [planned]\n"
         "repos: {}\nnext_issue_number: 1\nnext_session_number: 1\n"
@@ -427,24 +428,150 @@ def test_phase_advancement_transition_today_raises_on_load(
         encoding="utf-8",
     )
 
+    from tripwire.core.events.log import read_events
+    from tripwire.core.workflow.transitions import execute_transition
+
+    result = execute_transition(
+        tmp_path,
+        workflow_id="phase-advancement",
+        instance_id="test",
+        target_status="scoped",
+    )
+    assert result.ok is True
+    assert result.status_instance == "phase-advancement:test:scoped:1"
+
+    project_data = yaml.safe_load((tmp_path / "project.yaml").read_text())
+    assert project_data["phase"] == "scoped"
+    assert project_data["current_status_instance"] == "phase-advancement:test:scoped:1"
+
+    events = list(read_events(tmp_path, workflow="phase-advancement", instance="test"))
+    event_names = [e.get("event") for e in events]
+    assert "transition.requested" in event_names
+    assert "transition.completed" in event_names
+    assert "transition.rejected" not in event_names
+
+
+def test_issue_closure_transition_flips_issue_status_field(
+    tmp_path: Path, fake_validate
+) -> None:
+    """End-to-end happy path for the issue-closure workflow.
+
+    The issue-closure workflow's instance.storage_path is
+    ``instances/issues/{instance_id}/issue.yaml``. The executor must
+    load that file as a dict, flip its ``status`` field, and write it
+    back via :func:`save_instance` — no Issue model coercion required
+    at the executor layer (the instance file remains frontmatter+body).
+    """
+    (tmp_path / "project.yaml").write_text(
+        "name: test\nkey_prefix: TST\nbase_branch: main\nstatuses: [planned]\n"
+        "repos: {}\nnext_issue_number: 1\nnext_session_number: 1\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              issue-closure:
+                actor: pm-agent
+                trigger: command.pm-issue-close
+                instance:
+                  storage_path: instances/issues/{instance_id}/issue.yaml
+                  status_field: status
+                  status_enum: [planned, completed]
+                  instance_id_field: id
+                statuses:
+                  - id: planned
+                  - id: completed
+                    terminal: true
+                routes:
+                  - id: planned-to-completed
+                    actor: pm-agent
+                    from: planned
+                    to: completed
+                    kind: forward
+            """
+        ),
+        encoding="utf-8",
+    )
+    issue_dir = tmp_path / "instances" / "issues" / "TST-1"
+    issue_dir.mkdir(parents=True)
+    (issue_dir / "issue.yaml").write_text(
+        "---\nid: TST-1\ntitle: Demo issue\nstatus: planned\n---\nBody text.\n",
+        encoding="utf-8",
+    )
+
+    from tripwire.core.workflow.instance_io import load_instance
+    from tripwire.core.workflow.transitions import execute_transition
+
+    result = execute_transition(
+        tmp_path,
+        workflow_id="issue-closure",
+        instance_id="TST-1",
+        target_status="completed",
+    )
+    assert result.ok is True
+    assert result.status_instance == "issue-closure:TST-1:completed:1"
+
+    data = load_instance(tmp_path, "issue-closure", "TST-1")
+    assert data["status"] == "completed"
+    assert data["current_status_instance"] == "issue-closure:TST-1:completed:1"
+    # Body survives the round-trip — frontmatter+body shape is preserved
+    # by save_instance.
+    assert data.get("body", "").strip() == "Body text."
+
+
+def test_unknown_workflow_instance_raises_transition_error(
+    tmp_path: Path, fake_validate
+) -> None:
+    """When a declared non-coding-session workflow has no instance file
+    on disk, the executor wraps the underlying not-found error in a
+    structured :class:`TransitionError`. Parallels the coding-session
+    "session 'foo' not found" error contract."""
+    (tmp_path / "project.yaml").write_text(
+        "name: test\nkey_prefix: TST\nbase_branch: main\nstatuses: [planned]\n"
+        "repos: {}\nnext_issue_number: 1\nnext_session_number: 1\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              issue-closure:
+                actor: pm-agent
+                trigger: command.pm-issue-close
+                instance:
+                  storage_path: instances/issues/{instance_id}/issue.yaml
+                  status_field: status
+                  status_enum: [planned, completed]
+                  instance_id_field: id
+                statuses:
+                  - id: planned
+                  - id: completed
+                    terminal: true
+                routes:
+                  - id: planned-to-completed
+                    actor: pm-agent
+                    from: planned
+                    to: completed
+                    kind: forward
+            """
+        ),
+        encoding="utf-8",
+    )
+
     from tripwire.core.workflow.transitions import (
         TransitionError,
         execute_transition,
     )
 
-    # The executor today calls `load_session(project_dir, instance)`
-    # regardless of `workflow_id`. The project name is "test" but
-    # there's no session at instances/sessions/test/session.yaml —
-    # the loader raises FileNotFoundError, which the executor wraps
-    # in TransitionError("session 'test' not found"). When step 8's
-    # generic instance loader lands this test should be updated to
-    # exercise the happy path against ``project.yaml.phase``.
-    with pytest.raises(TransitionError, match="session 'test' not found"):
+    with pytest.raises(TransitionError, match="not found"):
         execute_transition(
             tmp_path,
-            workflow_id="phase-advancement",
-            instance_id="test",
-            target_status="scoped",
+            workflow_id="issue-closure",
+            instance_id="TST-404",
+            target_status="completed",
         )
 
 
