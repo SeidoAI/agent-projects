@@ -71,9 +71,33 @@ from tripwire.core.session_review_writer import (
 )
 from tripwire.core.session_store import list_sessions, load_session, save_session
 from tripwire.core.task_checklist import parse_task_checklist
-from tripwire.models.session import EngagementEntry
+from tripwire.models.session import AgentSession, EngagementEntry
 
 console = Console()
+
+
+def _resolve_and_load_session(
+    project_dir: Path, session_id: str
+) -> tuple[Path, AgentSession]:
+    """Resolve *project_dir* and load *session_id*.
+
+    Shared prelude for every ``tripwire session <verb> <session_id>``
+    subcommand: expand-and-resolve the project path, assert the directory
+    is a tripwire project, then load the session. Maps a missing
+    session.yaml to ``click.ClickException`` so the CLI exits 1 with a
+    readable message instead of a Python traceback.
+
+    Commands that follow a different shape — ``session show`` and
+    ``session check`` surface the underlying ``FileNotFoundError`` text,
+    ``session abandon``/``reopen``/``cost`` wrap a different helper that
+    raises ``FileNotFoundError`` — keep their own prelude.
+    """
+    resolved = project_dir.expanduser().resolve()
+    _require_project(resolved)
+    try:
+        return resolved, load_session(resolved, session_id)
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"session {session_id!r} not found") from exc
 
 
 @dataclass
@@ -448,12 +472,7 @@ def session_derive_branch_cmd(session_id: str, project_dir: Path) -> None:
     from tripwire.core.branch_naming import BranchNameError, derive_branch_name
     from tripwire.core.store import load_issue
 
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session '{session_id}' not found") from exc
+    resolved, session = _resolve_and_load_session(project_dir, session_id)
     if not session.issues:
         raise click.ClickException(
             f"session '{session_id}' has no issues; cannot derive branch"
@@ -496,13 +515,7 @@ def session_derive_branch_cmd(session_id: str, project_dir: Path) -> None:
 )
 def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) -> None:
     """Validate readiness and transition session to queued."""
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session '{session_id}' not found") from exc
+    resolved, session = _resolve_and_load_session(project_dir, session_id)
 
     if session.status != "planned":
         raise click.ClickException(
@@ -901,13 +914,7 @@ def session_attach_cmd(session_id: str, project_dir: Path) -> None:
     from tripwire.runtimes import get_runtime
     from tripwire.runtimes.base import AttachExec, AttachInstruction
 
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session '{session_id}' not found") from exc
+    resolved, session = _resolve_and_load_session(project_dir, session_id)
 
     spawn = load_resolved_spawn_config(resolved, session=session)
     try:
@@ -939,13 +946,7 @@ def session_pause_cmd(session_id: str, project_dir: Path) -> None:
     from tripwire.core.spawn_config import load_resolved_spawn_config
     from tripwire.runtimes import get_runtime
 
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session '{session_id}' not found") from exc
+    resolved, session = _resolve_and_load_session(project_dir, session_id)
 
     if session.status != "executing":
         raise click.ClickException(
@@ -1164,16 +1165,10 @@ def session_reopen_cmd(
     """
     from tripwire.core.session_reopen import reopen_session
 
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-
     # In-process prep: flip recorded draft PRs ready → draft. The daemon
     # paths skip this; the CLI wrapper does it so a single command does
     # the user-visible work.
-    try:
-        session_for_prep = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session '{session_id}' not found") from exc
+    resolved, session_for_prep = _resolve_and_load_session(project_dir, session_id)
     flipped: list[str] = []
     for wt in session_for_prep.runtime_state.worktrees:
         if not wt.draft_pr_url:
@@ -1454,12 +1449,7 @@ def session_scaffold_cmd(
     """
     from tripwire.core.manifest_loader import load_artifact_manifest
 
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session '{session_id}' not found") from exc
+    resolved, session = _resolve_and_load_session(project_dir, session_id)
 
     manifest, _findings = load_artifact_manifest(resolved)
     if manifest is None:
@@ -1631,12 +1621,7 @@ def session_logs_cmd(
     ``<session_id>-<timestamp>.log``. This subcommand surfaces them
     without requiring operators to grep the filesystem by hand.
     """
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session '{session_id}' not found") from exc
+    _, session = _resolve_and_load_session(project_dir, session_id)
 
     log_path_str = session.runtime_state.log_path
     if not log_path_str:
@@ -1707,12 +1692,7 @@ def session_summary_cmd(
 
     from tripwire.core.session_log_parser import format_text, parse
 
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session '{session_id}' not found") from exc
+    _, session = _resolve_and_load_session(project_dir, session_id)
 
     log_path_str = session.runtime_state.log_path
     if not log_path_str:
@@ -2467,13 +2447,7 @@ def session_prepare_review_cmd(
 
     from tripwire.core import paths as _paths
 
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session '{session_id}' not found") from exc
+    resolved, session = _resolve_and_load_session(project_dir, session_id)
 
     sdir = _paths.session_dir(resolved, session_id)
     sdir.mkdir(parents=True, exist_ok=True)
@@ -2869,12 +2843,7 @@ def session_kill_runtime_cmd(session_id: str, project_dir: Path) -> None:
     import os
     import signal
 
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session {session_id!r} not found") from exc
+    _, session = _resolve_and_load_session(project_dir, session_id)
 
     pid = session.runtime_state.pid if session.runtime_state else None
     if not pid:
@@ -2910,12 +2879,7 @@ def session_close_prs_cmd(session_id: str, project_dir: Path) -> None:
     """
     from tripwire.core.session_abandon import _close_pr_for_branch
 
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session {session_id!r} not found") from exc
+    _, session = _resolve_and_load_session(project_dir, session_id)
 
     if session.runtime_state is None or not session.runtime_state.worktrees:
         click.echo(f"session {session_id}: no recorded worktrees", err=True)
@@ -2956,12 +2920,7 @@ def session_remove_worktrees_cmd(session_id: str, project_dir: Path) -> None:
     are reported but never abort the loop — filesystem deletion is
     best-effort.
     """
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session {session_id!r} not found") from exc
+    _, session = _resolve_and_load_session(project_dir, session_id)
 
     if session.runtime_state is None or not session.runtime_state.worktrees:
         click.echo(f"session {session_id}: no recorded worktrees", err=True)
@@ -3003,12 +2962,7 @@ def session_flip_drafts_ready_cmd(session_id: str, project_dir: Path) -> None:
     """
     from tripwire.core.session_complete import _flip_drafts_to_ready
 
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session {session_id!r} not found") from exc
+    _, session = _resolve_and_load_session(project_dir, session_id)
 
     _flip_drafts_to_ready(session)
     click.echo(f"flipped drafts to ready for session {session_id}")
@@ -3030,12 +2984,7 @@ def session_flip_drafts_draft_cmd(session_id: str, project_dir: Path) -> None:
     Best-effort — ``gh`` errors are swallowed (the operator can re-run
     or inspect ``gh`` output directly).
     """
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session {session_id!r} not found") from exc
+    _, session = _resolve_and_load_session(project_dir, session_id)
 
     if session.runtime_state is None or not session.runtime_state.worktrees:
         click.echo(f"session {session_id}: no recorded worktrees", err=True)
@@ -3083,12 +3032,7 @@ def session_normalise_branch_cmd(session_id: str, project_dir: Path) -> None:
     Skips worktrees whose path is missing on disk (e.g. already
     cleaned up by ``session complete``) and reports them as warnings.
     """
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session {session_id!r} not found") from exc
+    _, session = _resolve_and_load_session(project_dir, session_id)
 
     if session.runtime_state is None or not session.runtime_state.worktrees:
         click.echo(f"session {session_id}: no recorded worktrees", err=True)
@@ -3188,12 +3132,7 @@ def session_followup_stub_cmd(session_id: str, reason: str, project_dir: Path) -
     """
     from tripwire.core import paths as _paths
 
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-    try:
-        load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session {session_id!r} not found") from exc
+    resolved, _ = _resolve_and_load_session(project_dir, session_id)
 
     plan_path = _paths.session_plan_path(resolved, session_id)
     if not plan_path.is_file():
@@ -3253,12 +3192,7 @@ def session_prepare_for_completion_cmd(session_id: str, project_dir: Path) -> No
     from tripwire.core.session_complete import _flip_drafts_to_ready
     from tripwire.core.validator import validate_project
 
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session {session_id!r} not found") from exc
+    resolved, session = _resolve_and_load_session(project_dir, session_id)
 
     # Step 1: validate, filtered by selector
     report = validate_project(resolved, strict=True, heuristic_mode="surface")
@@ -3378,12 +3312,7 @@ def session_prepare_for_abandon_cmd(session_id: str, project_dir: Path) -> None:
     """
     from tripwire.core.session_abandon import _close_pr_for_branch
 
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session {session_id!r} not found") from exc
+    _, session = _resolve_and_load_session(project_dir, session_id)
 
     failures: list[str] = []
 
@@ -3483,12 +3412,7 @@ def session_sweep_issues_forward_cmd(session_id: str, project_dir: Path) -> None
     """
     from tripwire.core.status_contract import sweep_target_for
 
-    resolved = project_dir.expanduser().resolve()
-    _require_project(resolved)
-    try:
-        session = load_session(resolved, session_id)
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"session {session_id!r} not found") from exc
+    resolved, session = _resolve_and_load_session(project_dir, session_id)
 
     target = sweep_target_for(session.status.value)
     if target is None:
