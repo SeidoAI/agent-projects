@@ -32,6 +32,11 @@ from rich.table import Table
 
 from tripwire.cli._utils import require_project as _require_project
 from tripwire.cli.artifacts import artifacts_list
+from tripwire.core.gh_helpers import (
+    GhError,
+    get_merged_pr_for_branch,
+    gh_pr_ready,
+)
 from tripwire.core.git_helpers import (
     worktree_is_dirty,
     worktree_prune,
@@ -1173,17 +1178,15 @@ def session_reopen_cmd(
     for wt in session_for_prep.runtime_state.worktrees:
         if not wt.draft_pr_url:
             continue
+        # Best-effort: a PR that's already draft, merged, or whose gh
+        # session has expired returns non-zero. We don't block reopen
+        # on the flip — swallow ``GhError`` (which now covers the
+        # previous ``SubprocessError`` / ``OSError`` / ``FileNotFoundError``
+        # surface uniformly).
         try:
-            subprocess.run(
-                ["gh", "pr", "ready", wt.draft_pr_url, "--undo"],
-                cwd=wt.worktree_path,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
+            gh_pr_ready(wt.draft_pr_url, undo=True, cwd=wt.worktree_path)
             flipped.append(wt.draft_pr_url)
-        except (subprocess.SubprocessError, OSError, FileNotFoundError):
+        except GhError:
             pass
 
     try:
@@ -3042,15 +3045,14 @@ def session_flip_drafts_draft_cmd(session_id: str, project_dir: Path) -> None:
     for wt in session.runtime_state.worktrees:
         if not wt.draft_pr_url:
             continue
+        # Best-effort by contract: a PR that's already draft or merged
+        # exits non-zero from gh, but the wrapper shouldn't fail loud —
+        # the operator can re-run or inspect gh directly. Swallow
+        # ``GhError`` here.
         try:
-            subprocess.run(
-                ["gh", "pr", "ready", wt.draft_pr_url, "--undo"],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            gh_pr_ready(wt.draft_pr_url, undo=True)
             flipped.append(wt.draft_pr_url)
-        except OSError:
+        except GhError:
             continue
 
     for url in flipped:
@@ -3104,43 +3106,12 @@ def session_normalise_branch_cmd(session_id: str, project_dir: Path) -> None:
         # Look up the PR for this branch — gh may return nothing if no
         # PR was ever opened; we treat that as "nothing to normalise".
         try:
-            listing = subprocess.run(
-                [
-                    "gh",
-                    "pr",
-                    "list",
-                    "--head",
-                    wt.branch,
-                    "--state",
-                    "merged",
-                    "--json",
-                    "number,mergedAt,mergeCommit",
-                    "--limit",
-                    "1",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                cwd=str(wt_path),
-            )
-        except (subprocess.SubprocessError, OSError) as exc:
+            pr = get_merged_pr_for_branch(wt.branch, cwd=wt_path)
+        except GhError as exc:
             errors.append(f"gh pr list failed for {wt.branch}: {exc}")
             continue
 
-        if listing.returncode != 0:
-            errors.append(
-                f"gh pr list for {wt.branch} exit={listing.returncode}: "
-                f"{(listing.stderr or '').strip()}"
-            )
-            continue
-
-        try:
-            prs = json.loads(listing.stdout or "[]")
-        except json.JSONDecodeError as exc:
-            errors.append(f"gh pr list invalid JSON for {wt.branch}: {exc}")
-            continue
-
-        if not prs or not prs[0].get("mergedAt"):
+        if pr is None or not pr.get("mergedAt"):
             skipped.append(f"{wt.branch}: PR not merged")
             continue
 

@@ -29,11 +29,11 @@ Codes (severity=error):
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 from typing import Any
 
 from tripwire.core import paths
+from tripwire.core.gh_helpers import GhError, get_merged_pr_for_branch
 from tripwire.core.validator._types import CheckResult, ValidationContext
 
 
@@ -66,41 +66,17 @@ def _issue_at_or_past(ctx: ValidationContext, current: str, threshold: str) -> b
 def _pr_merged_for_branch(worktree_path: str, branch: str) -> bool:
     """Return True when ``branch`` has a merged PR on its origin.
 
-    Mirrors ``session_complete._verify_pr_merged``: runs ``gh pr list
-    --state merged`` from inside the worktree so the right remote is
-    picked up when sessions span multiple repos. Errors are conservative
-    — treated as "not merged" so the operator re-runs once the env is
-    healthy rather than getting a false green.
+    Mirrors ``session_complete._verify_pr_merged``: delegates to
+    :func:`tripwire.core.gh_helpers.get_merged_pr_for_branch`, which
+    runs ``gh pr list --state merged`` from inside the worktree so the
+    right remote is picked up when sessions span multiple repos. Errors
+    are conservative — treated as "not merged" so the operator re-runs
+    once the env is healthy rather than getting a false green.
     """
     try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--head",
-                branch,
-                "--state",
-                "merged",
-                "--json",
-                "number",
-                "--limit",
-                "1",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=worktree_path,
-        )
-    except (subprocess.SubprocessError, OSError):
+        return get_merged_pr_for_branch(branch, cwd=worktree_path) is not None
+    except GhError:
         return False
-    if result.returncode != 0 or not result.stdout.strip():
-        return False
-    try:
-        prs = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return False
-    return bool(prs)
 
 
 def check_pr_merged_for_session(ctx: ValidationContext) -> list[CheckResult]:

@@ -36,6 +36,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from tripwire.core import paths
+from tripwire.core.gh_helpers import (
+    GhError,
+    get_merged_pr_for_branch,
+    gh_pr_ready,
+)
 from tripwire.core.issue_artifact_store import (
     load_issue_artifact_manifest,
     status_at_or_past,
@@ -157,15 +162,19 @@ def _flip_drafts_to_ready(session) -> None:
     """
     for wt in session.runtime_state.worktrees:
         if wt.draft_pr_url:
-            subprocess.run(
-                ["gh", "pr", "ready", wt.draft_pr_url],
-                cwd=wt.worktree_path,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
+            # Fail-quiet by contract: an already-ready or merged PR
+            # returns non-zero from gh, but we don't want a noisy warning
+            # to fail the whole complete. Swallow ``GhError`` here.
+            try:
+                gh_pr_ready(wt.draft_pr_url, cwd=wt.worktree_path)
+            except GhError:
+                pass
         else:
+            # Fallback path (pre-v0.7.5 sessions) — open a fresh PR.
+            # ``gh pr create`` is not a candidate for ``gh_helpers``
+            # because it carries a much larger arg surface than the
+            # three top-level operations we centralised; inlining the
+            # subprocess call here is fine.
             subprocess.run(
                 [
                     "gh",
@@ -186,8 +195,14 @@ def _flip_drafts_to_ready(session) -> None:
 def _verify_pr_merged(session) -> None:
     """Require every worktree branch to have a merged PR; raise
     :class:`CompleteError` naming the unmerged branch(es) otherwise.
-    ``gh`` is invoked from inside each worktree so it picks up the
-    correct remote when worktrees have different origins.
+    ``gh`` is invoked from inside each worktree (via
+    :func:`tripwire.core.gh_helpers.get_merged_pr_for_branch`) so it
+    picks up the correct remote when worktrees have different origins.
+
+    Fail-quiet on gh subprocess failure: treat "gh errored / not
+    installed / timed out / returned garbage" as "not merged" — the
+    operator re-runs once the environment is healthy, or runs
+    ``tripwire session abandon`` if the session genuinely shouldn't ship.
     """
     worktrees = list(session.runtime_state.worktrees)
     if not worktrees:
@@ -197,38 +212,11 @@ def _verify_pr_merged(session) -> None:
         )
     unmerged: list[str] = []
     for wt in worktrees:
-        merged = False
         try:
-            result = subprocess.run(
-                [
-                    "gh",
-                    "pr",
-                    "list",
-                    "--head",
-                    wt.branch,
-                    "--state",
-                    "merged",
-                    "--json",
-                    "number",
-                    "--limit",
-                    "1",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                cwd=wt.worktree_path,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                prs = json.loads(result.stdout)
-                if prs:
-                    merged = True
-        except (subprocess.SubprocessError, OSError, json.JSONDecodeError):
-            # Treat "gh errored / timed out / returned garbage" as "not
-            # merged" — conservative: operator re-runs once the
-            # environment is healthy, or `tripwire session abandon` if
-            # the session genuinely shouldn't ship.
-            pass
-        if not merged:
+            pr = get_merged_pr_for_branch(wt.branch, cwd=wt.worktree_path)
+        except GhError:
+            pr = None
+        if pr is None:
             unmerged.append(wt.branch)
     if unmerged:
         raise CompleteError(

@@ -11,13 +11,16 @@ Subcommands:
 - ``pr-ready-undo <num>`` — ``gh pr ready <num> --undo``
 - ``pr-close <num>``      — ``gh pr close <num>`` via the canonical
   :func:`tripwire.core.session_abandon._close_pr_by_num` helper.
+
+All three delegate their subprocess plumbing to
+:mod:`tripwire.core.gh_helpers`.
 """
 
 from __future__ import annotations
 
-import subprocess
-
 import click
+
+from tripwire.core.gh_helpers import GhError, gh_pr_ready
 
 
 @click.group(name="gh")
@@ -25,24 +28,20 @@ def gh_cmd() -> None:
     """Low-level GitHub CLI helpers exposed as Layer-1 CLI commands."""
 
 
-def _gh_pr_ready(pr_num: int, *, undo: bool) -> tuple[int, str]:
+def _gh_pr_ready(pr_num: int, *, undo: bool) -> tuple[bool, str]:
     """Run ``gh pr ready <num>`` (with optional ``--undo``).
 
-    Returns ``(returncode, stderr)``. Captured so both the ready and
-    ready-undo commands can share error handling without each
-    duplicating the subprocess plumbing.
+    Returns ``(ok, error_message)`` — ``ok`` is True when gh succeeded;
+    on failure ``error_message`` is the formatted ``GhError`` (which
+    already carries the original stderr and exit code, in the
+    ``"gh pr ready 42 exit=K: <stderr>"`` shape). The CLI wrappers
+    surface that string in their click error.
     """
-    cmd = ["gh", "pr", "ready", str(pr_num)]
-    if undo:
-        cmd.append("--undo")
-    result = subprocess.run(
-        cmd,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=15,
-    )
-    return result.returncode, (result.stderr or "").strip()
+    try:
+        gh_pr_ready(pr_num, undo=undo)
+    except GhError as exc:
+        return False, str(exc)
+    return True, ""
 
 
 @gh_cmd.command("pr-ready")
@@ -54,11 +53,12 @@ def gh_pr_ready_cmd(pr_num: int) -> None:
     as a click error so callers can detect failures; a previously-ready
     PR exits clean (idempotent at the gh level).
     """
-    rc, stderr = _gh_pr_ready(pr_num, undo=False)
-    if rc != 0:
-        raise click.ClickException(
-            f"gh pr ready #{pr_num} exit={rc}: {stderr or '<no stderr>'}"
-        )
+    ok, err = _gh_pr_ready(pr_num, undo=False)
+    if not ok:
+        # ``err`` already includes the gh exit code + stderr in its
+        # ``GhError`` shape; we prefix with the per-PR framing the
+        # test suite pinned in v0.13.
+        raise click.ClickException(f"gh pr ready #{pr_num}: {err}")
     click.echo(f"marked PR #{pr_num} ready-for-review")
 
 
@@ -70,11 +70,9 @@ def gh_pr_ready_undo_cmd(pr_num: int) -> None:
     Equivalent to ``gh pr ready <num> --undo``. Mirrors the
     ``flip_drafts_to_draft`` side-effect's per-PR step.
     """
-    rc, stderr = _gh_pr_ready(pr_num, undo=True)
-    if rc != 0:
-        raise click.ClickException(
-            f"gh pr ready --undo #{pr_num} exit={rc}: {stderr or '<no stderr>'}"
-        )
+    ok, err = _gh_pr_ready(pr_num, undo=True)
+    if not ok:
+        raise click.ClickException(f"gh pr ready --undo #{pr_num}: {err}")
     click.echo(f"flipped PR #{pr_num} back to draft")
 
 

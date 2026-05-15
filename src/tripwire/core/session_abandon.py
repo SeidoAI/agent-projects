@@ -34,6 +34,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from tripwire.core.gh_helpers import GhError, gh_pr_close
 from tripwire.core.git_helpers import worktree_remove
 from tripwire.core.session_store import load_session
 
@@ -179,22 +180,9 @@ def _close_pr_by_url(pr_url: str, worktree_path: str) -> _PrCloseVerdict:
     """
     verdict = _PrCloseVerdict()
     try:
-        close = subprocess.run(
-            ["gh", "pr", "close", pr_url],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            cwd=worktree_path,
-        )
-    except (subprocess.SubprocessError, OSError) as exc:
-        verdict.error = f"gh pr close {pr_url} failed: {exc}"
-        return verdict
-
-    if close.returncode != 0:
-        verdict.error = (
-            f"gh pr close {pr_url} exit={close.returncode}: "
-            f"{(close.stderr or '').strip()}"
-        )
+        gh_pr_close(pr_url, cwd=worktree_path)
+    except GhError as exc:
+        verdict.error = str(exc)
         return verdict
 
     tail = pr_url.rsplit("/", 1)[-1]
@@ -258,29 +246,14 @@ def _close_pr_for_branch(branch: str, worktree_path: str) -> _PrCloseVerdict:
         if state != "OPEN":
             continue
         try:
-            close = subprocess.run(
-                [
-                    "gh",
-                    "pr",
-                    "close",
-                    str(number),
-                    "--comment",
-                    "Session abandoned (`tripwire session abandon`).",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=15,
+            gh_pr_close(
+                number,
+                comment="Session abandoned (`tripwire session abandon`).",
                 cwd=worktree_path,
             )
-            if close.returncode == 0:
-                verdict.closed_pr = number
-            else:
-                verdict.error = (
-                    f"gh pr close #{number} exit={close.returncode}: "
-                    f"{(close.stderr or '').strip()}"
-                )
-        except (subprocess.SubprocessError, OSError) as exc:
-            verdict.error = f"gh pr close #{number} failed: {exc}"
+            verdict.closed_pr = number
+        except GhError as exc:
+            verdict.error = str(exc)
         # Closing the first open PR per branch is enough; gh shouldn't
         # show two open PRs for the same head, but if it does the
         # leftover surfaces in the next abandon run.
@@ -304,21 +277,9 @@ def _close_pr_by_num(pr_num: int, cwd: Path | str | None = None) -> _PrCloseVerd
     """
     verdict = _PrCloseVerdict()
     try:
-        close = subprocess.run(
-            ["gh", "pr", "close", str(pr_num)],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            cwd=str(cwd) if cwd is not None else None,
-        )
-    except (subprocess.SubprocessError, OSError) as exc:
-        verdict.error = f"gh pr close #{pr_num} failed: {exc}"
-        return verdict
-    if close.returncode != 0:
-        verdict.error = (
-            f"gh pr close #{pr_num} exit={close.returncode}: "
-            f"{(close.stderr or '').strip()}"
-        )
+        gh_pr_close(pr_num, cwd=cwd)
+    except GhError as exc:
+        verdict.error = str(exc)
         return verdict
     verdict.closed_pr = pr_num
     return verdict
