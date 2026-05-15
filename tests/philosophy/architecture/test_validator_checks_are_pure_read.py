@@ -1,4 +1,4 @@
-"""Validator checks/lint subdirs are pure read.
+"""The whole validator tree is pure read.
 
 Philosophy §3 ("Tripwires are agent-facing") makes validators the
 *report* surface of the framework:
@@ -10,20 +10,21 @@ A validator that mutates state — writes a file, deletes a directory,
 spawns a subprocess that does either — has moved out of the "report"
 role and into the "act" role. That's a §3 violation.
 
-But there's a documented carve-out: ``tripwire validate --fix`` does
-mutate. The fix path lives in ``core/validator/__init__.py`` (top-
-level module) and is invoked separately from the check pipeline. The
-checks themselves stay pure-read; the fixer is a sibling concept.
+History: round-3 of these tests *carved out* an exemption for
+``apply_fixes`` (in ``core/validator/__init__.py``) and another for
+``lint/no_orphan_proj_branches.py`` (raw ``subprocess.run`` for read-
+only git queries). Both carve-outs were the show-pony pattern: the
+test passes, but the philosophy violation remained. The correct
+response was to fix the code:
 
-This test enforces the actual rule: ``core/validator/checks/`` and
-``core/validator/lint/`` (the directories containing check / heuristic
-implementations) MUST NOT contain filesystem-mutating calls. The
-top-level ``core/validator/__init__.py`` is allowed to mutate — that's
-where ``apply_fixes`` lives.
+  - ``apply_fixes`` moved to ``core/fix.py`` (Finding 1 fix).
+  - Read-only git subprocess moved to ``core/git_helpers.py``
+    (Finding 3 fix).
 
-If a future change introduces a check that "auto-fixes" inline (mutates
-during the check) rather than going through ``apply_fixes``, the
-fix-as-side-effect-of-reporting drift trips this test.
+The validator tree (``core/validator/**``) is now mutation-free in
+its entirety. This test enforces that: ``checks/``, ``lint/``, AND
+``__init__.py`` are all scanned with no exemptions. A new mutation
+anywhere under the tree is a §3 regression to fix at the source.
 """
 
 from __future__ import annotations
@@ -34,8 +35,6 @@ from pathlib import Path
 import tripwire
 
 VALIDATOR_ROOT = Path(tripwire.__file__).parent / "core" / "validator"
-CHECKS_DIR = VALIDATOR_ROOT / "checks"
-LINT_DIR = VALIDATOR_ROOT / "lint"
 
 # Mutation patterns. Each is a regex matched against single lines of
 # source (so a literal occurrence in a comment is fine; the test skips
@@ -58,32 +57,18 @@ MUTATION_PATTERNS = [
     # at code review.
 ]
 
-# Files allowed to mutate despite the rule. Each entry needs a
-# comment explaining why. The exemption is a debt, not a discharge:
-# the long-term §3-pure pattern is to put subprocess plumbing in a
-# `_helpers` module (cf. `core/gh_helpers.py`) and have the lint
-# call the helper instead.
-EXEMPT_FILES: dict[Path, str] = {
-    # KUI: v0.13.1 deferral #2 consolidated `gh` subprocess plumbing
-    # into `core/gh_helpers.py`. The equivalent for `git` is a follow-
-    # up: `no_orphan_proj_branches.py` makes read-only `git for-each-
-    # ref` / `git rev-list` calls inline. The subprocess invocations
-    # are READ-only (capture_output=True, no mutation flags), so
-    # they don't violate §3 in spirit — but the §9 "CLI codifies
-    # repetitive procedure" principle says they should live in a
-    # `core/git_helpers.py`-style module, not inline in the lint.
-    LINT_DIR / "no_orphan_proj_branches.py": (
-        "v0.13.1 follow-up: read-only git subprocess should move to core/git_helpers.py"
-    ),
-}
+# No exemptions. A failing test means the code drifted from intent;
+# fix the code, not the test. (This used to carry an `EXEMPT_FILES`
+# allowlist for `lint/no_orphan_proj_branches.py`; the proper §9 fix
+# was to move its read-only `git` subprocess calls into
+# `core/git_helpers.py`. The allowlist is gone and so is the inline
+# subprocess.)
 
 
 def _scan(root: Path) -> list[str]:
     """Return a list of `path:line: <line>` violation strings."""
     out: list[str] = []
     for py_file in root.rglob("*.py"):
-        if py_file in EXEMPT_FILES:
-            continue
         text = py_file.read_text(encoding="utf-8")
         for line_no, line in enumerate(text.splitlines(), 1):
             stripped = line.lstrip()
@@ -97,43 +82,34 @@ def _scan(root: Path) -> list[str]:
     return out
 
 
-def test_validator_checks_subdir_is_pure_read():
-    """``core/validator/checks/**.py`` performs no filesystem
-    mutation. Reads are fine; subprocess invocations are not.
+def test_validator_tree_is_pure_read():
+    """``core/validator/**.py`` — every file under the validator tree
+    is mutation-free.
 
-    If a check needs to mutate, the §3-compatible pattern is:
-      1. Report the finding (return a CheckResult).
-      2. Wire the matching fix into ``apply_fixes`` in
-         ``core/validator/__init__.py``.
-    That separates "report" from "act" at the module boundary.
+    Includes the top-level ``__init__.py`` (which previously held
+    ``apply_fixes``; now extracted to ``core/fix.py``), the ``checks/``
+    subdir, and the ``lint/`` subdir. Reads are fine; mutations and
+    subprocess invocations are not.
+
+    The §3-compatible pattern for "we want auto-correction when a
+    check fires":
+      1. The check returns a CheckResult (pure-read).
+      2. The matching fix lives in ``core/fix.py``.
+      3. ``validate_project(fix=True)`` orchestrates "read → fix → re-read".
+    Mutation is partitioned to the fix module; the validator stays
+    passive.
     """
-    violations = _scan(CHECKS_DIR)
+    violations = _scan(VALIDATOR_ROOT)
     assert not violations, (
-        "Philosophy §3 violation — a validator check is mutating state.\n"
-        "Checks must be pure-read. Mutations belong in `apply_fixes`\n"
-        "(in `core/validator/__init__.py`), not in individual checks.\n"
+        "Philosophy §3 violation — a validator module is mutating state.\n"
+        "The validator tree is the *report* surface; mutations live in\n"
+        "`core/fix.py` and run via `validate_project(fix=True)`.\n"
         "\n"
         "Offending sites:\n" + "\n".join(violations) + "\n"
         "\n"
-        "Fix: return a CheckResult; add the corresponding fix to\n"
-        "`apply_fixes` so the `--fix` flag picks it up. See the existing\n"
-        "`_bump_next_issue_number` fixer for the canonical pattern."
-    )
-
-
-def test_validator_lint_subdir_is_pure_read():
-    """``core/validator/lint/**.py`` performs no filesystem mutation.
-
-    Heuristic / lint checks are advisory by design — they MUST NOT
-    take corrective action themselves.
-    """
-    violations = _scan(LINT_DIR)
-    assert not violations, (
-        "Philosophy §3 violation — a lint heuristic is mutating state.\n"
-        "Heuristics are advisory; they emit findings, never act.\n"
-        "\n"
-        "Offending sites:\n" + "\n".join(violations) + "\n"
-        "\n"
-        "Fix: emit a warning-severity CheckResult. If the lint truly\n"
-        "needs an auto-fix, promote it to a check + `apply_fixes` row."
+        "Fix: if the mutation is a corrective fix, add it to\n"
+        "`core/fix.py` (alongside the existing `_fix_uuid`,\n"
+        "`_fix_timestamps`, etc.). If it's a read-only subprocess call,\n"
+        "move it into the appropriate helper module (see\n"
+        "`core/git_helpers.py` or `core/gh_helpers.py`)."
     )

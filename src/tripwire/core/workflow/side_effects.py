@@ -96,8 +96,8 @@ def append_audit_record(
     logged try/except — swallowing here too would silently hide bugs.
     """
     from tripwire.core.events.log import isoformat_z
+    from tripwire.core.jsonl_log import append_jsonl
     from tripwire.core.session_reopen import _audit_path
-    from tripwire.ui.services._atomic_write import append_jsonl
 
     when = now or datetime.now(tz=timezone.utc)
     audit = _audit_path(project_dir)
@@ -113,6 +113,8 @@ def append_audit_record(
             "to_status": route.to_ref,
             "reason": flags.get("reason"),
         },
+        sort_keys=True,
+        default=str,
     )
 
 

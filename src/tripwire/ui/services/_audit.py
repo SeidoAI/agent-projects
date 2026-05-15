@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from tripwire.ui.services._atomic_write import append_jsonl
+from tripwire.core.jsonl_log import append_jsonl
 
 
 def _project_id(project_dir: Path) -> str:
@@ -69,7 +69,7 @@ def write_audit_entry(
     }
     if extras:
         record["extras"] = extras
-    append_jsonl(audit_log_path(project_dir), record)
+    append_jsonl(audit_log_path(project_dir), record, sort_keys=True, default=str)
 
 
 __all__ = ["audit_log_path", "write_audit_entry"]

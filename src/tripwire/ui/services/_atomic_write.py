@@ -23,7 +23,6 @@ than a cross-device copy.
 
 from __future__ import annotations
 
-import json
 import os
 import tempfile
 from pathlib import Path
@@ -75,18 +74,4 @@ def atomic_write_yaml(path: Path, data: Any) -> None:
     atomic_write_text(path, text)
 
 
-def append_jsonl(path: Path, record: dict[str, Any]) -> None:
-    """Append *record* to *path* as one JSON line.
-
-    Audit logs are append-only, so we use a single ``open(…, "a")``
-    write. On POSIX, writes under ``PIPE_BUF`` (at least 512 bytes, in
-    practice 4 KiB) are atomic with respect to concurrent appenders.
-    An audit-log record is far under that ceiling.
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    line = json.dumps(record, sort_keys=True, default=str) + "\n"
-    with path.open("a", encoding="utf-8") as fh:
-        fh.write(line)
-
-
-__all__ = ["append_jsonl", "atomic_write_text", "atomic_write_yaml"]
+__all__ = ["atomic_write_text", "atomic_write_yaml"]

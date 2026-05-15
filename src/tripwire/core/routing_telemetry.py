@@ -29,6 +29,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from tripwire.core.jsonl_log import append_jsonl
 from tripwire.models.session import AgentSession
 
 _TELEMETRY_FILENAME = ".routing_telemetry.jsonl"
@@ -152,10 +153,7 @@ def append_telemetry_row(project_dir: Path, row: TelemetryRow) -> None:
     line, which the reader skips.
     """
     path = telemetry_path(project_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    line = json.dumps(row.as_jsonl_dict(), separators=(",", ":"))
-    with path.open("a", encoding="utf-8") as fh:
-        fh.write(line + "\n")
+    append_jsonl(path, row.as_jsonl_dict(), separators=(",", ":"))
 
 
 def read_telemetry(project_dir: Path) -> list[dict[str, Any]]:

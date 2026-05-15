@@ -12,6 +12,31 @@ A working acceptance test is an executable spec. A failing fitness
 function is an instant alarm that someone (human or agent) tried
 to add a forbidden pattern.
 
+## How to read a failure
+
+The tests here are **audits**, not specs you tune to match current
+behaviour. When a fitness function fails, the correct response is:
+
+1. **Look at the code, not the test.** The failure is a finding,
+   like a tripwire firing for an agent. Read what the code is
+   actually doing.
+2. **Decide which is wrong.** Either:
+   - The code drifted from intent → fix the code.
+   - The philosophy claim was over-broad / outdated → update
+     `docs/philosophy.md` first, then update the test.
+3. **Never just add an `EXEMPT_FILES` allowlist.** That's the
+   show-pony pattern: the test passes, the violation remains, and
+   future readers think the carve-out was always intended. If the
+   test surfaces something the philosophy doesn't acknowledge, the
+   gap is real and worth resolving — not papering over.
+
+The fitness functions in this directory have already caught three
+real violations during their own development (v0.13.1 rounds 2-3):
+read-only `git` subprocess inline in `validator/lint/`, the
+`apply_fixes` mutator living inside `core/validator/`, and three
+JSONL appenders hand-rolling the same POSIX-append pattern. All
+three were fixed at the source — the tests didn't grow exemptions.
+
 ## Four kinds of test live here
 
 ### `acceptance/` — executable specifications

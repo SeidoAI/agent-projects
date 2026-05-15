@@ -18,9 +18,13 @@ session-tracking branches live.
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from tripwire.core.git_helpers import (
+    branch_commit_count_ahead,
+    local_branches_with_prefix,
+)
 
 if TYPE_CHECKING:
     from tripwire.core.validator import CheckResult, ValidationContext
@@ -29,51 +33,22 @@ if TYPE_CHECKING:
 def local_proj_branches(repo_dir: Path) -> list[str]:
     """Return local branch names under ``refs/heads/proj/``.
 
-    Degrades to ``[]`` on any failure (not a git repo, no proj/*
-    branches, etc.). The validator must be local-first and silent on
-    missing prerequisites.
+    Thin alias for :func:`local_branches_with_prefix` — preserved so
+    existing callers (and the test that imports this name) keep working.
     """
-    result = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repo_dir),
-            "for-each-ref",
-            "--format=%(refname:short)",
-            "refs/heads/proj/",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        return []
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    return local_branches_with_prefix(repo_dir, "proj/")
 
 
 def branch_is_empty(repo_dir: Path, branch: str, base: str) -> bool:
     """True if ``branch`` has zero commits ahead of ``base``.
 
-    Returns ``False`` (assume non-empty, don't fire) on any git
-    failure — local-first, no false positives when we can't tell.
+    Returns ``False`` (assume non-empty, don't fire) when we can't tell
+    — local-first, no false positives.
     """
-    result = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repo_dir),
-            "rev-list",
-            f"{base}..{branch}",
-            "--count",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
+    count = branch_commit_count_ahead(repo_dir, branch, base)
+    if count is None:
         return False
-    try:
-        return int(result.stdout.strip() or "0") == 0
-    except ValueError:
-        return False
+    return count == 0
 
 
 def check(ctx: ValidationContext) -> list[CheckResult]:

@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Any
 
 from tripwire.core.events.schema import Event
+from tripwire.core.jsonl_log import append_jsonl
 from tripwire.core.locks import project_lock
 
 EVENTS_DIRNAME = "events"
@@ -102,12 +103,9 @@ def emit_event(
     target_dir.mkdir(parents=True, exist_ok=True)
     target = target_dir / _today_filename(when)
 
-    line = json.dumps(record.to_json(), ensure_ascii=False, sort_keys=False)
     lock_name = f"{EVENTS_DIRNAME}/.{target.name}.lock"
     with project_lock(project_dir, name=lock_name):
-        with target.open("a", encoding="utf-8") as fh:
-            fh.write(line)
-            fh.write("\n")
+        append_jsonl(target, record.to_json(), ensure_ascii=False, sort_keys=False)
     return record
 
 
