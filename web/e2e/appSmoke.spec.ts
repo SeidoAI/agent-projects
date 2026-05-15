@@ -41,9 +41,18 @@ test("workflow page renders against real API payload without console regressions
   await expect(page.getByTestId("workflow-flowchart")).toBeVisible();
   await expect(page.getByTestId("workflow-nav-tile-coding-session")).toBeVisible();
   await expect(page.getByTestId("workflow-band-coding-session")).toBeVisible();
-  await expect(page.getByTestId("workflow-region-executing")).toBeVisible();
-  await expect(page.getByTestId("workflow-jit-completed-self-review")).toBeVisible();
-  await expect(page.getByTestId("workflow-workstep-executing-implement")).toBeVisible();
+  const codingSessionExecuting = page.getByTestId(
+    "rf__node-band:coding-session:status:executing",
+  );
+  await expect(
+    codingSessionExecuting.getByTestId("workflow-region-executing"),
+  ).toBeVisible();
+  await expect(
+    codingSessionExecuting.getByTestId("workflow-jit-completed-self-review"),
+  ).toBeVisible();
+  await expect(
+    codingSessionExecuting.getByTestId("workflow-workstep-executing-implement"),
+  ).toBeVisible();
 
   const gateBadge = page.getByTestId("workflow-gate-badge-queued-to-executing");
   await expect(gateBadge).toBeVisible();
