@@ -523,7 +523,11 @@ def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) 
         )
 
     if promote_issues:
-        from tripwire.core.store import load_issue, save_issue
+        from tripwire.core.store import load_issue
+        from tripwire.core.workflow.transitions import (
+            TransitionError,
+            execute_transition,
+        )
 
         promoted = 0
         for issue_key in session.issues:
@@ -532,11 +536,27 @@ def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) 
             except FileNotFoundError:
                 click.echo(f"  ! issue {issue_key} not found — skipping")
                 continue
-            if str(issue.status) == "planned":
-                issue.status = "queued"
-                save_issue(resolved, issue)
-                click.echo(f"  {issue_key}: planned → queued")
-                promoted += 1
+            if str(issue.status) != "planned":
+                continue
+            # Route through the executor — `execute_transition` is the
+            # sole writer of every workflow instance's status. The
+            # pre-v0.13.2 inline `issue.status = "queued"; save_issue(...)`
+            # bypassed the issue-closure workflow's route checks.
+            try:
+                result = execute_transition(
+                    resolved,
+                    workflow_id="issue-closure",
+                    instance_id=issue_key,
+                    target_status="queued",
+                )
+            except TransitionError as exc:
+                click.echo(f"  ! {issue_key}: {exc}")
+                continue
+            if not result.ok:
+                click.echo(f"  ! {issue_key}: {result.message or result.reason}")
+                continue
+            click.echo(f"  {issue_key}: planned → queued")
+            promoted += 1
         if promoted == 0:
             click.echo("  (no issues at 'planned' to promote)")
 

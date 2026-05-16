@@ -102,7 +102,16 @@ def make_project(
             f"        kind: forward\n"
             for idx, (f, t) in enumerate(issue_routes)
         )
-        statuses_yaml = "".join(f"      - id: {s}\n" for s in statuses_in_play)
+        # v0.13.2 follow-up: mark statuses with no outbound routes as
+        # ``terminal: true`` so `workflow/no_terminal_status` doesn't
+        # fire when the executor (now reached by the issue-mutation
+        # service via ``execute_transition``) validates the workflow.
+        statuses_with_outbound = {f for f, _ in issue_routes}
+        statuses_yaml = "".join(
+            f"      - id: {s}\n"
+            + ("        terminal: true\n" if s not in statuses_with_outbound else "")
+            for s in statuses_in_play
+        )
         issue_closure_block = (
             "  issue-closure:\n"
             "    actor: pm-agent\n"

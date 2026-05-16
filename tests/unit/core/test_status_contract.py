@@ -139,37 +139,23 @@ def _write_minimal_project(project_dir: Path) -> None:
     (project_dir / "project.yaml").write_text(
         yaml.safe_dump(
             {
+                # v0.13.2 follow-up: the fixture used to set `phase`,
+                # `labels`, `status_transitions` etc. (pre-v0.13.1 fields).
+                # ProjectConfig forbids extra keys and v0.13.1 B8 dropped
+                # `status_transitions`. sweep_issues now routes through
+                # execute_transition, which loads ProjectConfig on every
+                # call; the obsolete fields would trigger
+                # `schema/project_invalid` and reject every transition.
+                "name": "tmp",
                 "key_prefix": "T",
                 "next_issue_number": 100,
                 "next_session_number": 100,
-                "phase": "executing",
-                "created_at": "2026-01-01T00:00:00",
-                "labels": [],
+                "repos": {"SeidoAI/tmp": {"local": None}},
                 "label_categories": {
                     "executor": ["ai", "human", "mixed"],
                     "verifier": ["required", "optional", "none"],
                     "domain": [],
                     "agent": [],
-                },
-                "statuses": [
-                    "planned",
-                    "queued",
-                    "executing",
-                    "in_review",
-                    "verified",
-                    "completed",
-                    "abandoned",
-                    "deferred",
-                ],
-                "status_transitions": {
-                    "planned": ["queued", "abandoned"],
-                    "queued": ["executing", "abandoned"],
-                    "executing": ["in_review", "abandoned"],
-                    "in_review": ["verified", "executing"],
-                    "verified": ["completed", "in_review"],
-                    "completed": [],
-                    "abandoned": [],
-                    "deferred": [],
                 },
             }
         )
@@ -178,6 +164,70 @@ def _write_minimal_project(project_dir: Path) -> None:
     (project_dir / "instances" / "sessions").mkdir(parents=True, exist_ok=True)
     (project_dir / "events").mkdir(parents=True, exist_ok=True)
     (project_dir / "graph" / "nodes").mkdir(parents=True, exist_ok=True)
+
+    # v0.13.2 follow-up: sweep_issues now routes through
+    # ``execute_transition``, which needs an ``issue-closure`` workflow
+    # declared in ``workflow.yaml``. Single-step routes mirror the
+    # canonical 8-state lifecycle.
+    (project_dir / "workflow.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "workflow_schema_version": 1,
+                "workflows": {
+                    "issue-closure": {
+                        "actor": "pm-agent",
+                        "trigger": "command.pm-issue-close",
+                        "instance": {
+                            "storage_path": "instances/issues/{instance_id}/issue.yaml",
+                            "status_field": "status",
+                            "status_enum": [
+                                "planned",
+                                "queued",
+                                "executing",
+                                "in_review",
+                                "verified",
+                                "completed",
+                                "abandoned",
+                                "deferred",
+                            ],
+                            "instance_id_field": "id",
+                        },
+                        "statuses": [
+                            {"id": "planned"},
+                            {"id": "queued"},
+                            {"id": "executing"},
+                            {"id": "in_review"},
+                            {"id": "verified"},
+                            {"id": "completed", "terminal": True},
+                            # `abandoned` and `deferred` aren't traversed
+                            # in the test (sweep skips off-path statuses);
+                            # we omit them from `statuses` so the workflow
+                            # well-formedness lint doesn't flag them as
+                            # unreachable. They remain in `status_enum`
+                            # because the instance-shape validator needs
+                            # to accept their values on existing files.
+                        ],
+                        "routes": [
+                            {
+                                "id": f"r-{f}-{t}",
+                                "actor": "pm-agent",
+                                "from": f,
+                                "to": t,
+                                "kind": "forward",
+                            }
+                            for f, t in [
+                                ("planned", "queued"),
+                                ("queued", "executing"),
+                                ("executing", "in_review"),
+                                ("in_review", "verified"),
+                                ("verified", "completed"),
+                            ]
+                        ],
+                    }
+                },
+            }
+        )
+    )
 
 
 def _make_issue(project_dir: Path, key: str, status: str) -> None:

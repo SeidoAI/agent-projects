@@ -180,8 +180,25 @@ def sweep_issues(
     Used by ``session complete`` (sweeps to ``completed``) and by the
     ``sweep_issues_forward`` side-effect handler invoked from
     ``workflow.yaml`` routes.
+
+    v0.13.2 follow-up: each step routes through ``execute_transition``
+    so the issue-closure workflow's per-route gates fire. The pre-fix
+    version did ``issue.status = target`` directly + ``save_issue``,
+    bypassing the executor — a single-writer violation that the
+    v0.13.1 regex fitness test missed because pydantic coerces a
+    string assignment into the typed enum. The issue-closure workflow
+    declares only single-step routes (planned→queued→executing→
+    in_review→verified→completed) so a multi-step sweep walks the
+    lifecycle one step at a time. If any step rejects (e.g. an
+    artifact-presence tripwire), the sweep stops at the failure;
+    partially-advanced issues stay where they got to, and the issue
+    is not included in the returned ``changed`` list.
     """
-    from tripwire.core.store import load_issue, save_issue
+    from tripwire.core.store import load_issue
+    from tripwire.core.workflow.transitions import (
+        TransitionError,
+        execute_transition,
+    )
 
     target = sweep_target_for(target_session_state)
     if target is None:
@@ -189,7 +206,6 @@ def sweep_issues(
 
     target_idx = _lifecycle_index(target)
     if target_idx is None:
-        # Sweep target is off-path; nothing to do.
         return []
 
     changed: list[str] = []
@@ -198,7 +214,7 @@ def sweep_issues(
             issue = load_issue(project_dir, issue_key)
         except FileNotFoundError:
             continue
-        current = issue.status
+        current = str(issue.status)
         if current == target:
             continue
         current_idx = _lifecycle_index(current)
@@ -208,9 +224,26 @@ def sweep_issues(
         if current_idx >= target_idx:
             # Already at or past the target. No backslide.
             continue
-        issue.status = target
-        save_issue(project_dir, issue)
-        changed.append(issue_key)
+
+        reached_target = True
+        for step_idx in range(current_idx + 1, target_idx + 1):
+            step = _LIFECYCLE_ORDER[step_idx]
+            try:
+                result = execute_transition(
+                    project_dir,
+                    workflow_id="issue-closure",
+                    instance_id=issue_key,
+                    target_status=step,
+                )
+            except TransitionError:
+                reached_target = False
+                break
+            if not result.ok:
+                reached_target = False
+                break
+
+        if reached_target:
+            changed.append(issue_key)
     return changed
 
 

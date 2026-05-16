@@ -5,23 +5,29 @@ through ``execute_transition``.
 
 The regex-based companion test
 (:mod:`tests/philosophy/architecture/test_single_writer_guarantee`)
-catches the visible pattern: ``obj.status = SessionStatus.PAUSED``. It
-doesn't catch the bypass shapes:
+catches the visible enum-typed pattern: ``obj.status = SessionStatus.PAUSED``. It doesn't catch:
 
   - ``setattr(obj, "status", SessionStatus.PAUSED)``
   - ``obj.__dict__["status"] = SessionStatus.PAUSED``
   - ``vars(obj)["status"] = SessionStatus.PAUSED``
+  - ``obj.status = "completed"`` — string assignment, coerced into the
+    typed enum by pydantic. This was the v0.13.2 follow-up finding:
+    ``status_contract.sweep_issues`` wrote ``issue.status = target``
+    (a string) for years, the regex pattern only matched
+    ``IssueStatus.X``, the violation hid in plain sight.
 
-These all mutate the status field without tripping the regex. A
-future agent (or an over-clever refactor) could route around the
+All four shapes mutate the status field without tripping the regex.
+A future agent (or an over-clever refactor) could route around the
 single-writer guarantee via any of them.
 
 This test walks the AST of every source file and asserts:
 
-  1. No ``setattr(..., "status", ...)`` call exists (outside the
-     executor and model definitions).
+  1. No ``setattr(..., "status", ...)`` call.
   2. No ``Subscript`` assignment whose ``slice`` is ``"status"`` and
      whose target looks like ``obj.__dict__`` / ``vars(obj)``.
+  3. No ``Assign`` whose target is ``<expr>.status``.
+
+…all outside the executor and model definitions.
 
 Pure-read AST analysis; no runtime cost beyond parse.
 """
@@ -82,7 +88,8 @@ def _walk_violations(tree: ast.AST) -> list[tuple[int, str]]:
                             "setattr(..., 'status', ...) bypasses execute_transition",
                         )
                     )
-        # obj.__dict__["status"] = ... or vars(obj)["status"] = ...
+        # Assignment targets: obj.__dict__["status"] = ...,
+        # vars(obj)["status"] = ..., or obj.status = ...
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 if (
@@ -96,6 +103,29 @@ def _walk_violations(tree: ast.AST) -> list[tuple[int, str]]:
                             "__dict__/vars()['status'] assignment bypasses executor",
                         )
                     )
+                # `obj.status = ...` direct attribute write. The regex
+                # sibling test catches `IssueStatus.X` RHS; this catches
+                # string / variable / call RHS.
+                #
+                # Skip `self.status = ...` — that's the class-internal
+                # constructor pattern (e.g. exception classes carry a
+                # diagnostic `.status` attribute). The single-writer
+                # concern is about WRITING ANOTHER object's status, not
+                # an object initializing its own. We deliberately keep
+                # the receiver-is-Name("self") case scoped to literal
+                # `self` so `self.session.status = ...` (a real
+                # violation routed through a nested attribute) still
+                # flags.
+                if isinstance(target, ast.Attribute) and target.attr == "status":
+                    if not (
+                        isinstance(target.value, ast.Name) and target.value.id == "self"
+                    ):
+                        violations.append(
+                            (
+                                node.lineno,
+                                "direct `.status = ...` assignment bypasses executor",
+                            )
+                        )
     return violations
 
 

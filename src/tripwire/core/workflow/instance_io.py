@@ -158,6 +158,14 @@ def _parse_instance_text(text: str) -> dict[str, Any]:
     Frontmatter+body files surface the body under the ``body`` key so
     callers (the executor, the shape validator) can do simple key
     access. Pure-YAML files are returned as parsed.
+
+    v0.13.2 follow-up: ALWAYS include a ``body`` key for frontmatter-
+    shaped files, even when the body is empty. The previous behaviour
+    omitted ``body`` when ``body == ""`` — that lost the "this file was
+    frontmatter-delimited" signal, and ``_serialise_instance_data``
+    then round-tripped it to pure-YAML on save (stripping the leading
+    ``---`` delimiter). Issue files with empty bodies — common after
+    fresh ``tripwire issue create`` — became unparseable on re-load.
     """
     stripped = text.lstrip()
     if stripped.startswith("---"):
@@ -165,9 +173,7 @@ def _parse_instance_text(text: str) -> dict[str, Any]:
             frontmatter, body = parse_frontmatter_body(text)
         except ParseError as exc:
             raise ValueError(f"Could not parse instance file: {exc}") from exc
-        if body:
-            return {**frontmatter, "body": body}
-        return dict(frontmatter)
+        return {**frontmatter, "body": body}
     data = yaml.safe_load(text) or {}
     if not isinstance(data, dict):
         raise ValueError(

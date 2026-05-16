@@ -208,19 +208,22 @@ class TestUpdateIssueStatus:
             update_issue_status(project_with_transitions, "TMP-1", "completed")
         assert load_issue(project_with_transitions, "TMP-1").status == "queued"
 
-    def test_load_and_audit_happen_inside_project_lock(
+    def test_executor_call_and_audit_happen_inside_project_lock(
         self,
         project_with_transitions,
         save_test_issue,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        """Post-fix #4+#5: load → validate → save → audit all run under the
-        project lock so concurrent callers can't race, and so a crash
-        between save and audit never leaves a mutated-but-unaudited state.
+        """v0.13.2 follow-up: the executor call (which now does the
+        actual save) and the UI audit write both happen INSIDE the
+        ``project_lock`` so concurrent callers can't race and a crash
+        between executor-return and audit-write never leaves a mutated-
+        but-unaudited issue (from the UI audit log's perspective).
 
-        We prove this by tracing the order of lock-enter → save → audit →
-        lock-release. The audit write must happen before the lock
-        releases.
+        Trace order: lock-enter → executor → audit → lock-release.
+        The executor's own per-instance transition lock is a separate
+        lock (different path name) so it nests cleanly inside
+        ``project_lock``.
         """
         save_test_issue(project_with_transitions, "TMP-1", status="queued")
 
@@ -228,10 +231,11 @@ class TestUpdateIssueStatus:
 
         import contextlib
 
+        from tripwire.core.workflow import transitions as exec_mod
         from tripwire.ui.services import issue_mutation_service as svc
 
         original_lock = svc.project_lock
-        original_save = svc.save_issue
+        original_execute = exec_mod.execute_transition
         original_audit = svc.write_audit_entry
 
         def _traced_lock(project_dir):
@@ -244,27 +248,27 @@ class TestUpdateIssueStatus:
 
             return _wrap()
 
-        def _traced_save(*a, **kw):
-            events.append("save")
-            return original_save(*a, **kw)
+        def _traced_execute(*a, **kw):
+            events.append("execute_transition")
+            return original_execute(*a, **kw)
 
         def _traced_audit(*a, **kw):
             events.append("audit")
             return original_audit(*a, **kw)
 
         monkeypatch.setattr(svc, "project_lock", _traced_lock)
-        monkeypatch.setattr(svc, "save_issue", _traced_save)
+        monkeypatch.setattr(exec_mod, "execute_transition", _traced_execute)
         monkeypatch.setattr(svc, "write_audit_entry", _traced_audit)
 
         update_issue_status(project_with_transitions, "TMP-1", "executing")
 
-        # Order: acquired < save < audit < released.
+        # Order: acquired < execute_transition < audit < released.
         assert events[0] == "lock_acquired"
         assert events[-1] == "lock_released"
-        save_idx = events.index("save")
+        exec_idx = events.index("execute_transition")
         audit_idx = events.index("audit")
         release_idx = events.index("lock_released")
-        assert save_idx < audit_idx < release_idx
+        assert exec_idx < audit_idx < release_idx
 
     def test_updated_at_is_tz_aware_utc(
         self, project_with_transitions, save_test_issue
