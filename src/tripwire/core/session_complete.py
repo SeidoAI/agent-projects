@@ -115,6 +115,19 @@ def complete_session(
     if dry_run:
         return result
 
+    # v0.13.2 #2: side-effects fire AFTER the three verify gates and
+    # BEFORE the status flip. The pre-v0.13.1 flow had this ordering
+    # (single-function complete_session); the v0.13.1 refactor moved
+    # the flip + sweep into cli/session.py BEFORE the call, so a gate
+    # failure stranded issues at `completed` and PRs flipped ready
+    # while session.status stayed `verified` — retries silently no-op.
+    # Putting them back inside the verified→flipped window keeps the
+    # invariant: a failed gate means nothing mutated.
+    from tripwire.core.status_contract import sweep_issues
+
+    _flip_drafts_to_ready(session)
+    result.issues_closed = sweep_issues(project_dir, session, "completed")
+
     # Route the status flip through the workflow executor — the sole
     # writer of ``session.status``. Engagement close + telemetry +
     # audit are post-write hooks fired inside ``execute_transition``.

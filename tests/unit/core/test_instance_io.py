@@ -212,6 +212,33 @@ class TestListInstances:
         (tmp_path / "instances" / "demos" / "stray").mkdir(parents=True)
         assert list_instances(tmp_path, "demo") == ["real"]
 
+    def test_skips_graph_cache_in_flat_layout(self, tmp_path: Path) -> None:
+        """Regression test for v0.13.2 #1.
+
+        Flat-layout workflows (notably ``concept-freshness``) write to
+        ``instances/nodes/<id>.yaml``. The graph cache
+        ``tripwire-graph-index.yaml`` lives in the same directory; it
+        is derived, not an instance. v0.13.1 picked it up via
+        ``list_instances`` and fired three shape-validator errors per
+        ``tripwire validate`` run. The five other node-dir scan sites
+        already filtered it; ``list_instances`` did not.
+        """
+        from tripwire.core.paths import GRAPH_INDEX_FILENAME, GRAPH_INDEX_LOCK_FILENAME
+
+        _write_workflow_simple(
+            tmp_path, storage_path="instances/nodes/{instance_id}.yaml"
+        )
+        save_instance(
+            tmp_path, "demo", "real-node", {"id": "real-node", "status": "planned"}
+        )
+        # Plant the graph cache + its lock alongside the real node.
+        nodes_dir = tmp_path / "instances" / "nodes"
+        (nodes_dir / GRAPH_INDEX_FILENAME).write_text(
+            "cache: contents", encoding="utf-8"
+        )
+        (nodes_dir / GRAPH_INDEX_LOCK_FILENAME).write_text("", encoding="utf-8")
+        assert list_instances(tmp_path, "demo") == ["real-node"]
+
 
 # ---------------------------------------------------------------------------
 # Pre-resolved workflow short-circuit (KUI: redundant-parse elimination)

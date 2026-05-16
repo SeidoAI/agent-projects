@@ -80,16 +80,25 @@ def _pr_merged_for_branch(worktree_path: str, branch: str) -> bool:
 
 
 def check_pr_merged_for_session(ctx: ValidationContext) -> list[CheckResult]:
-    """Every worktree branch on a `verified`-or-past session must have a
-    merged PR before the session can reach `completed`.
+    """A session at `verified` must have a merged PR for every worktree
+    branch before it can reach `completed`.
 
     Code: ``session/pr_not_merged``.
+
+    v0.13.2: gate is exact ``== "verified"``, not ``at_or_past``.
+    After completion, ``session complete`` removes the worktree dir
+    without clearing ``runtime_state.worktrees``; re-validating a
+    completed session would shell out into the missing cwd and
+    surface a ``FileNotFoundError`` as a ``GhError`` (interpreted as
+    "not merged"), producing permanent noise per completed session.
+    The check is only meaningful at the verified → completed
+    boundary; after that, completion itself was the proof.
     """
     results: list[CheckResult] = []
     for entity in ctx.sessions:
         session = entity.model
         sid = session.id
-        if not _session_at_or_past(ctx, str(session.status), "verified"):
+        if str(session.status) != "verified":
             continue
 
         runtime = getattr(session, "runtime_state", None)
@@ -116,6 +125,13 @@ def check_pr_merged_for_session(ctx: ValidationContext) -> list[CheckResult]:
 
         unmerged: list[str] = []
         for wt in worktrees:
+            # Defensive: a worktree whose dir is gone (rare, but possible
+            # if cleanup ran out of order) shouldn't surface as
+            # "not merged" — it's an absent prerequisite, not a remote
+            # state. Skip and let the next layer report it if needed.
+            wt_path = Path(wt.worktree_path).expanduser()
+            if not wt_path.is_dir():
+                continue
             if not _pr_merged_for_branch(wt.worktree_path, wt.branch):
                 unmerged.append(wt.branch)
         if unmerged:

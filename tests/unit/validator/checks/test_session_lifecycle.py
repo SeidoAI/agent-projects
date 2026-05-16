@@ -125,6 +125,80 @@ class TestPrMergedForSession:
         ctx = load_context(tmp_path_project)
         assert check_pr_merged_for_session(ctx) == []
 
+    def test_completed_session_skips(
+        self,
+        tmp_path_project,
+        save_test_session,
+        monkeypatch,
+    ):
+        """Regression test for v0.13.2 #5.
+
+        A completed session still carries worktree records in
+        ``runtime_state.worktrees`` (cleanup doesn't clear them today).
+        Before v0.13.2 the gate was ``_session_at_or_past('verified')``
+        so completed sessions re-fired the PR-merged check; the worktree
+        dirs are gone after completion, so ``subprocess.run(cwd=...)``
+        raises ``FileNotFoundError``, surfaced as ``GhError``, treated
+        as "not merged" — permanent noise per completed session.
+
+        After: gate is exact ``== "verified"``; completed sessions skip.
+        """
+        _seed_session_with_worktree(
+            save_test_session, tmp_path_project, "s1", status="completed"
+        )
+        # If the gate were re-broadened, this lambda would force a
+        # finding; the tightened gate must skip before reaching it.
+        monkeypatch.setattr(sl, "_pr_merged_for_branch", lambda _wt, _br: False)
+        ctx = load_context(tmp_path_project)
+        assert check_pr_merged_for_session(ctx) == []
+
+    def test_missing_worktree_dir_does_not_fire(
+        self,
+        tmp_path_project,
+        save_test_session,
+        monkeypatch,
+    ):
+        """Defensive check for v0.13.2 #5.
+
+        Even on a verified session, a worktree whose dir has been
+        removed should not surface as "not merged" — that's an absent
+        prerequisite, not a remote PR state.
+        """
+        save_test_session(
+            tmp_path_project,
+            "s2",
+            status="verified",
+            issues=[],
+            runtime_state={
+                "worktrees": [
+                    {
+                        "repo": "SeidoAI/tmp",
+                        "clone_path": str(tmp_path_project),
+                        "worktree_path": str(tmp_path_project / "gone-worktree"),
+                        "branch": "feat/missing",
+                    }
+                ],
+            },
+        )
+        # _pr_merged_for_branch must NOT be called for the missing
+        # worktree; if it is, we'd see "not merged" surface.
+        called = {"hit": False}
+
+        def _spy(_wt, _br):
+            called["hit"] = True
+            return False
+
+        monkeypatch.setattr(sl, "_pr_merged_for_branch", _spy)
+        ctx = load_context(tmp_path_project)
+        results = check_pr_merged_for_session(ctx)
+        assert results == [], (
+            f"expected no findings for missing worktree, got "
+            f"{[r.code for r in results]}"
+        )
+        assert called["hit"] is False, (
+            "_pr_merged_for_branch was called against a missing worktree path"
+        )
+
 
 # ---------------------------------------------------------------------------
 # v_pr_review_approved
