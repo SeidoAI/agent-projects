@@ -38,6 +38,7 @@ from tripwire.core.gh_helpers import (
     gh_pr_ready,
 )
 from tripwire.core.git_helpers import (
+    commit_and_push_file,
     worktree_is_dirty,
     worktree_prune,
     worktree_remove,
@@ -828,6 +829,40 @@ def session_spawn_cmd(
         )
     )
     save_session(resolved, session)
+
+    # v0.13.2 — persist runtime_state to the PT worktree so the draft PR
+    # carries it. Without this, the field lives only as an uncommitted
+    # edit in the main checkout and gets wiped the next time main pulls
+    # (or worse, when the draft PR squash-merges and overwrites the
+    # tracked file). Failure here logs a WARNING but doesn't fail the
+    # spawn — the agent is already running and runtime_state is on disk
+    # in the main checkout; the operator can recover by hand.
+    pt_entry = next(
+        (wt for wt in start_result.worktrees if wt.branch.startswith("proj/")),
+        None,
+    )
+    if pt_entry is not None:
+        from tripwire.core.session_store import session_yaml_path
+
+        pt_path = Path(pt_entry.worktree_path)
+        save_session(pt_path, session, update_cache=False)
+        try:
+            commit_and_push_file(
+                pt_path,
+                session_yaml_path(pt_path, session_id),
+                f"session({session_id}): capture runtime_state from spawn",
+            )
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or "").strip() or str(exc)
+            click.echo(
+                f"WARNING: failed to commit runtime_state in PT worktree "
+                f"{pt_path}: {detail}. runtime_state.claude_session_id "
+                f"may be lost on next PR merge; commit manually with "
+                f"`git -C {pt_path} add {session_yaml_path(pt_path, session_id).relative_to(pt_path)} "
+                f"&& git -C {pt_path} commit -m 'session({session_id}): capture runtime_state' "
+                f"&& git -C {pt_path} push`.",
+                err=True,
+            )
 
     from tripwire.core.workflow.transitions import (
         TransitionError,
