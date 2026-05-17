@@ -133,6 +133,43 @@ class TestUpdateIssueStatus:
         result = update_issue_status(project_with_transitions, "TMP-1", "queued")
         assert result.status == "queued"
 
+    def test_no_op_same_status_writes_audit_and_bumps_updated_at(
+        self, project_with_transitions, save_test_issue
+    ):
+        """Regression test for codex-MED on the v0.13.2 same-status
+        short-circuit.
+
+        Before the fix, an idempotent same-status patch returned the
+        cached detail without writing an audit row or bumping
+        ``updated_at`` — the PM's request disappeared without trace.
+        That's a regression vs. the pre-v0.13.2 path, which always
+        recorded the acknowledgement.
+        """
+        from datetime import datetime, timedelta, timezone
+
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
+        before_updated_at = load_issue(project_with_transitions, "TMP-1").updated_at
+
+        update_issue_status(project_with_transitions, "TMP-1", "queued")
+
+        # updated_at advanced past the seeded value.
+        after_updated_at = load_issue(project_with_transitions, "TMP-1").updated_at
+        assert after_updated_at is not None
+        assert after_updated_at != before_updated_at
+        assert datetime.now(tz=timezone.utc) - after_updated_at < timedelta(minutes=1)
+
+        # Audit row written with the distinct ``no_op`` action so
+        # operators can filter same-status acks from real transitions.
+        log_path = audit_log_path(project_with_transitions)
+        assert log_path.is_file()
+        lines = log_path.read_text(encoding="utf-8").splitlines()
+        assert len(lines) == 1
+        record = json.loads(lines[0])
+        assert record["action"] == "issue.update_status.no_op"
+        assert record["before_state_snippet"] == {"status": "queued"}
+        assert record["after_state_snippet"] == {"status": "queued"}
+        assert record["extras"]["issue_key"] == "TMP-1"
+
     def test_transition_from_terminal_status_raises(
         self, project_with_transitions, save_test_issue
     ):

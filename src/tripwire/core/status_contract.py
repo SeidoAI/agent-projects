@@ -15,18 +15,44 @@ Public surface
 * ``is_issue_state_compatible_with_session_state(s, i)`` — invariant check.
 * ``sweep_target_for(session_state)`` — what state member issues should
   reach when the session enters ``session_state`` (None = no sweep).
-* ``sweep_issues(project_dir, session, target_session_state)`` — apply the
-  sweep to every member issue, returning the list of issue keys whose
-  status changed.
+* ``sweep_issues(project_dir, session, target_session_state)`` — apply
+  the sweep to every member issue, returning a :class:`SweepResult` that
+  splits fully-advanced issues from partial advancements (issues that
+  cleared at least one step but didn't reach the target).
 """
 
 from __future__ import annotations
 
+import logging
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from tripwire.models.session import AgentSession
+
+log = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class PartialAdvancement:
+    """An issue that advanced one or more lifecycle steps but did not
+    reach the sweep target.
+
+    The fields name exactly where the sweep stopped and why so callers
+    (``tripwire session complete``, the ``sweep-issues-forward`` CLI)
+    can decide whether to abort, retry, or surface the gap to the
+    operator. The pre-codex sweep returned only the fully-advanced
+    keys; partials were silently dropped, which let
+    ``session complete`` mark the session ``completed`` while one of
+    its issues was stuck at, say, ``verified``.
+    """
+
+    issue_key: str
+    started_at_status: str
+    reached_status: str
+    failed_at_step: str
+    reason: str
 
 
 # --- The contract: issue states ⊆ allowed-by-session-state -------------------
@@ -164,13 +190,43 @@ def _lifecycle_index(state: str) -> int | None:
         return None
 
 
+@dataclass(frozen=True)
+class SweepResult:
+    """Outcome of a :func:`sweep_issues` call.
+
+    ``changed`` — issue keys that reached the sweep target.
+    ``partial`` — issues that advanced at least one step but stopped
+    short of the target. Each entry names where it got to and why it
+    stopped, so callers can surface the gap rather than silently
+    treating the sweep as complete.
+
+    Iteration (``for k in result``) yields the fully-advanced keys for
+    backward-compatibility with the pre-codex ``list[str]`` return
+    shape; ``len(result)`` likewise returns ``len(result.changed)``.
+    Callers that care about partials read ``.partial`` directly.
+    """
+
+    changed: list[str] = field(default_factory=list)
+    partial: list[PartialAdvancement] = field(default_factory=list)
+
+    def __iter__(self):
+        return iter(self.changed)
+
+    def __len__(self) -> int:
+        return len(self.changed)
+
+    def __contains__(self, key: object) -> bool:
+        return key in self.changed
+
+
 def sweep_issues(
     project_dir: Path,
     session: AgentSession,
     target_session_state: str,
-) -> list[str]:
+) -> SweepResult:
     """Advance member issues to the sweep target implied by
-    ``target_session_state``. Returns issue keys whose status changed.
+    ``target_session_state``. Returns a :class:`SweepResult` that splits
+    fully-advanced issues from partial advancements.
 
     Skips issues that:
     - don't exist on disk (FileNotFoundError tolerated)
@@ -186,13 +242,15 @@ def sweep_issues(
     version did ``issue.status = target`` directly + ``save_issue``,
     bypassing the executor — a single-writer violation that the
     v0.13.1 regex fitness test missed because pydantic coerces a
-    string assignment into the typed enum. The issue-closure workflow
-    declares only single-step routes (planned→queued→executing→
-    in_review→verified→completed) so a multi-step sweep walks the
-    lifecycle one step at a time. If any step rejects (e.g. an
-    artifact-presence tripwire), the sweep stops at the failure;
-    partially-advanced issues stay where they got to, and the issue
-    is not included in the returned ``changed`` list.
+    string assignment into the typed enum.
+
+    v0.13.2 codex-MED: the multi-step walker stops at the first failing
+    step. The pre-codex return shape dropped partial advancements
+    silently — a session_complete that swept 5 issues to ``completed``
+    might leave 2 of them stuck at intermediate statuses and report
+    "all done" anyway. :class:`SweepResult` surfaces those stuck issues
+    via ``.partial`` plus a WARNING per partial via the module logger,
+    so callers and operators see the gap.
     """
     from tripwire.core.store import load_issue
     from tripwire.core.workflow.transitions import (
@@ -202,22 +260,23 @@ def sweep_issues(
 
     target = sweep_target_for(target_session_state)
     if target is None:
-        return []
+        return SweepResult()
 
     target_idx = _lifecycle_index(target)
     if target_idx is None:
-        return []
+        return SweepResult()
 
     changed: list[str] = []
+    partial: list[PartialAdvancement] = []
     for issue_key in session.issues:
         try:
             issue = load_issue(project_dir, issue_key)
         except FileNotFoundError:
             continue
-        current = str(issue.status)
-        if current == target:
+        started_at = str(issue.status)
+        if started_at == target:
             continue
-        current_idx = _lifecycle_index(current)
+        current_idx = _lifecycle_index(started_at)
         if current_idx is None:
             # Off-path (deferred, abandoned) — leave alone.
             continue
@@ -225,7 +284,9 @@ def sweep_issues(
             # Already at or past the target. No backslide.
             continue
 
-        reached_target = True
+        reached_status = started_at
+        failed_at_step: str | None = None
+        failure_reason: str | None = None
         for step_idx in range(current_idx + 1, target_idx + 1):
             step = _LIFECYCLE_ORDER[step_idx]
             try:
@@ -235,21 +296,48 @@ def sweep_issues(
                     instance_id=issue_key,
                     target_status=step,
                 )
-            except TransitionError:
-                reached_target = False
+            except TransitionError as exc:
+                failed_at_step = step
+                failure_reason = str(exc)
                 break
             if not result.ok:
-                reached_target = False
+                failed_at_step = step
+                failure_reason = result.message or result.reason or "rejected"
                 break
+            reached_status = step
 
-        if reached_target:
+        if failed_at_step is None:
             changed.append(issue_key)
-    return changed
+            continue
+
+        if reached_status != started_at:
+            entry = PartialAdvancement(
+                issue_key=issue_key,
+                started_at_status=started_at,
+                reached_status=reached_status,
+                failed_at_step=failed_at_step,
+                reason=failure_reason or "",
+            )
+            partial.append(entry)
+            log.warning(
+                "sweep_issues: %s partially advanced %s → %s "
+                "(failed at %s → %s: %s); target was %s",
+                issue_key,
+                started_at,
+                reached_status,
+                reached_status,
+                failed_at_step,
+                failure_reason,
+                target,
+            )
+    return SweepResult(changed=changed, partial=partial)
 
 
 __all__ = [
     "ALLOWED_ISSUE_STATES_BY_SESSION_STATE",
     "SWEEP_TARGETS",
+    "PartialAdvancement",
+    "SweepResult",
     "is_issue_state_compatible_with_session_state",
     "sweep_issues",
     "sweep_target_for",

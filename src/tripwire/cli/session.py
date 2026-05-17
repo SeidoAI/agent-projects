@@ -3472,10 +3472,17 @@ def session_sweep_issues_forward_cmd(session_id: str, project_dir: Path) -> None
         click.echo(f"session {session_id}: no member issues; nothing to sweep")
         return
 
-    changed = sweep_issues(resolved, session, session.status.value)
-    for key in changed:
+    sweep = sweep_issues(resolved, session, session.status.value)
+    for key in sweep.changed:
         click.echo(f"advanced {key} → {target}")
+    for p in sweep.partial:
+        click.echo(
+            f"PARTIAL {p.issue_key}: {p.started_at_status} → "
+            f"{p.reached_status} (failed {p.failed_at_step}: {p.reason})",
+            err=True,
+        )
     click.echo(
-        f"session {session_id}: swept {len(changed)} of {len(session.issues)} "
-        f"issue(s) → {target}"
+        f"session {session_id}: swept {len(sweep.changed)} of "
+        f"{len(session.issues)} issue(s) → {target}"
+        + (f"; {len(sweep.partial)} stuck mid-lifecycle" if sweep.partial else "")
     )

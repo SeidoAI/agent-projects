@@ -197,8 +197,24 @@ def update_issue_status(project_dir: Path, key: str, new_status: str) -> IssueDe
         # current status as a no-op (optimistic-update retries, drag-
         # to-same-column). The pre-v0.13.2 ``_validate_transition``
         # short-circuited this; the executor rejects same-status as
-        # ``transition_not_reachable``. Preserve the no-op semantics.
+        # ``transition_not_reachable``. Preserve the no-op semantics —
+        # but still write an audit entry and bump ``updated_at`` so the
+        # mutation history records the PM's acknowledged intent. The
+        # codex-MED on the original short-circuit was that the request
+        # disappeared without trace; that's a regression vs. the
+        # pre-v0.13.2 path that always wrote an audit row.
         if old_status == new_status:
+            issue.updated_at = datetime.now(tz=timezone.utc)
+            save_issue(project_dir, issue)
+            write_audit_entry(
+                project_dir,
+                "issue.update_status.no_op",
+                before={"status": old_status},
+                after={"status": new_status},
+                result_summary=f"{key}: already at {new_status!r} (no-op)",
+                extras={"issue_key": key},
+            )
+            logger.info("issue.update_status.no_op: %s already at %s", key, new_status)
             return get_issue(project_dir, key)
 
         try:

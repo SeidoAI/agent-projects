@@ -313,8 +313,9 @@ def test_sweep_issues_no_target_for_paused(tmp_path: Path) -> None:
     _write_minimal_project(tmp_path)
     _make_issue(tmp_path, "T-100", "queued")
     session = _make_fake_session(["T-100"])
-    changed = sweep_issues(tmp_path, session, "paused")
-    assert changed == []
+    result = sweep_issues(tmp_path, session, "paused")
+    assert result.changed == []
+    assert result.partial == []
     from tripwire.core.store import load_issue
 
     assert load_issue(tmp_path, "T-100").status == "queued"
@@ -324,8 +325,98 @@ def test_sweep_issues_tolerates_missing_issue_files(tmp_path: Path) -> None:
     _write_minimal_project(tmp_path)
     _make_issue(tmp_path, "T-100", "queued")
     session = _make_fake_session(["T-100", "T-999-MISSING"])
-    changed = sweep_issues(tmp_path, session, "in_review")
-    assert changed == ["T-100"]
+    result = sweep_issues(tmp_path, session, "in_review")
+    assert result.changed == ["T-100"]
+    assert result.partial == []
+
+
+def test_sweep_issues_surfaces_partial_advancement(
+    tmp_path: Path, monkeypatch, caplog
+) -> None:
+    """Regression test for v0.13.2 codex-MED on ``sweep_issues``.
+
+    When a multi-step walk fails partway, the issue ends up at an
+    intermediate status. The pre-codex sweep silently dropped these
+    from the return value — the caller had no way to know which issues
+    were stuck. The fix surfaces them via ``SweepResult.partial`` and
+    a per-issue WARNING in the module logger.
+
+    Set-up: seed an issue at ``queued`` and inject a fake
+    ``execute_transition`` that lets the first step (queued→executing)
+    succeed but rejects every later step. The issue should end at
+    ``executing`` with one ``PartialAdvancement`` recorded.
+    """
+    import logging
+
+    from tripwire.core import status_contract
+    from tripwire.core.status_contract import PartialAdvancement
+
+    _write_minimal_project(tmp_path)
+    _make_issue(tmp_path, "T-100", "queued")
+
+    call_count = {"n": 0}
+    real_execute = None
+
+    def _fake_execute(project_dir, *, workflow_id, instance_id, target_status, **_):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            # First step succeeds — actually run the real executor so
+            # the on-disk status moves.
+            nonlocal_real = real_execute
+            return nonlocal_real(
+                project_dir,
+                workflow_id=workflow_id,
+                instance_id=instance_id,
+                target_status=target_status,
+            )
+
+        # Subsequent steps: reject.
+        from tripwire.core.workflow.transitions import TransitionResult
+
+        return TransitionResult(
+            ok=False,
+            reason="tripwires_failed",
+            message=f"simulated gate failure at {target_status}",
+            status_instance=None,
+        )
+
+    from tripwire.core.workflow import transitions as _t
+
+    real_execute = _t.execute_transition
+    monkeypatch.setattr(
+        "tripwire.core.workflow.transitions.execute_transition", _fake_execute
+    )
+
+    session = _make_fake_session(["T-100"])
+    with caplog.at_level(logging.WARNING, logger="tripwire.core.status_contract"):
+        result = sweep_issues(tmp_path, session, "completed")
+
+    # T-100 advanced past queued but did NOT reach completed.
+    assert result.changed == []
+    assert len(result.partial) == 1
+    p = result.partial[0]
+    assert isinstance(p, PartialAdvancement)
+    assert p.issue_key == "T-100"
+    assert p.started_at_status == "queued"
+    assert p.reached_status == "executing"
+    assert p.failed_at_step == "in_review"
+    assert "simulated gate failure" in p.reason
+
+    # WARNING surfaces the partial so operators see the gap even when
+    # the calling code doesn't read .partial directly.
+    assert any(
+        "T-100 partially advanced" in r.message and r.levelname == "WARNING"
+        for r in caplog.records
+    ), [r.message for r in caplog.records]
+
+    from tripwire.core.store import load_issue
+
+    # The on-disk status reflects where T-100 actually got to.
+    assert load_issue(tmp_path, "T-100").status == "executing"
+
+    # Quiet ruff F401 — status_contract import is exercised via fixture
+    # path resolution above.
+    del status_contract
 
 
 # Run a tiny integration check: ensure ALLOWED contract is consistent with
