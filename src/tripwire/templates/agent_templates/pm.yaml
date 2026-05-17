@@ -49,4 +49,3 @@ orchestration:
       action: "re-engage coding agent with failure context"
 
 multi_ticket: false
----
