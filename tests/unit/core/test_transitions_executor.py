@@ -333,6 +333,215 @@ def test_terminal_transition_closes_active_engagement(
     assert last.outcome == "completed"
 
 
+def test_other_sessions_findings_do_not_block_target_transition(
+    project_with_workflow: Path, monkeypatch
+) -> None:
+    """Regression test for v0.13.2 #4.
+
+    Per-route session tripwires (e.g. ``v_pr_merged_for_session``)
+    iterate every session in the project. Before v0.13.2, transitioning
+    session B was blocked by a finding against session A — the
+    rejection message even cited A. After the fix, ``_run_gate``
+    filters the validation report to findings owned by the target
+    instance before checking errors.
+    """
+    from tripwire.core.validator._types import CheckResult, ValidationReport
+    from tripwire.core.workflow.transitions import execute_transition
+
+    # Inject a fake validate_project that returns a finding against a
+    # DIFFERENT session id (not the one being transitioned).
+    def _fake_validate(*args, **kwargs):
+        return ValidationReport(
+            exit_code=2,
+            errors=[
+                CheckResult(
+                    code="session/pr_not_merged",
+                    severity="error",
+                    file="instances/sessions/other-session/session.yaml",
+                    message="Session 'other-session' has unmerged PR.",
+                )
+            ],
+            warnings=[],
+            fixed=[],
+        )
+
+    monkeypatch.setattr("tripwire.cli.transition.validate_project", _fake_validate)
+
+    # Add a route-level tripwire so the gate calls validate_project.
+    (project_with_workflow / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                  - id: queued
+                    terminal: true
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    kind: forward
+                    controls:
+                      tripwires:
+                        - v_pr_merged_for_session
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    result = execute_transition(
+        project_with_workflow,
+        instance_id="test-session",
+        target_status="queued",
+    )
+    # The finding cited "other-session"; the target is "test-session".
+    # After v0.13.2 scoping, the report has no errors for this target.
+    assert result.ok is True, (
+        f"transitioning 'test-session' was blocked by a finding against "
+        f"'other-session': reason={result.reason!r} message={result.message!r}. "
+        f"v0.13.2 #4 regression: gate must filter findings to the target instance."
+    )
+
+
+def test_member_issue_finding_blocks_session_transition(
+    project_with_workflow: Path, monkeypatch
+) -> None:
+    """Regression test for the codex-HIGH on v0.13.2 #4.
+
+    The original v0.13.2 #4 filter kept ONLY findings whose owner equals
+    the target instance, which silently dropped findings against the
+    session's own member issues. A member-issue finding (e.g. an
+    unverified KUI-123) IS a legitimate blocker for transitioning the
+    session — that's the whole reason ``v_pr_review_approved`` &
+    friends iterate the session's issues. The fix expands the in-scope
+    set to ``{target} | <member instance ids>``.
+    """
+    from tripwire.core.validator._types import CheckResult, ValidationReport
+    from tripwire.core.workflow.transitions import execute_transition
+
+    # Rewrite the fixture session to declare one member issue.
+    sessions_dir = project_with_workflow / "instances" / "sessions" / "test-session"
+    (sessions_dir / "session.yaml").write_text(
+        "---\n"
+        "uuid: 11111111-1111-4111-8111-111111111111\n"
+        "id: test-session\n"
+        "name: Test session\n"
+        "agent: backend-coder\n"
+        "issues: [TST-1]\n"
+        "repos: []\n"
+        "status: planned\n"
+        "created_at: 2026-04-30T00:00:00Z\n"
+        "updated_at: 2026-04-30T00:00:00Z\n"
+        "---\n",
+        encoding="utf-8",
+    )
+
+    # Inject a fake validator that returns a finding against the MEMBER
+    # issue — not the session id directly.
+    def _fake_validate(*args, **kwargs):
+        return ValidationReport(
+            exit_code=2,
+            errors=[
+                CheckResult(
+                    code="issue/pr_review_not_approved",
+                    severity="error",
+                    file="instances/issues/TST-1/issue.yaml",
+                    message="Issue 'TST-1' has unapproved review.",
+                )
+            ],
+            warnings=[],
+            fixed=[],
+        )
+
+    monkeypatch.setattr("tripwire.cli.transition.validate_project", _fake_validate)
+
+    (project_with_workflow / "workflow.yaml").write_text(
+        dedent(
+            """\
+            workflow_schema_version: 1
+            workflows:
+              coding-session:
+                actor: coding-agent
+                trigger: session.spawn
+                statuses:
+                  - id: planned
+                  - id: queued
+                    terminal: true
+                routes:
+                  - id: planned-to-queued
+                    actor: pm-agent
+                    from: planned
+                    to: queued
+                    kind: forward
+                    controls:
+                      tripwires:
+                        - v_pr_review_approved
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    result = execute_transition(
+        project_with_workflow,
+        instance_id="test-session",
+        target_status="queued",
+    )
+    # The finding cited TST-1, which IS a member of test-session.
+    # After the codex-HIGH fix, that finding survives the filter and
+    # blocks the transition.
+    assert result.ok is False, (
+        "session transition should be blocked by a member-issue finding "
+        "(TST-1 is a member of test-session). codex-HIGH on v0.13.2 #4: "
+        "the filter over-scoped and dropped legitimate member blockers."
+    )
+    assert "TST-1" in (result.message or "") or "pr_review" in (result.reason or "")
+
+
+def test_telemetry_fires_only_on_completed_transition(
+    project_with_workflow: Path, fake_validate, monkeypatch
+) -> None:
+    """Regression test for v0.13.2 #3.
+
+    ``append_telemetry_record`` must fire only when transitioning TO
+    ``completed`` — telemetry rows represent finished sessions. The
+    v0.13.1 code path gated only on workflow id (coding-session), so
+    every transition fired a row: a typical session wrote ~5 rows
+    (planned→queued→…→completed), each carrying cumulative cost +
+    hardcoded ``merged=True``. ``queue_runner._recent_spend_usd``
+    summed ~Nx actual spend, tripping false `cap_usd_per_window`
+    rejections; analyze-routing's $/merged-PR was inflated.
+    """
+    from tripwire.core.workflow.transitions import execute_transition
+
+    calls: list[str] = []
+
+    def _record(project_dir, *, session) -> None:
+        calls.append(session.status.value)
+
+    monkeypatch.setattr(
+        "tripwire.core.workflow.side_effects.append_telemetry_record",
+        _record,
+    )
+
+    # Non-completed transition: planned → queued (the default fixture).
+    # Telemetry MUST NOT fire.
+    result = execute_transition(
+        project_with_workflow,
+        instance_id="test-session",
+        target_status="queued",
+    )
+    assert result.ok is True
+    assert calls == [], (
+        f"telemetry fired on non-completed transition: status set to {calls!r}. "
+        "v0.13.2 #3 regression — gate must check route.to_ref == 'completed'."
+    )
+
+
 def test_unknown_workflow_id_raises_transition_error(
     project_with_workflow: Path, fake_validate
 ) -> None:

@@ -162,42 +162,104 @@ def _validate_labels(project_dir: Path, labels: list[str]) -> None:
 def update_issue_status(project_dir: Path, key: str, new_status: str) -> IssueDetail:
     """Transition an issue's ``status`` field, returning the fresh detail.
 
-    The load → validate → save → audit sequence runs inside
-    :func:`tripwire.core.locks.project_lock` so two concurrent callers
-    can't both pass the transition check and have the second clobber the
-    first. The audit write is inside the same critical section so a
-    crash between save and audit can never leave a mutated-but-unaudited
-    issue on disk.
+    v0.13.2 follow-up: the status flip routes through
+    :func:`tripwire.core.workflow.transitions.execute_transition` so the
+    issue-closure workflow's route checks + tripwires run as a single
+    gate. The pre-fix path did ``issue.status = new_status; save_issue(...)`` directly — a single-writer violation that the
+    AST fitness function now catches.
+
+    The executor takes its own per-instance lock; the audit write
+    happens here in addition to the executor's audit hook (which only
+    fires for coding-session today) so the UI's mutation history stays
+    parallel to other UI patches.
 
     Raises:
         FileNotFoundError: if the issue file is missing.
         ValueError: if the transition isn't allowed by the
             ``issue-closure`` workflow routes in ``workflow.yaml``.
     """
+    from tripwire.core.workflow.transitions import (
+        TransitionError,
+        execute_transition,
+    )
+
+    # The UI-level ``project_lock`` covers load → executor-call →
+    # audit-write so a crash between the save (inside the executor)
+    # and the UI audit never leaves a mutated-but-unaudited issue
+    # for the UI's audit log. The executor takes its own per-
+    # instance transition lock under a different name — no conflict
+    # with the broader project_lock.
     with project_lock(project_dir):
         issue = load_issue(project_dir, key)
-        old_status = issue.status
+        old_status = str(issue.status)
+
+        # Idempotent same-status patches: UIs frequently re-send the
+        # current status as a no-op (optimistic-update retries, drag-
+        # to-same-column). The pre-v0.13.2 ``_validate_transition``
+        # short-circuited this; the executor rejects same-status as
+        # ``transition_not_reachable``. Preserve the no-op semantics —
+        # but still write an audit entry and bump ``updated_at`` so the
+        # mutation history records the PM's acknowledged intent. The
+        # codex-MED on the original short-circuit was that the request
+        # disappeared without trace; that's a regression vs. the
+        # pre-v0.13.2 path that always wrote an audit row.
+        if old_status == new_status:
+            issue.updated_at = datetime.now(tz=timezone.utc)
+            save_issue(project_dir, issue)
+            write_audit_entry(
+                project_dir,
+                "issue.update_status.no_op",
+                before={"status": old_status},
+                after={"status": new_status},
+                result_summary=f"{key}: already at {new_status!r} (no-op)",
+                extras={"issue_key": key},
+            )
+            logger.info("issue.update_status.no_op: %s already at %s", key, new_status)
+            return get_issue(project_dir, key)
 
         try:
-            _validate_transition(project_dir, old_status, new_status)
-        except ValueError:
-            # Log the rejected attempt so the audit log can show what
-            # the client tried to do — useful when diagnosing UI bugs
-            # that send the wrong next-status.
+            result = execute_transition(
+                project_dir,
+                workflow_id="issue-closure",
+                instance_id=key,
+                target_status=new_status,
+            )
+        except TransitionError as exc:
+            msg = f"Invalid transition from {old_status!r} to {new_status!r}: {exc}"
+            # Include the allowed-next list so UI clients can show
+            # the operator which moves are available from the
+            # current status.
+            allowed = sorted(build_issue_transitions(project_dir).get(old_status, []))
+            if allowed:
+                msg += f". Allowed next statuses: {allowed}"
             write_audit_entry(
                 project_dir,
                 "issue.update_status.rejected",
                 before={"status": old_status},
                 after={"status": new_status},
-                result_summary=(f"Invalid transition {old_status!r} → {new_status!r}"),
+                result_summary=msg,
                 extras={"issue_key": key},
             )
-            raise
+            raise ValueError(msg) from exc
 
-        issue.status = new_status
-        issue.updated_at = datetime.now(tz=timezone.utc)
-        save_issue(project_dir, issue)
+        if not result.ok:
+            detail = result.message or result.reason or "transition rejected"
+            msg = f"Invalid transition from {old_status!r} to {new_status!r}: {detail}"
+            allowed = sorted(build_issue_transitions(project_dir).get(old_status, []))
+            if allowed:
+                msg += f". Allowed next statuses: {allowed}"
+            write_audit_entry(
+                project_dir,
+                "issue.update_status.rejected",
+                before={"status": old_status},
+                after={"status": new_status},
+                result_summary=msg,
+                extras={"issue_key": key},
+            )
+            raise ValueError(msg)
 
+        # Re-load to grab the executor's stamps (current_status_instance,
+        # updated_at) for the audit `after`.
         write_audit_entry(
             project_dir,
             "issue.update_status",
@@ -232,11 +294,20 @@ def update_issue_fields(project_dir: Path, key: str, patch: IssuePatch) -> Issue
         # idempotent clients (retries, optimistic UIs) don't see a 500.
         return get_issue(project_dir, key)
 
+    # v0.13.2 follow-up: if the patch includes a status change, route
+    # that through the executor (sole writer of workflow instance
+    # status). Other fields (priority / labels / agent) are
+    # non-workflow metadata and go through the direct write path.
+    if "status" in fields:
+        new_status = fields.pop("status")
+        update_issue_status(project_dir, key, str(new_status))
+        if not fields:
+            # Status was the only field; we're done.
+            return get_issue(project_dir, key)
+
     with project_lock(project_dir):
         issue = load_issue(project_dir, key)
 
-        if "status" in fields:
-            _validate_transition(project_dir, issue.status, fields["status"])
         if "priority" in fields:
             _validate_enum_value(
                 project_dir,

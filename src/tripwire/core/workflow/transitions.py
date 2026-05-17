@@ -446,6 +446,17 @@ def _run_gate(
         workflow=workflow_id,
         status=target_status,
     )
+    # v0.13.2 #4: the session-lifecycle validators iterate
+    # ``ctx.sessions`` unfiltered, so a finding against session A
+    # (e.g. its PR isn't merged) would block transitioning session B.
+    # Scope the report to findings against the target instance and its
+    # members (for ``coding-session``, the session's member issues)
+    # before checking errors. Project-level findings (no `file`) pass
+    # through. The member-scope expansion is the codex-HIGH fix on top
+    # of the original v0.13.2 #4: without it, an unverified member
+    # issue would never block the session's transition to ``completed``.
+    in_scope = _in_scope_instance_ids(project_dir, workflow_id, instance)
+    _filter_report_to_target_instance(report, in_scope)
     if report.errors:
         first = report.errors[0]
         return _reject(
@@ -660,13 +671,21 @@ def _apply_post_write_hooks(
                 instance_id,
             )
 
-        try:
-            append_telemetry_record(project_dir, session=instance_obj)
-        except Exception:
-            logger.exception(
-                "post-write hook append_telemetry_record failed for session %s",
-                instance_id,
-            )
+        # Telemetry records one row per session-COMPLETION, not per
+        # transition. Without this gate every coding-session writes
+        # ~5 rows (planned→queued→…→completed) and
+        # `queue_runner._recent_spend_usd` sums ~Nx actual spend,
+        # tripping false `cap_usd_per_window` rejections; analyze-
+        # routing's $/merged-PR is similarly inflated.
+        # See v0.13.2 finding #3.
+        if route.to_ref == "completed":
+            try:
+                append_telemetry_record(project_dir, session=instance_obj)
+            except Exception:
+                logger.exception(
+                    "post-write hook append_telemetry_record failed for session %s",
+                    instance_id,
+                )
 
         try:
             reset_acks_if_requested(project_dir, session=instance_obj, flags=flags)
@@ -704,6 +723,93 @@ def _write_path(obj: object, path: str, value: object) -> bool:
     except (AttributeError, TypeError):
         return False
     return True
+
+
+def _instance_owner_from_path(file_path: str) -> str | None:
+    """Extract the owning instance id from a finding's file path.
+
+    Returns the id segment of ``instances/<type>/<id>/...`` (subdir
+    layout) or the stem of ``instances/<type>/<id>.yaml`` (flat layout).
+    Returns ``None`` for paths that don't fit either shape (project-
+    level findings, ``workflow.yaml``, etc.) — callers treat those as
+    project-level and let them pass through scope filtering.
+    """
+    parts = Path(file_path).parts
+    if len(parts) >= 3 and parts[0] == "instances":
+        # instances/<type>/<rest>...
+        # Subdir layout: instances/sessions/<sid>/session.yaml → "sessions", "<sid>", ...
+        # Flat layout:   instances/nodes/<id>.yaml             → "nodes", "<id>.yaml"
+        third = parts[2]
+        if third.endswith(".yaml"):
+            return third[: -len(".yaml")]
+        return third
+    return None
+
+
+def _in_scope_instance_ids(
+    project_dir: Path, workflow_id: str, instance: str
+) -> set[str]:
+    """Return the set of instance ids whose findings should still
+    block transitioning ``instance``.
+
+    Always includes ``instance`` itself. For ``coding-session``, also
+    includes the session's member issue keys: a finding against one of
+    the session's own issues (e.g. an unverified KUI-123) is a legitimate
+    blocker for transitioning the session to ``completed``. Without this
+    expansion the v0.13.2 #4 scope filter over-cropped and silently let
+    member-issue failures through.
+
+    Failure to load the session (missing file, broken yaml) falls back to
+    ``{instance}`` only — the instance-shape validator surfaces the load
+    failure through its own finding, which still belongs to ``instance``.
+    """
+    in_scope: set[str] = {instance}
+    if workflow_id == "coding-session":
+        try:
+            from tripwire.core.session_store import load_session
+
+            session = load_session(project_dir, instance)
+        except Exception:
+            return in_scope
+        for issue_key in getattr(session, "issues", []) or []:
+            in_scope.add(issue_key)
+    return in_scope
+
+
+def _filter_report_to_target_instance(report, in_scope: set[str]) -> None:
+    """In-place scope a validation report to the target transition's
+    instance and its members.
+
+    Per-instance tripwires (the session-lifecycle catalog, primarily)
+    iterate every entity in the project. Without scoping, a finding
+    against session A blocks transitioning session B. This filter drops
+    findings whose owning instance is outside ``in_scope`` — the set is
+    typically ``{target} | <member instance ids>`` so legitimate member
+    blockers survive the filter.
+
+    Project-level findings (no ``file``) and findings against entities
+    we can't attribute to an owner pass through — they represent
+    invariants the whole project owes, not per-instance state.
+    """
+
+    def _keep(finding) -> bool:
+        if not finding.file:
+            return True
+        owner = _instance_owner_from_path(finding.file)
+        if owner is None:
+            return True
+        return owner in in_scope
+
+    report.errors = [f for f in report.errors if _keep(f)]
+    report.warnings = [f for f in report.warnings if _keep(f)]
+    report.fixed = [f for f in report.fixed if _keep(f)]
+    # Recompute exit code to reflect filtered errors.
+    if report.errors:
+        report.exit_code = 2
+    elif report.warnings:
+        report.exit_code = 1
+    else:
+        report.exit_code = 0
 
 
 def _reject(

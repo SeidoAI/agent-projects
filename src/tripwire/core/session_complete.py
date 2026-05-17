@@ -64,6 +64,12 @@ class CompleteResult:
     worktrees_removed: list[str] = field(default_factory=list)
     node_diffs: list[dict] = field(default_factory=list)
     sessions_unblocked: list[str] = field(default_factory=list)
+    # v0.13.2 codex-MED: any member issues that advanced one or more
+    # steps but didn't reach ``completed``. ``complete_session`` raises
+    # ``CompleteError`` rather than flipping the session when this is
+    # non-empty, but the field is populated so the error path can
+    # surface the exact stuck issues to the operator.
+    partial_advancements: list = field(default_factory=list)
 
 
 def complete_session(
@@ -114,6 +120,41 @@ def complete_session(
 
     if dry_run:
         return result
+
+    # v0.13.2 #2: side-effects fire AFTER the three verify gates and
+    # BEFORE the status flip. The pre-v0.13.1 flow had this ordering
+    # (single-function complete_session); the v0.13.1 refactor moved
+    # the flip + sweep into cli/session.py BEFORE the call, so a gate
+    # failure stranded issues at `completed` and PRs flipped ready
+    # while session.status stayed `verified` — retries silently no-op.
+    # Putting them back inside the verified→flipped window keeps the
+    # invariant: a failed gate means nothing mutated.
+    from tripwire.core.status_contract import sweep_issues
+
+    _flip_drafts_to_ready(session)
+    sweep = sweep_issues(project_dir, session, "completed")
+    result.issues_closed = sweep.changed
+    result.partial_advancements = sweep.partial
+    if sweep.partial:
+        # v0.13.2 codex-MED: refuse to flip the session when any member
+        # issue is stuck mid-lifecycle. The pre-codex sweep silently
+        # dropped partials, so session_complete declared success while
+        # member issues sat at intermediate statuses. Surface the gap
+        # by raising — the operator can unstick the partials (resolve
+        # the per-route gate that rejected) and re-run complete.
+        details = ", ".join(
+            f"{p.issue_key} stuck at {p.reached_status} "
+            f"(failed {p.failed_at_step}: {p.reason})"
+            for p in sweep.partial
+        )
+        raise CompleteError(
+            "complete/sweep_partial",
+            f"Cannot complete session {session_id}: "
+            f"{len(sweep.partial)} member issue(s) advanced but did not "
+            f"reach 'completed': {details}. Resolve the per-step "
+            f"tripwire failure on each stuck issue and re-run "
+            f"`tripwire session complete {session_id}`.",
+        )
 
     # Route the status flip through the workflow executor — the sole
     # writer of ``session.status``. Engagement close + telemetry +

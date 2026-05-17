@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import subprocess
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 
 def branch_exists(repo_path: Path, branch_name: str) -> bool:
@@ -275,3 +278,75 @@ def rebase_branch_onto(worktree_path: Path, upstream: str) -> None:
     raise RebaseConflict(
         f"`git rebase {upstream}` failed in {worktree_path}:\n{detail}"
     )
+
+
+def commit_and_push_file(
+    repo_path: Path,
+    file_path: Path,
+    message: str,
+) -> str | None:
+    """Stage, commit, and push a single file inside ``repo_path``.
+
+    Returns the new commit SHA, or ``None`` when ``file_path`` has no
+    diff vs HEAD (nothing to commit). Commit failures raise
+    ``subprocess.CalledProcessError`` so the caller sees pre-commit
+    hook rejections — those are real problems that need surfacing.
+    Push failures (no upstream, auth, network) log a WARNING with the
+    local SHA and return normally; the commit is durable on disk and
+    can be pushed by hand.
+
+    Used post-spawn to land ``runtime_state.claude_session_id`` on the
+    PT branch so PR squash-merge preserves it. Without this commit the
+    runtime field lives only as an uncommitted edit in the main checkout
+    and gets wiped the next time main pulls.
+    """
+    # ``git status --porcelain`` covers both tracked diffs AND untracked
+    # files; ``git diff HEAD`` misses the latter, which would silently
+    # no-op every fresh ``session.yaml`` write.
+    status = subprocess.run(
+        ["git", "-C", str(repo_path), "status", "--porcelain", "--", str(file_path)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    if not status.stdout.strip():
+        return None
+
+    subprocess.run(
+        ["git", "-C", str(repo_path), "add", "--", str(file_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo_path), "commit", "-m", message, "--", str(file_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    sha_result = subprocess.run(
+        ["git", "-C", str(repo_path), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    sha = sha_result.stdout.strip()
+
+    push_result = subprocess.run(
+        ["git", "-C", str(repo_path), "push"],
+        capture_output=True,
+        text=True,
+    )
+    if push_result.returncode != 0:
+        log.warning(
+            "git_helpers.commit_and_push_file: committed %s in %s as %s "
+            "but push failed: %s. Push manually with "
+            "`git -C %s push`.",
+            file_path.name,
+            repo_path,
+            sha,
+            (push_result.stderr or push_result.stdout).strip(),
+            repo_path,
+        )
+
+    return sha

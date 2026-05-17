@@ -157,15 +157,14 @@ def test_complete_dry_run_passes_when_gates_satisfied(
 def test_complete_closes_issues_and_transitions_session(
     tmp_path_project: Path, save_test_session, save_test_issue, stub_pr_merged
 ):
-    """Real (non-dry-run) close-out: every gate passes, transitions
-    happen. Worktree cleanup is a no-op here (empty runtime_state).
+    """Real (non-dry-run) close-out: every gate passes; issues sweep
+    forward, session transitions to ``completed``. Worktree cleanup
+    stays in the CLI wrapper (no-op here on empty runtime_state).
 
-    v0.13: the executor only declares a ``verified → completed`` route
-    in the conftest workflow, so the test session enters ``verified``
-    here. Issue sweep moved out of ``complete_session()`` to the
-    Layer-1 CLI wrapper, so the assertion on ``issue.status`` /
-    ``result.issues_closed`` no longer applies — the helper just runs
-    the gates + status flip now.
+    v0.13.2 (#2): the sweep is back inside ``complete_session()`` (it
+    briefly lived in cli/session.py during v0.13.1, where a gate
+    failure stranded swept issues). This test asserts both the
+    transition AND the sweep happen after the gates pass.
     """
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
     (
@@ -182,12 +181,63 @@ def test_complete_closes_issues_and_transitions_session(
     )
     _write_review_json(tmp_path_project, "s1", exit_code=0, verdict="approved")
 
-    complete_session(tmp_path_project, "s1")
+    result = complete_session(tmp_path_project, "s1")
 
     from tripwire.core.session_store import load_session
+    from tripwire.core.store import load_issue
 
     session = load_session(tmp_path_project, "s1")
     assert session.status == "completed"
+    # Issue sweep ran AFTER gates passed.
+    assert "TMP-1" in result.issues_closed
+    issue = load_issue(tmp_path_project, "TMP-1")
+    assert issue.status == "completed"
+
+
+def test_complete_gate_failure_does_not_sweep_issues(
+    tmp_path_project: Path, save_test_session, save_test_issue, monkeypatch
+):
+    """Regression test for v0.13.2 #2.
+
+    If any verify gate fails, NO side-effects fire — issues stay at
+    their current status, PR drafts stay unchanged. The v0.13.1 flow
+    ran the sweep before calling complete_session, so a gate rejection
+    would strand member issues at ``completed`` while the session
+    stayed at ``verified``.
+    """
+    from tripwire.core.session_complete import CompleteError, complete_session
+    from tripwire.core.store import load_issue
+
+    save_test_issue(tmp_path_project, "TMP-1", status="in_review")
+    save_test_session(
+        tmp_path_project,
+        "s1",
+        status="verified",
+        issues=["TMP-1"],
+    )
+    # Plant artifacts so the artifact gate passes ...
+    issue_docs = tmp_path_project / "instances" / "issues" / "TMP-1" / "docs"
+    issue_docs.mkdir(parents=True, exist_ok=True)
+    (issue_docs / "developer.md").write_text("# notes\n", encoding="utf-8")
+    _write_review_json(tmp_path_project, "s1", exit_code=0, verdict="approved")
+    # ... but force the PR-merged gate to fail.
+    monkeypatch.setattr(
+        "tripwire.core.session_complete._verify_pr_merged",
+        lambda session: (_ for _ in ()).throw(
+            CompleteError("complete/unmerged_pr", "no merged PR found")
+        ),
+    )
+
+    with pytest.raises(CompleteError) as exc:
+        complete_session(tmp_path_project, "s1")
+    assert exc.value.code == "complete/unmerged_pr"
+
+    # Issue must NOT have been swept to completed.
+    issue = load_issue(tmp_path_project, "TMP-1")
+    assert issue.status == "in_review", (
+        f"v0.13.2 #2 regression — gate failure swept issue to "
+        f"{issue.status!r}; should stay at 'in_review' until gates pass."
+    )
 
 
 def test_complete_signature_has_no_bypass_flags():

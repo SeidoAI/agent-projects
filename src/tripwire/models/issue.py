@@ -75,6 +75,16 @@ class Issue(BaseModel):
     updated_at: datetime | None = None
     created_by: str | None = None
 
+    # Workflow station-instance id, format
+    # ``{workflow}:{instance}:{station}:{n}``. Written by the
+    # ``tripwire transition`` gate runner each time the issue enters a
+    # new station; mirrors the field on AgentSession + ProjectConfig.
+    # v0.13.2: added when ``sweep_issues`` was routed through
+    # ``execute_transition``. Without it, a second-step transition
+    # tripped extra='forbid' validation when the executor stamped the
+    # field from the previous step's write.
+    current_status_instance: str | None = None
+
     # The Markdown body, parsed separately from frontmatter.
     body: str = ""
 

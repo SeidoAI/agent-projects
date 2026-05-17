@@ -40,6 +40,7 @@ from typing import Any
 
 import yaml
 
+from tripwire.core import paths
 from tripwire.core.parser import (
     ParseError,
     parse_frontmatter_body,
@@ -48,6 +49,19 @@ from tripwire.core.parser import (
 from tripwire.core.workflow.loader import load_workflows
 from tripwire.core.workflow.schema import Workflow, WorkflowInstanceShape
 from tripwire.ui.services._atomic_write import atomic_write_text
+
+# Filenames that live inside instance-storage directories but are NOT
+# instances themselves. ``nodes/tripwire-graph-index.yaml`` is the
+# derived graph cache; its sibling ``.tripwire-graph-index.lock`` is
+# a transient build lock. Five other scan sites already skip both
+# (``node_store.iter_nodes``, ``validator/__init__._load_nodes``,
+# ``graph/cache._classify`` x2, ``ui/services/project_service``);
+# the generic instance lister did not, so concept-freshness's
+# ``list_instances`` would pick up the cache file and fire shape-
+# validator errors on every ``tripwire validate`` after a rebuild.
+_NON_INSTANCE_FILENAMES = frozenset(
+    {paths.GRAPH_INDEX_FILENAME, paths.GRAPH_INDEX_LOCK_FILENAME}
+)
 
 
 class WorkflowMissingInstanceBlockError(LookupError):
@@ -144,6 +158,14 @@ def _parse_instance_text(text: str) -> dict[str, Any]:
     Frontmatter+body files surface the body under the ``body`` key so
     callers (the executor, the shape validator) can do simple key
     access. Pure-YAML files are returned as parsed.
+
+    v0.13.2 follow-up: ALWAYS include a ``body`` key for frontmatter-
+    shaped files, even when the body is empty. The previous behaviour
+    omitted ``body`` when ``body == ""`` — that lost the "this file was
+    frontmatter-delimited" signal, and ``_serialise_instance_data``
+    then round-tripped it to pure-YAML on save (stripping the leading
+    ``---`` delimiter). Issue files with empty bodies — common after
+    fresh ``tripwire issue create`` — became unparseable on re-load.
     """
     stripped = text.lstrip()
     if stripped.startswith("---"):
@@ -151,9 +173,7 @@ def _parse_instance_text(text: str) -> dict[str, Any]:
             frontmatter, body = parse_frontmatter_body(text)
         except ParseError as exc:
             raise ValueError(f"Could not parse instance file: {exc}") from exc
-        if body:
-            return {**frontmatter, "body": body}
-        return dict(frontmatter)
+        return {**frontmatter, "body": body}
     data = yaml.safe_load(text) or {}
     if not isinstance(data, dict):
         raise ValueError(
@@ -296,6 +316,11 @@ def list_instances(
 
     out: list[str] = []
     for entry in parent_dir.iterdir():
+        # Skip non-instance siblings that share the storage dir — the
+        # graph cache and its lock live alongside concept nodes but are
+        # derived/transient, not instances. See _NON_INSTANCE_FILENAMES.
+        if entry.name in _NON_INSTANCE_FILENAMES:
+            continue
         # Compute the candidate instance id from the entry name + tail
         # shape. The tail starts with either a "/" (subdir layout) or a
         # file-suffix (flat layout). Use both shapes uniformly: render

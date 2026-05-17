@@ -907,27 +907,25 @@ def test_prepare_for_abandon_close_prs_fails_continues(
 
 
 def test_sweep_issues_forward_happy_path(
-    tmp_path_project: Path, save_test_issue, save_test_session, monkeypatch
+    tmp_path_project: Path, save_test_issue, save_test_session
 ) -> None:
-    """Two member issues, both transition cleanly → exit 0."""
-    save_test_issue(tmp_path_project, "TMP-1")
-    save_test_issue(tmp_path_project, "TMP-2")
+    """Two member issues at `planned` get swept forward to `verified`
+    when the session is verified.
+
+    v0.13.2 (#6): sweep-issues-forward calls in-process
+    ``status_contract.sweep_issues`` instead of shelling out to
+    ``tripwire transition issue-closure``. The executor's exact (from,
+    to) route match couldn't bridge a multi-step gap; the in-process
+    helper walks the lifecycle order.
+    """
+    save_test_issue(tmp_path_project, "TMP-1", status="planned")
+    save_test_issue(tmp_path_project, "TMP-2", status="planned")
     save_test_session(
         tmp_path_project,
         "s1",
         status="verified",
         issues=["TMP-1", "TMP-2"],
     )
-
-    from tripwire.cli import session as cli_session
-
-    calls: list[list[str]] = []
-
-    def fake_run(cmd, **kwargs):
-        calls.append(list(cmd))
-        return _mk_completed(0, stdout="ok")
-
-    monkeypatch.setattr(cli_session.subprocess, "run", fake_run)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -936,21 +934,23 @@ def test_sweep_issues_forward_happy_path(
     )
 
     assert result.exit_code == 0, result.output
-    # One call per issue; each invokes the issue-closure workflow.
-    assert len(calls) == 2
-    for c in calls:
-        assert c[:3] == ["tripwire", "transition", "issue-closure"]
-        # target = sweep_target_for("verified") = "verified"
-        assert c[4] == "verified"
-    assert "swept 2 issue(s)" in result.output
+    # sweep_target_for("verified") == "verified"; both issues advance.
+    assert "advanced TMP-1 → verified" in result.output
+    assert "advanced TMP-2 → verified" in result.output
+    assert "swept 2 of 2 issue(s) → verified" in result.output
 
 
-def test_sweep_issues_forward_one_rejected(
-    tmp_path_project: Path, save_test_issue, save_test_session, monkeypatch
+def test_sweep_issues_forward_skips_at_target(
+    tmp_path_project: Path, save_test_issue, save_test_session
 ) -> None:
-    """One issue's transition is rejected → exit 1 with per-issue summary."""
-    save_test_issue(tmp_path_project, "TMP-1")
-    save_test_issue(tmp_path_project, "TMP-2")
+    """Issues already at-or-past the target are no-ops, not rejections.
+
+    v0.13.2 (#6): previously the subprocess approach failed for issues
+    already at-target (no self-edge route → ``transition_not_reachable``).
+    The in-process helper correctly skips them.
+    """
+    save_test_issue(tmp_path_project, "TMP-1", status="verified")
+    save_test_issue(tmp_path_project, "TMP-2", status="planned")
     save_test_session(
         tmp_path_project,
         "s1",
@@ -958,15 +958,35 @@ def test_sweep_issues_forward_one_rejected(
         issues=["TMP-1", "TMP-2"],
     )
 
-    from tripwire.cli import session as cli_session
+    runner = CliRunner()
+    result = runner.invoke(
+        session_cmd,
+        ["sweep-issues-forward", "s1", "--project-dir", str(tmp_path_project)],
+    )
 
-    def fake_run(cmd, **kwargs):
-        # Reject TMP-2 only.
-        if "TMP-2" in cmd:
-            return _mk_completed(1, stderr="transition rejected: not_reachable")
-        return _mk_completed(0)
+    assert result.exit_code == 0, result.output
+    assert "advanced TMP-1" not in result.output  # already at target
+    assert "advanced TMP-2 → verified" in result.output
+    assert "swept 1 of 2 issue(s) → verified" in result.output
 
-    monkeypatch.setattr(cli_session.subprocess, "run", fake_run)
+
+def test_sweep_issues_forward_bridges_multi_step_gap(
+    tmp_path_project: Path, save_test_issue, save_test_session
+) -> None:
+    """A planned issue + a completed session → issues swept to completed.
+
+    v0.13.2 (#6) regression test: this case used to fail with
+    ``transition_not_reachable`` because issue-closure has no direct
+    planned→completed route. The in-process helper walks the
+    lifecycle.
+    """
+    save_test_issue(tmp_path_project, "TMP-1", status="planned")
+    save_test_session(
+        tmp_path_project,
+        "s1",
+        status="completed",
+        issues=["TMP-1"],
+    )
 
     runner = CliRunner()
     result = runner.invoke(
@@ -974,9 +994,8 @@ def test_sweep_issues_forward_one_rejected(
         ["sweep-issues-forward", "s1", "--project-dir", str(tmp_path_project)],
     )
 
-    assert result.exit_code != 0
-    assert "TMP-2" in result.output
-    assert "not_reachable" in result.output
+    assert result.exit_code == 0, result.output
+    assert "advanced TMP-1 → completed" in result.output
 
 
 def test_sweep_issues_forward_no_member_issues(

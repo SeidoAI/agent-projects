@@ -38,6 +38,7 @@ from tripwire.core.gh_helpers import (
     gh_pr_ready,
 )
 from tripwire.core.git_helpers import (
+    commit_and_push_file,
     worktree_is_dirty,
     worktree_prune,
     worktree_remove,
@@ -523,7 +524,11 @@ def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) 
         )
 
     if promote_issues:
-        from tripwire.core.store import load_issue, save_issue
+        from tripwire.core.store import load_issue
+        from tripwire.core.workflow.transitions import (
+            TransitionError,
+            execute_transition,
+        )
 
         promoted = 0
         for issue_key in session.issues:
@@ -532,11 +537,27 @@ def session_queue_cmd(session_id: str, project_dir: Path, promote_issues: bool) 
             except FileNotFoundError:
                 click.echo(f"  ! issue {issue_key} not found — skipping")
                 continue
-            if str(issue.status) == "planned":
-                issue.status = "queued"
-                save_issue(resolved, issue)
-                click.echo(f"  {issue_key}: planned → queued")
-                promoted += 1
+            if str(issue.status) != "planned":
+                continue
+            # Route through the executor — `execute_transition` is the
+            # sole writer of every workflow instance's status. The
+            # pre-v0.13.2 inline `issue.status = "queued"; save_issue(...)`
+            # bypassed the issue-closure workflow's route checks.
+            try:
+                result = execute_transition(
+                    resolved,
+                    workflow_id="issue-closure",
+                    instance_id=issue_key,
+                    target_status="queued",
+                )
+            except TransitionError as exc:
+                click.echo(f"  ! {issue_key}: {exc}")
+                continue
+            if not result.ok:
+                click.echo(f"  ! {issue_key}: {result.message or result.reason}")
+                continue
+            click.echo(f"  {issue_key}: planned → queued")
+            promoted += 1
         if promoted == 0:
             click.echo("  (no issues at 'planned' to promote)")
 
@@ -808,6 +829,40 @@ def session_spawn_cmd(
         )
     )
     save_session(resolved, session)
+
+    # v0.13.2 — persist runtime_state to the PT worktree so the draft PR
+    # carries it. Without this, the field lives only as an uncommitted
+    # edit in the main checkout and gets wiped the next time main pulls
+    # (or worse, when the draft PR squash-merges and overwrites the
+    # tracked file). Failure here logs a WARNING but doesn't fail the
+    # spawn — the agent is already running and runtime_state is on disk
+    # in the main checkout; the operator can recover by hand.
+    pt_entry = next(
+        (wt for wt in start_result.worktrees if wt.branch.startswith("proj/")),
+        None,
+    )
+    if pt_entry is not None:
+        from tripwire.core.session_store import session_yaml_path
+
+        pt_path = Path(pt_entry.worktree_path)
+        save_session(pt_path, session, update_cache=False)
+        try:
+            commit_and_push_file(
+                pt_path,
+                session_yaml_path(pt_path, session_id),
+                f"session({session_id}): capture runtime_state from spawn",
+            )
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or "").strip() or str(exc)
+            click.echo(
+                f"WARNING: failed to commit runtime_state in PT worktree "
+                f"{pt_path}: {detail}. runtime_state.claude_session_id "
+                f"may be lost on next PR merge; commit manually with "
+                f"`git -C {pt_path} add {session_yaml_path(pt_path, session_id).relative_to(pt_path)} "
+                f"&& git -C {pt_path} commit -m 'session({session_id}): capture runtime_state' "
+                f"&& git -C {pt_path} push`.",
+                err=True,
+            )
 
     from tripwire.core.workflow.transitions import (
         TransitionError,
@@ -2134,23 +2189,10 @@ def session_complete_cmd(
                 click.echo(prompt)
             raise SystemExit(1)
 
-    # Pre-flight side-effects: flip drafts to ready, sweep member
-    # issues forward. The agent procedure runs ``tripwire session
-    # prepare-for-completion`` as a separate step; we replay the same
-    # work in-process here so the ``tripwire session complete`` CLI
-    # behaviour is single-command. Skipped in dry-run (no mutations).
-    sweep_closed: list[str] = []
-    if not dry_run:
-        try:
-            session_for_prep = load_session(resolved, session_id)
-        except FileNotFoundError as exc:
-            raise click.ClickException(f"session '{session_id}' not found") from exc
-        from tripwire.core.session_complete import _flip_drafts_to_ready
-        from tripwire.core.status_contract import sweep_issues
-
-        _flip_drafts_to_ready(session_for_prep)
-        sweep_closed = sweep_issues(resolved, session_for_prep, "completed")
-
+    # v0.13.2 #2: pre-flight side-effects (flip drafts, sweep issues)
+    # moved INTO ``complete_session`` so they only run after the verify
+    # gates pass. Doing them here before the call left issues stuck at
+    # `completed` whenever any gate later rejected.
     try:
         result = complete_session(resolved, session_id, dry_run=dry_run)
     except CompleteError as exc:
@@ -2162,9 +2204,10 @@ def session_complete_cmd(
             click.echo(f"  Node diffs to review: {len(result.node_diffs)}")
         return
 
-    # Stamp the sweep + worktree-removal outcomes onto the result for
-    # the CLI summary (these moved out of complete_session()).
-    result.issues_closed = sweep_closed
+    # Worktree removal stays in the CLI: it's external state cleanup,
+    # not part of the verified→completed atomic step. A failure here
+    # leaves an idle worktree dir, surfaced as a hygiene finding by
+    # the orphan-branches lint on the next validate.
     try:
         session_after = load_session(resolved, session_id)
     except FileNotFoundError:
@@ -3403,14 +3446,18 @@ def session_sweep_issues_forward_cmd(session_id: str, project_dir: Path) -> None
     are no-ops; off-path issues (``deferred``, ``abandoned``) are left
     alone — same contract as the ``sweep_issues_forward`` side-effect.
 
-    Approach: shell out to ``tripwire transition issue-closure <key>
-    <target>`` per issue. The executor accepts non-coding-session
-    workflows via the generic instance loader, so each invocation
-    routes through the same write path as the per-issue commands.
-    Exit code is inherited per-issue: any non-zero subprocess exit
-    becomes a structured per-issue rejection in the summary.
+    v0.13.2 (#6): previously this shelled out to
+    ``tripwire transition issue-closure <key> <target>`` per issue, but
+    ``execute_transition`` looks up an exact ``(from, to)`` route and
+    the issue-closure workflow only declares single-step routes — so
+    sweeping a ``planned`` issue to ``completed`` failed with
+    ``transition_not_reachable``, and issues already at-target failed
+    because there's no self-edge. Use the in-process sweep helper
+    instead, which mirrors the original v0.12 behaviour (skip already-
+    at-or-beyond, skip off-path, skip missing) the workflow doesn't yet
+    express as a multi-step route.
     """
-    from tripwire.core.status_contract import sweep_target_for
+    from tripwire.core.status_contract import sweep_issues, sweep_target_for
 
     resolved, session = _resolve_and_load_session(project_dir, session_id)
 
@@ -3425,46 +3472,17 @@ def session_sweep_issues_forward_cmd(session_id: str, project_dir: Path) -> None
         click.echo(f"session {session_id}: no member issues; nothing to sweep")
         return
 
-    rejected: list[tuple[str, str]] = []
-    advanced: list[str] = []
-    for issue_key in session.issues:
-        try:
-            result = subprocess.run(
-                [
-                    "tripwire",
-                    "transition",
-                    "issue-closure",
-                    issue_key,
-                    target,
-                    "--project-dir",
-                    str(resolved),
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-        except (subprocess.SubprocessError, OSError) as exc:
-            rejected.append((issue_key, f"subprocess failure: {exc}"))
-            continue
-        if result.returncode == 0:
-            advanced.append(issue_key)
-            click.echo(f"advanced {issue_key} → {target}")
-        else:
-            reason = (result.stderr or result.stdout or "").strip() or (
-                f"exit={result.returncode}"
-            )
-            rejected.append((issue_key, reason))
-
-    if rejected:
+    sweep = sweep_issues(resolved, session, session.status.value)
+    for key in sweep.changed:
+        click.echo(f"advanced {key} → {target}")
+    for p in sweep.partial:
         click.echo(
-            f"session {session_id}: {len(rejected)} issue(s) rejected by issue-closure",
+            f"PARTIAL {p.issue_key}: {p.started_at_status} → "
+            f"{p.reached_status} (failed {p.failed_at_step}: {p.reason})",
             err=True,
         )
-        for key, reason in rejected:
-            click.echo(f"  {key}: {reason}", err=True)
-        raise click.ClickException(
-            f"sweep-issues-forward rejected {len(rejected)} issue(s) for {session_id}"
-        )
-
-    click.echo(f"session {session_id}: swept {len(advanced)} issue(s) → {target}")
+    click.echo(
+        f"session {session_id}: swept {len(sweep.changed)} of "
+        f"{len(session.issues)} issue(s) → {target}"
+        + (f"; {len(sweep.partial)} stuck mid-lifecycle" if sweep.partial else "")
+    )

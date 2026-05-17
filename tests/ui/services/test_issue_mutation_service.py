@@ -133,6 +133,43 @@ class TestUpdateIssueStatus:
         result = update_issue_status(project_with_transitions, "TMP-1", "queued")
         assert result.status == "queued"
 
+    def test_no_op_same_status_writes_audit_and_bumps_updated_at(
+        self, project_with_transitions, save_test_issue
+    ):
+        """Regression test for codex-MED on the v0.13.2 same-status
+        short-circuit.
+
+        Before the fix, an idempotent same-status patch returned the
+        cached detail without writing an audit row or bumping
+        ``updated_at`` — the PM's request disappeared without trace.
+        That's a regression vs. the pre-v0.13.2 path, which always
+        recorded the acknowledgement.
+        """
+        from datetime import datetime, timedelta, timezone
+
+        save_test_issue(project_with_transitions, "TMP-1", status="queued")
+        before_updated_at = load_issue(project_with_transitions, "TMP-1").updated_at
+
+        update_issue_status(project_with_transitions, "TMP-1", "queued")
+
+        # updated_at advanced past the seeded value.
+        after_updated_at = load_issue(project_with_transitions, "TMP-1").updated_at
+        assert after_updated_at is not None
+        assert after_updated_at != before_updated_at
+        assert datetime.now(tz=timezone.utc) - after_updated_at < timedelta(minutes=1)
+
+        # Audit row written with the distinct ``no_op`` action so
+        # operators can filter same-status acks from real transitions.
+        log_path = audit_log_path(project_with_transitions)
+        assert log_path.is_file()
+        lines = log_path.read_text(encoding="utf-8").splitlines()
+        assert len(lines) == 1
+        record = json.loads(lines[0])
+        assert record["action"] == "issue.update_status.no_op"
+        assert record["before_state_snippet"] == {"status": "queued"}
+        assert record["after_state_snippet"] == {"status": "queued"}
+        assert record["extras"]["issue_key"] == "TMP-1"
+
     def test_transition_from_terminal_status_raises(
         self, project_with_transitions, save_test_issue
     ):
@@ -208,19 +245,22 @@ class TestUpdateIssueStatus:
             update_issue_status(project_with_transitions, "TMP-1", "completed")
         assert load_issue(project_with_transitions, "TMP-1").status == "queued"
 
-    def test_load_and_audit_happen_inside_project_lock(
+    def test_executor_call_and_audit_happen_inside_project_lock(
         self,
         project_with_transitions,
         save_test_issue,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        """Post-fix #4+#5: load → validate → save → audit all run under the
-        project lock so concurrent callers can't race, and so a crash
-        between save and audit never leaves a mutated-but-unaudited state.
+        """v0.13.2 follow-up: the executor call (which now does the
+        actual save) and the UI audit write both happen INSIDE the
+        ``project_lock`` so concurrent callers can't race and a crash
+        between executor-return and audit-write never leaves a mutated-
+        but-unaudited issue (from the UI audit log's perspective).
 
-        We prove this by tracing the order of lock-enter → save → audit →
-        lock-release. The audit write must happen before the lock
-        releases.
+        Trace order: lock-enter → executor → audit → lock-release.
+        The executor's own per-instance transition lock is a separate
+        lock (different path name) so it nests cleanly inside
+        ``project_lock``.
         """
         save_test_issue(project_with_transitions, "TMP-1", status="queued")
 
@@ -228,10 +268,11 @@ class TestUpdateIssueStatus:
 
         import contextlib
 
+        from tripwire.core.workflow import transitions as exec_mod
         from tripwire.ui.services import issue_mutation_service as svc
 
         original_lock = svc.project_lock
-        original_save = svc.save_issue
+        original_execute = exec_mod.execute_transition
         original_audit = svc.write_audit_entry
 
         def _traced_lock(project_dir):
@@ -244,27 +285,27 @@ class TestUpdateIssueStatus:
 
             return _wrap()
 
-        def _traced_save(*a, **kw):
-            events.append("save")
-            return original_save(*a, **kw)
+        def _traced_execute(*a, **kw):
+            events.append("execute_transition")
+            return original_execute(*a, **kw)
 
         def _traced_audit(*a, **kw):
             events.append("audit")
             return original_audit(*a, **kw)
 
         monkeypatch.setattr(svc, "project_lock", _traced_lock)
-        monkeypatch.setattr(svc, "save_issue", _traced_save)
+        monkeypatch.setattr(exec_mod, "execute_transition", _traced_execute)
         monkeypatch.setattr(svc, "write_audit_entry", _traced_audit)
 
         update_issue_status(project_with_transitions, "TMP-1", "executing")
 
-        # Order: acquired < save < audit < released.
+        # Order: acquired < execute_transition < audit < released.
         assert events[0] == "lock_acquired"
         assert events[-1] == "lock_released"
-        save_idx = events.index("save")
+        exec_idx = events.index("execute_transition")
         audit_idx = events.index("audit")
         release_idx = events.index("lock_released")
-        assert save_idx < audit_idx < release_idx
+        assert exec_idx < audit_idx < release_idx
 
     def test_updated_at_is_tz_aware_utc(
         self, project_with_transitions, save_test_issue

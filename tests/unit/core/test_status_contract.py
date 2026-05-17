@@ -139,37 +139,23 @@ def _write_minimal_project(project_dir: Path) -> None:
     (project_dir / "project.yaml").write_text(
         yaml.safe_dump(
             {
+                # v0.13.2 follow-up: the fixture used to set `phase`,
+                # `labels`, `status_transitions` etc. (pre-v0.13.1 fields).
+                # ProjectConfig forbids extra keys and v0.13.1 B8 dropped
+                # `status_transitions`. sweep_issues now routes through
+                # execute_transition, which loads ProjectConfig on every
+                # call; the obsolete fields would trigger
+                # `schema/project_invalid` and reject every transition.
+                "name": "tmp",
                 "key_prefix": "T",
                 "next_issue_number": 100,
                 "next_session_number": 100,
-                "phase": "executing",
-                "created_at": "2026-01-01T00:00:00",
-                "labels": [],
+                "repos": {"SeidoAI/tmp": {"local": None}},
                 "label_categories": {
                     "executor": ["ai", "human", "mixed"],
                     "verifier": ["required", "optional", "none"],
                     "domain": [],
                     "agent": [],
-                },
-                "statuses": [
-                    "planned",
-                    "queued",
-                    "executing",
-                    "in_review",
-                    "verified",
-                    "completed",
-                    "abandoned",
-                    "deferred",
-                ],
-                "status_transitions": {
-                    "planned": ["queued", "abandoned"],
-                    "queued": ["executing", "abandoned"],
-                    "executing": ["in_review", "abandoned"],
-                    "in_review": ["verified", "executing"],
-                    "verified": ["completed", "in_review"],
-                    "completed": [],
-                    "abandoned": [],
-                    "deferred": [],
                 },
             }
         )
@@ -178,6 +164,70 @@ def _write_minimal_project(project_dir: Path) -> None:
     (project_dir / "instances" / "sessions").mkdir(parents=True, exist_ok=True)
     (project_dir / "events").mkdir(parents=True, exist_ok=True)
     (project_dir / "graph" / "nodes").mkdir(parents=True, exist_ok=True)
+
+    # v0.13.2 follow-up: sweep_issues now routes through
+    # ``execute_transition``, which needs an ``issue-closure`` workflow
+    # declared in ``workflow.yaml``. Single-step routes mirror the
+    # canonical 8-state lifecycle.
+    (project_dir / "workflow.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "workflow_schema_version": 1,
+                "workflows": {
+                    "issue-closure": {
+                        "actor": "pm-agent",
+                        "trigger": "command.pm-issue-close",
+                        "instance": {
+                            "storage_path": "instances/issues/{instance_id}/issue.yaml",
+                            "status_field": "status",
+                            "status_enum": [
+                                "planned",
+                                "queued",
+                                "executing",
+                                "in_review",
+                                "verified",
+                                "completed",
+                                "abandoned",
+                                "deferred",
+                            ],
+                            "instance_id_field": "id",
+                        },
+                        "statuses": [
+                            {"id": "planned"},
+                            {"id": "queued"},
+                            {"id": "executing"},
+                            {"id": "in_review"},
+                            {"id": "verified"},
+                            {"id": "completed", "terminal": True},
+                            # `abandoned` and `deferred` aren't traversed
+                            # in the test (sweep skips off-path statuses);
+                            # we omit them from `statuses` so the workflow
+                            # well-formedness lint doesn't flag them as
+                            # unreachable. They remain in `status_enum`
+                            # because the instance-shape validator needs
+                            # to accept their values on existing files.
+                        ],
+                        "routes": [
+                            {
+                                "id": f"r-{f}-{t}",
+                                "actor": "pm-agent",
+                                "from": f,
+                                "to": t,
+                                "kind": "forward",
+                            }
+                            for f, t in [
+                                ("planned", "queued"),
+                                ("queued", "executing"),
+                                ("executing", "in_review"),
+                                ("in_review", "verified"),
+                                ("verified", "completed"),
+                            ]
+                        ],
+                    }
+                },
+            }
+        )
+    )
 
 
 def _make_issue(project_dir: Path, key: str, status: str) -> None:
@@ -263,8 +313,9 @@ def test_sweep_issues_no_target_for_paused(tmp_path: Path) -> None:
     _write_minimal_project(tmp_path)
     _make_issue(tmp_path, "T-100", "queued")
     session = _make_fake_session(["T-100"])
-    changed = sweep_issues(tmp_path, session, "paused")
-    assert changed == []
+    result = sweep_issues(tmp_path, session, "paused")
+    assert result.changed == []
+    assert result.partial == []
     from tripwire.core.store import load_issue
 
     assert load_issue(tmp_path, "T-100").status == "queued"
@@ -274,8 +325,98 @@ def test_sweep_issues_tolerates_missing_issue_files(tmp_path: Path) -> None:
     _write_minimal_project(tmp_path)
     _make_issue(tmp_path, "T-100", "queued")
     session = _make_fake_session(["T-100", "T-999-MISSING"])
-    changed = sweep_issues(tmp_path, session, "in_review")
-    assert changed == ["T-100"]
+    result = sweep_issues(tmp_path, session, "in_review")
+    assert result.changed == ["T-100"]
+    assert result.partial == []
+
+
+def test_sweep_issues_surfaces_partial_advancement(
+    tmp_path: Path, monkeypatch, caplog
+) -> None:
+    """Regression test for v0.13.2 codex-MED on ``sweep_issues``.
+
+    When a multi-step walk fails partway, the issue ends up at an
+    intermediate status. The pre-codex sweep silently dropped these
+    from the return value — the caller had no way to know which issues
+    were stuck. The fix surfaces them via ``SweepResult.partial`` and
+    a per-issue WARNING in the module logger.
+
+    Set-up: seed an issue at ``queued`` and inject a fake
+    ``execute_transition`` that lets the first step (queued→executing)
+    succeed but rejects every later step. The issue should end at
+    ``executing`` with one ``PartialAdvancement`` recorded.
+    """
+    import logging
+
+    from tripwire.core import status_contract
+    from tripwire.core.status_contract import PartialAdvancement
+
+    _write_minimal_project(tmp_path)
+    _make_issue(tmp_path, "T-100", "queued")
+
+    call_count = {"n": 0}
+    real_execute = None
+
+    def _fake_execute(project_dir, *, workflow_id, instance_id, target_status, **_):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            # First step succeeds — actually run the real executor so
+            # the on-disk status moves.
+            nonlocal_real = real_execute
+            return nonlocal_real(
+                project_dir,
+                workflow_id=workflow_id,
+                instance_id=instance_id,
+                target_status=target_status,
+            )
+
+        # Subsequent steps: reject.
+        from tripwire.core.workflow.transitions import TransitionResult
+
+        return TransitionResult(
+            ok=False,
+            reason="tripwires_failed",
+            message=f"simulated gate failure at {target_status}",
+            status_instance=None,
+        )
+
+    from tripwire.core.workflow import transitions as _t
+
+    real_execute = _t.execute_transition
+    monkeypatch.setattr(
+        "tripwire.core.workflow.transitions.execute_transition", _fake_execute
+    )
+
+    session = _make_fake_session(["T-100"])
+    with caplog.at_level(logging.WARNING, logger="tripwire.core.status_contract"):
+        result = sweep_issues(tmp_path, session, "completed")
+
+    # T-100 advanced past queued but did NOT reach completed.
+    assert result.changed == []
+    assert len(result.partial) == 1
+    p = result.partial[0]
+    assert isinstance(p, PartialAdvancement)
+    assert p.issue_key == "T-100"
+    assert p.started_at_status == "queued"
+    assert p.reached_status == "executing"
+    assert p.failed_at_step == "in_review"
+    assert "simulated gate failure" in p.reason
+
+    # WARNING surfaces the partial so operators see the gap even when
+    # the calling code doesn't read .partial directly.
+    assert any(
+        "T-100 partially advanced" in r.message and r.levelname == "WARNING"
+        for r in caplog.records
+    ), [r.message for r in caplog.records]
+
+    from tripwire.core.store import load_issue
+
+    # The on-disk status reflects where T-100 actually got to.
+    assert load_issue(tmp_path, "T-100").status == "executing"
+
+    # Quiet ruff F401 — status_contract import is exercised via fixture
+    # path resolution above.
+    del status_contract
 
 
 # Run a tiny integration check: ensure ALLOWED contract is consistent with
