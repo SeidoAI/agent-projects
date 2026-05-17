@@ -26,12 +26,8 @@ from tripwire.core.git_helpers import commit_and_push_file
 
 def _init_repo(path: Path) -> None:
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=path, check=True)
-    subprocess.run(
-        ["git", "-C", str(path), "config", "user.name", "t"], check=True
-    )
-    subprocess.run(
-        ["git", "-C", str(path), "config", "user.email", "t@t"], check=True
-    )
+    subprocess.run(["git", "-C", str(path), "config", "user.name", "t"], check=True)
+    subprocess.run(["git", "-C", str(path), "config", "user.email", "t@t"], check=True)
     subprocess.run(
         [
             "git",
@@ -70,9 +66,7 @@ def test_returns_none_when_no_diff(tmp_path: Path) -> None:
     target = repo / "f.txt"
     target.write_text("hello\n")
     subprocess.run(["git", "-C", str(repo), "add", str(target)], check=True)
-    subprocess.run(
-        ["git", "-C", str(repo), "commit", "-q", "-m", "seed"], check=True
-    )
+    subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "seed"], check=True)
 
     sha = commit_and_push_file(repo, target, "noop")
 
@@ -170,9 +164,7 @@ def test_path_scoped_commit_ignores_other_staged_changes(tmp_path: Path) -> None
     other = repo / "other.txt"
     other.write_text("baseline\n")
     subprocess.run(["git", "-C", str(repo), "add", str(other)], check=True)
-    subprocess.run(
-        ["git", "-C", str(repo), "commit", "-q", "-m", "seed"], check=True
-    )
+    subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "seed"], check=True)
 
     # Stage an edit to other.txt — should NOT land in the commit below.
     other.write_text("staged-but-uncommitted\n")
