@@ -98,6 +98,7 @@ _RECOGNIZED_ROUTE_KEYS = frozenset(
         "preserve_fields",
         "clear_fields",
         "side_effects",
+        "reset_acks",
         "rollback",
     }
 )
@@ -630,6 +631,7 @@ def _parse_routes(
                 preserve_fields=_str_list(entry.get("preserve_fields")),
                 clear_fields=_str_list(entry.get("clear_fields")),
                 side_effects=_str_list(entry.get("side_effects")),
+                reset_acks=bool(entry.get("reset_acks", False)),
                 rollback=rollback,  # type: ignore[arg-type]
             )
         )

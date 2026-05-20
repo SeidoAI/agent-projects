@@ -268,6 +268,11 @@ class WorkflowRoute:
     preserve_fields: list[str] = field(default_factory=list)
     clear_fields: list[str] = field(default_factory=list)
     side_effects: list[str] = field(default_factory=list)
+    # v0.14.0 — when true, the executor clears the JIT-prompt ack
+    # markers for the instance after the status write. Replaces the
+    # legacy `side_effects: [reset_acks]` informational tag (which the
+    # executor never honoured — it read a per-call flag instead).
+    reset_acks: bool = False
     rollback: Literal["atomic", "none"] = "atomic"
 
 
