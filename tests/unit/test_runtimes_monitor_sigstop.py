@@ -63,6 +63,9 @@ def _ctx(tmp_path: Path, **overrides) -> MonitorContext:
         "pt_worktree": pt,
         "project_dir": tmp_path / "proj",
         "max_budget_usd": 10.0,
+        # v0.14.0: push_loop thresholds required on MonitorContext.
+        "push_loop_warn_threshold": 5,
+        "push_loop_terminate_threshold": 10,
     }
     base.update(overrides)
     return MonitorContext(**base)

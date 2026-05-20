@@ -163,9 +163,14 @@ def test_cost_overrun_e2e_sigterms_real_subprocess_and_pauses_session(
             max_budget_usd=0.0001,  # vanishingly small, blown by one event
             monitor_log_path=monitor_log,
             poll_interval=0.05,
+            # v0.14.0 — runtime YAML tunables, pinned in-test.
+            stream_idle_threshold_seconds=0.0,  # disabled
+            max_runtime_seconds=10.0,
+            push_loop_warn_threshold=5,
+            push_loop_terminate_threshold=10,
         )
 
-        runner = MonitorRunner(cfg, max_runtime_seconds=10.0)
+        runner = MonitorRunner(cfg)
         runner_thread = threading.Thread(target=runner.run, daemon=True)
         runner_thread.start()
 

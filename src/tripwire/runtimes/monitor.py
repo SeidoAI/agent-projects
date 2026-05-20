@@ -133,6 +133,12 @@ class MonitorContext:
     The monitor doesn't fetch session state on its own — the caller
     populates everything it might need to evaluate a tripwire here.
     Keeps the monitor a pure function of (context, event-stream).
+
+    v0.14.0: ``push_loop_warn_threshold`` and ``push_loop_terminate_threshold``
+    are the consecutive-failed-push counts that fire the warn and SIGTERM
+    actions in ``_maybe_fire_push_loop``. Sourced from
+    ``templates/runtime/defaults.yaml`` (``monitor.push_loop``) and
+    passed through by the runner; no Python-side default.
     """
 
     session_id: str
@@ -142,6 +148,8 @@ class MonitorContext:
     pt_worktree: Path | None
     project_dir: Path
     max_budget_usd: float
+    push_loop_warn_threshold: int
+    push_loop_terminate_threshold: int
     model_name: str = "claude-opus-4-7"
     key_files: list[str] = field(default_factory=list)
     required_artifacts: list[str] = field(default_factory=list)
@@ -418,7 +426,7 @@ class RuntimeMonitor:
 
     def _maybe_fire_push_loop(self, actions: list[MonitorAction]) -> None:
         n = self._consecutive_failed_pushes
-        if n >= 10 and not self._push_sigterm_fired:
+        if n >= self.ctx.push_loop_terminate_threshold and not self._push_sigterm_fired:
             self._push_sigterm_fired = True
             actions.append(
                 SigtermProcess(
@@ -428,7 +436,7 @@ class RuntimeMonitor:
                 )
             )
             return
-        if n >= 5 and not self._push_warning_fired:
+        if n >= self.ctx.push_loop_warn_threshold and not self._push_warning_fired:
             self._push_warning_fired = True
             actions.append(
                 LogWarning(

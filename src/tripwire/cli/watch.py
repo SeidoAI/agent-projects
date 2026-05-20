@@ -61,12 +61,17 @@ def watch_cmd() -> None:
 @click.option(
     "--poll-interval",
     type=float,
-    default=300.0,
-    show_default=True,
-    help="Seconds between PR poll cycles.",
+    default=None,
+    help=(
+        "Seconds between PR poll cycles. Defaults to "
+        "`pr_watcher.poll_interval` from templates/runtime/defaults.yaml "
+        "(project-overridable)."
+    ),
 )
 @_project_dir_option()
-def watch_start_cmd(background: bool, poll_interval: float, project_dir: Path) -> None:
+def watch_start_cmd(
+    background: bool, poll_interval: float | None, project_dir: Path
+) -> None:
     """Start the watch daemon."""
     project_dir = project_dir.expanduser().resolve()
     if is_daemon_running(project_dir):
@@ -74,6 +79,13 @@ def watch_start_cmd(background: bool, poll_interval: float, project_dir: Path) -
         raise click.ClickException(
             f"watch daemon already running for this project (pid {existing_pid})"
         )
+
+    # Resolve runtime YAML default; click option (when provided) overrides.
+    overrides: dict[str, float] = {}
+    if poll_interval is not None:
+        overrides["poll_interval"] = poll_interval
+    cfg = DaemonConfig.from_runtime(project_dir, token=resolve_token(), **overrides)
+
     if background:
         log_path = logfile_path(project_dir)
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -89,7 +101,7 @@ def watch_start_cmd(background: bool, poll_interval: float, project_dir: Path) -
                     "--project-dir",
                     str(project_dir),
                     "--poll-interval",
-                    str(poll_interval),
+                    str(cfg.poll_interval),
                 ],
                 stdout=log_fh,
                 stderr=subprocess.STDOUT,
@@ -101,14 +113,9 @@ def watch_start_cmd(background: bool, poll_interval: float, project_dir: Path) -
             f"watch daemon started in background (pid {proc.pid}) — log at {log_path}"
         )
         return
-    cfg = DaemonConfig(
-        project_dir=project_dir,
-        poll_interval=poll_interval,
-        token=resolve_token(),
-    )
     daemon = WatchDaemon(cfg)
     click.echo(
-        f"watch daemon: project={project_dir} poll_interval={poll_interval}s "
+        f"watch daemon: project={project_dir} poll_interval={cfg.poll_interval}s "
         "(Ctrl-C to stop)"
     )
     daemon.run_forever()

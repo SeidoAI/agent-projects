@@ -58,16 +58,22 @@ def queue_cmd() -> None:
 @click.option(
     "--cap-usd",
     type=float,
-    default=200.0,
-    show_default=True,
-    help="USD cap for recent telemetry; the daemon defers above this.",
+    default=None,
+    help=(
+        "USD cap for recent telemetry; the daemon defers above this. "
+        "Defaults to `queue.cap_usd_per_window` from "
+        "templates/runtime/defaults.yaml (project-overridable)."
+    ),
 )
 @click.option(
     "--tick-sleep",
     type=float,
-    default=60.0,
-    show_default=True,
-    help="Seconds between policy ticks.",
+    default=None,
+    help=(
+        "Seconds between policy ticks. Defaults to "
+        "`queue.tick_sleep_seconds` from templates/runtime/defaults.yaml "
+        "(project-overridable)."
+    ),
 )
 @click.option(
     "--max-ticks",
@@ -78,8 +84,8 @@ def queue_cmd() -> None:
 @_project_dir_option()
 def queue_start_cmd(
     background: bool,
-    cap_usd: float,
-    tick_sleep: float,
+    cap_usd: float | None,
+    tick_sleep: float | None,
     max_ticks: int | None,
     project_dir: Path,
 ) -> None:
@@ -90,6 +96,15 @@ def queue_start_cmd(
         raise click.ClickException(
             f"queue daemon already running for this project (pid {existing_pid})"
         )
+
+    # Resolve runtime YAML defaults; click options (when provided)
+    # override the YAML values. None → use the YAML floor.
+    overrides: dict[str, float | int] = {}
+    if cap_usd is not None:
+        overrides["cap_usd_per_window"] = cap_usd
+    if tick_sleep is not None:
+        overrides["tick_sleep_seconds"] = tick_sleep
+    cfg = QueueRunnerConfig.from_runtime(project_dir, **overrides)
 
     if background:
         log_path = logfile_path(project_dir)
@@ -106,9 +121,9 @@ def queue_start_cmd(
                     "--project-dir",
                     str(project_dir),
                     "--cap-usd",
-                    str(cap_usd),
+                    str(cfg.cap_usd_per_window),
                     "--tick-sleep",
-                    str(tick_sleep),
+                    str(cfg.tick_sleep_seconds),
                 ],
                 stdout=log_fh,
                 stderr=subprocess.STDOUT,
@@ -121,15 +136,11 @@ def queue_start_cmd(
         )
         return
 
-    cfg = QueueRunnerConfig(
-        cap_usd_per_window=cap_usd,
-        tick_sleep_seconds=tick_sleep,
-    )
     runner = QueueRunner(project_dir=project_dir, config=cfg)
     write_pidfile(project_dir, os.getpid())
     click.echo(
-        f"queue daemon: project={project_dir} cap=${cap_usd:.2f} "
-        f"tick_sleep={tick_sleep}s (Ctrl-C to stop)"
+        f"queue daemon: project={project_dir} cap=${cfg.cap_usd_per_window:.2f} "
+        f"tick_sleep={cfg.tick_sleep_seconds}s (Ctrl-C to stop)"
     )
     try:
         runner.run_forever(max_ticks=max_ticks)

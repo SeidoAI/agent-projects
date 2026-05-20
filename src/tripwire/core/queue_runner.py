@@ -90,19 +90,51 @@ def is_queue_running(project_dir: Path) -> bool:
 
 @dataclass
 class QueueRunnerConfig:
-    """Tunables for the queue runner. Defaults err on the conservative side."""
+    """Tunables for the queue runner.
 
-    cap_usd_per_window: float = 200.0
-    """USD cap to compare recent spend against. Tune per Max plan."""
+    v0.14.0: no Python-side defaults. Values are loaded from
+    ``templates/runtime/defaults.yaml`` (``queue:`` block) via
+    ``tripwire.core.runtime_config.load_resolved_runtime_config`` at
+    construction time; callers either pass them through directly or
+    use ``QueueRunnerConfig.from_runtime`` (see below).
+    """
 
-    max_concurrent_spawns: int = 1
+    cap_usd_per_window: float
+    """USD cap to compare recent spend against. Tune per billing plan."""
+
+    max_concurrent_spawns: int
     """How many sessions to spawn per tick. 1 keeps semantics simple."""
 
-    probe_interval_seconds: float = 300.0
+    probe_interval_seconds: float
     """Sleep between probes while in cool-down."""
 
-    tick_sleep_seconds: float = 60.0
+    tick_sleep_seconds: float
     """Sleep between policy ticks when ``run_forever`` is in use."""
+
+    @classmethod
+    def from_runtime(
+        cls, project_dir: Path, **overrides: float | int
+    ) -> QueueRunnerConfig:
+        """Load defaults from ``templates/runtime/defaults.yaml`` (+ project
+        overrides), apply any kwarg overrides, return a fully-populated cfg.
+        """
+        from tripwire.core.runtime_config import load_resolved_runtime_config
+
+        rt = load_resolved_runtime_config(project_dir).queue
+        return cls(
+            cap_usd_per_window=overrides.get(
+                "cap_usd_per_window", rt.cap_usd_per_window
+            ),
+            max_concurrent_spawns=overrides.get(
+                "max_concurrent_spawns", rt.max_concurrent_spawns
+            ),
+            probe_interval_seconds=overrides.get(
+                "probe_interval_seconds", rt.probe_interval_seconds
+            ),
+            tick_sleep_seconds=overrides.get(
+                "tick_sleep_seconds", rt.tick_sleep_seconds
+            ),
+        )
 
 
 @dataclass
