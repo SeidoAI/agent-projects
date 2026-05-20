@@ -23,6 +23,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="sweep_issues_forward")
     parser.add_argument("--project-dir", type=Path, required=True)
     parser.add_argument("--session-id", required=True)
+    parser.add_argument(
+        "--from-status",
+        help="Current session status (pre-flip). Optional context.",
+    )
+    parser.add_argument(
+        "--to-status",
+        help=(
+            "Destination session status. When set, sweep targets are "
+            "computed from this rather than the on-disk session.status "
+            "— required when the executor calls the script pre-flip."
+        ),
+    )
     args = parser.parse_args()
 
     from tripwire.core.status_contract import sweep_issues, sweep_target_for
@@ -31,7 +43,13 @@ def main() -> int:
     project_dir = args.project_dir.expanduser().resolve()
     session = load_session(project_dir, args.session_id)
 
-    target = sweep_target_for(session.status.value)
+    # Pre-flip invocation: status on disk is the FROM state, not the TO.
+    # Use --to-status when provided so the sweep targets match where the
+    # session is HEADED. Post-flip / ad-hoc invocations omit --to-status
+    # and fall back to the on-disk status (legacy CLI behavior).
+    state_for_sweep = args.to_status or session.status.value
+
+    target = sweep_target_for(state_for_sweep)
     if target is None:
         print(
             f"session {args.session_id}: status {session.status.value!r} has no "
@@ -47,7 +65,7 @@ def main() -> int:
         )
         return 0
 
-    sweep = sweep_issues(project_dir, session, session.status.value)
+    sweep = sweep_issues(project_dir, session, state_for_sweep)
     for key in sweep.changed:
         print(f"  advanced {key} → {target}", file=sys.stderr)
     for p in sweep.partial:

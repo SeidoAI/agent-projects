@@ -20,6 +20,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="close_open_prs")
     parser.add_argument("--project-dir", type=Path, required=True)
     parser.add_argument("--session-id", required=True)
+    parser.add_argument("--from-status", help="(unused — uniform executor interface)")
+    parser.add_argument("--to-status", help="(unused — uniform executor interface)")
     args = parser.parse_args()
 
     from tripwire.core.session_abandon import (

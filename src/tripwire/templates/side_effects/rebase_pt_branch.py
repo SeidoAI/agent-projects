@@ -21,6 +21,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="rebase_pt_branch")
     parser.add_argument("--project-dir", type=Path, required=True)
     parser.add_argument("--session-id", required=True)
+    parser.add_argument("--from-status", help="(unused — uniform executor interface)")
+    parser.add_argument("--to-status", help="(unused — uniform executor interface)")
     parser.add_argument(
         "--upstream",
         default="origin/main",

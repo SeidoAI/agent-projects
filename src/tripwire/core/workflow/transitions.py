@@ -218,7 +218,91 @@ class TransitionResult:
 
 
 class TransitionError(Exception):
-    """Raised for unrecoverable input errors (unknown session/status)."""
+    """Raised for unrecoverable input errors (unknown session/status).
+
+    Also raised by ``_run_declared_side_effects`` when a side-effect
+    script exits non-zero; ``execute_transition`` catches it and
+    translates to a ``transition.rejected`` event with the script's
+    failure reason. Status is not flipped on rejection.
+    """
+
+
+def _run_declared_side_effects(
+    project_dir: Path,
+    *,
+    workflow_id: str,
+    instance_id: str,
+    route: WorkflowRoute,
+) -> None:
+    """Invoke each declared side_effect script in order, synchronously.
+
+    v0.14.0 — each name in ``route.side_effects`` maps to a Python
+    script at ``templates/side_effects/<name>.py`` (overridable per
+    project at ``<project>/.tripwire/side_effects/<name>.py``).
+    Scripts run via ``subprocess.run([sys.executable, script_path,
+    ...])`` with the executor's own stderr inherited so progress
+    reaches the agent's transcript inline (no opt-in explain flag —
+    progressive disclosure is unconditional).
+
+    Contract: exit code 0 = success, continue. Non-zero = failure —
+    raise :class:`TransitionError` with the script name + exit code
+    so ``execute_transition`` aborts BEFORE the status write. The
+    status flip downstream is the certificate that every validator
+    AND every side_effect passed.
+
+    Each script receives:
+      --project-dir <path>
+      --session-id  <instance-id>
+      --from-status <route.from_ref>
+      --to-status   <route.to_ref>
+
+    Scripts that don't use the status args accept-and-ignore them
+    (uniform interface across all 8 shipped scripts).
+    """
+    if not route.side_effects:
+        return
+
+    import subprocess
+    import sys
+
+    from tripwire.core.paths import resolve_side_effect_path
+
+    for name in route.side_effects:
+        script_path = resolve_side_effect_path(project_dir, name)
+        if not script_path.is_file():
+            raise TransitionError(
+                f"side_effect/script_not_found: declared side_effect "
+                f"{name!r} on route {workflow_id}/{route.id} resolves to "
+                f"{script_path} which does not exist on disk."
+            )
+
+        print(
+            f"running side_effects/{name}.py for {workflow_id}/{instance_id}...",
+            file=sys.stderr,
+        )
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "--project-dir",
+                str(project_dir),
+                "--session-id",
+                instance_id,
+                "--from-status",
+                route.from_ref,
+                "--to-status",
+                route.to_ref,
+            ],
+            stderr=sys.stderr,
+        )
+        if result.returncode != 0:
+            raise TransitionError(
+                f"side_effect/failed: {name!r} exited with code "
+                f"{result.returncode}. transition aborted; status "
+                f"unchanged. fix the underlying state and re-run the "
+                f"transition, or invoke `templates/side_effects/{name}.py` "
+                f"directly to debug."
+            )
 
 
 def _resolve_workflow(spec: WorkflowSpec, workflow_id: str) -> Workflow:
@@ -523,7 +607,32 @@ def _run_gate(
             reason=f"artifacts_missing: {missing_artifacts}",
         )
 
-    # 6. Capture pre-state for preserve/clear semantics. Only the
+    # 6. Run declared side_effects as standalone scripts (v0.14.0).
+    #    Each name in route.side_effects maps to a file under
+    #    ``templates/side_effects/<name>.py`` (override at
+    #    ``<project>/.tripwire/side_effects/<name>.py``). Scripts run
+    #    synchronously via subprocess BEFORE the status flip; any
+    #    non-zero exit aborts the transition with status unchanged.
+    #    The status flip below is therefore the certificate that every
+    #    validator AND every side_effect passed — no post-conditions
+    #    or recovery layer.
+    try:
+        _run_declared_side_effects(
+            project_dir,
+            workflow_id=workflow_id,
+            instance_id=instance,
+            route=route,
+        )
+    except TransitionError as exc:
+        return _reject(
+            project_dir,
+            workflow_id,
+            instance,
+            target_status,
+            reason=str(exc),
+        )
+
+    # 7. Capture pre-state for preserve/clear semantics. Only the
     # coding-session model declares these fields today (dotted paths
     # against ``AgentSession``); guarding the whole block keeps the
     # dict-loader path simple and avoids inventing dotted-path
@@ -535,7 +644,9 @@ def _run_gate(
         for path in route.clear_fields:
             _write_path(session, path, None)
 
-    # 7. Flip status, assign status-instance id, save.
+    # 8. Flip status, assign status-instance id, save. This is the
+    # commit point — every validator and every declared side_effect
+    # has passed by this line.
     n = _next_status_instance_n(project_dir, workflow_id, instance, target_status)
     status_instance = f"{workflow_id}:{instance}:{target_status}:{n}"
     _set_status(session, workflow, target_status)
