@@ -13,12 +13,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from tripwire.core.spawn_config import shipped_with_overrides
 from tripwire.models.session import (
     AgentSession,
     RuntimeState,
     WorktreeEntry,
 )
-from tripwire.models.spawn import SpawnDefaults
 from tripwire.runtimes import CodexRuntime
 from tripwire.runtimes.base import (
     AttachExec,
@@ -46,7 +46,7 @@ def _prepped(tmp_path: Path, *, resume: bool = False) -> PreppedSession:
         prompt="REVIEW THIS PR",
         system_append="",
         project_slug="test-proj",
-        spawn_defaults=SpawnDefaults.model_validate(
+        spawn_defaults=shipped_with_overrides(
             {
                 "prompt_template": "{plan}",
                 "resume_prompt_template": "resuming",

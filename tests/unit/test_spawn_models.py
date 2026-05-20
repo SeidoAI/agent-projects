@@ -27,11 +27,16 @@ def test_spawn_defaults_load_from_shipped():
     assert "Resuming session" in defaults.resume_prompt_template
 
 
-def test_spawn_defaults_minimal_roundtrip():
-    # Empty dict accepts all defaults.
-    defaults = SpawnDefaults.model_validate({})
-    assert defaults.config.model == "opus"
-    assert defaults.invocation.command == "claude"
+def test_spawn_defaults_empty_dict_fails_loud():
+    """v0.14.0: SpawnDefaults has no Python-side field defaults; an
+    empty dict (or any payload missing a required field) must raise
+    ValidationError at construction. Tests the fail-loud principle —
+    a malformed/incomplete spawn YAML can't silently fall back."""
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        SpawnDefaults.model_validate({})
 
 
 def test_spawn_config_session_override():

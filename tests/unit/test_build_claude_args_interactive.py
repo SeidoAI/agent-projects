@@ -1,11 +1,11 @@
 """Tests for build_claude_args interactive mode."""
 
-from tripwire.core.spawn_config import build_claude_args
+from tripwire.core.spawn_config import build_claude_args, shipped_with_overrides
 from tripwire.models.spawn import SpawnDefaults
 
 
 def _defaults() -> SpawnDefaults:
-    return SpawnDefaults.model_validate(
+    return shipped_with_overrides(
         {
             "prompt_template": "hi",
             "system_prompt_append": "sa",

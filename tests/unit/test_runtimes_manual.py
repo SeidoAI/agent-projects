@@ -2,12 +2,12 @@
 
 from pathlib import Path
 
+from tripwire.core.spawn_config import _shipped_defaults
 from tripwire.models.session import (
     AgentSession,
     RuntimeState,
     WorktreeEntry,
 )
-from tripwire.models.spawn import SpawnDefaults
 from tripwire.runtimes import ManualRuntime
 from tripwire.runtimes.base import AttachInstruction, PreppedSession
 
@@ -29,7 +29,9 @@ def _prepped(tmp_path: Path) -> PreppedSession:
         prompt="do the thing",
         system_append="",
         project_slug="test-proj",
-        spawn_defaults=SpawnDefaults(),
+        # v0.14.0: SpawnDefaults has no Python field defaults; load from
+        # the shipped YAML to get the framework floor for tests.
+        spawn_defaults=_shipped_defaults(),
     )
 
 

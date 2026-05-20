@@ -1,15 +1,25 @@
-"""Resolve spawn configuration with precedence session > project > tripwire default.
+"""Resolve spawn configuration with precedence session > project > agent > tripwire default.
 
-Three sources stack onto the shipped default:
+Five layers stack onto the shipped default (highest precedence last
+within each layer; later layers override earlier ones at every key):
+
   1. `src/tripwire/templates/spawn/defaults.yaml` (tripwire default — always loaded)
-  2. `<project>/.tripwire/spawn/defaults.yaml` (file-based project override)
-  3. `project.yaml.spawn_defaults` (inline project override)
-  4. `session.yaml.spawn_config` (per-session override — highest priority)
+  2. `src/tripwire/templates/agent_templates/<agent>.yaml`'s `spawn_config:` block
+     (per-agent framework floor; v0.14.0 — only when session.agent is set)
+  3. `<project>/.tripwire/spawn/defaults.yaml` (file-based project override)
+  4. `project.yaml.spawn_defaults` (inline project override)
+  5. `session.yaml.spawn_config` (per-session override — highest priority)
 
 Each layer deep-merges into the prior; scalar/list values at a leaf key
 replace the prior value entirely. Use `load_resolved_spawn_config` to get
 a fully merged `SpawnDefaults` and then `build_claude_args` to emit the
 Popen argv list.
+
+v0.14.0 — `SpawnInvocation` and `SpawnConfigValues` no longer carry
+field defaults; the shipped YAML is the only floor. A malformed YAML
+(missing any required field) raises ``ValidationError`` at
+``SpawnDefaults.model_validate(base)`` rather than silently filling
+from a Python-side default.
 """
 
 from __future__ import annotations
@@ -33,6 +43,39 @@ def _shipped_path() -> Path:
     return Path(tripwire.__file__).parent / "templates" / "spawn" / "defaults.yaml"
 
 
+def _shipped_agent_template_path(agent_id: str) -> Path:
+    """Path to the packaged agent template YAML for ``agent_id``."""
+    import tripwire
+
+    return (
+        Path(tripwire.__file__).parent
+        / "templates"
+        / "agent_templates"
+        / f"{agent_id}.yaml"
+    )
+
+
+def _shipped_agent_spawn_config(agent_id: str) -> dict[str, Any]:
+    """Return the packaged agent template's ``spawn_config:`` block.
+
+    Returns ``{}`` when the template doesn't exist or has no
+    ``spawn_config:`` block. v0.14.0 — the per-agent floor for spawn
+    config; layered between the shipped framework default and any
+    project-level overrides.
+    """
+    template_path = _shipped_agent_template_path(agent_id)
+    if not template_path.is_file():
+        return {}
+    try:
+        data = yaml.safe_load(template_path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    block = data.get("spawn_config")
+    return block if isinstance(block, dict) else {}
+
+
 def _deep_merge(base: dict, override: dict) -> dict:
     """Merge `override` into `base`. Dicts recurse; other types replace."""
     result = dict(base)
@@ -48,12 +91,18 @@ def load_resolved_spawn_config(
     project_dir: Path,
     session: AgentSession | None = None,
 ) -> SpawnDefaults:
-    """Resolve spawn config. Session > project-inline > project-file > default."""
+    """Resolve spawn config. Session > project-inline > project-file > agent > default."""
     base: dict[str, Any] = (
         yaml.safe_load(_shipped_path().read_text(encoding="utf-8")) or {}
     )
 
-    # 2. Project file override
+    # 2. Packaged agent-template spawn_config block (v0.14.0).
+    if session is not None and session.agent:
+        agent_block = _shipped_agent_spawn_config(session.agent)
+        if agent_block:
+            base = _deep_merge(base, agent_block)
+
+    # 3. Project file override
     file_override = project_dir / ".tripwire" / "spawn" / "defaults.yaml"
     if file_override.is_file():
         override = yaml.safe_load(file_override.read_text(encoding="utf-8")) or {}
@@ -173,9 +222,44 @@ def _apply_agent_yaml_overrides(
     # when the helper is invoked from inside the loader.
 
 
-# Field defaults used to detect "user-set non-default" values on codex
-# sessions. Computed once at module load so the comparison stays cheap.
-_CONFIG_DEFAULTS = SpawnConfigValues()
+def _shipped_defaults() -> SpawnDefaults:
+    """Load the shipped framework defaults at module-call time.
+
+    v0.14.0: the SpawnConfigValues/SpawnInvocation Pydantic models no
+    longer carry field defaults, so we can't ``SpawnConfigValues()``
+    to get the framework floor. The shipped YAML is the only source.
+    Computed lazily on first ``_apply_provider_validation`` so the
+    module imports cheaply even when no spawn is happening.
+    """
+    payload = yaml.safe_load(_shipped_path().read_text(encoding="utf-8")) or {}
+    return SpawnDefaults.model_validate(payload)
+
+
+def shipped_with_overrides(overrides: dict[str, Any]) -> SpawnDefaults:
+    """Build a ``SpawnDefaults`` by deep-merging *overrides* over the
+    shipped YAML.
+
+    v0.14.0 helper for tests (and callers) that previously relied on
+    SpawnDefaults field defaults to fill in unspecified values. The
+    shipped YAML provides every required field; overrides take
+    precedence per-key.
+    """
+    base = yaml.safe_load(_shipped_path().read_text(encoding="utf-8")) or {}
+    merged = _deep_merge(base, overrides)
+    return SpawnDefaults.model_validate(merged)
+
+
+# Used to detect "user-set non-default" values on codex sessions.
+# Cached lazily on first access; v0.14.0 — no longer a module-level
+# constant (would crash at import if the YAML were missing).
+_CONFIG_DEFAULTS_CACHE: SpawnConfigValues | None = None
+
+
+def _config_defaults() -> SpawnConfigValues:
+    global _CONFIG_DEFAULTS_CACHE
+    if _CONFIG_DEFAULTS_CACHE is None:
+        _CONFIG_DEFAULTS_CACHE = _shipped_defaults().config
+    return _CONFIG_DEFAULTS_CACHE
 
 
 def _apply_provider_validation(resolved: SpawnDefaults) -> None:
@@ -209,7 +293,7 @@ def _apply_provider_validation(resolved: SpawnDefaults) -> None:
         )
         cfg.fallback_model = ""
 
-    if cfg.max_turns != _CONFIG_DEFAULTS.max_turns:
+    if cfg.max_turns != _config_defaults().max_turns:
         warnings.warn(
             "spawn_config: 'max_turns' is enforced by the in-flight monitor "
             "for codex sessions (no flag analogue); value preserved. "

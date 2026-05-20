@@ -48,3 +48,13 @@ grouping_rules:
   same_repo: required
   file_overlap: preferred
   sequential_deps: preferred
+
+# v0.14.0 — per-agent spawn config floor. Deep-merged over
+# templates/spawn/defaults.yaml; under-cut by project + session
+# overrides. Only declare values that DIFFER from the framework
+# floor; missing keys inherit unchanged. Empty block (or omitted
+# section) means "this agent uses the framework defaults verbatim."
+spawn_config:
+  # Backend coders write a lot of code; allow longer runs.
+  config:
+    max_turns: 300

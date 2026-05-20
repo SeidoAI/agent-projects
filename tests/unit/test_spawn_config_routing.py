@@ -15,28 +15,41 @@ from pathlib import Path
 
 import pytest
 
-from tripwire.core.spawn_config import build_claude_args
+from tripwire.core.spawn_config import build_claude_args, shipped_with_overrides
 from tripwire.core.spawn_routing import resolve_route
-from tripwire.models.spawn import SpawnConfigValues, SpawnDefaults
 
 
-def test_spawn_config_values_has_task_kind_field() -> None:
-    """``SpawnConfigValues`` must include a ``task_kind`` (default empty)."""
-    cfg = SpawnConfigValues()
+def test_spawn_config_values_has_task_kind_field_default_empty() -> None:
+    """``SpawnConfigValues`` must include a ``task_kind`` field, and the
+    shipped YAML defaults it to empty string (no specific task kind →
+    routing table falls through to its ``default:`` route).
+
+    v0.14.0: SpawnConfigValues no longer has Python-side field defaults.
+    The shipped ``templates/spawn/defaults.yaml`` is the only floor;
+    test it directly.
+    """
+    from tripwire.core.spawn_config import _shipped_defaults
+
+    cfg = _shipped_defaults().config
     assert hasattr(cfg, "task_kind")
     assert cfg.task_kind == ""
 
 
 def test_spawn_config_values_accepts_task_kind() -> None:
     """The ``task_kind`` field must be assignable from session.yaml input."""
-    cfg = SpawnConfigValues(task_kind="lint_or_template_edit")
+    from tripwire.core.spawn_config import _shipped_defaults
+
+    defaults = _shipped_defaults()
+    payload = defaults.model_dump()
+    payload["config"]["task_kind"] = "lint_or_template_edit"
+    cfg = shipped_with_overrides(payload).config
     assert cfg.task_kind == "lint_or_template_edit"
 
 
 def test_build_claude_args_uses_route_when_provided(tmp_path: Path) -> None:
     """A non-empty ``task_kind`` causes ``build_claude_args`` to substitute
     the route's model+effort for the cfg defaults."""
-    defaults = SpawnDefaults.model_validate(
+    defaults = shipped_with_overrides(
         {"config": {"task_kind": "lint_or_template_edit"}}
     )
     args = build_claude_args(
@@ -61,7 +74,7 @@ def test_build_claude_args_empty_task_kind_uses_cfg_defaults(tmp_path: Path) -> 
     The default route (agentic_loop) is (opus, xhigh) — same as the
     cfg defaults ship today. Either path lands at (opus, xhigh).
     """
-    defaults = SpawnDefaults.model_validate({})
+    defaults = shipped_with_overrides({})
     args = build_claude_args(
         defaults,
         prompt="x",
@@ -79,7 +92,7 @@ def test_build_claude_args_unknown_task_kind_raises(tmp_path: Path) -> None:
     """An unknown ``task_kind`` propagates ``UnknownTaskKindError``."""
     from tripwire.core.spawn_routing import UnknownTaskKindError
 
-    defaults = SpawnDefaults.model_validate({"config": {"task_kind": "not_a_kind"}})
+    defaults = shipped_with_overrides({"config": {"task_kind": "not_a_kind"}})
     with pytest.raises(UnknownTaskKindError):
         build_claude_args(
             defaults,
