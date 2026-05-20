@@ -1,7 +1,10 @@
 """Per-lint thresholds with project-level override layering.
 
-Defaults live in ``DEFAULT_THRESHOLDS`` (mutable dict — keep keys
-stable). KUI-149 (D7) extends :func:`get_threshold` to honour
+v0.14.0 — package-shipped defaults moved to
+``templates/lint/defaults.yaml``. The dicts ``DEFAULT_THRESHOLDS``
+and ``KIND_OVERRIDES`` are populated at import time by reading that
+file; the public API (and ``get_threshold``'s merge semantics)
+unchanged. KUI-149 (D7) extends :func:`get_threshold` to honour
 ``project.yaml.lint_config`` overrides; the v0.9 default-only
 implementation is the floor.
 
@@ -20,53 +23,54 @@ contract is published (TW1-4).
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+import yaml
 
 if TYPE_CHECKING:
     from tripwire.models.project import ProjectConfig
 
 
-# Defaults: shape `{lint_name: {threshold_name: value}}`.
-DEFAULT_THRESHOLDS: dict[str, dict[str, Any]] = {
-    "concept_name_prose": {
-        # Min number of issues that must use the node name as prose
-        # (without a [[ref]]) before the lint warns.
-        "min_issues": 2,
-    },
-    "semantic_coverage": {
-        # Min `[[node-id]]` references in the AC section per active issue.
-        # Defaults to 0 (off) — projects opt in via lint_config because the
-        # convention of putting concept refs in AC items is project-policy,
-        # not universal. See decisions.md D-1 in the v09-validators
-        # session for the rationale.
-        "min_ac_node_refs": 0,
-    },
-    "mega_issue": {
-        # Warn when an issue has >= this many child issues OR sessions.
-        "max_children": 8,
-        "max_sessions": 6,
-    },
-    "node_ratio": {
-        # Warn when nodes-per-active-issue ratio falls outside this band.
-        "min_ratio": 0.10,
-        "max_ratio": 5.0,
-    },
-}
+def _shipped_defaults_path() -> Path:
+    """Path to the package-shipped lint defaults YAML."""
+    import tripwire
 
+    return Path(tripwire.__file__).parent / "templates" / "lint" / "defaults.yaml"
+
+
+def _load_shipped() -> tuple[
+    dict[str, dict[str, Any]], dict[str, dict[str, dict[str, Any]]]
+]:
+    """Load (DEFAULT_THRESHOLDS, KIND_OVERRIDES) from the shipped YAML.
+
+    Read at import time; the public dict constants below are populated
+    from the result. Failing here is a packaging bug — surfacing it as
+    ImportError at module load is the right move (no silent fallback).
+    """
+    payload = yaml.safe_load(_shipped_defaults_path().read_text(encoding="utf-8")) or {}
+    defaults = payload.get("default_thresholds") or {}
+    overrides = payload.get("kind_overrides") or {}
+    if not isinstance(defaults, dict) or not isinstance(overrides, dict):
+        raise RuntimeError(
+            "templates/lint/defaults.yaml: expected top-level keys "
+            "`default_thresholds` and `kind_overrides` to be mappings."
+        )
+    return defaults, overrides
+
+
+# Defaults: shape `{lint_name: {threshold_name: value}}`.
+# Populated from `templates/lint/defaults.yaml` (v0.14.0); the module-
+# level constant exposes the dict so existing callers continue to work.
+DEFAULT_THRESHOLDS: dict[str, dict[str, Any]]
 
 # Per-project-kind overrides on top of DEFAULT_THRESHOLDS. Missing kinds
 # fall through to the defaults; missing keys inside a kind also fall
 # through. Project-team can layer their own values via
 # `project.yaml.lint_config` (KUI-149).
-KIND_OVERRIDES: dict[str, dict[str, dict[str, Any]]] = {
-    "library": {
-        # Libraries tend to have fewer issues per concept node.
-        "node_ratio": {"min_ratio": 0.5, "max_ratio": 10.0},
-    },
-    "framework": {
-        "node_ratio": {"min_ratio": 0.5, "max_ratio": 10.0},
-    },
-}
+KIND_OVERRIDES: dict[str, dict[str, dict[str, Any]]]
+
+DEFAULT_THRESHOLDS, KIND_OVERRIDES = _load_shipped()
 
 
 def get_threshold(
