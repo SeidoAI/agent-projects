@@ -1,0 +1,44 @@
+# Default runtime configuration — daemon-wide tunables for the
+# monitor, queue runner, and PR watcher. Projects override via
+# `<project>/.tripwire/runtime/defaults.yaml` or inline via
+# `project.yaml.runtime`.
+#
+# Precedence: project.yaml.runtime > project-file > tripwire default.
+# Values are matched against the Pydantic models in
+# `tripwire.models.runtime`; missing required fields fail loud at
+# load time (no silent fallback to Python defaults).
+
+monitor:
+  # Stream-idle reaper: if the agent's log file has produced no
+  # new events for this many seconds while the process is still
+  # alive, the runner classifies it as a silent stream-idle death
+  # (typically a wedged libuv loop after a SIGSTOP/SIGCONT cycle,
+  # or a `claude -p` post-end_turn hang) and reaps it.
+  stream_idle_threshold_seconds: 600.0
+
+  # Hard cap on agent wall-clock time. Beyond this the runner
+  # SIGTERMs the process regardless of progress.
+  max_runtime_seconds: 21600  # 6 hours
+
+  # Push-loop tripwire: counts consecutive failed `git push` attempts
+  # and fires escalating actions. terminate_threshold > warn_threshold.
+  push_loop:
+    warn_threshold: 5
+    terminate_threshold: 10
+
+queue:
+  # USD cap to compare recent spend against. Tune per billing plan.
+  cap_usd_per_window: 200.0
+
+  # How many sessions to spawn per tick. 1 keeps semantics simple.
+  max_concurrent_spawns: 1
+
+  # Sleep between probes while in cool-down.
+  probe_interval_seconds: 300.0
+
+  # Sleep between policy ticks when `run_forever` is in use.
+  tick_sleep_seconds: 60.0
+
+pr_watcher:
+  # PR-watch daemon poll cadence.
+  poll_interval: 300.0  # 5 min

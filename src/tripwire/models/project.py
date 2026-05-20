@@ -348,6 +348,13 @@ class ProjectConfig(BaseModel):
     # the v1.0 contract publishes (TW1-4).
     lint_config: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
+    # v0.14.0: per-project runtime config overrides. Free-form mapping
+    # deep-merged on top of `templates/runtime/defaults.yaml` and any
+    # `<project>/.tripwire/runtime/defaults.yaml` file. Resolved by
+    # `tripwire.core.runtime_config.load_resolved_runtime_config`.
+    # Empty dict means "no project-level overrides."
+    runtime: dict[str, Any] = Field(default_factory=dict)
+
     # v0.7.6: SSH URL of the project-tracking repo on GitHub (the repo that
     # holds this project.yaml). Recorded by `tripwire init` after auto-creating
     # the repo; absent on pre-v0.7.6 projects. Disambiguates from `repos:`

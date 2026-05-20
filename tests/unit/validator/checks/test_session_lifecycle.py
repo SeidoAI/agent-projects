@@ -132,9 +132,7 @@ class TestMemberIssuesAtOrPastInReview:
         # the session has reached in_review. Pre-in_review is the
         # legal sweep window, not a failure window.
         _save_issue(save_test_issue, tmp_path_project, "TMP-1", status="queued")
-        save_test_session(
-            tmp_path_project, "s1", status="executing", issues=["TMP-1"]
-        )
+        save_test_session(tmp_path_project, "s1", status="executing", issues=["TMP-1"])
         ctx = load_context(tmp_path_project)
         assert check_member_issues_at_or_past_in_review(ctx) == []
 
