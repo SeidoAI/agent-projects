@@ -1,10 +1,16 @@
-"""Session-lifecycle tripwires that gate the verified → completed route.
+"""Session-lifecycle tripwires that gate forward transitions.
 
-All four are session-scoped: they iterate ``ctx.sessions`` and gate
+All five are session-scoped: they iterate ``ctx.sessions`` and gate
 each session on its current status (read via the ``session_status``
 enum). The canonical wiring is the route's ``controls.tripwires:``
 list.
 
+- ``v_member_issues_at_or_past_in_review``
+                                   gates ``in_review`` (about to flip
+                                   to verified → all session member
+                                   issues must be swept forward).
+                                   Backstop for the
+                                   ``sweep_issues_forward`` side_effect.
 - ``v_pr_merged_for_session``     gates ``verified`` (about to flip to
                                    completed → PRs must already be
                                    merged on the remote).
@@ -15,11 +21,13 @@ list.
 - ``v_session_has_verified_md``   gates each session-member issue at
                                    ``verified``.
 
-The first two are split out from a single artifact gate so failures
-point at one file kind rather than a mixed list.
+The PR-merged and PR-review checks are split out from a single
+artifact gate so failures point at one file kind rather than a mixed
+list.
 
 Codes (severity=error):
 
+- ``session/member_issue_not_swept``
 - ``session/pr_not_merged``
 - ``session/review_not_approved``
 - ``session/developer_md_missing``
@@ -56,6 +64,65 @@ def _issue_at_or_past(ctx: ValidationContext, current: str, threshold: str) -> b
     return status_at_or_past(
         current, threshold, ctx.project_dir, enum_name="issue_status"
     )
+
+
+# ----------------------------------------------------------------------
+# v_member_issues_at_or_past_in_review
+# ----------------------------------------------------------------------
+
+
+def check_member_issues_at_or_past_in_review(
+    ctx: ValidationContext,
+) -> list[CheckResult]:
+    """Sessions at-or-past ``in_review`` must have every member issue
+    swept forward to at-or-past ``in_review``.
+
+    Backstop for the ``sweep_issues_forward`` side_effect that runs on
+    the ``executing → in_review`` route in v0.14.0+. If the sweep is
+    bypassed for any reason (manual YAML edit, executor regression),
+    this validator catches the resulting drift: a session that says
+    "ready for review" while member issues are still at ``queued``
+    means the per-issue artifact gates (developer.md presence) cannot
+    fire, because they're keyed off issue status.
+
+    Code: ``session/member_issue_not_swept``.
+    """
+    from tripwire.core.store import load_issue
+
+    results: list[CheckResult] = []
+    for entity in ctx.sessions:
+        session = entity.model
+        sid = session.id
+        if not _session_at_or_past(ctx, str(session.status), "in_review"):
+            continue
+
+        for issue_key in session.issues:
+            try:
+                issue = load_issue(ctx.project_dir, issue_key)
+            except FileNotFoundError:
+                # Reference-integrity validators surface dangling
+                # references separately; don't double-fire here.
+                continue
+            if _issue_at_or_past(ctx, issue.status, "in_review"):
+                continue
+            results.append(
+                CheckResult(
+                    code="session/member_issue_not_swept",
+                    severity="error",
+                    file=f"{paths.SESSIONS_DIR}/{sid}/session.yaml",
+                    field="issues",
+                    message=(
+                        f"Session {sid!r} ({session.status}) is at-or-past "
+                        f"in_review but member issue {issue_key!r} is still "
+                        f"at {issue.status!r}."
+                    ),
+                    fix_hint=(
+                        f"Run `tripwire session sweep-issues-forward {sid}` "
+                        f"to move member issues to in_review, then re-validate."
+                    ),
+                )
+            )
+    return results
 
 
 # ----------------------------------------------------------------------
@@ -336,6 +403,7 @@ def check_session_has_verified_md(ctx: ValidationContext) -> list[CheckResult]:
 
 
 SESSION_LIFECYCLE_CHECKS = [
+    check_member_issues_at_or_past_in_review,
     check_pr_merged_for_session,
     check_pr_review_approved,
     check_session_has_developer_md,
@@ -345,6 +413,7 @@ SESSION_LIFECYCLE_CHECKS = [
 
 __all__ = [
     "SESSION_LIFECYCLE_CHECKS",
+    "check_member_issues_at_or_past_in_review",
     "check_pr_merged_for_session",
     "check_pr_review_approved",
     "check_session_has_developer_md",

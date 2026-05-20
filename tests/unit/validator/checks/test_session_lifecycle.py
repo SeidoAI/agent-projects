@@ -1,11 +1,12 @@
-"""v0.13 — session-lifecycle tripwires (promoted from side-effects).
+"""v0.13/v0.14 — session-lifecycle tripwires.
 
 One happy-path + one failure-finding test per validator:
 
-- ``check_pr_merged_for_session``       → ``session/pr_not_merged``
-- ``check_pr_review_approved``          → ``session/review_not_approved``
-- ``check_session_has_developer_md``    → ``session/developer_md_missing``
-- ``check_session_has_verified_md``     → ``session/verified_md_missing``
+- ``check_member_issues_at_or_past_in_review`` → ``session/member_issue_not_swept`` (v0.14.0)
+- ``check_pr_merged_for_session``              → ``session/pr_not_merged``
+- ``check_pr_review_approved``                 → ``session/review_not_approved``
+- ``check_session_has_developer_md``           → ``session/developer_md_missing``
+- ``check_session_has_verified_md``            → ``session/verified_md_missing``
 
 The PR-merged tests monkeypatch ``_pr_merged_for_branch`` to avoid
 shelling out to ``gh`` from the test process.
@@ -19,6 +20,7 @@ from pathlib import Path
 from tripwire.core.validator import load_context
 from tripwire.core.validator.checks import session_lifecycle as sl
 from tripwire.core.validator.checks.session_lifecycle import (
+    check_member_issues_at_or_past_in_review,
     check_pr_merged_for_session,
     check_pr_review_approved,
     check_session_has_developer_md,
@@ -72,6 +74,69 @@ def _write_review_json(project_dir: Path, sid: str, *, exit_code: int) -> None:
 
 def _save_issue(save_test_issue, project_dir: Path, key: str, *, status: str) -> None:
     save_test_issue(project_dir, key, status=status)
+
+
+# ---------------------------------------------------------------------------
+# v_member_issues_at_or_past_in_review (v0.14.0)
+# ---------------------------------------------------------------------------
+
+
+class TestMemberIssuesAtOrPastInReview:
+    def test_happy_path_all_member_issues_at_in_review(
+        self,
+        tmp_path_project,
+        save_test_session,
+        save_test_issue,
+    ):
+        _save_issue(save_test_issue, tmp_path_project, "TMP-1", status="in_review")
+        _save_issue(save_test_issue, tmp_path_project, "TMP-2", status="verified")
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="in_review",
+            issues=["TMP-1", "TMP-2"],
+        )
+        ctx = load_context(tmp_path_project)
+        assert check_member_issues_at_or_past_in_review(ctx) == []
+
+    def test_unswept_member_issue_fires(
+        self,
+        tmp_path_project,
+        save_test_session,
+        save_test_issue,
+    ):
+        _save_issue(save_test_issue, tmp_path_project, "TMP-1", status="in_review")
+        _save_issue(save_test_issue, tmp_path_project, "TMP-2", status="queued")
+        save_test_session(
+            tmp_path_project,
+            "s1",
+            status="in_review",
+            issues=["TMP-1", "TMP-2"],
+        )
+        ctx = load_context(tmp_path_project)
+        results = check_member_issues_at_or_past_in_review(ctx)
+        assert any(r.code == "session/member_issue_not_swept" for r in results), (
+            f"expected session/member_issue_not_swept, got {[r.code for r in results]}"
+        )
+        # Only the unswept one (TMP-2) should be named in any finding message.
+        swept_messages = [r.message for r in results if "TMP-1" in r.message]
+        assert swept_messages == []
+
+    def test_executing_session_does_not_fire(
+        self,
+        tmp_path_project,
+        save_test_session,
+        save_test_issue,
+    ):
+        # Session still at executing — the backstop only gates once
+        # the session has reached in_review. Pre-in_review is the
+        # legal sweep window, not a failure window.
+        _save_issue(save_test_issue, tmp_path_project, "TMP-1", status="queued")
+        save_test_session(
+            tmp_path_project, "s1", status="executing", issues=["TMP-1"]
+        )
+        ctx = load_context(tmp_path_project)
+        assert check_member_issues_at_or_past_in_review(ctx) == []
 
 
 # ---------------------------------------------------------------------------

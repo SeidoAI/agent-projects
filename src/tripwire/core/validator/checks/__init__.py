@@ -53,6 +53,7 @@ from tripwire.core.validator.checks.references import (
     check_reference_integrity,
 )
 from tripwire.core.validator.checks.session_lifecycle import (
+    check_member_issues_at_or_past_in_review,
     check_pr_merged_for_session,
     check_pr_review_approved,
     check_session_has_developer_md,
@@ -131,10 +132,12 @@ PR_REVIEW_CHECKS = [
     check_pr_review_code_review_skill,
 ]
 
-# Session-lifecycle: gates the verified → completed route on PR merge,
-# review approval, and the per-issue developer.md / verified.md
-# artifacts that the session's member issues are required to produce.
+# Session-lifecycle: gates forward transitions:
+# `executing → in_review` (member issues must be swept forward)
+# `verified → completed`  (PRs merged, review approved, per-issue
+#                          developer.md / verified.md present).
 SESSION_LIFECYCLE_CHECKS = [
+    check_member_issues_at_or_past_in_review,
     check_pr_merged_for_session,
     check_pr_review_approved,
     check_session_has_developer_md,
@@ -196,6 +199,7 @@ ALL_CHECKS = [
     check_pr_review_threshold_findings,
     check_pr_review_external_reviewer,
     check_pr_review_code_review_skill,
+    check_member_issues_at_or_past_in_review,
     check_pr_merged_for_session,
     check_pr_review_approved,
     check_session_has_developer_md,
