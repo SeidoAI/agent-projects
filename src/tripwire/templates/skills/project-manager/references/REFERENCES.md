@@ -38,7 +38,7 @@ example commands or output without worrying about triggering false
 positives:
 
 ````markdown
-Run `tripwire refs list SEI-42` to see the references:
+Run `tripwire node refs list SEI-42` to see the references:
 
 ```
 user-model     resolves    ok
@@ -106,9 +106,9 @@ validator reports it as `ref/dangling`. Common causes:
 
 ## Reference commands
 
-- `tripwire refs list <issue-key>` — every reference in one issue
-- `tripwire refs reverse <node-id>` — every entity that references a node
-- `tripwire refs check` — full scan (dangling, orphan, stale)
+- `tripwire node refs list <issue-key>` — every reference in one issue
+- `tripwire node refs reverse <node-id>` — every entity that references a node
+- `tripwire node refs check` — full scan (dangling, orphan, stale)
 
 ## See also
 

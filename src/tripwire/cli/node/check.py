@@ -1,9 +1,9 @@
 """`tripwire node check` — concept node freshness check.
 
-The only `node` subcommand in v0 is `check`, which compares each active
-node's stored `content_hash` against the live content on disk (local clone)
-or via the GitHub API. Mutation commands (`node create`, `node update`)
-are deferred; agents create nodes by writing files directly.
+Compares each active node's stored `content_hash` against the live
+content on disk (local clone) or via the GitHub API. Mutation commands
+(`node create`, `node update`) are deferred; agents create nodes by
+writing files directly.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from tripwire.cli.node._group import node_cmd
 from tripwire.core.freshness import (
     check_all_nodes,
     check_node_freshness,
@@ -27,11 +28,6 @@ from tripwire.core.store import ProjectNotFoundError, load_project
 from tripwire.models.graph import FreshnessResult, FreshnessStatus
 
 console = Console()
-
-
-@click.group(name="node")
-def node_cmd() -> None:
-    """Concept node operations (check-only in v0)."""
 
 
 @node_cmd.command("check")
@@ -200,3 +196,6 @@ def _status_style(status: FreshnessStatus) -> str:
         FreshnessStatus.SOURCE_MISSING: "red",
         FreshnessStatus.NO_SOURCE: "dim",
     }.get(status, "white")
+
+
+__all__ = ["node_check_cmd"]

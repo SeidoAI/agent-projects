@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 from click.testing import CliRunner
 
-from tripwire.cli.graph import graph_cmd
+from tripwire.cli.node.graph import graph_cmd
 from tripwire.core.graph.cache import full_rebuild
 from tripwire.core.store import save_issue, save_project
 from tripwire.models import Issue, ProjectConfig, RepoEntry

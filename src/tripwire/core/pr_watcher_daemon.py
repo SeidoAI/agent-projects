@@ -13,8 +13,8 @@ deduplication) and on disk in:
   ``<project>/.tripwire/watch/state.json`` — per-session snapshot
                                               (code_pr_opened_at, etc.)
 
-The CLI surface (``tripwire watch start / stop / status / logs``) lives
-in :mod:`tripwire.cli.watch`; this module provides the building blocks.
+The CLI surface (``tripwire pr watch start / stop / status / logs``) lives
+in :mod:`tripwire.cli.pr.watch`; this module provides the building blocks.
 """
 
 from __future__ import annotations

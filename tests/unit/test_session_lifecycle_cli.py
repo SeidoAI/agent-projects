@@ -307,7 +307,7 @@ class TestSessionQueue:
         write_handoff_yaml(tmp_path_project, "s1")
         runner = CliRunner()
         result = runner.invoke(
-            session_cmd, ["queue", "s1", "--project-dir", str(tmp_path_project)]
+            session_cmd, ["queue", "add", "s1", "--project-dir", str(tmp_path_project)]
         )
         assert result.exit_code == 0, result.output
         s = load_session(tmp_path_project, "s1")
@@ -320,7 +320,7 @@ class TestSessionQueue:
         write_handoff_yaml(tmp_path_project, "s1")
         runner = CliRunner()
         result = runner.invoke(
-            session_cmd, ["queue", "s1", "--project-dir", str(tmp_path_project)]
+            session_cmd, ["queue", "add", "s1", "--project-dir", str(tmp_path_project)]
         )
         assert result.exit_code != 0
 
@@ -331,7 +331,7 @@ class TestSessionQueue:
         write_handoff_yaml(tmp_path_project, "s1")
         runner = CliRunner()
         result = runner.invoke(
-            session_cmd, ["queue", "s1", "--project-dir", str(tmp_path_project)]
+            session_cmd, ["queue", "add", "s1", "--project-dir", str(tmp_path_project)]
         )
         assert result.exit_code != 0
 

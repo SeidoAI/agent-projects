@@ -117,7 +117,8 @@ def test_cli_outputs_marker_first(two_state_repo):
     result = runner.invoke(
         cli,
         [
-            "pr-summary",
+            "pr",
+            "summary",
             "--project-dir",
             str(repo),
             "--base",
@@ -136,7 +137,8 @@ def test_cli_includes_section_summaries(two_state_repo):
     result = runner.invoke(
         cli,
         [
-            "pr-summary",
+            "pr",
+            "summary",
             "--project-dir",
             str(repo),
             "--base",
@@ -165,7 +167,8 @@ def test_cli_surfaces_issue_status_change(two_state_repo):
     result = runner.invoke(
         cli,
         [
-            "pr-summary",
+            "pr",
+            "summary",
             "--project-dir",
             str(repo),
             "--base",
@@ -185,7 +188,8 @@ def test_cli_json_format_returns_parseable_json(two_state_repo):
     result = runner.invoke(
         cli,
         [
-            "pr-summary",
+            "pr",
+            "summary",
             "--project-dir",
             str(repo),
             "--base",
@@ -214,6 +218,6 @@ def test_cli_errors_outside_git_repo(tmp_path: Path):
     not_a_repo.mkdir()
     result = runner.invoke(
         cli,
-        ["pr-summary", "--project-dir", str(not_a_repo)],
+        ["pr", "summary", "--project-dir", str(not_a_repo)],
     )
     assert result.exit_code != 0

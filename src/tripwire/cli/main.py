@@ -21,11 +21,9 @@ from tripwire.cli.enums import enums_cmd
 from tripwire.cli.events import events_cmd
 from tripwire.cli.gh import gh_cmd
 from tripwire.cli.git import git_cmd
-from tripwire.cli.graph import graph_cmd
 from tripwire.cli.heuristic import heuristic_cmd
 from tripwire.cli.hooks import hook_cmd, hooks_cmd
 from tripwire.cli.inbox import inbox_cmd
-from tripwire.cli.init import init_cmd
 from tripwire.cli.issue import issue_cmd
 from tripwire.cli.jit_prompts import jit_prompts_cmd
 from tripwire.cli.lint import lint_cmd
@@ -34,13 +32,9 @@ from tripwire.cli.next_key import next_key_cmd
 from tripwire.cli.node import node_cmd
 from tripwire.cli.plan import plan_cmd
 from tripwire.cli.pr import pr_cmd
-from tripwire.cli.pr_summary import pr_summary_cmd
+from tripwire.cli.project import project_cmd
 from tripwire.cli.prompt_check import prompt_check_cmd
-from tripwire.cli.queue import queue_cmd
-from tripwire.cli.readme import readme_cmd
 from tripwire.cli.refresh import refresh_cmd
-from tripwire.cli.refs import refs_cmd
-from tripwire.cli.scaffold import brief_cmd
 from tripwire.cli.session import session_cmd
 from tripwire.cli.status import status_cmd
 from tripwire.cli.templates import templates_cmd
@@ -50,7 +44,6 @@ from tripwire.cli.ui import ui_cmd
 from tripwire.cli.uuid_cmd import uuid_cmd
 from tripwire.cli.validate import validate_cmd
 from tripwire.cli.validate_plan import validate_plan_cmd
-from tripwire.cli.watch import watch_cmd
 from tripwire.cli.workspace import workspace_cmd
 
 # Verbose count → logging level. -v = INFO, -vv = DEBUG, default = WARNING.
@@ -98,30 +91,24 @@ def cli(ctx: click.Context, verbose: int) -> None:
 
 
 cli.add_command(agenda_cmd)
-cli.add_command(init_cmd)
 cli.add_command(issue_cmd)
 cli.add_command(ci_cmd)
-cli.add_command(brief_cmd)
 cli.add_command(next_key_cmd)
 cli.add_command(plan_cmd)
 cli.add_command(pr_cmd)
-cli.add_command(pr_summary_cmd)
-cli.add_command(readme_cmd)
+cli.add_command(project_cmd)
 cli.add_command(uuid_cmd)
 cli.add_command(validate_cmd)
 cli.add_command(validate_plan_cmd)
 cli.add_command(lint_cmd)
 cli.add_command(status_cmd)
-cli.add_command(graph_cmd)
 cli.add_command(drift_cmd)
 cli.add_command(hook_cmd)
 cli.add_command(hooks_cmd)
 cli.add_command(refresh_cmd)
-cli.add_command(refs_cmd)
 cli.add_command(node_cmd)
 cli.add_command(session_cmd)
 cli.add_command(inbox_cmd)
-cli.add_command(queue_cmd)
 cli.add_command(templates_cmd)
 cli.add_command(enums_cmd)
 cli.add_command(artifacts_cmd)
@@ -129,7 +116,6 @@ cli.add_command(completion_cmd)
 cli.add_command(config_cmd)
 cli.add_command(migrate_cmd)
 cli.add_command(ui_cmd)
-cli.add_command(watch_cmd)
 cli.add_command(workspace_cmd)
 cli.add_command(jit_prompts_cmd)
 cli.add_command(heuristic_cmd)

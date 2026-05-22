@@ -91,6 +91,7 @@ def test_gc_runs_against_real_project(tmp_path: Path):
             "--project",
             str(repo_root),
             "tripwire",
+            "project",
             "init",
             "--name",
             "p",

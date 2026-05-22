@@ -44,7 +44,7 @@
 
 | Step | Done? | Notes |
 |---|---|---|
-| 1. Run tripwire brief | Yes | |
+| 1. Run tripwire project brief | Yes | |
 | 2. Read all planning docs | Yes | Read 10 files (~8,000 lines) |
 | 3. Read canonical examples | Yes | 6 examples |
 | 4. Write scoping plan | Yes | plans/artifacts/scoping-plan.md |

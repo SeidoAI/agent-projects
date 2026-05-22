@@ -98,7 +98,7 @@ truth.
 
 | Target | Pre-transition CLI (run first) | Transition command |
 |---|---|---|
-| `queued` | `tripwire session queue <sid> [--promote-issues]` | `tripwire transition coding-session <sid> queued` |
+| `queued` | `tripwire session queue add <sid> [--promote-issues]` | `tripwire transition coding-session <sid> queued` |
 | `executing` | `tripwire session spawn <sid>` (or `--resume`) | issued by `spawn`; do not run `transition` directly |
 | `in_review` | record artifacts in `controls.tripwires`; rebase PT branch | `tripwire transition coding-session <sid> in_review` |
 | `verified` | independent code-review evidence (`pr_review.yaml`); write `verified.md` | `tripwire transition coding-session <sid> verified` |
@@ -150,7 +150,7 @@ Full error catalogue: `references/VALIDATION.md`.
 ## Front-load context first
 
 ```bash
-tripwire brief
+tripwire project brief
 ```
 
 Dumps project config, next IDs, active enums, manifest, orchestration
@@ -221,7 +221,7 @@ backlog → todo → in_progress → verifying → reviewing → testing → rea
                                                                                    ↘ canceled
 ```
 
-`tripwire brief` shows this as `ISSUE WORKFLOW`. The validator checks
+`tripwire project brief` shows this as `ISSUE WORKFLOW`. The validator checks
 that every status is reachable from `backlog` via the transitions in
 `project.yaml`; otherwise `status/unreachable` fires.
 
@@ -231,10 +231,10 @@ Do not edit `status:` on an issue by hand.
 
 ## Before modifying any concept node
 
-Run `tripwire refs reverse <node-id>` first.
+Run `tripwire node refs reverse <node-id>` first.
 
 ```bash
-tripwire refs reverse <node-id>
+tripwire node refs reverse <node-id>
 ```
 
 It lists every artifact holding a `[[node-id]]` reference. Changing
@@ -247,9 +247,9 @@ If any referrer surfaces unexpectedly: stop, audit, then proceed.
 ## The concept graph as working memory
 
 ```bash
-tripwire graph --type concept
-tripwire graph --upstream <id>     # or --downstream
-tripwire refs summary              # reference counts across nodes
+tripwire node graph --type concept
+tripwire node graph --upstream <id>     # or --downstream
+tripwire node refs summary              # reference counts across nodes
 ```
 
 ### When to create a node
@@ -299,7 +299,7 @@ alongside, using the template at `examples/artifacts/plan.md`.
 
 All session status mutations go through `tripwire transition
 coding-session <sid> <target>`. The session subcommands
-(`tripwire session queue|spawn|pause|abandon|reopen`) wrap the
+(`tripwire session queue add|spawn|pause|abandon|reopen`) wrap the
 transition with their pre-CLI side-effects. Do not edit
 `session.yaml.status` by hand.
 
@@ -405,5 +405,5 @@ session via `tripwire session prepare-for-completion <sid>` +
 - **Errors from the validator you don't recognise?** → `references/VALIDATION.md`
 - **Want to see a worked example first?** → `examples/issue-fully-formed.yaml`
 
-Now: run `tripwire brief`, then read the workflow reference for the
+Now: run `tripwire project brief`, then read the workflow reference for the
 task you're on.

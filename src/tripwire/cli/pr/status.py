@@ -1,8 +1,4 @@
-"""``tripwire pr`` CLI — PR-side queries (KUI-152 / J3).
-
-Subcommands:
-
-    tripwire pr status <session-id>     latest pm-review verdict
+"""``tripwire pr status`` — latest pm-review verdict for a session.
 
 Read-only — never mutates events log or artifacts. Reads
 ``pm_review.completed`` events emitted by
@@ -17,13 +13,9 @@ from pathlib import Path
 import click
 
 from tripwire.cli._utils import require_project as _require_project
+from tripwire.cli.pr._group import pr_cmd
 from tripwire.core.events.log import read_events
 from tripwire.core.pm_review.checks import PM_REVIEW_CHECKS
-
-
-@click.group(name="pr")
-def pr_cmd() -> None:
-    """PR-side queries.  Read-only summaries over the events log."""
 
 
 @pr_cmd.command(name="status")
@@ -86,4 +78,4 @@ def pr_status_cmd(session_id: str, project_dir: Path) -> None:
         click.echo(f"Failed checks: {', '.join(failed) if failed else '(none)'}")
 
 
-__all__ = ["pr_cmd", "pr_status_cmd"]
+__all__ = ["pr_status_cmd"]

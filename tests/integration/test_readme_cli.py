@@ -33,6 +33,7 @@ class TestGenerate:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "readme",
                 "generate",
                 "--project-dir",
@@ -55,6 +56,7 @@ class TestGenerate:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "readme",
                 "generate",
                 "--project-dir",
@@ -75,6 +77,7 @@ class TestGenerate:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "readme",
                 "generate",
                 "--project-dir",
@@ -116,6 +119,7 @@ class TestCheck:
         gen = runner.invoke(
             cli,
             [
+                "project",
                 "readme",
                 "generate",
                 "--project-dir",
@@ -129,6 +133,7 @@ class TestCheck:
         check = runner.invoke(
             cli,
             [
+                "project",
                 "readme",
                 "generate",
                 "--project-dir",
@@ -148,6 +153,7 @@ class TestCheck:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "readme",
                 "generate",
                 "--project-dir",
@@ -169,6 +175,7 @@ class TestCheck:
         gen = runner.invoke(
             cli,
             [
+                "project",
                 "readme",
                 "generate",
                 "--project-dir",
@@ -187,6 +194,7 @@ class TestCheck:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "readme",
                 "generate",
                 "--project-dir",
@@ -216,6 +224,7 @@ class TestCustomTemplate:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "readme",
                 "generate",
                 "--project-dir",
@@ -242,6 +251,7 @@ class TestCustomTemplate:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "readme",
                 "generate",
                 "--project-dir",
@@ -267,6 +277,7 @@ class TestRecentMerges:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "readme",
                 "generate",
                 "--project-dir",

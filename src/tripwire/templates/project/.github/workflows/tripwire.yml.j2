@@ -26,4 +26,4 @@ jobs:
       - name: Lint session
         run: tripwire lint session
       - name: Brief (smoke test)
-        run: tripwire brief --format=json > /dev/null
+        run: tripwire project brief --format=json > /dev/null

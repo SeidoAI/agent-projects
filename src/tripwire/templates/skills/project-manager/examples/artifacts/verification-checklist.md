@@ -37,7 +37,7 @@ This session ships an OpenAPI schema fragment for `POST /v1/auth/token`.
 - [x] [[auth-token-endpoint]] node created and referenced in SEI-42
 - [x] [[user-model]] rehashed after touching `src/models/user.py` (no-op; not touched)
 - [x] Every `[[reference]]` in committed markdown resolves
-- [x] `tripwire refs check` reports no dangling refs
+- [x] `tripwire node refs check` reports no dangling refs
 
 ## Artifacts
 - [x] plan.md committed

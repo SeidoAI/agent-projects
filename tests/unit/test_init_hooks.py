@@ -12,7 +12,7 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from tripwire.cli.init import init_cmd
+from tripwire.cli.project.init import init_cmd
 
 
 def _run_init(target: Path) -> None:

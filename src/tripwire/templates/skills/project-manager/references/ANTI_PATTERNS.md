@@ -34,7 +34,7 @@ sessions match `^[a-z][a-z0-9-]*$`.
 
 ## Workflow mistakes
 
-- **Skipping `tripwire brief`** at session start. Missing it costs
+- **Skipping `tripwire project brief`** at session start. Missing it costs
   you the active enums, next ID, orchestration pattern, and template
   paths.
 - **Reading only schemas, not examples.** Schemas explain WHY;

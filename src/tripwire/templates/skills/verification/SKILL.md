@@ -141,7 +141,7 @@ approve an incomplete implementation.
 
 12. **Identify nodes the PR touched**. For every source path in the
     diff, check if any node points at it (use
-    `tripwire refs reverse` or read the cache directly).
+    `tripwire node refs reverse` or read the cache directly).
 13. **Confirm nodes that point at changed code were rehashed**:
     ```bash
     tripwire node check

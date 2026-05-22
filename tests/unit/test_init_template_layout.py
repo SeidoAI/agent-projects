@@ -29,6 +29,7 @@ def test_init_writes_consolidated_templates_layout(tmp_path: Path):
     result = runner.invoke(
         cli,
         [
+            "project",
             "init",
             "--non-interactive",
             "--no-git",
@@ -94,6 +95,7 @@ def test_init_does_not_create_graph_directory(tmp_path: Path):
     result = runner.invoke(
         cli,
         [
+            "project",
             "init",
             "--non-interactive",
             "--no-git",
@@ -116,6 +118,7 @@ def test_init_populates_templates_agents_with_yaml_files(tmp_path: Path):
     result = runner.invoke(
         cli,
         [
+            "project",
             "init",
             "--non-interactive",
             "--no-git",

@@ -39,6 +39,7 @@ def init_project(runner: CliRunner, target: Path, key_prefix: str = "TST") -> No
     result = runner.invoke(
         cli,
         [
+            "project",
             "init",
             str(target),
             "--name",
@@ -313,7 +314,7 @@ class TestGraph:
     def test_mermaid_is_default(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         populate_project(runner, target)
-        result = runner.invoke(cli, ["graph", "--project-dir", str(target)])
+        result = runner.invoke(cli, ["node", "graph", "--project-dir", str(target)])
         assert result.exit_code == 0
         assert result.output.startswith("graph LR")
 
@@ -321,7 +322,7 @@ class TestGraph:
         target = tmp_path / "p"
         populate_project(runner, target)
         result = runner.invoke(
-            cli, ["graph", "--project-dir", str(target), "--format", "json"]
+            cli, ["node", "graph", "--project-dir", str(target), "--format", "json"]
         )
         assert result.exit_code == 0
         payload = json.loads(result.output)
@@ -331,7 +332,7 @@ class TestGraph:
         target = tmp_path / "p"
         populate_project(runner, target)
         result = runner.invoke(
-            cli, ["graph", "--project-dir", str(target), "--format", "mermaid"]
+            cli, ["node", "graph", "--project-dir", str(target), "--format", "mermaid"]
         )
         assert result.exit_code == 0
         assert result.output.startswith("graph LR")
@@ -341,7 +342,7 @@ class TestGraph:
         target = tmp_path / "p"
         populate_project(runner, target)
         result = runner.invoke(
-            cli, ["graph", "--project-dir", str(target), "--format", "dot"]
+            cli, ["node", "graph", "--project-dir", str(target), "--format", "dot"]
         )
         assert result.exit_code == 0
         assert "digraph" in result.output
@@ -353,6 +354,7 @@ class TestGraph:
         result = runner.invoke(
             cli,
             [
+                "node",
                 "graph",
                 "--project-dir",
                 str(target),
@@ -373,6 +375,7 @@ class TestGraph:
         result = runner.invoke(
             cli,
             [
+                "node",
                 "graph",
                 "--project-dir",
                 str(target),
@@ -394,6 +397,7 @@ class TestGraph:
         result = runner.invoke(
             cli,
             [
+                "node",
                 "graph",
                 "--project-dir",
                 str(target),
@@ -419,7 +423,7 @@ class TestRefs:
         target = tmp_path / "p"
         populate_project(runner, target)
         result = runner.invoke(
-            cli, ["refs", "list", "TST-1", "--project-dir", str(target)]
+            cli, ["node", "refs", "list", "TST-1", "--project-dir", str(target)]
         )
         assert result.exit_code == 0
         assert "user-model" in result.output
@@ -430,6 +434,7 @@ class TestRefs:
         result = runner.invoke(
             cli,
             [
+                "node",
                 "refs",
                 "list",
                 "TST-1",
@@ -450,7 +455,7 @@ class TestRefs:
         # Build cache first
         runner.invoke(cli, ["validate", "--project-dir", str(target)])
         result = runner.invoke(
-            cli, ["refs", "reverse", "user-model", "--project-dir", str(target)]
+            cli, ["node", "refs", "reverse", "user-model", "--project-dir", str(target)]
         )
         assert result.exit_code == 0
         # All 3 issues reference [[user-model]] via their default body
@@ -461,7 +466,9 @@ class TestRefs:
     def test_check_clean(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         populate_project(runner, target)
-        result = runner.invoke(cli, ["refs", "check", "--project-dir", str(target)])
+        result = runner.invoke(
+            cli, ["node", "refs", "check", "--project-dir", str(target)]
+        )
         assert result.exit_code == 0
         assert "no dangling" in result.output
 
@@ -486,6 +493,7 @@ class TestRefs:
         result = runner.invoke(
             cli,
             [
+                "node",
                 "refs",
                 "check",
                 "--project-dir",
@@ -979,22 +987,22 @@ class TestEndToEnd:
         assert s.exit_code == 0
 
         # 3. brief
-        sc = runner.invoke(cli, ["brief", "--project-dir", str(target)])
+        sc = runner.invoke(cli, ["project", "brief", "--project-dir", str(target)])
         assert sc.exit_code == 0
 
         # 4. graph deps
-        gd = runner.invoke(cli, ["graph", "--project-dir", str(target)])
+        gd = runner.invoke(cli, ["node", "graph", "--project-dir", str(target)])
         assert gd.exit_code == 0
 
         # 5. graph concept
         gc = runner.invoke(
             cli,
-            ["graph", "--project-dir", str(target), "--type", "concept"],
+            ["node", "graph", "--project-dir", str(target), "--type", "concept"],
         )
         assert gc.exit_code == 0
 
         # 6. refs check
-        rc = runner.invoke(cli, ["refs", "check", "--project-dir", str(target)])
+        rc = runner.invoke(cli, ["node", "refs", "check", "--project-dir", str(target)])
         assert rc.exit_code == 0
 
         # 7. node check

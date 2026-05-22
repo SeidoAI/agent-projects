@@ -31,6 +31,6 @@ Workflow:
 8. Commit: `complete: <session-id> (<comma-separated issue keys>)`.
 9. Report back:
    - Issues closed
-   - Nodes updated (with downstream impact via `tripwire refs reverse`)
+   - Nodes updated (with downstream impact via `tripwire node refs reverse`)
    - Sessions unblocked
    - Recommended next launches

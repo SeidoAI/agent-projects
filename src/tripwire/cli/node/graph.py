@@ -1,15 +1,15 @@
-"""`tripwire graph` — render or query the unified entity graph.
+"""`tripwire node graph` — render or query the unified entity graph.
 
 The command is a Click group with three operating modes:
 
-- `tripwire graph render [...flags...]` — render the dependency or
+- `tripwire node graph render [...flags...]` — render the dependency or
   concept graph as Mermaid / DOT / JSON. This is the historic
-  rendering surface. The bare invocation `tripwire graph [...flags...]`
+  rendering surface. The bare invocation `tripwire node graph [...flags...]`
   (no subcommand) keeps working for backwards compat and dispatches
   to `render`.
-- `tripwire graph query upstream <id>` — IDs of nodes the given id
+- `tripwire node graph query upstream <id>` — IDs of nodes the given id
   points at across every entity type.
-- `tripwire graph query downstream <id>` — IDs of nodes that point
+- `tripwire node graph query downstream <id>` — IDs of nodes that point
   at the given id across every entity type.
 
 Both query subcommands take canonical edge-kind filters
@@ -26,6 +26,7 @@ from pathlib import Path
 import click
 
 from tripwire.cli._profiling import profileable
+from tripwire.cli.node._group import node_cmd
 from tripwire.core.graph import index as graph_index
 from tripwire.core.graph.cache import ensure_fresh
 from tripwire.core.graph.concept import build_full_graph
@@ -45,7 +46,7 @@ from tripwire.core.store import (
 # ---------------------------------------------------------------------------
 
 
-@click.group(
+@node_cmd.group(
     name="graph",
     invoke_without_command=True,
     context_settings={"ignore_unknown_options": False},
@@ -111,7 +112,7 @@ def graph_cmd(
     ctx.ensure_object(dict)
     ctx.obj["project_dir"] = project_dir
     if ctx.invoked_subcommand is None:
-        # Backwards-compat: bare `tripwire graph [...flags...]` keeps
+        # Backwards-compat: bare `tripwire node graph [...flags...]` keeps
         # behaving as the rendering command. The render() implementation
         # is shared.
         ctx.invoke(

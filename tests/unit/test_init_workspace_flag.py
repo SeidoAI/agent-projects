@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from tripwire.cli.init import init_cmd
+from tripwire.cli.project.init import init_cmd
 from tripwire.core.paths import workspace_nodes_dir
 from tripwire.core.store import load_project
 from tripwire.core.workspace_store import load_workspace
