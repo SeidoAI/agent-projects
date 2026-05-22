@@ -524,7 +524,7 @@ def test_telemetry_fires_only_on_completed_transition(
         calls.append(session.status.value)
 
     monkeypatch.setattr(
-        "tripwire.core.workflow.side_effects.append_telemetry_record",
+        "tripwire.core.workflow.post_write_hooks.append_telemetry_record",
         _record,
     )
 

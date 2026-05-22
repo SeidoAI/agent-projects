@@ -1,7 +1,7 @@
 """``tripwire gh`` CLI — Layer-1 wrappers around the ``gh`` cli.
 
 Thin click adapters that match the side-effect handler bodies in
-:mod:`tripwire.core.workflow.side_effects` one-to-one. They exist so an
+:mod:`tripwire.core.workflow.post_write_hooks` one-to-one. They exist so an
 operator can replay a single ``gh`` interaction (mark a PR ready, undo
 it, close one) without driving a full workflow transition.
 

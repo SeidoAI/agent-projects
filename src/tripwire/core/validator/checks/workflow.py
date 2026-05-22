@@ -115,7 +115,7 @@ def _known_skills(project_dir):  # type: ignore[no-untyped-def]
 
 def _known_side_effects() -> set[str]:
     """Return registered side-effect ids."""
-    from tripwire.core.workflow.side_effects import known_ids
+    from tripwire.core.workflow.post_write_hooks import known_ids
 
     return known_ids()
 

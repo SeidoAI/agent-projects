@@ -202,7 +202,7 @@ def _maybe_close_active_engagement(
     """
     if not hasattr(instance, "engagements"):
         return False
-    from tripwire.core.workflow.side_effects import close_active_engagement
+    from tripwire.core.workflow.post_write_hooks import close_active_engagement
 
     return close_active_engagement(instance, route, now=now)
 
@@ -740,7 +740,7 @@ def _apply_post_write_hooks(
       reopen route sets it); guarded with the same workflow-id check
       since it reaches into per-session ack files.
     """
-    from tripwire.core.workflow.side_effects import (
+    from tripwire.core.workflow.post_write_hooks import (
         append_audit_record,
         append_telemetry_record,
         reset_acks_if_requested,

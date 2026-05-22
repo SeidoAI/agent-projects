@@ -17,7 +17,7 @@ telemetry, close engagement) live elsewhere:
 - ``sweep_issues`` → Layer-1 ``tripwire session sweep-issues-forward``.
 - ``remove_worktrees`` → Layer-1 ``tripwire session remove-worktrees``.
 - ``append_telemetry_row`` → executor post-write hook
-  (:func:`tripwire.core.workflow.side_effects.append_telemetry_record`).
+  (:func:`tripwire.core.workflow.post_write_hooks.append_telemetry_record`).
 - ``close_active_engagement`` → executor post-write hook.
 
 This helper verifies the gates, then calls ``execute_transition`` —
