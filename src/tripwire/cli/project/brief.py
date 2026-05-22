@@ -1,4 +1,4 @@
-"""`tripwire brief` — front-load the agent's context.
+"""`tripwire project brief` — front-load the agent's context.
 
 This is the single command an agent runs FIRST when starting a session.
 It dumps everything the agent needs to know about the project — config,
@@ -27,6 +27,7 @@ from typing import Any
 import click
 import yaml
 
+from tripwire.cli.project._group import project_cmd
 from tripwire.core import paths
 from tripwire.core.enum_loader import load_enums
 from tripwire.core.id_generator import format_key
@@ -465,7 +466,7 @@ def _scaffold_impl(project_dir: Path, output_format: str) -> None:
         click.echo(_render_text(data), nl=False)
 
 
-@click.command(name="brief")
+@project_cmd.command(name="brief")
 @click.option(
     "--project-dir",
     type=click.Path(path_type=Path, file_okay=False, dir_okay=True),

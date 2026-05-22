@@ -12,7 +12,7 @@ import json
 
 import click
 
-from tripwire.cli.init import _extract_key_prefix
+from tripwire.cli.project.init import _extract_key_prefix
 from tripwire.core.planner import preview_init
 
 

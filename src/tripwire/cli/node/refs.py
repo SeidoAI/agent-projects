@@ -1,14 +1,15 @@
-"""`tripwire refs` — reference inspection.
+"""`tripwire node refs` — reference inspection.
 
-Three subcommands, all read-only:
-- `refs list <issue-key>` — show every `[[reference]]` in this issue with
+Four subcommands, all read-only:
+- `node refs list <issue-key>` — show every `[[reference]]` in this issue with
   a resolve + freshness indicator
-- `refs reverse <node-id>` — show every issue or node that references
+- `node refs reverse <node-id>` — show every issue or node that references
   this node
-- `refs check` — full scan across the project, report dangling refs,
+- `node refs check` — full scan across the project, report dangling refs,
   orphan nodes, and stale content hashes
+- `node refs summary` — per-node reference counts across the project
 
-All three read from the graph cache when it exists and fall back to a
+All read from the graph cache when it exists and fall back to a
 filesystem scan otherwise.
 """
 
@@ -23,6 +24,7 @@ from rich.console import Console
 from rich.table import Table
 
 from tripwire.cli._utils import require_project as _require_project
+from tripwire.cli.node._group import node_cmd
 from tripwire.core.graph import cache as graph_cache
 from tripwire.core.graph.refs import extract_references
 from tripwire.core.node_store import list_nodes, node_exists
@@ -35,7 +37,7 @@ from tripwire.core.store import (
 console = Console()
 
 
-@click.group(name="refs")
+@node_cmd.group(name="refs")
 def refs_cmd() -> None:
     """Reference inspection (list, reverse, check, summary)."""
 
@@ -379,6 +381,4 @@ def refs_summary(project_dir: Path, output_format: str) -> None:
     console.print(table)
 
 
-# ============================================================================
-# Helpers
-# ============================================================================
+__all__ = ["refs_cmd"]

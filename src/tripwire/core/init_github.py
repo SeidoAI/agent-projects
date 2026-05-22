@@ -4,7 +4,7 @@ Resolves the target GitHub repo, creates it if missing, attaches it as
 ``origin``, and pushes the initial commit. Also owns the local
 ``git init`` step and the short-HEAD helper used elsewhere.
 
-The CLI wrapper at ``cli/init.py`` calls these from `init_cmd`; on
+The CLI wrapper at ``cli/project/init.py`` calls these from `init_cmd`; on
 failure they raise :class:`ValueError` (or call :func:`click.prompt`,
 the one click coupling that's intrinsic to interactive resolution).
 The CLI converts ValueErrors into :class:`InitError` for user-facing

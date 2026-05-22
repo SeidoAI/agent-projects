@@ -1,19 +1,19 @@
-"""``tripwire watch`` — post-PR auto-check daemon (v0.7.9 §A8).
+"""``tripwire pr watch`` — post-PR auto-check daemon (v0.7.9 §A8).
 
 Lifecycle:
 
-  ``tripwire watch start [--background] [--poll-interval N]``
+  ``tripwire pr watch start [--background] [--poll-interval N]``
       Launch the daemon. Foreground by default; ``--background``
       forks a detached subprocess and prints the pid.
 
-  ``tripwire watch status``
+  ``tripwire pr watch status``
       Report whether the daemon is running for this project, and the
       pid if so.
 
-  ``tripwire watch stop``
+  ``tripwire pr watch stop``
       SIGTERM the running daemon. No-op when not running.
 
-  ``tripwire watch logs [--no-follow]``
+  ``tripwire pr watch logs [--no-follow]``
       Tail the daemon's log file. ``--no-follow`` prints once and
       exits (used by tests + scripted callers).
 """
@@ -27,6 +27,7 @@ from pathlib import Path
 
 import click
 
+from tripwire.cli.pr._group import pr_cmd
 from tripwire.core.github_client import resolve_token
 from tripwire.core.pr_watcher_daemon import (
     DaemonConfig,
@@ -47,7 +48,7 @@ def _project_dir_option():
     )
 
 
-@click.group(name="watch")
+@pr_cmd.group(name="watch")
 def watch_cmd() -> None:
     """Post-PR auto-check daemon (v0.7.9 §A8)."""
 
@@ -96,6 +97,7 @@ def watch_start_cmd(
                     sys.executable,
                     "-m",
                     "tripwire.cli.main",
+                    "pr",
                     "watch",
                     "start",
                     "--project-dir",

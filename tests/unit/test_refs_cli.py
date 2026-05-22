@@ -6,7 +6,7 @@ non-zero on integrity errors (dangling refs, stale nodes).
 
 from click.testing import CliRunner
 
-from tripwire.cli.refs import refs_cmd
+from tripwire.cli.node.refs import refs_cmd
 
 
 def test_refs_check_exits_zero_on_clean_project(tmp_path_project):

@@ -29,6 +29,7 @@ def _init(runner: CliRunner, target: Path) -> None:
     result = runner.invoke(
         cli,
         [
+            "project",
             "init",
             str(target),
             "--name",
@@ -54,6 +55,7 @@ def test_no_flag_sets_warning_level(runner: CliRunner, tmp_path: Path) -> None:
     result = runner.invoke(
         cli,
         [
+            "project",
             "init",
             str(target),
             "--name",

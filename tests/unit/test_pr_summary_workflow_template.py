@@ -82,6 +82,7 @@ def test_init_stamps_workflow_into_project(tmp_path: Path):
     result = runner.invoke(
         cli,
         [
+            "project",
             "init",
             str(target),
             "--name",

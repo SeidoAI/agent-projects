@@ -1,4 +1,4 @@
-"""``tripwire pr-summary`` — render a PR comment for a base..head diff.
+"""``tripwire pr summary`` — render a PR comment for a base..head diff.
 
 Designed to run from CI (see the workflow template in
 ``templates/project/.github/workflows/pr-summary.yml.j2``): the action
@@ -21,11 +21,12 @@ from pathlib import Path
 
 import click
 
+from tripwire.cli.pr._group import pr_cmd
 from tripwire.core.pr_summary_compute import compute_pr_summary
 from tripwire.core.pr_summary_renderer import render
 
 
-@click.command(name="pr-summary")
+@pr_cmd.command(name="summary")
 @click.option(
     "--project-dir",
     type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
@@ -93,3 +94,6 @@ def _git_toplevel(start: Path) -> Path:
             f"{start} is not inside a git repository (git rev-parse failed)."
         ) from exc
     return Path(result.stdout.strip())
+
+
+__all__ = ["pr_summary_cmd"]

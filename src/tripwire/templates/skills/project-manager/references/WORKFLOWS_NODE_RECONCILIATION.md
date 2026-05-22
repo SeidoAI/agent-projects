@@ -93,7 +93,7 @@ re-pinning, or the next scan re-fires. Run `tripwire validate`.
 ## Delete
 
 1. `rm nodes/<id>.yaml`.
-2. Run `tripwire refs reverse <id>` — find every node whose
+2. Run `tripwire node refs reverse <id>` — find every node whose
    `related:` includes the deleted id.
 3. Edit each (`Edit` tool) to drop the id (graph stays bidirectional).
 4. Run `tripwire validate`. Exit 0 → done. Non-zero → STOP and fix.

@@ -14,7 +14,7 @@ $ARGUMENTS
 
 Before acting:
 
-1. Run `tripwire brief` to load current project state.
+1. Run `tripwire project brief` to load current project state.
 2. Identify the inbound items to triage:
    - If the user passed a specific item ID, focus on that one.
    - Otherwise, gather all pending inbound items: unprocessed comments

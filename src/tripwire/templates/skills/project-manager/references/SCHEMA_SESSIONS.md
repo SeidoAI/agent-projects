@@ -53,7 +53,7 @@ The directory name must match the session's `id` field.
 ## Session lifecycle (v0.6c)
 
 ```
-planned ──[tripwire session queue]────→ queued
+planned ──[tripwire session queue add]────→ queued
 queued  ──[tripwire session spawn]───→ executing
 executing ──[agent exits 0]──────→ completed
 executing ──[agent exits non-0]──→ failed

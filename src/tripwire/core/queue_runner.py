@@ -192,7 +192,7 @@ def default_spawn_runner(project_dir: Path, session_id: str) -> None:
 
 
 class QueueRunner:
-    """Stateful policy + tick loop. One per ``tripwire queue start``."""
+    """Stateful policy + tick loop. One per ``tripwire session queue start``."""
 
     def __init__(
         self,

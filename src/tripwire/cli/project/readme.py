@@ -1,4 +1,4 @@
-"""`tripwire readme generate` — write or check the auto-generated README.
+"""`tripwire project readme generate` — write or check the auto-generated README.
 
 The CD workflow runs this on every push to main; humans run it via
 pre-commit (`--check`) or to refresh the README locally. The renderer
@@ -18,6 +18,7 @@ from pathlib import Path
 import click
 
 from tripwire.cli._utils import require_project
+from tripwire.cli.project._group import project_cmd
 from tripwire.core.readme_renderer import render
 
 # Default to fetching this many merged PRs for the "Recent merges" section.
@@ -25,7 +26,7 @@ from tripwire.core.readme_renderer import render
 DEFAULT_MERGES_LIMIT = 5
 
 
-@click.group(name="readme")
+@project_cmd.group(name="readme")
 def readme_cmd() -> None:
     """Generate or check the project README."""
 

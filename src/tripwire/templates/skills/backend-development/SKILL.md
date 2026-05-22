@@ -69,7 +69,7 @@ fix-hints since v0.12 self-identify the actor.
 
 ### Phase 2: Planning
 
-5. `tripwire brief` to front-load context.
+5. `tripwire project brief` to front-load context.
 6. Read the source at each node path. Understand existing patterns
    before designing.
 7. Write `plan.md` to `<project>/sessions/<session-id>/artifacts/`,
@@ -124,7 +124,7 @@ fix-hints since v0.12 self-identify the actor.
 20. Target-repo checks: `make lint`, `make test`, plus any
     build/Docker/package-specific. (Project-side validate is the
     `tripwire session transition` gate — see Phase 6.)
-21. `tripwire refs check` — no dangling or stale refs in anything
+21. `tripwire node refs check` — no dangling or stale refs in anything
     you wrote.
 
 ### Phase 6: Delivery

@@ -25,8 +25,9 @@ def runner() -> CliRunner:
 
 
 def _init_args(target: Path, **overrides: str) -> list[str]:
-    """Return a `[init, ...]` argv that skips all prompts by default."""
+    """Return a `[project, init, ...]` argv that skips all prompts by default."""
     args = [
+        "project",
         "init",
         str(target),
         "--name",
@@ -214,6 +215,7 @@ class TestInitBasics:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "init",
                 str(target),
                 "--key-prefix",
@@ -235,6 +237,7 @@ class TestInitBasics:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "init",
                 str(target),
                 "--name",
@@ -255,6 +258,7 @@ class TestInitBasics:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "init",
                 str(tmp_path / "p"),
                 "--name",
@@ -275,6 +279,7 @@ class TestInitBasics:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "init",
                 str(target),
                 "--name",
@@ -447,6 +452,7 @@ class TestGitInit:
         # remote-setup happy path is exercised separately in
         # tests/unit/test_init_github_remote.py.
         args = [
+            "project",
             "init",
             str(target),
             "--name",
@@ -524,6 +530,7 @@ class TestTargetPath:
             result = runner.invoke(
                 cli,
                 [
+                    "project",
                     "init",
                     ".",
                     "--name",

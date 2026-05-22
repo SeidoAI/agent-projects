@@ -1,4 +1,4 @@
-"""``tripwire queue`` CLI (KUI-96 §E1)."""
+"""``tripwire session queue`` CLI (KUI-96 §E1)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from tripwire.cli.queue import queue_cmd
+from tripwire.cli.session.queue import queue_cmd
 from tripwire.core.queue_runner import (
     pidfile_path,
     write_pidfile,

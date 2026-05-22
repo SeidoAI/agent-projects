@@ -15,7 +15,7 @@ $ARGUMENTS
 Rescoping differs from initial scoping because the project already has
 content:
 
-1. Run `tripwire brief` to load current project state.
+1. Run `tripwire project brief` to load current project state.
 2. Read the existing issues, concept nodes, and sessions so you know
    what's already scoped and what's in progress.
 3. If the user's description references a new planning doc path, read

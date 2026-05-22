@@ -14,7 +14,7 @@ Workflow:
 
 1. Parse `$ARGUMENTS`. First token is the issue key. The rest (if
    any) is a closing note.
-2. Run `tripwire brief` to load project state.
+2. Run `tripwire project brief` to load project state.
 3. Read `issues/<issue-key>/issue.yaml`. Verify:
    - Status is not already `done` or `canceled` (if so, report and
      stop).

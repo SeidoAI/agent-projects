@@ -21,7 +21,7 @@ Workflow:
    - If `--workspace=<path>`, use that.
    - Else if cwd has `workspace.yaml` at root, use cwd.
    - Else walk up for a workspace.yaml; if none found, standalone project.
-3. Run `tripwire init <name>` to scaffold the project directory. After init,
+3. Run `tripwire project init <name>` to scaffold the project directory. After init,
    if a workspace context was detected:
    a. `cd <new-project>` (so relative workspace pointers resolve).
    b. Run `tripwire workspace link <workspace-path> --slug <key-prefix-lowercased>`.

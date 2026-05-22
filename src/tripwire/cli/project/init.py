@@ -1,4 +1,4 @@
-"""`tripwire init` — create a new project from the packaged templates.
+"""`tripwire project init` — create a new project from the packaged templates.
 
 The command is interactive by default: any required option that wasn't
 passed as a flag gets a prompt. Use `--non-interactive` to fail fast if any
@@ -28,6 +28,8 @@ from typing import Any
 import click
 from rich.console import Console
 from rich.panel import Panel
+
+from tripwire.cli.project._group import project_cmd
 
 # Init-time helpers (template tree, GitHub, workspace) live in core/.
 # These are aliased under the underscore names init_cmd already calls;
@@ -360,7 +362,7 @@ def _write_initial_readme(target_dir: Path) -> None:
     console.print(f"  [green]+[/green] {readme_path.relative_to(target_dir)}")
 
 
-@click.command(name="init")
+@project_cmd.command(name="init")
 @click.argument(
     "target",
     type=click.Path(path_type=Path),

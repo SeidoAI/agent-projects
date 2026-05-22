@@ -87,7 +87,7 @@ class TestSpawnLifecycle:
 
         # Queue
         result = runner.invoke(
-            session_cmd, ["queue", "lifecycle-test", "--project-dir", pdir]
+            session_cmd, ["queue", "add", "lifecycle-test", "--project-dir", pdir]
         )
         assert result.exit_code == 0, result.output
         assert load_session(tmp_path_project, "lifecycle-test").status == "queued"

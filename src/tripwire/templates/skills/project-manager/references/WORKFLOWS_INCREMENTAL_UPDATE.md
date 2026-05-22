@@ -29,7 +29,7 @@ transition.
 Run:
 
 ```bash
-tripwire brief
+tripwire project brief
 ```
 
 Even for small updates, this is worth running — it confirms the
@@ -103,7 +103,7 @@ subcommand or `tripwire transition`:
 
 | Target | Command |
 |---|---|
-| `queued` | `tripwire session queue <sid> [--promote-issues]` |
+| `queued` | `tripwire session queue add <sid> [--promote-issues]` |
 | `executing` | `tripwire session spawn <sid>` (or `--resume`) |
 | `paused` | `tripwire session pause <sid>` |
 | `abandoned` | `tripwire session prepare-for-abandon <sid>` then `tripwire session abandon <sid>` |
@@ -136,7 +136,7 @@ If any step fails: read the validator finding; fix in place; re-validate.
 |---|---|
 | "It's just one field change, I don't need to validate" | You do. One field change can break a reference chain. Always validate. |
 | "I'll just edit `status:` directly — it's faster" | No. Run `tripwire transition`. Direct edits bypass validators and audit. |
-| "I'll update the status without checking `refs reverse`" | Run `tripwire refs reverse <id>` first on nodes. Status changes on heavily-referenced entities may need downstream updates. |
+| "I'll update the status without checking `refs reverse`" | Run `tripwire node refs reverse <id>` first on nodes. Status changes on heavily-referenced entities may need downstream updates. |
 
 ## See also
 
