@@ -237,8 +237,10 @@ def _run_declared_side_effects(
     """Invoke each declared side_effect script in order, synchronously.
 
     v0.14.0 — each name in ``route.side_effects`` maps to a Python
-    script at ``templates/side_effects/<name>.py`` (overridable per
-    project at ``<project>/.tripwire/side_effects/<name>.py``).
+    script at ``templates/side_effects/<entity>/<name>.py`` (overridable
+    per project at ``<project>/.tripwire/side_effects/<entity>/<name>.py``).
+    The ``<entity>`` subdir is resolved from ``workflow_id`` via
+    :data:`tripwire.core.paths._WORKFLOW_ENTITY_DIR`.
     Scripts run via ``subprocess.run([sys.executable, script_path,
     ...])`` with the executor's own stderr inherited so progress
     reaches the agent's transcript inline (no opt-in explain flag —
@@ -268,7 +270,9 @@ def _run_declared_side_effects(
     from tripwire.core.paths import resolve_side_effect_path
 
     for name in route.side_effects:
-        script_path = resolve_side_effect_path(project_dir, name)
+        script_path = resolve_side_effect_path(
+            project_dir, name, workflow_id=workflow_id
+        )
         if not script_path.is_file():
             raise TransitionError(
                 f"side_effect/script_not_found: declared side_effect "
