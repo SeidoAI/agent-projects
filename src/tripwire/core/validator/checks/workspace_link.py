@@ -1,21 +1,4 @@
-"""Bidirectional workspace<->project link consistency check.
-
-Tripwire workspaces and projects link two ways:
-
-  * project side: ``project.yaml.workspace.path`` points at the
-    workspace dir.
-  * workspace side: ``workspace.yaml.projects[]`` lists the projects
-    registered with the workspace.
-
-This check enforces both halves agree. Drift (a project pointing at
-a workspace that doesn't list it back, or vice versa) means a stale
-config that the UI will silently mis-bucket. Catching it here keeps
-the link a single source of truth.
-
-Severity: ``error``. The fix is mechanical (``tripwire workspace
-link``), so a hard error is the right level — silent warnings let
-the inconsistency rot.
-"""
+"""Bidirectional workspace<->project link consistency check."""
 
 from __future__ import annotations
 
@@ -26,7 +9,24 @@ from tripwire.core.workspace_store import load_workspace
 
 
 def check_workspace_link(ctx: ValidationContext) -> list[CheckResult]:
-    """Verify the project<->workspace link is consistent in both directions."""
+    """Verify the project<->workspace link is consistent in both directions.
+
+    Tripwire workspaces and projects link two ways:
+
+      * project side: ``project.yaml.workspace.path`` points at the
+        workspace dir.
+      * workspace side: ``workspace.yaml.projects[]`` lists the projects
+        registered with the workspace.
+
+    This check enforces both halves agree. Drift (a project pointing at
+    a workspace that doesn't list it back, or vice versa) means a stale
+    config that the UI will silently mis-bucket. Catching it here keeps
+    the link a single source of truth.
+
+    Severity: ``error``. The fix is mechanical (``tripwire workspace
+    link``), so a hard error is the right level — silent warnings let
+    the inconsistency rot.
+    """
     out: list[CheckResult] = []
     config = ctx.project_config
     if config is None or config.workspace is None or config.workspace.path is None:

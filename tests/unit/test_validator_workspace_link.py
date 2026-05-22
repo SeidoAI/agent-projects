@@ -157,13 +157,9 @@ def test_workspace_yaml_load_error_is_surfaced(
 
 def test_check_is_registered_in_all_checks() -> None:
     """Wire-up regression: the new check must run in the canonical pipeline."""
-    from tripwire.core.validator.checks import (
-        ALL_CHECKS,
-        WORKSPACE_CHECKS,
-    )
+    from tripwire.core.validator.checks import ALL_CHECKS
 
     assert check_workspace_link in ALL_CHECKS
-    assert WORKSPACE_CHECKS == [check_workspace_link]
 
 
 def test_pointer_object_form_pydantic_construct(

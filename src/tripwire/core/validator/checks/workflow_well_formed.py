@@ -1,13 +1,4 @@
-"""Workflow well-formedness check (KUI-119).
-
-Runs the typed loader against ``<project>/workflow.yaml`` and routes
-each :class:`WorkflowFinding` into the validator's standard
-:class:`CheckResult` channel. Surfaces under ``tripwire validate``.
-
-Reference checks resolve against implementation catalogs. The catalogs
-only prove an id exists; ``workflow.yaml`` is the sole source of where
-that id runs.
-"""
+"""KUI-119 — validate ``<project>/workflow.yaml`` shape and references."""
 
 from __future__ import annotations
 

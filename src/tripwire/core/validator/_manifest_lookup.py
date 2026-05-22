@@ -37,7 +37,7 @@ def artifact_entry(ctx: ValidationContext, name: str) -> ArtifactEntry | None:
     entry isn't in the project's manifest are deliberately silent rather
     than firing on a phantom assumption.
     """
-    from tripwire.core.validator.checks.artifacts import _load_manifest
+    from tripwire.core.validator.checks._helpers import _load_manifest
 
     manifest, _ = _load_manifest(ctx)
     if manifest is None:
