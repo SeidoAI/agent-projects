@@ -133,7 +133,7 @@ def abandon_session(
     # 4. Transition. This step always happens — it's the contract.
     # Route through ``execute_transition`` — the sole writer of
     # ``session.status``. Engagement close is a post-write hook
-    # (:func:`tripwire.core.workflow.side_effects.close_active_engagement`)
+    # (:func:`tripwire.core.workflow.post_write_hooks.close_active_engagement`)
     # that the executor fires for terminal-bound transitions.
     from tripwire.core.workflow.transitions import (
         TransitionError,
