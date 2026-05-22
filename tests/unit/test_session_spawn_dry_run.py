@@ -99,7 +99,7 @@ class TestDryRunPure:
 
         runner = CliRunner()
         with patch(
-            "tripwire.cli.session._resolve_clone_path",
+            "tripwire.cli.session.spawn._resolve_clone_path",
             return_value=clone,
         ):
             result = runner.invoke(
@@ -145,7 +145,7 @@ class TestDryRunPure:
 
         runner = CliRunner()
         with patch(
-            "tripwire.cli.session._resolve_clone_path",
+            "tripwire.cli.session.spawn._resolve_clone_path",
             return_value=clone,
         ):
             result = runner.invoke(
@@ -199,7 +199,7 @@ class TestDryRunPure:
         runner = CliRunner()
         with (
             patch(
-                "tripwire.cli.session._resolve_clone_path",
+                "tripwire.cli.session.spawn._resolve_clone_path",
                 return_value=clone,
             ),
             patch(
@@ -265,7 +265,7 @@ class TestDryRunPure:
 
         runner = CliRunner()
         with patch(
-            "tripwire.cli.session._resolve_clone_path",
+            "tripwire.cli.session.spawn._resolve_clone_path",
             return_value=None,
         ):
             result = runner.invoke(
