@@ -28,14 +28,16 @@ import pytest
 import yaml
 
 from tripwire.core.validator import load_context
-from tripwire.core.validator.checks.pr_review_code_review_skill import (
+from tripwire.core.validator.checks.session.pr_review_code_review_skill import (
     check_pr_review_code_review_skill,
 )
-from tripwire.core.validator.checks.pr_review_evidence import check_pr_review_evidence
-from tripwire.core.validator.checks.pr_review_external_reviewer import (
+from tripwire.core.validator.checks.session.pr_review_evidence import (
+    check_pr_review_evidence,
+)
+from tripwire.core.validator.checks.session.pr_review_external_reviewer import (
     check_pr_review_external_reviewer,
 )
-from tripwire.core.validator.checks.pr_review_threshold_findings import (
+from tripwire.core.validator.checks.session.pr_review_threshold_findings import (
     check_pr_review_threshold_findings,
 )
 

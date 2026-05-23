@@ -67,68 +67,82 @@ from tripwire.core.validator._types import (
 # here so the historical `from tripwire.core.validator import check_*` import
 # paths keep resolving (and so tests importing the constants
 # `_SESSION_STATUS_TO_PHASE` / `_COHERENCE_MATRIX` keep working).
+from tripwire.core.validator.checks._cross.bidirectional_related import (
+    check_bidirectional_related,
+)
+from tripwire.core.validator.checks._cross.comment_provenance import (
+    check_comment_provenance,
+)
+from tripwire.core.validator.checks._cross.enum_values import check_enum_values
+from tripwire.core.validator.checks._cross.freshness import check_freshness
+from tripwire.core.validator.checks._cross.handoff_artifact import (
+    check_handoff_artifact,
+)
+from tripwire.core.validator.checks._cross.id_collisions import check_id_collisions
+from tripwire.core.validator.checks._cross.id_format import check_id_format
+from tripwire.core.validator.checks._cross.reference_integrity import (
+    check_reference_integrity,
+)
+from tripwire.core.validator.checks._cross.sequence_drift import check_sequence_drift
+from tripwire.core.validator.checks._cross.timestamps import check_timestamps
+from tripwire.core.validator.checks._cross.uuid_present import check_uuid_present
 from tripwire.core.validator.checks._helpers import (
     _load_manifest,
     uuid_v4_load_error,
 )
-from tripwire.core.validator.checks.artifact_presence import check_artifact_presence
-from tripwire.core.validator.checks.bidirectional_related import (
-    check_bidirectional_related,
+from tripwire.core.validator.checks.artifact.artifact_presence import (
+    check_artifact_presence,
 )
-from tripwire.core.validator.checks.comment_provenance import check_comment_provenance
-from tripwire.core.validator.checks.coverage_heuristics import (
-    check_coverage_heuristics,
+from tripwire.core.validator.checks.artifact.manifest_phase_ownership_consistent import (
+    check_manifest_phase_ownership_consistent,
 )
-from tripwire.core.validator.checks.done_implies_session_completed import (
+from tripwire.core.validator.checks.artifact.manifest_schema import (
+    check_manifest_schema,
+)
+from tripwire.core.validator.checks.issue.done_implies_session_completed import (
     check_done_implies_session_completed,
 )
-from tripwire.core.validator.checks.enum_values import check_enum_values
-from tripwire.core.validator.checks.freshness import check_freshness
-from tripwire.core.validator.checks.handoff_artifact import check_handoff_artifact
-from tripwire.core.validator.checks.id_collisions import check_id_collisions
-from tripwire.core.validator.checks.id_format import check_id_format
-from tripwire.core.validator.checks.instance_shape_conforms import (
-    check_instance_shape_conforms,
-)
-from tripwire.core.validator.checks.issue_artifact_presence import (
+from tripwire.core.validator.checks.issue.issue_artifact_presence import (
     check_issue_artifact_presence,
 )
-from tripwire.core.validator.checks.issue_body_structure import (
+from tripwire.core.validator.checks.issue.issue_body_structure import (
     REQUIRED_EPIC_BODY_HEADINGS,
     REQUIRED_ISSUE_BODY_HEADINGS,
     check_issue_body_structure,
 )
-from tripwire.core.validator.checks.issue_session_status_compatibility import (
+from tripwire.core.validator.checks.issue.issue_session_status_compatibility import (
     check_issue_session_status_compatibility,
 )
-from tripwire.core.validator.checks.manifest_phase_ownership_consistent import (
-    check_manifest_phase_ownership_consistent,
+from tripwire.core.validator.checks.project.coverage_heuristics import (
+    check_coverage_heuristics,
 )
-from tripwire.core.validator.checks.manifest_schema import check_manifest_schema
-from tripwire.core.validator.checks.phase_requirements import check_phase_requirements
-from tripwire.core.validator.checks.pm_response_covers_self_review import (
-    check_pm_response_covers_self_review,
+from tripwire.core.validator.checks.project.project_standards import (
+    check_project_standards,
 )
-from tripwire.core.validator.checks.pm_response_followups_resolve import (
-    check_pm_response_followups_resolve,
-)
-from tripwire.core.validator.checks.project_standards import check_project_standards
-from tripwire.core.validator.checks.quality_consistency import (
+from tripwire.core.validator.checks.project.quality_consistency import (
     check_quality_consistency,
 )
-from tripwire.core.validator.checks.reference_integrity import (
-    check_reference_integrity,
+from tripwire.core.validator.checks.session.phase_requirements import (
+    check_phase_requirements,
 )
-from tripwire.core.validator.checks.sequence_drift import check_sequence_drift
-from tripwire.core.validator.checks.session_issue_coherence import (
+from tripwire.core.validator.checks.session.pm_response_covers_self_review import (
+    check_pm_response_covers_self_review,
+)
+from tripwire.core.validator.checks.session.pm_response_followups_resolve import (
+    check_pm_response_followups_resolve,
+)
+from tripwire.core.validator.checks.session.session_issue_coherence import (
     _COHERENCE_MATRIX,
     _SESSION_STATUS_TO_PHASE,
     check_session_issue_coherence,
 )
-from tripwire.core.validator.checks.status_transitions import check_status_transitions
-from tripwire.core.validator.checks.timestamps import check_timestamps
-from tripwire.core.validator.checks.uuid_present import check_uuid_present
-from tripwire.core.validator.checks.workflow_well_formed import (
+from tripwire.core.validator.checks.workflow.instance_shape_conforms import (
+    check_instance_shape_conforms,
+)
+from tripwire.core.validator.checks.workflow.status_transitions import (
+    check_status_transitions,
+)
+from tripwire.core.validator.checks.workflow.workflow_well_formed import (
     check_workflow_well_formed,
 )
 from tripwire.models.comment import Comment

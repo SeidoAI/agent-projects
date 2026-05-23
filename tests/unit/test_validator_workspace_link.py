@@ -9,7 +9,7 @@ from uuid import uuid4
 import pytest
 
 from tripwire.core.validator._types import ValidationContext
-from tripwire.core.validator.checks.workspace_link import check_workspace_link
+from tripwire.core.validator.checks.workspace.workspace_link import check_workspace_link
 from tripwire.core.workspace_store import save_workspace
 from tripwire.models.project import ProjectConfig, ProjectWorkspacePointer
 from tripwire.models.workspace import Workspace, WorkspaceProjectEntry

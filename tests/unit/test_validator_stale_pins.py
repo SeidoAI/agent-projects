@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from tripwire.core.validator._types import LoadedEntity, ValidationContext
-from tripwire.core.validator.checks.no_stale_pins import check_no_stale_pins
+from tripwire.core.validator.checks._cross.no_stale_pins import check_no_stale_pins
 from tripwire.models import ConceptNode, Issue
 
 

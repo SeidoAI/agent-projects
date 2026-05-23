@@ -60,7 +60,7 @@ def test_unknown_side_effect_lint_fires_with_known_ids(tmp_path: Path) -> None:
     """A workflow that declares a side-effect not in ``known_ids()`` is
     flagged by the lint."""
     from tripwire.core.validator._types import ValidationContext
-    from tripwire.core.validator.checks.workflow_well_formed import (
+    from tripwire.core.validator.checks.workflow.workflow_well_formed import (
         check_workflow_well_formed,
     )
 
@@ -96,7 +96,7 @@ def test_unknown_side_effect_lint_fires_with_known_ids(tmp_path: Path) -> None:
 def test_known_side_effect_does_not_fire_lint(tmp_path: Path) -> None:
     """A workflow declaring a known side-effect id passes the lint."""
     from tripwire.core.validator._types import ValidationContext
-    from tripwire.core.validator.checks.workflow_well_formed import (
+    from tripwire.core.validator.checks.workflow.workflow_well_formed import (
         check_workflow_well_formed,
     )
 
@@ -134,7 +134,7 @@ def test_unknown_status_field_lint_uses_agent_session_fields(tmp_path: Path) -> 
     ``preserve_fields`` paths against ``AgentSession.model_fields``.
     ``runtime_state`` resolves; ``bogus_field`` doesn't."""
     from tripwire.core.validator._types import ValidationContext
-    from tripwire.core.validator.checks.workflow_well_formed import (
+    from tripwire.core.validator.checks.workflow.workflow_well_formed import (
         check_workflow_well_formed,
     )
 
