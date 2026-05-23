@@ -18,18 +18,20 @@ import json
 from pathlib import Path
 
 from tripwire.core.validator import load_context
-from tripwire.core.validator.checks import pr_merged_for_session as sl
-from tripwire.core.validator.checks.member_issues_at_or_past_in_review import (
+from tripwire.core.validator.checks.session import pr_merged_for_session as sl
+from tripwire.core.validator.checks.session.member_issues_at_or_past_in_review import (
     check_member_issues_at_or_past_in_review,
 )
-from tripwire.core.validator.checks.pr_merged_for_session import (
+from tripwire.core.validator.checks.session.pr_merged_for_session import (
     check_pr_merged_for_session,
 )
-from tripwire.core.validator.checks.pr_review_approved import check_pr_review_approved
-from tripwire.core.validator.checks.session_has_developer_md import (
+from tripwire.core.validator.checks.session.pr_review_approved import (
+    check_pr_review_approved,
+)
+from tripwire.core.validator.checks.session.session_has_developer_md import (
     check_session_has_developer_md,
 )
-from tripwire.core.validator.checks.session_has_verified_md import (
+from tripwire.core.validator.checks.session.session_has_verified_md import (
     check_session_has_verified_md,
 )
 

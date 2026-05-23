@@ -18,7 +18,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from tripwire.core.validator._types import ValidationContext
-from tripwire.core.validator.checks.instance_shape_conforms import (
+from tripwire.core.validator.checks.workflow.instance_shape_conforms import (
     check_instance_shape_conforms,
 )
 from tripwire.core.workflow.instance_io import save_instance
