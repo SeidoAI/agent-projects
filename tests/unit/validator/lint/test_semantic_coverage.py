@@ -18,7 +18,7 @@ from pathlib import Path
 import yaml
 
 from tripwire.core.validator import load_context
-from tripwire.core.validator.lint import semantic_coverage
+from tripwire.core.validator.lint.node import semantic_coverage
 
 
 def _body(*, context_refs: str = "", ac_refs: str = "") -> str:

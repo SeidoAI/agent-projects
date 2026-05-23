@@ -10,7 +10,7 @@ from pathlib import Path
 
 from tripwire.core import git_helpers
 from tripwire.core.validator import load_context
-from tripwire.core.validator.lint import self_review_implies_pm_response
+from tripwire.core.validator.lint.session import self_review_implies_pm_response
 
 
 def _stub_main(monkeypatch, paths: set[str]) -> None:

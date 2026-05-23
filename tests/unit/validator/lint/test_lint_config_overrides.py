@@ -9,11 +9,8 @@ from pathlib import Path
 import yaml
 
 from tripwire.core.validator import load_context
-from tripwire.core.validator.lint import (
-    concept_name_prose,
-    mega_issue,
-    semantic_coverage,
-)
+from tripwire.core.validator.lint.issue import mega_issue
+from tripwire.core.validator.lint.node import concept_name_prose, semantic_coverage
 
 
 def _set_lint_config(project_dir: Path, cfg: dict) -> None:
@@ -113,7 +110,7 @@ def test_string_node_ratio_threshold_falls_back(
     tmp_path_project: Path, save_test_issue
 ):
     """codex P1: float-valued thresholds also reject string overrides."""
-    from tripwire.core.validator.lint import node_ratio
+    from tripwire.core.validator.lint.node import node_ratio
 
     for n in range(10):
         save_test_issue(tmp_path_project, key=f"TMP-{n + 1}", status="executing")

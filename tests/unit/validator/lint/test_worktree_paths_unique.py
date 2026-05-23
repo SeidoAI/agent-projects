@@ -9,7 +9,7 @@ silently overwrite work.
 from pathlib import Path
 
 from tripwire.core.validator import load_context
-from tripwire.core.validator.lint import worktree_paths_unique
+from tripwire.core.validator.lint.session import worktree_paths_unique
 
 
 def _wt(repo: str, clone: str, path: str, branch: str) -> dict:
