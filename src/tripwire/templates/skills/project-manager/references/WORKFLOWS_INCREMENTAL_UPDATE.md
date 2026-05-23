@@ -103,7 +103,7 @@ subcommand or `tripwire transition`:
 
 | Target | Command |
 |---|---|
-| `queued` | `tripwire session queue add <sid> [--promote-issues]` |
+| `queued` | `tripwire session queue <sid> [--promote-issues]` |
 | `executing` | `tripwire session spawn <sid>` (or `--resume`) |
 | `paused` | `tripwire session pause <sid>` |
 | `abandoned` | `tripwire session prepare-for-abandon <sid>` then `tripwire session abandon <sid>` |
