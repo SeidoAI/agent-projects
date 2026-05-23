@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tripwire.cli.agenda import _collect_agenda
+from tripwire.cli.project.agenda import _collect_agenda
 from tripwire.core.parser import serialize_frontmatter_body
 
 

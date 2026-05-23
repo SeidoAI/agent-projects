@@ -1,4 +1,4 @@
-"""``tripwire lint`` — stage-aware heuristic checks.
+"""``tripwire project lint`` — stage-aware heuristic checks.
 
 Distinct from ``tripwire validate``: validate is mechanical
 (schema/refs/graph consistency); lint is heuristic (did someone
@@ -23,13 +23,14 @@ from pathlib import Path
 import click
 
 from tripwire.cli._utils import require_project as _require_project
+from tripwire.cli.project._group import project_cmd
 
 # Importing the rules package triggers @register_rule for each rule.
 from tripwire.core import lint_rules  # noqa: F401
 from tripwire.core.linter import Linter, exit_code_for
 
 
-@click.group(name="lint")
+@project_cmd.group(name="lint")
 def lint_cmd() -> None:
     """Heuristic checks (distinct from `tripwire validate`)."""
 

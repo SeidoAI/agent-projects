@@ -120,7 +120,7 @@ def clean_validator(monkeypatch):
     def _clean(*args, **kwargs):
         return ValidationReport(exit_code=0, errors=[], warnings=[])
 
-    monkeypatch.setattr("tripwire.cli.transition.validate_project", _clean)
+    monkeypatch.setattr("tripwire.cli._cross.transition.validate_project", _clean)
     return _clean
 
 
@@ -128,8 +128,8 @@ def test_full_lifecycle_drives_via_transition_only(
     tmp_path: Path, clean_validator
 ) -> None:
     """Drive planned → completed using `tripwire transition` only."""
-    from tripwire.cli.drift import drift_cmd
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
+    from tripwire.cli.project.drift import drift_cmd
     from tripwire.core.events.log import read_events
 
     pd = _project_dir(tmp_path)
@@ -172,7 +172,7 @@ def test_unreachable_target_emits_structured_reason(
     tmp_path: Path,
 ) -> None:
     """Trying to skip statuses produces `transition_not_reachable`."""
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
     from tripwire.core.events.log import read_events
 
     pd = _project_dir(tmp_path)
@@ -193,7 +193,7 @@ def test_drift_surfaces_when_required_step_skipped(tmp_path: Path) -> None:
     """A workflow.yaml with a declared prompt-check on target `executing` produces
     a `drift/prompt_check_missing` finding once the session leaves
     `queued` and enters `executing` without that prompt-check."""
-    from tripwire.cli.drift import drift_cmd
+    from tripwire.cli.project.drift import drift_cmd
     from tripwire.core.events.log import emit_event
 
     pd = _project_dir(tmp_path)

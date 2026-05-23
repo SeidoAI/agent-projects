@@ -507,7 +507,7 @@ def _run_gate(
     # missing id and the gate would pass against fewer checks than the
     # route declared. Surface that as a structured rejection here so
     # the gate is honest about which tripwires actually ran.
-    from tripwire.cli.transition import validate_project
+    from tripwire.cli._cross.transition import validate_project
     from tripwire.core.workflow.registry import validator_catalog
 
     catalog_ids = set(validator_catalog())

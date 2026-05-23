@@ -25,7 +25,7 @@ def _mk_completed(returncode: int, stderr: str = "", stdout: str = ""):
 
 
 def test_gh_pr_ready_invokes_gh(monkeypatch) -> None:
-    from tripwire.cli import gh as gh_mod
+    from tripwire.cli._tools import gh as gh_mod
     from tripwire.core import gh_helpers
 
     calls: list[list[str]] = []
@@ -44,7 +44,7 @@ def test_gh_pr_ready_invokes_gh(monkeypatch) -> None:
 
 
 def test_gh_pr_ready_surfaces_failure(monkeypatch) -> None:
-    from tripwire.cli import gh as gh_mod
+    from tripwire.cli._tools import gh as gh_mod
     from tripwire.core import gh_helpers
 
     def fake_run(cmd, **kwargs):
@@ -60,7 +60,7 @@ def test_gh_pr_ready_surfaces_failure(monkeypatch) -> None:
 
 
 def test_gh_pr_ready_undo_invokes_gh_with_undo(monkeypatch) -> None:
-    from tripwire.cli import gh as gh_mod
+    from tripwire.cli._tools import gh as gh_mod
     from tripwire.core import gh_helpers
 
     calls: list[list[str]] = []
@@ -79,7 +79,7 @@ def test_gh_pr_ready_undo_invokes_gh_with_undo(monkeypatch) -> None:
 
 
 def test_gh_pr_ready_undo_surfaces_failure(monkeypatch) -> None:
-    from tripwire.cli import gh as gh_mod
+    from tripwire.cli._tools import gh as gh_mod
     from tripwire.core import gh_helpers
 
     def fake_run(cmd, **kwargs):
@@ -98,7 +98,7 @@ def test_gh_pr_close_invokes_helper(monkeypatch) -> None:
     error-capture semantics apply as in session_abandon. The subprocess
     call itself now lives in :mod:`tripwire.core.gh_helpers` — patch
     there to intercept it."""
-    from tripwire.cli import gh as gh_mod
+    from tripwire.cli._tools import gh as gh_mod
     from tripwire.core import gh_helpers
 
     calls: list[list[str]] = []
@@ -117,7 +117,7 @@ def test_gh_pr_close_invokes_helper(monkeypatch) -> None:
 
 
 def test_gh_pr_close_surfaces_failure(monkeypatch) -> None:
-    from tripwire.cli import gh as gh_mod
+    from tripwire.cli._tools import gh as gh_mod
     from tripwire.core import gh_helpers
 
     def fake_run(cmd, **kwargs):

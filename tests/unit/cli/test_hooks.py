@@ -83,7 +83,7 @@ def _hook_input(tool_input: dict | None, *, cwd: Path | str = ".") -> str:
     ],
 )
 def test_is_tripwire_artifact(rel_path: str, expected: bool) -> None:
-    from tripwire.cli.hooks import _is_tripwire_artifact
+    from tripwire.cli.project.hooks import _is_tripwire_artifact
 
     assert _is_tripwire_artifact(rel_path) is expected
 
@@ -94,7 +94,7 @@ def test_is_tripwire_artifact(rel_path: str, expected: bool) -> None:
 
 
 def test_finds_project_root_from_nested_path(tmp_path: Path) -> None:
-    from tripwire.cli.hooks import _find_project_root
+    from tripwire.cli.project.hooks import _find_project_root
 
     _write_minimal_project(tmp_path)
     nested = tmp_path / "instances" / "sessions" / "abc"
@@ -105,7 +105,7 @@ def test_finds_project_root_from_nested_path(tmp_path: Path) -> None:
 
 
 def test_no_project_root_returns_none(tmp_path: Path) -> None:
-    from tripwire.cli.hooks import _find_project_root
+    from tripwire.cli.project.hooks import _find_project_root
 
     no_proj = tmp_path / "loose-dir"
     no_proj.mkdir()
@@ -175,7 +175,7 @@ def test_hook_passes_silently_on_clean_validate(tmp_path: Path) -> None:
 
     payload = _hook_input({"file_path": str(sess_path)}, cwd=tmp_path)
     # Patch validate_project to return a clean report.
-    with patch("tripwire.cli.hooks.validate_project") as mock_validate:
+    with patch("tripwire.cli.project.hooks.validate_project") as mock_validate:
         from tripwire.core.validator import ValidationReport
 
         mock_validate.return_value = ValidationReport(
@@ -197,7 +197,7 @@ def test_hook_emits_block_json_on_validate_failure(tmp_path: Path) -> None:
     sess_path.write_text("---\n", encoding="utf-8")
 
     payload = _hook_input({"file_path": str(sess_path)}, cwd=tmp_path)
-    with patch("tripwire.cli.hooks.validate_project") as mock_validate:
+    with patch("tripwire.cli.project.hooks.validate_project") as mock_validate:
         from tripwire.core.validator import CheckResult, ValidationReport
 
         finding = CheckResult(
@@ -236,7 +236,7 @@ def test_hook_handles_notebook_path(tmp_path: Path) -> None:
             "cwd": str(tmp_path),
         }
     )
-    with patch("tripwire.cli.hooks.validate_project") as mock_validate:
+    with patch("tripwire.cli.project.hooks.validate_project") as mock_validate:
         from tripwire.core.validator import ValidationReport
 
         mock_validate.return_value = ValidationReport(
@@ -256,7 +256,7 @@ def test_hook_swallows_internal_exception(tmp_path: Path) -> None:
     sess_path.write_text("---\n", encoding="utf-8")
 
     payload = _hook_input({"file_path": str(sess_path)}, cwd=tmp_path)
-    with patch("tripwire.cli.hooks.validate_project") as mock_validate:
+    with patch("tripwire.cli.project.hooks.validate_project") as mock_validate:
         mock_validate.side_effect = RuntimeError("boom")
         result = runner.invoke(cli, ["hook", "validate-on-edit"], input=payload)
 
@@ -283,7 +283,7 @@ def test_hook_timeout_exits_silent(tmp_path: Path) -> None:
 
     payload = _hook_input({"file_path": str(sess_path)}, cwd=tmp_path)
     # We pass timeout=1 second so the test runs fast.
-    with patch("tripwire.cli.hooks.validate_project", _slow_validate):
+    with patch("tripwire.cli.project.hooks.validate_project", _slow_validate):
         result = runner.invoke(
             cli,
             ["hook", "validate-on-edit", "--timeout-seconds", "1"],

@@ -51,7 +51,7 @@ cat issues/<KEY>/issue.yaml
 | Small non-status frontmatter tweak | Use `Edit` tool on the file. Update `updated_at`. |
 | Comment | Write a new file at `issues/<KEY>/comments/<NNN>-<topic>-<date>.yaml`. Use the next sequence number. See `examples/comment-status-change.yaml`. |
 | New concept node | Write a new file at `nodes/<id>.yaml`. Use the matching example. Add `[[<id>]]` references where needed. |
-| New issue | Run `tripwire next-key --type issue` for the key, then write `issues/<KEY>/issue.yaml`. See initial scoping workflow for the full procedure. |
+| New issue | Run `tripwire project next-key --type issue` for the key, then write `issues/<KEY>/issue.yaml`. See initial scoping workflow for the full procedure. |
 | Session re-engagement event | Edit `sessions/<id>/session.yaml` to append an engagement entry. Append only — never overwrite. |
 
 If any step fails: read the error, fix the underlying cause, re-run.

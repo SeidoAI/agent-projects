@@ -1,4 +1,4 @@
-"""``tripwire events`` — read-only inspection of the workflow events log.
+"""``tripwire project events`` — read-only inspection of the workflow events log.
 
 Subcommands:
 
@@ -21,10 +21,11 @@ from pathlib import Path
 import click
 
 from tripwire.cli._utils import require_project as _require_project
+from tripwire.cli.project._group import project_cmd
 from tripwire.core.events.log import read_events
 
 
-@click.group(name="events")
+@project_cmd.group(name="events")
 def events_cmd() -> None:
     """Workflow events log (KUI-123) — read-only inspection."""
 

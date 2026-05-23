@@ -13,7 +13,7 @@ $ARGUMENTS
 Workflow:
 
 1. Run `tripwire session check $ARGUMENTS`.
-2. Also run `tripwire lint handoff $ARGUMENTS`.
+2. Also run `tripwire project lint handoff $ARGUMENTS`.
 3. Summarise for the user:
    - Must-fix items (errors)
    - Warnings

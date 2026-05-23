@@ -1,4 +1,4 @@
-"""`tripwire ui` — start the Tripwire dashboard.
+"""`tripwire project ui` — start the Tripwire dashboard.
 
 Heavy imports (FastAPI, uvicorn) happen inside the command body so that
 ``tripwire --help`` works even on a minimal ``tripwire[projects]`` install.
@@ -15,6 +15,8 @@ import webbrowser
 from pathlib import Path
 
 import click
+
+from tripwire.cli.project._group import project_cmd
 
 # Modules whose absence indicates a minimal [projects] install.
 _UI_MODULES = frozenset({"fastapi", "uvicorn", "watchdog", "websockets"})
@@ -75,7 +77,7 @@ def _check_port(host: str, port: int) -> tuple[str, str]:
     return ("conflict", url)
 
 
-@click.command(name="ui")
+@project_cmd.command(name="ui")
 @click.option(
     "--project-dir",
     type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
@@ -156,11 +158,11 @@ def ui_cmd(
             # No projects found anywhere — still launch the UI so the
             # user can see the empty state and take action (e.g. open
             # another project from the picker route, or add a project
-            # root via `tripwire config add`). Killing the launch here
+            # root via `tripwire project config add`). Killing the launch here
             # would leave them with nothing actionable in the terminal.
             click.echo(
                 "No projects discovered. Launching UI anyway —\n"
-                "use the picker or `tripwire config add project-root <path>`\n"
+                "use the picker or `tripwire project config add project-root <path>`\n"
                 "to register one."
             )
         pin = False

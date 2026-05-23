@@ -197,7 +197,7 @@ def test_cli_events_tail_shows_recent(tmp_path: Path) -> None:
     standard JSON shape."""
     from click.testing import CliRunner
 
-    from tripwire.cli.events import events_cmd
+    from tripwire.cli.project.events import events_cmd
     from tripwire.core.events.log import emit_event
 
     pd = _project_dir(tmp_path)
@@ -227,7 +227,7 @@ def test_cli_events_tail_shows_recent(tmp_path: Path) -> None:
 def test_cli_events_filter_narrows_results(tmp_path: Path) -> None:
     from click.testing import CliRunner
 
-    from tripwire.cli.events import events_cmd
+    from tripwire.cli.project.events import events_cmd
     from tripwire.core.events.log import emit_event
 
     pd = _project_dir(tmp_path)

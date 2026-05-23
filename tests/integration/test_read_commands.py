@@ -260,7 +260,7 @@ class TestStatus:
         target = tmp_path / "p"
         init_project(runner, target)
         # Default is rich now
-        result = runner.invoke(cli, ["status", "--project-dir", str(target)])
+        result = runner.invoke(cli, ["project", "status", "--project-dir", str(target)])
         assert result.exit_code == 0
         assert "0 issues" in result.output or "total_issues" not in result.output
 
@@ -269,7 +269,7 @@ class TestStatus:
         populate_project(runner, target)
         # Use rich format for human-readable assertions
         result = runner.invoke(
-            cli, ["status", "--project-dir", str(target), "--format", "text"]
+            cli, ["project", "status", "--project-dir", str(target), "--format", "text"]
         )
         assert result.exit_code == 0
         assert "3 issues" in result.output
@@ -279,7 +279,7 @@ class TestStatus:
     def test_rich_is_default(self, runner: CliRunner, tmp_path: Path) -> None:
         target = tmp_path / "p"
         populate_project(runner, target)
-        result = runner.invoke(cli, ["status", "--project-dir", str(target)])
+        result = runner.invoke(cli, ["project", "status", "--project-dir", str(target)])
         assert result.exit_code == 0
         # Default is now rich, not JSON
         assert "3 issues" in result.output
@@ -288,7 +288,7 @@ class TestStatus:
         target = tmp_path / "p"
         populate_project(runner, target)
         result = runner.invoke(
-            cli, ["status", "--project-dir", str(target), "--format", "json"]
+            cli, ["project", "status", "--project-dir", str(target), "--format", "json"]
         )
         assert result.exit_code == 0
         payload = json.loads(result.output)
@@ -300,7 +300,9 @@ class TestStatus:
     def test_status_missing_project_yaml(
         self, runner: CliRunner, tmp_path: Path
     ) -> None:
-        result = runner.invoke(cli, ["status", "--project-dir", str(tmp_path)])
+        result = runner.invoke(
+            cli, ["project", "status", "--project-dir", str(tmp_path)]
+        )
         assert result.exit_code != 0
         assert "project.yaml not found" in result.output
 
@@ -565,7 +567,9 @@ class TestTemplates:
         """Step 9+ ships a full template set, so init'd projects list them."""
         target = tmp_path / "p"
         init_project(runner, target)
-        result = runner.invoke(cli, ["templates", "list", "--project-dir", str(target)])
+        result = runner.invoke(
+            cli, ["project", "templates", "list", "--project-dir", str(target)]
+        )
         assert result.exit_code == 0
         # Every major template subdirectory should appear in the list.
         assert "templates/issues/default.yaml.j2" in result.output
@@ -591,7 +595,9 @@ class TestTemplates:
             if (target / subdir).exists():
                 _shutil.rmtree(target / subdir)
 
-        result = runner.invoke(cli, ["templates", "list", "--project-dir", str(target)])
+        result = runner.invoke(
+            cli, ["project", "templates", "list", "--project-dir", str(target)]
+        )
         assert result.exit_code == 0
         assert "no templates" in result.output
 
@@ -603,7 +609,9 @@ class TestTemplates:
         tpl_dir.mkdir(exist_ok=True)
         (tpl_dir / "bug.yaml.j2").write_text("---\nid: {{id}}\n---\n")
 
-        result = runner.invoke(cli, ["templates", "list", "--project-dir", str(target)])
+        result = runner.invoke(
+            cli, ["project", "templates", "list", "--project-dir", str(target)]
+        )
         assert result.exit_code == 0
         assert "templates/issues/bug.yaml.j2" in result.output
         # The packaged default should still be listed too.
@@ -616,6 +624,7 @@ class TestTemplates:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "templates",
                 "show",
                 "templates/issues/default.yaml.j2",
@@ -639,7 +648,7 @@ class TestTemplates:
 
         result = runner.invoke(
             cli,
-            ["templates", "show", "bug", "--project-dir", str(target)],
+            ["project", "templates", "show", "bug", "--project-dir", str(target)],
         )
         assert result.exit_code == 0
         assert "BUG TEMPLATE BODY" in result.output
@@ -649,7 +658,14 @@ class TestTemplates:
         init_project(runner, target)
         result = runner.invoke(
             cli,
-            ["templates", "show", "nope-does-not-exist", "--project-dir", str(target)],
+            [
+                "project",
+                "templates",
+                "show",
+                "nope-does-not-exist",
+                "--project-dir",
+                str(target),
+            ],
         )
         assert result.exit_code != 0
 
@@ -664,7 +680,9 @@ class TestEnums:
         """After init, enums come from project files (source=project)."""
         target = tmp_path / "p"
         init_project(runner, target)
-        result = runner.invoke(cli, ["enums", "list", "--project-dir", str(target)])
+        result = runner.invoke(
+            cli, ["project", "enums", "list", "--project-dir", str(target)]
+        )
         assert result.exit_code == 0
         assert "issue_status" in result.output
         assert "project" in result.output  # source column shows project-level files
@@ -675,6 +693,7 @@ class TestEnums:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "enums",
                 "list",
                 "--project-dir",
@@ -692,7 +711,7 @@ class TestEnums:
         init_project(runner, target)
         result = runner.invoke(
             cli,
-            ["enums", "show", "issue_status", "--project-dir", str(target)],
+            ["project", "enums", "show", "issue_status", "--project-dir", str(target)],
         )
         assert result.exit_code == 0
         assert "planned" in result.output
@@ -702,7 +721,7 @@ class TestEnums:
         target = tmp_path / "p"
         init_project(runner, target)
         result = runner.invoke(
-            cli, ["enums", "show", "nope", "--project-dir", str(target)]
+            cli, ["project", "enums", "show", "nope", "--project-dir", str(target)]
         )
         assert result.exit_code != 0
 
@@ -726,6 +745,7 @@ class TestEnums:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "enums",
                 "show",
                 "issue_status",
@@ -757,6 +777,7 @@ class TestArtifacts:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "artifacts",
                 "list",
                 "api-endpoints",
@@ -820,6 +841,7 @@ class TestArtifacts:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "artifacts",
                 "list",
                 "api-endpoints",
@@ -855,6 +877,7 @@ class TestArtifacts:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "artifacts",
                 "list",
                 "api-endpoints",
@@ -880,6 +903,7 @@ class TestArtifacts:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "artifacts",
                 "show",
                 "api-endpoints",
@@ -921,6 +945,7 @@ class TestArtifacts:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "artifacts",
                 "show",
                 "api-endpoints",
@@ -938,6 +963,7 @@ class TestArtifacts:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "artifacts",
                 "show",
                 "nonexistent",
@@ -983,7 +1009,7 @@ class TestEndToEnd:
         )
 
         # 2. status
-        s = runner.invoke(cli, ["status", "--project-dir", str(target)])
+        s = runner.invoke(cli, ["project", "status", "--project-dir", str(target)])
         assert s.exit_code == 0
 
         # 3. brief
@@ -1010,15 +1036,19 @@ class TestEndToEnd:
         assert nc.exit_code == 0
 
         # 8. enums list
-        el = runner.invoke(cli, ["enums", "list", "--project-dir", str(target)])
+        el = runner.invoke(
+            cli, ["project", "enums", "list", "--project-dir", str(target)]
+        )
         assert el.exit_code == 0
 
         # 9. templates list
-        tl = runner.invoke(cli, ["templates", "list", "--project-dir", str(target)])
+        tl = runner.invoke(
+            cli, ["project", "templates", "list", "--project-dir", str(target)]
+        )
         assert tl.exit_code == 0
 
         # 10. next-key still works
-        nk = runner.invoke(cli, ["next-key", "--project-dir", str(target)])
+        nk = runner.invoke(cli, ["project", "next-key", "--project-dir", str(target)])
         assert nk.exit_code == 0
         # TST-1/2/3 already exist, so next key should be past the drift fix
         # (which was applied by validate above)

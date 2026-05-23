@@ -40,7 +40,7 @@ def session_prepare_for_completion_cmd(session_id: str, project_dir: Path) -> No
     Exits 0 only when all three steps pass. Idempotent — safe to re-run
     after the agent has fixed whatever each loud failure pointed at.
     """
-    from tripwire.cli.validate import _filter_report_by_selector
+    from tripwire.cli.project.validate import _filter_report_by_selector
     from tripwire.core.session_complete import _flip_drafts_to_ready
     from tripwire.core.validator import validate_project
 

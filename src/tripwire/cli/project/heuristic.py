@@ -1,4 +1,4 @@
-"""`tripwire heuristic` — manage heuristic suppression markers.
+"""`tripwire project heuristic` — manage heuristic suppression markers.
 
 Subcommands:
 
@@ -27,9 +27,10 @@ from tripwire._internal.heuristics import (
     reset_markers,
 )
 from tripwire._internal.heuristics._acks import ACK_DIR_REL
+from tripwire.cli.project._group import project_cmd
 
 
-@click.group("heuristic")
+@project_cmd.group("heuristic")
 def heuristic_cmd() -> None:
     """Manage heuristic suppression markers."""
 
@@ -103,7 +104,7 @@ def heuristic_reset_cmd(
     if heuristic_id is not None and heuristic_id not in known_heuristic_ids():
         raise click.UsageError(
             f"unknown heuristic {heuristic_id!r}. "
-            f"Run `tripwire heuristic list` to see registered ids."
+            f"Run `tripwire project heuristic list` to see registered ids."
         )
 
     removed = reset_markers(

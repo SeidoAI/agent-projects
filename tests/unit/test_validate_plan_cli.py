@@ -12,7 +12,7 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from tripwire.cli.validate_plan import validate_plan_cmd
+from tripwire.cli.session.validate_plan import validate_plan_cmd
 
 
 def _write_plan(project_dir: Path, session_id: str, body: str) -> None:

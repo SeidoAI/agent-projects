@@ -1,4 +1,4 @@
-"""`tripwire status` — dashboard summary of a project.
+"""`tripwire project status` — dashboard summary of a project.
 
 Prints issue counts by status/executor/priority, blocked issues, stale
 references (from the graph cache), and the critical path through the
@@ -21,6 +21,7 @@ from rich.console import Console
 from rich.table import Table
 
 from tripwire.cli._profiling import profileable
+from tripwire.cli.project._group import project_cmd
 from tripwire.core.graph import cache as graph_cache
 from tripwire.core.graph.dependency import build_dependency_graph
 from tripwire.core.store import (
@@ -180,7 +181,7 @@ def _render_json(summary: StatusSummary) -> str:
 # ============================================================================
 
 
-@click.command(name="status")
+@project_cmd.command(name="status")
 @click.option(
     "--project-dir",
     type=click.Path(path_type=Path, file_okay=False, dir_okay=True),

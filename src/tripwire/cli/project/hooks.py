@@ -9,7 +9,7 @@ Two distinct verbs live here:
   state. All defensive paths exit 0 silently so the hook never breaks
   unrelated agent work.
 
-- ``tripwire hooks install`` (plural) — operator-facing retrofit. Drops
+- ``tripwire project hooks install`` (plural) — operator-facing retrofit. Drops
   ``.claude/settings.json`` (or merges the hooks block into an existing
   one) so an existing project picks up the edit-time hook without
   re-running ``tripwire init``.
@@ -32,6 +32,7 @@ from typing import Any
 
 import click
 
+from tripwire.cli.project._group import project_cmd
 from tripwire.core.validator import validate_project
 
 logger = logging.getLogger(__name__)
@@ -316,11 +317,11 @@ def validate_on_edit_cmd(timeout_seconds: int) -> None:
 
 
 # ----------------------------------------------------------------------
-# `tripwire hooks install`
+# `tripwire project hooks install`
 # ----------------------------------------------------------------------
 
 
-@click.group(name="hooks")
+@project_cmd.group(name="hooks")
 def hooks_cmd() -> None:
     """Hook management commands (install / upgrade)."""
 

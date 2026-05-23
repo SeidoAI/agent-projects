@@ -22,7 +22,7 @@
 
 | Command | Keys allocated | Range |
 |---|---|---|
-| `tripwire next-key --type issue --count 25` | 25 | SEI-1 to SEI-25 |
+| `tripwire project next-key --type issue --count 25` | 25 | SEI-1 to SEI-25 |
 
 ## UUID allocation
 

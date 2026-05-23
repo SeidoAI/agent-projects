@@ -30,7 +30,7 @@ Subcommands (one per module):
 - ``cost <id>`` — sum per-category token cost for a session
 - ``analyze-routing`` — aggregate routing telemetry rows by route
 - ``agenda`` — session dependency DAG with launch recommendations
-- ``artifacts <id>`` — alias for ``tripwire artifacts list <id>``
+- ``artifacts <id>`` — alias for ``tripwire project artifacts list <id>``
 - ``log <id>`` — per-session JIT prompt fire log
 - ``complete <id>`` — close-out orchestration (PR merged, issues closed)
 - ``review <id>`` — review PR diff vs. issue specs
@@ -127,6 +127,7 @@ from tripwire.cli.session import (
     sweep_issues_forward as _sweep_issues_forward_mod,  # noqa: F401
 )
 from tripwire.cli.session import transition as _transition_mod  # noqa: F401
+from tripwire.cli.session import validate_plan as _validate_plan_mod  # noqa: F401
 
 # Bare group first — every subcommand module imports it.
 from tripwire.cli.session._group import session_cmd

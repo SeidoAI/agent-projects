@@ -1,15 +1,15 @@
-"""`tripwire migrate` — schema/layout migrations for existing projects.
+"""`tripwire project migrate` — schema/layout migrations for existing projects.
 
 Subcommands:
 
-- ``tripwire migrate templates`` — move a pre-v0.10.0 flat-layout project
+- ``tripwire project migrate templates`` — move a pre-v0.10.0 flat-layout project
   into the consolidated ``templates/`` layout.
-- ``tripwire migrate graph`` — relocate the derived graph cache from
+- ``tripwire project migrate graph`` — relocate the derived graph cache from
   ``graph/`` into ``nodes/``.
-- ``tripwire migrate graph-edges`` — rewrite pre-v0.9 edge type strings
+- ``tripwire project migrate graph-edges`` — rewrite pre-v0.9 edge type strings
   in the cache (``references`` → ``refs``, ``blocked_by`` → ``depends_on``,
   ``related`` → ``refs``).
-- ``tripwire migrate status-values`` — rewrite pre-v0.9.4 issue and
+- ``tripwire project migrate status-values`` — rewrite pre-v0.9.4 issue and
   session ``status:`` values to the canonical v0.9.4 taxonomy
   (``backlog`` → ``planned``, ``active`` → ``executing``, etc.).
 
@@ -26,6 +26,7 @@ from typing import Any
 import click
 import yaml
 
+from tripwire.cli.project._group import project_cmd
 from tripwire.core import paths
 from tripwire.core.parser import (
     ParseError,
@@ -47,7 +48,7 @@ _TEMPLATE_RENAMES: tuple[tuple[str, str], ...] = (
 )
 
 
-@click.group(name="migrate")
+@project_cmd.group(name="migrate")
 def migrate_cmd() -> None:
     """Run a one-shot schema/layout migration on the project at cwd."""
 
@@ -906,7 +907,7 @@ def migrate_storage_cmd(project_dir: Path, yes: bool, skip_validate: bool) -> No
 
     # 5. Run validate in-process. Failure leaves the user with the
     #    moved tree on disk; the recommended undo is `git reset --hard`.
-    from tripwire.cli.transition import validate_project
+    from tripwire.cli._cross.transition import validate_project
 
     report = validate_project(project_dir, strict=True, fix=False)
     if report.errors:

@@ -1,4 +1,4 @@
-"""`tripwire validate-plan <session-id>` — pre-spawn coherence gate.
+"""`tripwire session validate-plan <session-id>` — pre-spawn coherence gate.
 
 Catches the failure mode the testing-backend trial surfaced: plan
 written months ago, repo state has moved on, plan still says "create
@@ -28,6 +28,7 @@ from typing import Literal
 
 import click
 
+from tripwire.cli.session._group import session_cmd
 from tripwire.core.concept_context import extract_plan_concepts
 from tripwire.core.paths import session_plan_path
 from tripwire.core.session_store import load_session
@@ -311,7 +312,7 @@ def _render_markdown(report: PlanReport) -> str:
     return "\n".join(lines) + "\n"
 
 
-@click.command(name="validate-plan")
+@session_cmd.command(name="validate-plan")
 @click.argument("session_id")
 @click.option(
     "--project-dir",

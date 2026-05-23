@@ -28,13 +28,13 @@ def _redirect_default_config(tmp_path: Path, monkeypatch):
 
 class TestShow:
     def test_show_empty_config_prints_defaults(self, _redirect_default_config: Path):
-        result = runner.invoke(cli, ["config", "show"])
+        result = runner.invoke(cli, ["project", "config", "show"])
         assert result.exit_code == 0
         assert "port: 8000" in result.output
         assert "open_browser: true" in result.output
 
     def test_show_includes_path_header(self, _redirect_default_config: Path):
-        result = runner.invoke(cli, ["config", "show"])
+        result = runner.invoke(cli, ["project", "config", "show"])
         assert result.exit_code == 0
         assert str(_redirect_default_config) in result.output
 
@@ -48,7 +48,7 @@ class TestSet:
         root_b = tmp_path / "b"
         root_b.mkdir()
         result = runner.invoke(
-            cli, ["config", "set", "project-roots", str(root_a), str(root_b)]
+            cli, ["project", "config", "set", "project-roots", str(root_a), str(root_b)]
         )
         assert result.exit_code == 0, result.output
         on_disk = yaml.safe_load(_redirect_default_config.read_text())
@@ -59,7 +59,9 @@ class TestSet:
     ):
         root = tmp_path / "ws"
         root.mkdir()
-        result = runner.invoke(cli, ["config", "set", "workspace-roots", str(root)])
+        result = runner.invoke(
+            cli, ["project", "config", "set", "workspace-roots", str(root)]
+        )
         assert result.exit_code == 0, result.output
         on_disk = yaml.safe_load(_redirect_default_config.read_text())
         assert on_disk["workspace_roots"] == [str(root)]
@@ -71,8 +73,10 @@ class TestSet:
         first.mkdir()
         second = tmp_path / "second"
         second.mkdir()
-        runner.invoke(cli, ["config", "set", "project-roots", str(first)])
-        result = runner.invoke(cli, ["config", "set", "project-roots", str(second)])
+        runner.invoke(cli, ["project", "config", "set", "project-roots", str(first)])
+        result = runner.invoke(
+            cli, ["project", "config", "set", "project-roots", str(second)]
+        )
         assert result.exit_code == 0
         on_disk = yaml.safe_load(_redirect_default_config.read_text())
         assert on_disk["project_roots"] == [str(second)]
@@ -81,7 +85,9 @@ class TestSet:
         self, tmp_path: Path, _redirect_default_config: Path
     ):
         ghost = tmp_path / "does-not-exist"
-        result = runner.invoke(cli, ["config", "set", "project-roots", str(ghost)])
+        result = runner.invoke(
+            cli, ["project", "config", "set", "project-roots", str(ghost)]
+        )
         # Persisted anyway — warn but don't fail; user may be configuring
         # ahead of mounting the volume / cloning the repo.
         assert result.exit_code == 0
@@ -96,7 +102,9 @@ class TestSet:
         """
         root = tmp_path / "r"
         root.mkdir()
-        result = runner.invoke(cli, ["config", "set", "project-roots", str(root)])
+        result = runner.invoke(
+            cli, ["project", "config", "set", "project-roots", str(root)]
+        )
         assert result.exit_code == 0
         on_disk = yaml.safe_load(_redirect_default_config.read_text())
         # Only project_roots should be persisted — port/open_browser/
@@ -109,8 +117,8 @@ class TestSet:
     def test_show_round_trips_set(self, tmp_path: Path, _redirect_default_config: Path):
         root = tmp_path / "r"
         root.mkdir()
-        runner.invoke(cli, ["config", "set", "project-roots", str(root)])
-        show = runner.invoke(cli, ["config", "show"])
+        runner.invoke(cli, ["project", "config", "set", "project-roots", str(root)])
+        show = runner.invoke(cli, ["project", "config", "show"])
         assert show.exit_code == 0
         assert str(root) in show.output
 
@@ -123,8 +131,10 @@ class TestAdd:
         first.mkdir()
         second = tmp_path / "second"
         second.mkdir()
-        runner.invoke(cli, ["config", "set", "project-roots", str(first)])
-        result = runner.invoke(cli, ["config", "add", "project-root", str(second)])
+        runner.invoke(cli, ["project", "config", "set", "project-roots", str(first)])
+        result = runner.invoke(
+            cli, ["project", "config", "add", "project-root", str(second)]
+        )
         assert result.exit_code == 0
         on_disk = yaml.safe_load(_redirect_default_config.read_text())
         assert on_disk["project_roots"] == [str(first), str(second)]
@@ -132,8 +142,10 @@ class TestAdd:
     def test_add_is_idempotent(self, tmp_path: Path, _redirect_default_config: Path):
         root = tmp_path / "r"
         root.mkdir()
-        runner.invoke(cli, ["config", "add", "project-root", str(root)])
-        result = runner.invoke(cli, ["config", "add", "project-root", str(root)])
+        runner.invoke(cli, ["project", "config", "add", "project-root", str(root)])
+        result = runner.invoke(
+            cli, ["project", "config", "add", "project-root", str(root)]
+        )
         assert result.exit_code == 0
         assert "already in" in result.output
         on_disk = yaml.safe_load(_redirect_default_config.read_text())
@@ -142,7 +154,7 @@ class TestAdd:
 
 class TestPath:
     def test_path_prints_default_location(self, _redirect_default_config: Path):
-        result = runner.invoke(cli, ["config", "path"])
+        result = runner.invoke(cli, ["project", "config", "path"])
         assert result.exit_code == 0
         assert str(_redirect_default_config) in result.output
 

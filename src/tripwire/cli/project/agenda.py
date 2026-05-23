@@ -1,4 +1,4 @@
-"""`tripwire agenda` — aggregated view of everything in flight.
+"""`tripwire project agenda` — aggregated view of everything in flight.
 
 Reads all issues from the project and renders a unified "what's in
 flight" feed, grouped by a chosen axis (status, executor, priority).
@@ -21,6 +21,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from tripwire.cli.project._group import project_cmd
 from tripwire.core.graph import cache as graph_cache
 from tripwire.core.graph.dependency import build_dependency_graph
 from tripwire.core.store import (
@@ -196,7 +197,7 @@ def _render_json(result: AgendaResult) -> str:
 # ============================================================================
 
 
-@click.command(name="agenda")
+@project_cmd.command(name="agenda")
 @click.option(
     "--project-dir",
     type=click.Path(path_type=Path, file_okay=False, dir_okay=True),

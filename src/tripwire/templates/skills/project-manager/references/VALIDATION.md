@@ -131,15 +131,15 @@ semantic. Re-run without `--fix` to confirm clean.
 If the same error recurs after fixing, you misread the schema. Re-read
 the matching `SCHEMA_*.md` and example file.
 
-## `tripwire lint` — heuristic checks (v0.6a+)
+## `tripwire project lint` — heuristic checks (v0.6a+)
 
 Distinct from `tripwire validate`. Validate is mechanical (schema/refs);
 lint is heuristic (did someone actually do the work at each stage).
 
 ```bash
-tripwire lint scoping              # project-level scoping checks
-tripwire lint handoff <session-id> # handoff-readiness checks
-tripwire lint session <session-id> # in-flight session health checks
+tripwire project lint scoping              # project-level scoping checks
+tripwire project lint handoff <session-id> # handoff-readiness checks
+tripwire project lint session <session-id> # in-flight session health checks
 ```
 
 Exit codes: 0 (info-only), 1 (warning present), 2 (error present).

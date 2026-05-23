@@ -617,7 +617,7 @@ def init_cmd(
     # validate-on-edit hook fires from day zero. Idempotent — if a
     # template already wrote `.claude/settings.json`, the helper merges
     # our entry rather than overwriting.
-    from tripwire.cli.hooks import install_settings_into
+    from tripwire.cli.project.hooks import install_settings_into
 
     settings_path = install_settings_into(target_dir)
     console.print(f"  [green]+[/green] {settings_path.relative_to(target_dir)}")

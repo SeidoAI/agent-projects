@@ -44,7 +44,7 @@ def test_full_session_lifecycle(save_test_issue, tmp_path_project):
     )
 
     # Allocate a session key via the CLI.
-    alloc = _run_tripwire(tmp_path_project, "next-key", "--type", "session")
+    alloc = _run_tripwire(tmp_path_project, "project", "next-key", "--type", "session")
     assert alloc.returncode == 0, alloc.stdout + alloc.stderr
     session_id = alloc.stdout.strip()
 
