@@ -9,7 +9,7 @@ accumulates as orphan refs over time.
 from pathlib import Path
 
 from tripwire.core.validator import load_context
-from tripwire.core.validator.lint import no_orphan_proj_branches
+from tripwire.core.validator.lint.pr import no_orphan_proj_branches
 
 
 def _stub_branches(monkeypatch, branches: list[str]) -> None:

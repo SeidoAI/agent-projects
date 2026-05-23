@@ -15,7 +15,7 @@ from pathlib import Path
 import yaml
 
 from tripwire.core.validator import load_context
-from tripwire.core.validator.lint import node_ratio
+from tripwire.core.validator.lint.node import node_ratio
 
 
 def _set_kind(project_dir: Path, kind: str) -> None:

@@ -9,7 +9,7 @@ suggesting it ought to be broken down. Thresholds come from
 from pathlib import Path
 
 from tripwire.core.validator import load_context
-from tripwire.core.validator.lint import mega_issue
+from tripwire.core.validator.lint.issue import mega_issue
 
 
 def test_warns_when_children_exceed_threshold(tmp_path_project: Path, save_test_issue):
