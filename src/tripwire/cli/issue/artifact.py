@@ -1,4 +1,11 @@
-"""`tripwire issue` — per-issue operations (artifact, insights).
+"""``tripwire issue artifact`` — per-issue artifact operations.
+
+This file declares the ``artifact`` Click sub-group AND its three
+subcommands (``list``, ``init``, ``verify``). The group is small enough
+that splitting each leaf into its own module would harm readability more
+than it would help — all three share one manifest
+(:func:`tripwire.core.issue_artifact_store.load_issue_artifact_manifest`)
+and one issue load.
 
 v0.7b introduces per-issue artifacts (developer.md, verified.md) alongside
 the issue YAML. This module exposes the read/render/verify helpers; the
@@ -16,6 +23,7 @@ from rich.console import Console
 from rich.table import Table
 
 from tripwire.cli._utils import require_project as _require_project
+from tripwire.cli.issue._group import issue_cmd
 from tripwire.core import paths
 from tripwire.core.issue_artifact_store import (
     load_issue_artifact_manifest,
@@ -24,11 +32,6 @@ from tripwire.core.issue_artifact_store import (
 from tripwire.core.store import load_issue
 
 console = Console()
-
-
-@click.group(name="issue")
-def issue_cmd() -> None:
-    """Per-issue operations (artifact + insights subgroups)."""
 
 
 @issue_cmd.group(name="artifact")
