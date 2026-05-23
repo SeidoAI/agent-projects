@@ -788,10 +788,9 @@ def _apply_post_write_hooks(
 
         # Telemetry records one row per session-COMPLETION, not per
         # transition. Without this gate every coding-session writes
-        # ~5 rows (planned→queued→…→completed) and
-        # `queue_runner._recent_spend_usd` sums ~Nx actual spend,
-        # tripping false `cap_usd_per_window` rejections; analyze-
-        # routing's $/merged-PR is similarly inflated.
+        # ~5 rows (planned→queued→…→completed), each carrying
+        # cumulative cost + hardcoded `merged=True`; analyze-routing's
+        # $/merged-PR is then ~Nx inflated.
         # See v0.13.2 finding #3.
         if route.to_ref == "completed":
             try:

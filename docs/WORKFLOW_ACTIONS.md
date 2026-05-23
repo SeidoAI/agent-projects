@@ -56,7 +56,7 @@ is a thin gate-and-flip.
 | Route id | from → to | Kind | CLI | Pre-CLI agent procedure |
 |---|---|---|---|---|
 | `session-create` | source:issue → planned | forward | `tripwire transition coding-session <sid> planned` (issued by `/pm-session-create`) | PM scopes the session, writes the session.yaml + plan.md + verification-checklist.md skeleton. |
-| `planned-to-queued` | planned → queued | forward | `tripwire transition coding-session <sid> queued` | `tripwire session queue add <sid> [--promote-issues]` (readiness check); plan.md + verification-checklist.md must be complete. |
+| `planned-to-queued` | planned → queued | forward | `tripwire transition coding-session <sid> queued` | `tripwire session queue <sid> [--promote-issues]` (readiness check); plan.md + verification-checklist.md must be complete. |
 | `queued-to-executing` | queued → executing | forward | `tripwire transition coding-session <sid> executing` (typically driven through `tripwire session spawn <sid>`) | `tripwire session spawn <sid>` (creates worktrees + skills + CLAUDE.md, starts the runtime). |
 | `executing-to-in_review` | executing → in_review | forward | `tripwire transition coding-session <sid> in_review` | Coding agent records every artifact in `controls.tripwires` (diff, task-checklist.md, self-review.md, recommended-testing-plan.md, post-completion-comments.md, developer.md, tripwire-pr, project-pr); rebase PT branch onto origin/main. |
 | `review-approved` | in_review → verified | forward | `tripwire transition coding-session <sid> verified` (issued by `/pm-session-review`) | Independent code-review evidence present (`pr_review.yaml`); verifier writes `verified.md`. |

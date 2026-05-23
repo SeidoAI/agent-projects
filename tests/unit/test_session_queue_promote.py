@@ -40,7 +40,6 @@ class TestPromoteIssuesFlag:
             session_cmd,
             [
                 "queue",
-                "add",
                 "s1",
                 "--project-dir",
                 str(tmp_path_project),
@@ -76,7 +75,6 @@ class TestPromoteIssuesFlag:
             session_cmd,
             [
                 "queue",
-                "add",
                 "s1",
                 "--project-dir",
                 str(tmp_path_project),
@@ -106,7 +104,7 @@ class TestPromoteIssuesFlag:
         runner = CliRunner()
         result = runner.invoke(
             session_cmd,
-            ["queue", "add", "s1", "--project-dir", str(tmp_path_project)],
+            ["queue", "s1", "--project-dir", str(tmp_path_project)],
         )
 
         assert result.exit_code == 0, result.output
@@ -130,7 +128,6 @@ class TestPromoteIssuesFlag:
             session_cmd,
             [
                 "queue",
-                "add",
                 "s1",
                 "--project-dir",
                 str(tmp_path_project),

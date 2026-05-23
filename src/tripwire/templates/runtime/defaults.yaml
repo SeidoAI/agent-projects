@@ -1,5 +1,5 @@
 # Default runtime configuration — daemon-wide tunables for the
-# monitor, queue runner, and PR watcher. Projects override via
+# monitor and PR watcher. Projects override via
 # `<project>/.tripwire/runtime/defaults.yaml` or inline via
 # `project.yaml.runtime`.
 #
@@ -25,19 +25,6 @@ monitor:
   push_loop:
     warn_threshold: 5
     terminate_threshold: 10
-
-queue:
-  # USD cap to compare recent spend against. Tune per billing plan.
-  cap_usd_per_window: 200.0
-
-  # How many sessions to spawn per tick. 1 keeps semantics simple.
-  max_concurrent_spawns: 1
-
-  # Sleep between probes while in cool-down.
-  probe_interval_seconds: 300.0
-
-  # Sleep between policy ticks when `run_forever` is in use.
-  tick_sleep_seconds: 60.0
 
 pr_watcher:
   # PR-watch daemon poll cadence.

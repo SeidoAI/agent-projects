@@ -512,9 +512,8 @@ def test_telemetry_fires_only_on_completed_transition(
     v0.13.1 code path gated only on workflow id (coding-session), so
     every transition fired a row: a typical session wrote ~5 rows
     (planned→queued→…→completed), each carrying cumulative cost +
-    hardcoded ``merged=True``. ``queue_runner._recent_spend_usd``
-    summed ~Nx actual spend, tripping false `cap_usd_per_window`
-    rejections; analyze-routing's $/merged-PR was inflated.
+    hardcoded ``merged=True``, leaving analyze-routing's $/merged-PR
+    ~Nx inflated.
     """
     from tripwire.core.workflow.transitions import execute_transition
 

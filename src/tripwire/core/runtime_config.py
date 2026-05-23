@@ -1,10 +1,9 @@
 """Runtime configuration resolver.
 
-Loads daemon-wide tunables for the monitor, queue runner, and PR
-watcher. Mirrors the precedence chain in
-:mod:`tripwire.core.spawn_config` but with a simpler three-layer
-hierarchy (no per-agent or per-session layer — runtime config is
-daemon-wide, not per-instance):
+Loads daemon-wide tunables for the monitor and PR watcher. Mirrors
+the precedence chain in :mod:`tripwire.core.spawn_config` but with a
+simpler three-layer hierarchy (no per-agent or per-session layer —
+runtime config is daemon-wide, not per-instance):
 
 1. shipped ``templates/runtime/defaults.yaml`` (framework floor)
 2. ``<project>/.tripwire/runtime/defaults.yaml`` (project file override)

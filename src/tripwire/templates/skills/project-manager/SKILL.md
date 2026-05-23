@@ -98,7 +98,7 @@ truth.
 
 | Target | Pre-transition CLI (run first) | Transition command |
 |---|---|---|
-| `queued` | `tripwire session queue add <sid> [--promote-issues]` | `tripwire transition coding-session <sid> queued` |
+| `queued` | `tripwire session queue <sid> [--promote-issues]` | `tripwire transition coding-session <sid> queued` |
 | `executing` | `tripwire session spawn <sid>` (or `--resume`) | issued by `spawn`; do not run `transition` directly |
 | `in_review` | record artifacts in `controls.tripwires`; rebase PT branch | `tripwire transition coding-session <sid> in_review` |
 | `verified` | independent code-review evidence (`pr_review.yaml`); write `verified.md` | `tripwire transition coding-session <sid> verified` |
@@ -299,7 +299,7 @@ alongside, using the template at `examples/artifacts/plan.md`.
 
 All session status mutations go through `tripwire transition
 coding-session <sid> <target>`. The session subcommands
-(`tripwire session queue add|spawn|pause|abandon|reopen`) wrap the
+(`tripwire session queue|spawn|pause|abandon|reopen`) wrap the
 transition with their pre-CLI side-effects. Do not edit
 `session.yaml.status` by hand.
 

@@ -1,9 +1,9 @@
 """Runtime configuration models.
 
-Daemon-wide tunables for the monitor, queue runner, and PR watcher.
-Shipped defaults live in ``templates/runtime/defaults.yaml``;
-projects override via ``<project>/.tripwire/runtime/defaults.yaml``
-or inline via ``project.yaml.runtime``.
+Daemon-wide tunables for the monitor and PR watcher. Shipped defaults
+live in ``templates/runtime/defaults.yaml``; projects override via
+``<project>/.tripwire/runtime/defaults.yaml`` or inline via
+``project.yaml.runtime``.
 
 Per the v0.14.0 "no hardcoded Python defaults" principle, models
 declare structure only — no field defaults. A YAML missing any
@@ -45,17 +45,6 @@ class MonitorConfig(BaseModel):
     push_loop: PushLoopConfig
 
 
-class QueueConfig(BaseModel):
-    """Queue runner tunables — spend cap, concurrency, polling cadence."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    cap_usd_per_window: float
-    max_concurrent_spawns: int
-    probe_interval_seconds: float
-    tick_sleep_seconds: float
-
-
 class PRWatcherConfig(BaseModel):
     """PR watcher daemon tunables."""
 
@@ -70,5 +59,4 @@ class RuntimeDefaults(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     monitor: MonitorConfig
-    queue: QueueConfig
     pr_watcher: PRWatcherConfig
