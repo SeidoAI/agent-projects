@@ -1,4 +1,4 @@
-"""`tripwire templates list|show` — explore the project's templates.
+"""`tripwire project templates list|show` — explore the project's templates.
 
 Read-only helper for exploring the template tree the project owns. The
 source of truth is whatever files live under the template directories
@@ -19,6 +19,7 @@ from rich.console import Console
 from rich.table import Table
 
 from tripwire.cli._utils import require_project as _require_project
+from tripwire.cli.project._group import project_cmd
 from tripwire.core import paths
 
 console = Console()
@@ -35,7 +36,7 @@ TEMPLATE_SUBDIRS = (
 )
 
 
-@click.group(name="templates")
+@project_cmd.group(name="templates")
 def templates_cmd() -> None:
     """Explore the templates the project ships (read-only)."""
 
@@ -99,7 +100,7 @@ def templates_show(name: str, project_dir: Path) -> None:
     if not matches:
         raise click.ClickException(
             f"No template matching {name!r} found in the project. "
-            f"Run `tripwire templates list` to see what's available."
+            f"Run `tripwire project templates list` to see what's available."
         )
     if len(matches) > 1:
         options = ", ".join(p for p, _ in matches)

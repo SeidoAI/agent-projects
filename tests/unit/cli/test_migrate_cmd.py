@@ -52,7 +52,15 @@ class TestMigrateTemplates:
     def test_dry_run_makes_no_changes(self, tmp_path: Path):
         project = _make_flat_layout_project(tmp_path / "proj")
         result = runner.invoke(
-            cli, ["migrate", "templates", "--project-dir", str(project), "--dry-run"]
+            cli,
+            [
+                "project",
+                "migrate",
+                "templates",
+                "--project-dir",
+                str(project),
+                "--dry-run",
+            ],
         )
         assert result.exit_code == 0, result.output
         assert "would move: agents/" in result.output
@@ -64,7 +72,7 @@ class TestMigrateTemplates:
     def test_non_git_project_uses_shutil_move(self, tmp_path: Path):
         project = _make_flat_layout_project(tmp_path / "proj")
         result = runner.invoke(
-            cli, ["migrate", "templates", "--project-dir", str(project)]
+            cli, ["project", "migrate", "templates", "--project-dir", str(project)]
         )
         assert result.exit_code == 0, result.output
         # Each flat-layout dir gone, canonical present with the marker file.
@@ -85,7 +93,7 @@ class TestMigrateTemplates:
         project = _make_flat_layout_project(tmp_path / "proj")
         _git_init(project)
         result = runner.invoke(
-            cli, ["migrate", "templates", "--project-dir", str(project)]
+            cli, ["project", "migrate", "templates", "--project-dir", str(project)]
         )
         assert result.exit_code == 0, result.output
         # Git tracks the rename. `git status -s` shows R lines.
@@ -104,11 +112,11 @@ class TestMigrateTemplates:
     def test_idempotent_second_run_is_noop(self, tmp_path: Path):
         project = _make_flat_layout_project(tmp_path / "proj")
         first = runner.invoke(
-            cli, ["migrate", "templates", "--project-dir", str(project)]
+            cli, ["project", "migrate", "templates", "--project-dir", str(project)]
         )
         assert first.exit_code == 0
         second = runner.invoke(
-            cli, ["migrate", "templates", "--project-dir", str(project)]
+            cli, ["project", "migrate", "templates", "--project-dir", str(project)]
         )
         assert second.exit_code == 0
         assert "Nothing to migrate" in second.output or "Skipped" in second.output
@@ -122,7 +130,7 @@ class TestMigrateTemplates:
             "# foreign\n"
         )
         result = runner.invoke(
-            cli, ["migrate", "templates", "--project-dir", str(project)]
+            cli, ["project", "migrate", "templates", "--project-dir", str(project)]
         )
         assert result.exit_code != 0
         assert "destination already exists" in result.output
@@ -131,12 +139,13 @@ class TestMigrateTemplates:
         not_a_project = tmp_path / "random"
         not_a_project.mkdir()
         result = runner.invoke(
-            cli, ["migrate", "templates", "--project-dir", str(not_a_project)]
+            cli,
+            ["project", "migrate", "templates", "--project-dir", str(not_a_project)],
         )
         assert result.exit_code != 0
         assert "doesn't look like a tripwire project" in result.output
 
     def test_help_lists_migrations(self):
-        result = runner.invoke(cli, ["migrate", "--help"])
+        result = runner.invoke(cli, ["project", "migrate", "--help"])
         assert result.exit_code == 0
         assert "templates" in result.output

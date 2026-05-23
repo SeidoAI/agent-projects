@@ -297,7 +297,7 @@ def collect_scaffold(project_dir: Path) -> ScaffoldData:
             "side_effect": "rebuilds nodes/tripwire-graph-index.yaml",
         },
         id_allocation={
-            "sequential_keys": "tripwire next-key --type issue --count N",
+            "sequential_keys": "tripwire project next-key --type issue --count N",
             "uuids": "tripwire uuid --count N",
             "rules": [
                 "Do NOT hand-write UUIDs — validator checks RFC 4122",

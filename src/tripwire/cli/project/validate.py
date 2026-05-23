@@ -26,6 +26,7 @@ import click
 from rich.console import Console
 
 from tripwire.cli._profiling import profileable
+from tripwire.cli.project._group import project_cmd
 from tripwire.core.validator import (
     CheckResult,
     ValidationReport,
@@ -35,7 +36,7 @@ from tripwire.core.validator import (
 console = Console()
 
 
-@click.command(name="validate")
+@project_cmd.command(name="validate")
 @click.option(
     "--project-dir",
     type=click.Path(path_type=Path, file_okay=False, dir_okay=True),

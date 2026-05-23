@@ -1,13 +1,13 @@
-"""`tripwire drift` — drift reporting CLI for the project.
+"""`tripwire project drift` — drift reporting CLI for the project.
 
 Two subcommands, both shipped in v0.9:
 
-- ``tripwire drift report`` (KUI-128 / A3) — single 0-100 coherence
+- ``tripwire project drift report`` (KUI-128 / A3) — single 0-100 coherence
   score with per-signal breakdown across stale pins, unresolved
   references, stale concept-node freshness, and recent
   workflow-drift findings. Higher = healthier.
 
-- ``tripwire drift findings`` (KUI-124) — list every workflow drift
+- ``tripwire project drift findings`` (KUI-124) — list every workflow drift
   finding (missing required prompt-checks, JIT prompts that
   should-have-fired, unexpected transitions). Output is one finding
   per line as ``<code> <workflow>:<instance> <status?> :: <message>``
@@ -26,12 +26,13 @@ from pathlib import Path
 import click
 
 from tripwire.cli._utils import require_project as _require_project
+from tripwire.cli.project._group import project_cmd
 from tripwire.core.drift import compute_coherence, drift_finding_to_dict
 from tripwire.core.store import ProjectNotFoundError, load_project
 from tripwire.core.workflow.drift import detect_drift
 
 
-@click.group(name="drift")
+@project_cmd.group(name="drift")
 def drift_cmd() -> None:
     """Drift reporting for the project (coherence score + workflow gate findings)."""
 

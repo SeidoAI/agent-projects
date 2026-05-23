@@ -22,7 +22,7 @@ Workflow:
    - All `blocked_by` dependencies are `done`.
    - Referenced concept nodes exist and are fresh.
    If any check fails, report why and stop.
-4. Allocate a session key: `tripwire next-key --type session`.
+4. Allocate a session key: `tripwire project next-key --type session`.
 5. Create `sessions/<session-key>/` with:
    - `session.yaml` (from `session_templates/default.yaml.j2`) —
      include the issue key in `issues:` and the agent type.

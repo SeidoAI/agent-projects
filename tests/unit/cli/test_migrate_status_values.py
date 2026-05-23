@@ -76,7 +76,7 @@ class TestMigrateStatusValues:
         e = _write_issue(project, "SM-5", "canceled")
 
         result = runner.invoke(
-            cli, ["migrate", "status-values", "--project-dir", str(project)]
+            cli, ["project", "migrate", "status-values", "--project-dir", str(project)]
         )
         assert result.exit_code == 0, result.output
         assert _read_status(a) == "planned"
@@ -95,7 +95,7 @@ class TestMigrateStatusValues:
         e = _write_session(project, "sess-5", "re_engaged")
 
         result = runner.invoke(
-            cli, ["migrate", "status-values", "--project-dir", str(project)]
+            cli, ["project", "migrate", "status-values", "--project-dir", str(project)]
         )
         assert result.exit_code == 0, result.output
         assert _read_status(a) == "executing"
@@ -111,7 +111,7 @@ class TestMigrateStatusValues:
         _write_session(project, "sess-1", "executing")
 
         result = runner.invoke(
-            cli, ["migrate", "status-values", "--project-dir", str(project)]
+            cli, ["project", "migrate", "status-values", "--project-dir", str(project)]
         )
         assert result.exit_code == 0, result.output
         assert "nothing to migrate" in result.output.lower()
@@ -122,13 +122,13 @@ class TestMigrateStatusValues:
         _write_session(project, "sess-1", "active")
 
         first = runner.invoke(
-            cli, ["migrate", "status-values", "--project-dir", str(project)]
+            cli, ["project", "migrate", "status-values", "--project-dir", str(project)]
         )
         assert first.exit_code == 0, first.output
         assert "2 file(s) rewritten" in first.output
 
         second = runner.invoke(
-            cli, ["migrate", "status-values", "--project-dir", str(project)]
+            cli, ["project", "migrate", "status-values", "--project-dir", str(project)]
         )
         assert second.exit_code == 0, second.output
         assert "nothing to migrate" in second.output.lower()
@@ -137,7 +137,7 @@ class TestMigrateStatusValues:
         # No issues/ or sessions/ directories at all — must still pass.
         project = _make_project(tmp_path / "p")
         result = runner.invoke(
-            cli, ["migrate", "status-values", "--project-dir", str(project)]
+            cli, ["project", "migrate", "status-values", "--project-dir", str(project)]
         )
         assert result.exit_code == 0, result.output
         assert "nothing to migrate" in result.output.lower()
@@ -150,6 +150,7 @@ class TestMigrateStatusValues:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "migrate",
                 "status-values",
                 "--project-dir",
@@ -165,7 +166,7 @@ class TestMigrateStatusValues:
         bare = tmp_path / "bare"
         bare.mkdir()
         result = runner.invoke(
-            cli, ["migrate", "status-values", "--project-dir", str(bare)]
+            cli, ["project", "migrate", "status-values", "--project-dir", str(bare)]
         )
         assert result.exit_code != 0
         assert "doesn't look like a tripwire project" in result.output
@@ -180,7 +181,7 @@ class TestMigrateStatusValues:
         path = _write_issue(project, "SM-2", "backlog")
 
         result = runner.invoke(
-            cli, ["migrate", "status-values", "--project-dir", str(project)]
+            cli, ["project", "migrate", "status-values", "--project-dir", str(project)]
         )
         assert result.exit_code == 0, result.output
         assert _read_status(path) == "planned"

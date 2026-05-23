@@ -47,7 +47,7 @@ Capture:
 - **Concept nodes** — does this touch an existing node? Create
   `[[references]]` in the body so the graph stays connected
 
-Run `tripwire next-key --type issue` for the key. Reference any
+Run `tripwire project next-key --type issue` for the key. Reference any
 existing nodes from the body. If this introduces a new concept (new
 endpoint, new model, new decision), create the node file too.
 

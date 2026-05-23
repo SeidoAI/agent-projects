@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 from click.testing import CliRunner
 
-from tripwire.cli.ci import ci_cmd
+from tripwire.cli.project.ci import ci_cmd
 
 
 def test_ci_install_writes_workflow(tmp_path_project: Path):

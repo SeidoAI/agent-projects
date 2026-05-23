@@ -662,7 +662,7 @@ def test_prepare_for_completion_happy_path(
     )
 
     from tripwire.cli import session as cli_session
-    from tripwire.cli import validate as cli_validate
+    from tripwire.cli.project import validate as cli_validate
     from tripwire.core import session_complete as sc
     from tripwire.core import validator as core_validator
 
@@ -701,7 +701,7 @@ def test_prepare_for_completion_validate_fails(
     save_test_session(tmp_path_project, "s1", status="verified")
 
     from tripwire.cli import session as cli_session
-    from tripwire.cli import validate as cli_validate
+    from tripwire.cli.project import validate as cli_validate
     from tripwire.core import validator as core_validator
 
     monkeypatch.setattr(
@@ -741,7 +741,7 @@ def test_prepare_for_completion_pr_blocked(
     )
 
     from tripwire.cli import session as cli_session
-    from tripwire.cli import validate as cli_validate
+    from tripwire.cli.project import validate as cli_validate
     from tripwire.core import session_complete as sc
     from tripwire.core import validator as core_validator
 

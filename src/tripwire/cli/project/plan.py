@@ -1,4 +1,4 @@
-"""`tripwire plan` — preview what init would produce without writing.
+"""`tripwire project plan` — preview what init would produce without writing.
 
 Dry-run of ``tripwire init``: shows the directory tree, file list,
 sizes, and sources (jinja-rendered vs verbatim copy) that would be
@@ -12,11 +12,12 @@ import json
 
 import click
 
+from tripwire.cli.project._group import project_cmd
 from tripwire.cli.project.init import _extract_key_prefix
 from tripwire.core.planner import preview_init
 
 
-@click.command(name="plan")
+@project_cmd.command(name="plan")
 @click.option(
     "--name",
     default="my-project",

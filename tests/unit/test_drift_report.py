@@ -14,7 +14,7 @@ from textwrap import dedent
 
 from click.testing import CliRunner
 
-from tripwire.cli.drift import drift_cmd
+from tripwire.cli.project.drift import drift_cmd
 from tripwire.core.store import save_issue, save_project
 from tripwire.models import Issue, ProjectConfig, RepoEntry
 

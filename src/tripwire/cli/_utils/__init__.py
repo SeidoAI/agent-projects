@@ -1,7 +1,11 @@
-"""Shared CLI helpers.
+"""Shared CLI helpers + true cross-entity user-facing utility commands.
 
-Small utilities used by multiple CLI command modules. Prefer importing
-from here over re-implementing the same helper in each command.
+This package hosts both shared helpers (e.g. ``require_project``) and
+small user-facing utility commands like ``tripwire uuid`` and
+``tripwire completion`` that don't belong to any single entity. Each
+command module registers itself as a top-level Click command via
+``cli.add_command`` in ``cli/main.py`` — the ``_utils/`` prefix is
+internal organization, not part of the user-facing CLI surface.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""`tripwire refresh` — rebuild the graph cache from the filesystem.
+"""`tripwire project refresh` — rebuild the graph cache from the filesystem.
 
 Exposes `graph_cache.ensure_fresh` as a public command for debugging,
 manual invocation, and agent workflows that want an explicit cache
@@ -11,10 +11,11 @@ from pathlib import Path
 
 import click
 
+from tripwire.cli.project._group import project_cmd
 from tripwire.core.graph.cache import ensure_fresh
 
 
-@click.command(name="refresh")
+@project_cmd.command(name="refresh")
 @click.option(
     "--project-dir",
     type=click.Path(path_type=Path, file_okay=False, dir_okay=True),

@@ -1,4 +1,4 @@
-"""`tripwire enums list|show` — explore the active enums.
+"""`tripwire project enums list|show` — explore the active enums.
 
 Read-only view over whatever `core.enum_loader.load_enums` returns for
 this project. If the project has its own `enums/*.yaml` files, those
@@ -15,12 +15,13 @@ from rich.console import Console
 from rich.table import Table
 
 from tripwire.cli._utils import require_project as _require_project
+from tripwire.cli.project._group import project_cmd
 from tripwire.core.enum_loader import load_enums
 
 console = Console()
 
 
-@click.group(name="enums")
+@project_cmd.group(name="enums")
 def enums_cmd() -> None:
     """Explore the active enums (project override + packaged defaults)."""
 

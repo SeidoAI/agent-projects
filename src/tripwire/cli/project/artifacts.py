@@ -1,4 +1,4 @@
-"""`tripwire artifacts list|show` — read session artifacts.
+"""`tripwire project artifacts list|show` — read session artifacts.
 
 Session artifacts live at `sessions/<session-id>/artifacts/<file>`. The
 set of required artifacts is declared in `templates/artifacts/manifest.yaml`
@@ -18,6 +18,7 @@ from rich.console import Console
 from rich.table import Table
 
 from tripwire.cli._utils import require_project as _require_project
+from tripwire.cli.project._group import project_cmd
 from tripwire.core import paths
 
 console = Console()
@@ -26,7 +27,7 @@ ARTIFACTS_SUBPATH = paths.SESSION_ARTIFACTS_SUBDIR
 MANIFEST_REL = paths.TEMPLATES_ARTIFACTS_MANIFEST
 
 
-@click.group(name="artifacts")
+@project_cmd.group(name="artifacts")
 def artifacts_cmd() -> None:
     """Browse session artifacts (read-only)."""
 

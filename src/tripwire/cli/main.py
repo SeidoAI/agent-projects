@@ -2,6 +2,23 @@
 
 Registers every v0 subcommand. The root group does nothing on its own —
 all work happens inside the commands.
+
+The CLI surface is organised by what each command OPERATES ON:
+
+- ``session`` / ``issue`` / ``pr`` / ``node`` / ``project`` /
+  ``workspace`` / ``inbox`` — entity groups; every command nests
+  under its owning entity.
+- ``_tools/`` (``gh``, ``git``), ``_utils/`` (``uuid``,
+  ``completion``), ``_dev/`` (``jit-prompts``, ``test-jit-prompt``,
+  ``prompt-check``), ``_cross/`` (``transition``) — internal
+  organisation for files that don't belong to a single entity.
+  Their commands still register at the root of the CLI (no
+  ``_tools/_utils/_dev/_cross`` prefix in user-facing invocations).
+- ``validate`` — top-level alias for ``project validate`` (the
+  single most common command).
+- ``hook`` — system entry point invoked by Claude Code via the
+  ``.claude/settings.json`` PostToolUse hook. Stays at the root for
+  back-compat with installed hook configs.
 """
 
 from __future__ import annotations
@@ -11,39 +28,22 @@ import logging
 import click
 
 from tripwire import __version__
-from tripwire.cli.agenda import agenda_cmd
-from tripwire.cli.artifacts import artifacts_cmd
-from tripwire.cli.ci import ci_cmd
-from tripwire.cli.completion import completion_cmd
-from tripwire.cli.config import config_cmd
-from tripwire.cli.drift import drift_cmd
-from tripwire.cli.enums import enums_cmd
-from tripwire.cli.events import events_cmd
-from tripwire.cli.gh import gh_cmd
-from tripwire.cli.git import git_cmd
-from tripwire.cli.heuristic import heuristic_cmd
-from tripwire.cli.hooks import hook_cmd, hooks_cmd
+from tripwire.cli._cross.transition import transition_cmd
+from tripwire.cli._dev.jit_prompts import jit_prompts_cmd
+from tripwire.cli._dev.prompt_check import prompt_check_cmd
+from tripwire.cli._dev.test_jit_prompt import test_jit_prompt_cmd
+from tripwire.cli._tools.gh import gh_cmd
+from tripwire.cli._tools.git import git_cmd
+from tripwire.cli._utils.completion import completion_cmd
+from tripwire.cli._utils.uuid_cmd import uuid_cmd
 from tripwire.cli.inbox import inbox_cmd
 from tripwire.cli.issue import issue_cmd
-from tripwire.cli.jit_prompts import jit_prompts_cmd
-from tripwire.cli.lint import lint_cmd
-from tripwire.cli.migrate import migrate_cmd
-from tripwire.cli.next_key import next_key_cmd
 from tripwire.cli.node import node_cmd
-from tripwire.cli.plan import plan_cmd
 from tripwire.cli.pr import pr_cmd
 from tripwire.cli.project import project_cmd
-from tripwire.cli.prompt_check import prompt_check_cmd
-from tripwire.cli.refresh import refresh_cmd
+from tripwire.cli.project.hooks import hook_cmd
+from tripwire.cli.project.validate import validate_cmd as project_validate_cmd
 from tripwire.cli.session import session_cmd
-from tripwire.cli.status import status_cmd
-from tripwire.cli.templates import templates_cmd
-from tripwire.cli.test_jit_prompt import test_jit_prompt_cmd
-from tripwire.cli.transition import transition_cmd
-from tripwire.cli.ui import ui_cmd
-from tripwire.cli.uuid_cmd import uuid_cmd
-from tripwire.cli.validate import validate_cmd
-from tripwire.cli.validate_plan import validate_plan_cmd
 from tripwire.cli.workspace import workspace_cmd
 
 # Verbose count → logging level. -v = INFO, -vv = DEBUG, default = WARNING.
@@ -90,42 +90,37 @@ def cli(ctx: click.Context, verbose: int) -> None:
     _configure_logging(verbose)
 
 
-cli.add_command(agenda_cmd)
+# Entity groups.
 cli.add_command(issue_cmd)
-cli.add_command(ci_cmd)
-cli.add_command(next_key_cmd)
-cli.add_command(plan_cmd)
 cli.add_command(pr_cmd)
 cli.add_command(project_cmd)
-cli.add_command(uuid_cmd)
-cli.add_command(validate_cmd)
-cli.add_command(validate_plan_cmd)
-cli.add_command(lint_cmd)
-cli.add_command(status_cmd)
-cli.add_command(drift_cmd)
-cli.add_command(hook_cmd)
-cli.add_command(hooks_cmd)
-cli.add_command(refresh_cmd)
 cli.add_command(node_cmd)
 cli.add_command(session_cmd)
 cli.add_command(inbox_cmd)
-cli.add_command(templates_cmd)
-cli.add_command(enums_cmd)
-cli.add_command(artifacts_cmd)
-cli.add_command(completion_cmd)
-cli.add_command(config_cmd)
-cli.add_command(migrate_cmd)
-cli.add_command(ui_cmd)
 cli.add_command(workspace_cmd)
-cli.add_command(jit_prompts_cmd)
-cli.add_command(heuristic_cmd)
-cli.add_command(test_jit_prompt_cmd)
-cli.add_command(prompt_check_cmd)
-cli.add_command(events_cmd)
+
+# Top-level alias: `tripwire validate` → `tripwire project validate`.
+# The same Click command object is re-registered at the root. Per user
+# direction this is the ONLY top-level shortcut.
+cli.add_command(project_validate_cmd, name="validate")
+
+# System entry point: invoked by Claude Code via .claude/settings.json
+# (PostToolUse hook). Stays at the root for back-compat with installed
+# settings.json files.
+cli.add_command(hook_cmd)
+
+# Cross-cutting, dev, tool, and utility commands. Internally organised
+# under cli/_cross/, cli/_dev/, cli/_tools/, cli/_utils/ — but each
+# registers as a top-level command (no ``_cross/_dev/_tools/_utils``
+# prefix in the user-facing invocation).
 cli.add_command(transition_cmd)
-cli.add_command(drift_cmd)
-cli.add_command(git_cmd)
+cli.add_command(jit_prompts_cmd)
+cli.add_command(prompt_check_cmd)
+cli.add_command(test_jit_prompt_cmd)
 cli.add_command(gh_cmd)
+cli.add_command(git_cmd)
+cli.add_command(uuid_cmd)
+cli.add_command(completion_cmd)
 
 
 if __name__ == "__main__":

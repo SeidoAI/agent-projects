@@ -9,7 +9,7 @@ first for the short list, then this for examples.
    triggers `issue/schema_invalid`. Stick to the example file.
 2. **Skipping `validate`** after a batch of writes. It catches 95% of
    errors before a reviewer sees them.
-3. **Hand-picking issue keys** instead of `tripwire next-key
+3. **Hand-picking issue keys** instead of `tripwire project next-key
    --type issue`. Drift in `next_issue_number` → `sequence/drift`.
 4. **Hand-writing UUIDs** like `uuid: 1234`. Use a real uuid4.
 5. **Dangling references.** `[[user-model]]` in a body without
@@ -21,7 +21,7 @@ first for the short list, then this for examples.
 Manual entries drift. Leave it empty.
 
 **Invalid enum values.** `status: in-progress` (should be underscore),
-`priority: very-high` (not in enum). Run `tripwire enums show <name>`
+`priority: very-high` (not in enum). Run `tripwire project enums show <name>`
 or read `templates/enums/<name>.yaml`.
 
 **Bad timestamp format.** ISO 8601 only:

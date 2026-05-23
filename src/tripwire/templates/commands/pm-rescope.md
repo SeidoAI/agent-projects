@@ -22,7 +22,7 @@ content:
    those files.
 4. Identify what the new scope adds:
    - **New issues** to create (allocate new keys via
-     `tripwire next-key --type issue`)
+     `tripwire project next-key --type issue`)
    - **New concept nodes** to add
    - **Existing issues to modify** (priority changes, acceptance
      criteria updates, new references)

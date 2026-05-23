@@ -62,7 +62,7 @@ class TestMigrateGraphEdges:
         )
 
         result = runner.invoke(
-            cli, ["migrate", "graph-edges", "--project-dir", str(project)]
+            cli, ["project", "migrate", "graph-edges", "--project-dir", str(project)]
         )
         assert result.exit_code == 0, result.output
         assert "Rewrote 3 edge(s)" in result.output
@@ -84,13 +84,13 @@ class TestMigrateGraphEdges:
         )
 
         first = runner.invoke(
-            cli, ["migrate", "graph-edges", "--project-dir", str(project)]
+            cli, ["project", "migrate", "graph-edges", "--project-dir", str(project)]
         )
         assert first.exit_code == 0, first.output
         assert "Rewrote 2 edge(s)" in first.output
 
         second = runner.invoke(
-            cli, ["migrate", "graph-edges", "--project-dir", str(project)]
+            cli, ["project", "migrate", "graph-edges", "--project-dir", str(project)]
         )
         assert second.exit_code == 0, second.output
         assert "already canonical" in second.output
@@ -100,7 +100,7 @@ class TestMigrateGraphEdges:
         project = _make_project(tmp_path / "p")
         # No cache file written.
         result = runner.invoke(
-            cli, ["migrate", "graph-edges", "--project-dir", str(project)]
+            cli, ["project", "migrate", "graph-edges", "--project-dir", str(project)]
         )
         assert result.exit_code == 0, result.output
         assert "nothing to migrate" in result.output.lower()
@@ -120,6 +120,7 @@ class TestMigrateGraphEdges:
         result = runner.invoke(
             cli,
             [
+                "project",
                 "migrate",
                 "graph-edges",
                 "--project-dir",
@@ -143,7 +144,7 @@ class TestMigrateGraphEdges:
         )
 
         result = runner.invoke(
-            cli, ["migrate", "graph-edges", "--project-dir", str(project)]
+            cli, ["project", "migrate", "graph-edges", "--project-dir", str(project)]
         )
         assert result.exit_code == 0, result.output
         edges = _read_edges(project)
@@ -156,7 +157,7 @@ class TestMigrateGraphEdges:
         bare = tmp_path / "bare"
         bare.mkdir()
         result = runner.invoke(
-            cli, ["migrate", "graph-edges", "--project-dir", str(bare)]
+            cli, ["project", "migrate", "graph-edges", "--project-dir", str(bare)]
         )
         assert result.exit_code != 0
         assert "doesn't look like a tripwire project" in result.output
@@ -172,7 +173,7 @@ class TestMigrateGraphEdges:
         )
 
         result = runner.invoke(
-            cli, ["migrate", "graph-edges", "--project-dir", str(project)]
+            cli, ["project", "migrate", "graph-edges", "--project-dir", str(project)]
         )
         assert result.exit_code == 0, result.output
         edges = _read_edges(project)

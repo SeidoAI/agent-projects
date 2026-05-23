@@ -190,7 +190,7 @@ class TestScaffoldText:
         target = tmp_path / "p"
         _init_project(runner, target)
         result = runner.invoke(cli, ["project", "brief", "--project-dir", str(target)])
-        assert "tripwire next-key --type issue" in result.output
+        assert "tripwire project next-key --type issue" in result.output
         assert "uuid4" in result.output
         assert "Do NOT hand-write UUIDs" in result.output
 

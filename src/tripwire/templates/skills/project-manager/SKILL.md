@@ -166,7 +166,7 @@ based — there is no `tripwire issue create` CLI. For creation, use the
 1. Read the schema reference (`references/SCHEMA_<ENTITY>.md`).
 2. Read the matching example (`examples/<entity>-*.yaml`).
 3. Allocate keys for issues:
-   `tripwire next-key --type issue --count N`. Nodes and sessions use
+   `tripwire project next-key --type issue --count N`. Nodes and sessions use
    slug ids you pick.
 4. Allocate UUIDs for all entities: `tripwire uuid --count N`. Do NOT
    hand-craft — the validator checks RFC 4122 v4 bits.
@@ -186,7 +186,7 @@ Every entity has **both** a `uuid` and a human-readable `id`:
 
 - **UUIDs** — `tripwire uuid --count N`. Don't hand-craft (validator
   checks RFC 4122 v4 bits).
-- **Issue keys** (`SEI-42`, …) — `tripwire next-key --type issue
+- **Issue keys** (`SEI-42`, …) — `tripwire project next-key --type issue
   --count N`. Atomic under a file lock; safe in parallel.
 - **Node / session ids** — slugs you pick. Lowercase, letter-first,
   hyphenated. Be descriptive (`storage-adapter-impl`, not `s1`).

@@ -1,8 +1,8 @@
-"""`tripwire config` — read and write ``~/.tripwire/config.yaml``.
+"""`tripwire project config` — read and write ``~/.tripwire/config.yaml``.
 
 Provides ergonomic subcommands so users don't have to hand-edit YAML.
 The config file is single-user, machine-local, and only consulted by
-``tripwire ui`` (project + workspace discovery roots, port, etc.).
+``tripwire project ui`` (project + workspace discovery roots, port, etc.).
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from pathlib import Path
 import click
 import yaml
 
+from tripwire.cli.project._group import project_cmd
 from tripwire.ui.config import (
     _default_config_path,
     load_user_config,
@@ -19,7 +20,7 @@ from tripwire.ui.config import (
 )
 
 
-@click.group(name="config")
+@project_cmd.group(name="config")
 def config_cmd() -> None:
     """Manage ``~/.tripwire/config.yaml``."""
 
@@ -48,7 +49,7 @@ def config_set_cmd(key: str, paths: tuple[Path, ...]) -> None:
     """Overwrite a list-valued config key.
 
     Example:
-        tripwire config set project-roots ~/Code/seido/tripwire/projects
+        tripwire project config set project-roots ~/Code/seido/tripwire/projects
     """
     config = load_user_config()
     expanded = [Path(p).expanduser() for p in paths]
@@ -73,7 +74,7 @@ def config_add_cmd(key: str, path: Path) -> None:
     """Append a single path to a list-valued config key.
 
     Example:
-        tripwire config add project-root ~/Code/seido/tripwire/projects
+        tripwire project config add project-root ~/Code/seido/tripwire/projects
     """
     config = load_user_config()
     expanded = Path(path).expanduser()

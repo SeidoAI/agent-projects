@@ -1,4 +1,4 @@
-"""`tripwire ci` — install the project-side CI workflow.
+"""`tripwire project ci` — install the project-side CI workflow.
 
 Renders `templates/project/.github/workflows/tripwire.yml.j2` into the
 project's `.github/workflows/tripwire.yml`, pinned to the project's
@@ -14,10 +14,11 @@ from jinja2 import Environment, FileSystemLoader
 
 from tripwire import __version__ as _installed_tripwire_version
 from tripwire.cli._utils import require_project as _require_project
+from tripwire.cli.project._group import project_cmd
 from tripwire.core.store import load_project
 
 
-@click.group(name="ci")
+@project_cmd.group(name="ci")
 def ci_cmd() -> None:
     """Project CI workflow management."""
 

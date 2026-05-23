@@ -36,7 +36,7 @@ def session_log_cmd(
 
     Thin wrapper — see :func:`tripwire.core.session_log.enumerate_fires`.
     """
-    from tripwire.cli.jit_prompts import _is_pm
+    from tripwire.cli._dev.jit_prompts import _is_pm
     from tripwire.core.session_log import enumerate_fires
 
     resolved = project_dir.expanduser().resolve()

@@ -114,7 +114,7 @@ cannot proceed.
 Read `plans/artifacts/scoping-plan.md`. For each issue listed, run:
 
 ```bash
-tripwire next-key --type issue --count N
+tripwire project next-key --type issue --count N
 ```
 
 where N is the number of issues. Collect the allocated keys.
@@ -253,7 +253,7 @@ other? Does the API spec reference infra the infra spec doesn't
 mention? Does the frontend depend on endpoints the API spec doesn't
 list? Flag **INCONSISTENCY** and comment on the relevant issue.
 
-**Project self-coherence.** Run `tripwire agenda` and
+**Project self-coherence.** Run `tripwire project agenda` and
 `tripwire node graph --type concept`. Flag: issues with 0 node refs, nodes
 with only 1 referrer, sessions with 0 issues, dependency cycles or
 orphans.
@@ -281,8 +281,8 @@ Run, in order:
 
 ```bash
 tripwire validate
-tripwire status
-tripwire agenda --by status
+tripwire project status
+tripwire project agenda --by status
 tripwire node graph --type concept
 tripwire node refs summary
 ```

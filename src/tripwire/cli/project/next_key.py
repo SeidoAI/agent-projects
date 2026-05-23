@@ -1,4 +1,4 @@
-"""`tripwire next-key` — atomic sequential key allocation.
+"""`tripwire project next-key` — atomic sequential key allocation.
 
 Thin CLI wrapper around `core.key_allocator.allocate_keys`. The atomicity
 guarantee (file lock on `project.yaml`) lives in the allocator; this
@@ -16,13 +16,14 @@ from pathlib import Path
 
 import click
 
+from tripwire.cli.project._group import project_cmd
 from tripwire.core.key_allocator import (
     KeyAllocationError,
     allocate_keys,
 )
 
 
-@click.command(name="next-key")
+@project_cmd.command(name="next-key")
 @click.option(
     "--project-dir",
     type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
@@ -56,9 +57,9 @@ def next_key_cmd(project_dir: Path, key_type: str, count: int) -> None:
 
     \b
     Examples:
-        tripwire next-key              # → TST-42
-        tripwire next-key --count 3    # → TST-43\\nTST-44\\nTST-45
-        tripwire next-key --type session
+        tripwire project next-key              # → TST-42
+        tripwire project next-key --count 3    # → TST-43\\nTST-44\\nTST-45
+        tripwire project next-key --type session
     """
     try:
         keys = allocate_keys(

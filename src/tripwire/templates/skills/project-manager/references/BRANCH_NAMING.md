@@ -47,7 +47,7 @@ Its output is the exact branch name — use it verbatim; don't guess.
 
 - `handoff.yaml.branch` is validated against this pattern at session
   launch (`/pm-session-queue`).
-- `tripwire lint handoff` flags any branch that doesn't match.
+- `tripwire project lint handoff` flags any branch that doesn't match.
 - The Pydantic `SessionHandoff` model rejects invalid branches at
   parse time.
 
