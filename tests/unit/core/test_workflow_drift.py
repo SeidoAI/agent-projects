@@ -296,7 +296,7 @@ def test_drift_detects_unexpected_transition(tmp_path: Path) -> None:
 
 
 def test_cli_drift_report_runs_clean(tmp_path: Path) -> None:
-    from tripwire.cli.drift import drift_cmd
+    from tripwire.cli.project.drift import drift_cmd
 
     pd = _project_dir(tmp_path)
     runner = CliRunner()
@@ -307,7 +307,7 @@ def test_cli_drift_report_runs_clean(tmp_path: Path) -> None:
 
 
 def test_cli_drift_report_surfaces_findings(tmp_path: Path) -> None:
-    from tripwire.cli.drift import drift_cmd
+    from tripwire.cli.project.drift import drift_cmd
     from tripwire.core.events.log import emit_event
 
     pd = _project_dir(tmp_path)
@@ -327,7 +327,7 @@ def test_cli_drift_report_surfaces_findings(tmp_path: Path) -> None:
 
 
 def test_cli_drift_report_filters_by_instance(tmp_path: Path) -> None:
-    from tripwire.cli.drift import drift_cmd
+    from tripwire.cli.project.drift import drift_cmd
     from tripwire.core.events.log import emit_event
 
     pd = _project_dir(tmp_path)

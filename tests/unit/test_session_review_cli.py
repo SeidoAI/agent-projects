@@ -21,7 +21,7 @@ def _stub_gh(*_args, **_kwargs):
 def test_review_empty_session(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1", status="in_review")
     runner = CliRunner()
-    with patch("tripwire.cli.session.subprocess.run", side_effect=_stub_gh):
+    with patch("tripwire.cli.session.review.subprocess.run", side_effect=_stub_gh):
         result = runner.invoke(
             session_cmd,
             [
@@ -45,7 +45,7 @@ def test_review_with_issue_writes_verified(
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
     save_test_session(tmp_path_project, "s1", status="in_review", issues=["TMP-1"])
     runner = CliRunner()
-    with patch("tripwire.cli.session.subprocess.run", side_effect=_stub_gh):
+    with patch("tripwire.cli.session.review.subprocess.run", side_effect=_stub_gh):
         result = runner.invoke(
             session_cmd,
             [
@@ -71,7 +71,7 @@ def test_review_with_issue_writes_verified(
 def test_review_writes_review_json(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1", status="in_review")
     runner = CliRunner()
-    with patch("tripwire.cli.session.subprocess.run", side_effect=_stub_gh):
+    with patch("tripwire.cli.session.review.subprocess.run", side_effect=_stub_gh):
         result = runner.invoke(
             session_cmd,
             [
@@ -102,7 +102,7 @@ def test_review_verified_md_rendered_from_template(
     save_test_issue(tmp_path_project, "TMP-1", status="in_review")
     save_test_session(tmp_path_project, "s1", status="in_review", issues=["TMP-1"])
     runner = CliRunner()
-    with patch("tripwire.cli.session.subprocess.run", side_effect=_stub_gh):
+    with patch("tripwire.cli.session.review.subprocess.run", side_effect=_stub_gh):
         result = runner.invoke(
             session_cmd,
             [
@@ -133,7 +133,7 @@ def test_review_verified_md_rendered_from_template(
 def test_review_json_output(tmp_path_project: Path, save_test_session):
     save_test_session(tmp_path_project, "s1", status="in_review")
     runner = CliRunner()
-    with patch("tripwire.cli.session.subprocess.run", side_effect=_stub_gh):
+    with patch("tripwire.cli.session.review.subprocess.run", side_effect=_stub_gh):
         result = runner.invoke(
             session_cmd,
             [

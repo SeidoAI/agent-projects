@@ -24,7 +24,7 @@ first 3 concrete issues against your last 3 at each checkpoint.
 
 | Command | Keys allocated | Range |
 |---|---|---|
-| `tripwire next-key --type issue --count N` | N | KEY-X to KEY-Y |
+| `tripwire project next-key --type issue --count N` | N | KEY-X to KEY-Y |
 
 ## UUID allocation
 
@@ -46,7 +46,7 @@ first 3 concrete issues against your last 3 at each checkpoint.
 
 | Step | Done? | Notes |
 |---|---|---|
-| 1. Run tripwire brief | | |
+| 1. Run tripwire project brief | | |
 | 2. Read all planning docs | | |
 | 3. Read canonical examples | | |
 | 4. Write scoping plan | | |

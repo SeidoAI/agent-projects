@@ -150,7 +150,7 @@ Full error catalogue: `references/VALIDATION.md`.
 ## Front-load context first
 
 ```bash
-tripwire brief
+tripwire project brief
 ```
 
 Dumps project config, next IDs, active enums, manifest, orchestration
@@ -166,7 +166,7 @@ based — there is no `tripwire issue create` CLI. For creation, use the
 1. Read the schema reference (`references/SCHEMA_<ENTITY>.md`).
 2. Read the matching example (`examples/<entity>-*.yaml`).
 3. Allocate keys for issues:
-   `tripwire next-key --type issue --count N`. Nodes and sessions use
+   `tripwire project next-key --type issue --count N`. Nodes and sessions use
    slug ids you pick.
 4. Allocate UUIDs for all entities: `tripwire uuid --count N`. Do NOT
    hand-craft — the validator checks RFC 4122 v4 bits.
@@ -186,7 +186,7 @@ Every entity has **both** a `uuid` and a human-readable `id`:
 
 - **UUIDs** — `tripwire uuid --count N`. Don't hand-craft (validator
   checks RFC 4122 v4 bits).
-- **Issue keys** (`SEI-42`, …) — `tripwire next-key --type issue
+- **Issue keys** (`SEI-42`, …) — `tripwire project next-key --type issue
   --count N`. Atomic under a file lock; safe in parallel.
 - **Node / session ids** — slugs you pick. Lowercase, letter-first,
   hyphenated. Be descriptive (`storage-adapter-impl`, not `s1`).
@@ -221,7 +221,7 @@ backlog → todo → in_progress → verifying → reviewing → testing → rea
                                                                                    ↘ canceled
 ```
 
-`tripwire brief` shows this as `ISSUE WORKFLOW`. The validator checks
+`tripwire project brief` shows this as `ISSUE WORKFLOW`. The validator checks
 that every status is reachable from `backlog` via the transitions in
 `project.yaml`; otherwise `status/unreachable` fires.
 
@@ -231,10 +231,10 @@ Do not edit `status:` on an issue by hand.
 
 ## Before modifying any concept node
 
-Run `tripwire refs reverse <node-id>` first.
+Run `tripwire node refs reverse <node-id>` first.
 
 ```bash
-tripwire refs reverse <node-id>
+tripwire node refs reverse <node-id>
 ```
 
 It lists every artifact holding a `[[node-id]]` reference. Changing
@@ -247,9 +247,9 @@ If any referrer surfaces unexpectedly: stop, audit, then proceed.
 ## The concept graph as working memory
 
 ```bash
-tripwire graph --type concept
-tripwire graph --upstream <id>     # or --downstream
-tripwire refs summary              # reference counts across nodes
+tripwire node graph --type concept
+tripwire node graph --upstream <id>     # or --downstream
+tripwire node refs summary              # reference counts across nodes
 ```
 
 ### When to create a node
@@ -405,5 +405,5 @@ session via `tripwire session prepare-for-completion <sid>` +
 - **Errors from the validator you don't recognise?** → `references/VALIDATION.md`
 - **Want to see a worked example first?** → `examples/issue-fully-formed.yaml`
 
-Now: run `tripwire brief`, then read the workflow reference for the
+Now: run `tripwire project brief`, then read the workflow reference for the
 task you're on.

@@ -25,6 +25,27 @@ from tripwire.runtimes.monitor_runner import (
 )
 
 
+def _v014_runner_defaults(**overrides: float | int) -> dict[str, float | int]:
+    """Test-friendly defaults for the v0.14.0 runtime-tunable fields.
+
+    Production loads these from ``templates/runtime/defaults.yaml`` (the
+    Pydantic schema in :mod:`tripwire.models.runtime` enforces presence
+    on the YAML side). Tests construct ``RunnerConfig`` directly with
+    minimal scaffolding so we use explicit short-window values that
+    keep tests fast (stream_idle disabled, max_runtime 1h, push_loop
+    thresholds matching the shipped defaults). Per-test overrides via
+    kwargs.
+    """
+    base: dict[str, float | int] = {
+        "stream_idle_threshold_seconds": 0.0,
+        "max_runtime_seconds": 3600.0,
+        "push_loop_warn_threshold": 5,
+        "push_loop_terminate_threshold": 10,
+    }
+    base.update(overrides)
+    return base
+
+
 @pytest.fixture
 def project(tmp_path: Path, save_test_session) -> Path:
     (tmp_path / "project.yaml").write_text(
@@ -142,6 +163,7 @@ def test_runner_config_roundtrips_through_json(tmp_path: Path):
         required_artifacts=["self-review.md"],
         monitor_log_path=tmp_path / "monitor.log",
         poll_interval=0.5,
+        **_v014_runner_defaults(),
     )
     target = tmp_path / "ctx.json"
     write_runner_config(cfg, target)
@@ -163,8 +185,9 @@ def test_runner_exits_cleanly_when_pid_dies(project: Path, tmp_path: Path):
         max_budget_usd=10.0,
         monitor_log_path=tmp_path / "monitor.log",
         poll_interval=0.05,
+        **_v014_runner_defaults(max_runtime_seconds=2.0),
     )
-    runner = MonitorRunner(cfg, max_runtime_seconds=2.0)
+    runner = MonitorRunner(cfg)
     runner.run()
     # Returned without timing out: the pid-dead exit branch fired.
     assert runner.exit_reason == "pid_dead"
@@ -188,8 +211,9 @@ def test_runner_respects_max_runtime_safety_cap(project: Path, tmp_path: Path):
         max_budget_usd=10.0,
         monitor_log_path=tmp_path / "monitor.log",
         poll_interval=0.05,
+        **_v014_runner_defaults(max_runtime_seconds=0.3),
     )
-    runner = MonitorRunner(cfg, max_runtime_seconds=0.3)
+    runner = MonitorRunner(cfg)
     runner.run()
     assert runner.exit_reason == "max_runtime"
 
@@ -223,8 +247,9 @@ def test_runner_dispatches_actions_to_executor(project: Path, tmp_path: Path):
         max_budget_usd=0.001,  # blown by the first event
         monitor_log_path=tmp_path / "monitor.log",
         poll_interval=0.05,
+        **_v014_runner_defaults(max_runtime_seconds=2.0),
     )
-    runner = MonitorRunner(cfg, max_runtime_seconds=2.0)
+    runner = MonitorRunner(cfg)
     runner.run()
     session = load_session(project, "s1")
     assert session.status == "paused"
@@ -254,9 +279,12 @@ def test_runner_reaps_stream_idle_when_log_silent(project: Path, tmp_path: Path)
         max_budget_usd=10.0,
         monitor_log_path=tmp_path / "monitor.log",
         poll_interval=0.02,
-        stream_idle_threshold_seconds=0.1,  # 100ms — fires fast in test
+        **_v014_runner_defaults(
+            stream_idle_threshold_seconds=0.1,  # 100ms — fires fast in test
+            max_runtime_seconds=2.0,
+        ),
     )
-    runner = MonitorRunner(cfg, max_runtime_seconds=2.0)
+    runner = MonitorRunner(cfg)
     # Patch the SIGTERM action so the test doesn't actually kill pytest.
     import tripwire.runtimes.monitor_actions as actions_mod
 
@@ -295,9 +323,12 @@ def test_runner_does_not_reap_when_events_keep_flowing(project: Path, tmp_path: 
         max_budget_usd=10.0,
         monitor_log_path=tmp_path / "monitor.log",
         poll_interval=0.02,
-        stream_idle_threshold_seconds=0.5,  # 500ms — would fire if no events
+        **_v014_runner_defaults(
+            stream_idle_threshold_seconds=0.5,  # 500ms — would fire if no events
+            max_runtime_seconds=2.0,
+        ),
     )
-    runner = MonitorRunner(cfg, max_runtime_seconds=2.0)
+    runner = MonitorRunner(cfg)
     # Even with pid not alive, the runner's first poll-tick happens
     # before pid is checked → if stream-idle threshold is very small
     # AND no events arrive AND pid_dead is faster, we'd want pid_dead.
@@ -332,6 +363,8 @@ def test_monitor_thread_tracks_last_event_at(tmp_path: Path):
             pt_worktree=None,
             project_dir=tmp_path,
             max_budget_usd=10.0,
+            push_loop_warn_threshold=5,
+            push_loop_terminate_threshold=10,
             model_name="claude-opus-4-7",
             key_files=[],
             required_artifacts=[],
@@ -354,20 +387,22 @@ def test_monitor_thread_tracks_last_event_at(tmp_path: Path):
     assert thread.last_event_at > baseline
 
 
-def test_runner_config_defaults_stream_idle_threshold_to_600s():
-    """Default threshold is 10 minutes — well above any normal
-    between-events gap during heavy tool use."""
-    cfg = RunnerConfig(
-        session_id="s1",
-        pid=1,
-        log_path=Path("/tmp/x"),
-        code_worktree=Path("/tmp/code"),
-        pt_worktree=None,
-        project_dir=Path("/tmp/proj"),
-        max_budget_usd=10.0,
-        monitor_log_path=Path("/tmp/m"),
-    )
-    assert cfg.stream_idle_threshold_seconds == 600.0
+def test_shipped_runtime_yaml_stream_idle_threshold_is_600s():
+    """The shipped runtime YAML pins stream_idle to 10 minutes — well
+    above any normal between-events gap during heavy tool use.
+
+    v0.14.0: this value moved from a Python field default on
+    RunnerConfig to ``templates/runtime/defaults.yaml``. The test now
+    verifies the YAML, since the dataclass no longer carries a
+    default.
+    """
+    import tempfile
+
+    from tripwire.core.runtime_config import load_resolved_runtime_config
+
+    with tempfile.TemporaryDirectory() as td:
+        rt = load_resolved_runtime_config(Path(td))
+    assert rt.monitor.stream_idle_threshold_seconds == 600.0
 
 
 def test_runner_config_roundtrips_stream_idle_threshold(tmp_path: Path):
@@ -382,7 +417,7 @@ def test_runner_config_roundtrips_stream_idle_threshold(tmp_path: Path):
         project_dir=tmp_path,
         max_budget_usd=10.0,
         monitor_log_path=tmp_path / "m",
-        stream_idle_threshold_seconds=120.0,
+        **_v014_runner_defaults(stream_idle_threshold_seconds=120.0),
     )
     target = tmp_path / "ctx.json"
     write_runner_config(cfg, target)

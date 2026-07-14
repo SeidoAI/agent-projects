@@ -15,9 +15,9 @@ Workflow:
 1. Run `tripwire session check $ARGUMENTS` to verify launch-readiness.
    If exit code is non-zero, report the punch list and stop. Do NOT
    proceed with outstanding errors.
-2. Run `tripwire lint handoff $ARGUMENTS` and surface findings. Any
+2. Run `tripwire project lint handoff $ARGUMENTS` and surface findings. Any
    error-severity finding blocks queueing.
-3. Run `tripwire brief` to load project state.
+3. Run `tripwire project brief` to load project state.
 4. Read `sessions/$ARGUMENTS/session.yaml` and `handoff.yaml`.
 5. Record the workflow prompt-check:
    `tripwire prompt-check invoke pm-session-queue $ARGUMENTS --status queued`.

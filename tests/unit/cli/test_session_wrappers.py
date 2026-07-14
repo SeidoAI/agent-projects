@@ -245,16 +245,16 @@ def test_remove_worktrees_invokes_helper(
         tmp_path_project, "s1", status="executing", runtime_state=rs.model_dump()
     )
 
-    from tripwire.cli import session as cli_session
+    from tripwire.cli.session import remove_worktrees as cli_remove_worktrees
 
     calls: list[tuple[Path, Path]] = []
 
     def fake_remove(clone: Path, wt: Path) -> None:
         calls.append((clone, wt))
 
-    # cli/session.py imports `worktree_remove` at top-level — patch
-    # it on that module directly.
-    monkeypatch.setattr(cli_session, "worktree_remove", fake_remove)
+    # cli/session/remove_worktrees.py imports `worktree_remove` at top-level —
+    # patch it on that subcommand module directly.
+    monkeypatch.setattr(cli_remove_worktrees, "worktree_remove", fake_remove)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -288,12 +288,12 @@ def test_remove_worktrees_records_failure(
         tmp_path_project, "s1", status="executing", runtime_state=rs.model_dump()
     )
 
-    from tripwire.cli import session as cli_session
+    from tripwire.cli.session import remove_worktrees as cli_remove_worktrees
 
     def fake_remove(clone: Path, wt: Path) -> None:
         raise OSError("locked")
 
-    monkeypatch.setattr(cli_session, "worktree_remove", fake_remove)
+    monkeypatch.setattr(cli_remove_worktrees, "worktree_remove", fake_remove)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -662,7 +662,7 @@ def test_prepare_for_completion_happy_path(
     )
 
     from tripwire.cli import session as cli_session
-    from tripwire.cli import validate as cli_validate
+    from tripwire.cli.project import validate as cli_validate
     from tripwire.core import session_complete as sc
     from tripwire.core import validator as core_validator
 
@@ -701,7 +701,7 @@ def test_prepare_for_completion_validate_fails(
     save_test_session(tmp_path_project, "s1", status="verified")
 
     from tripwire.cli import session as cli_session
-    from tripwire.cli import validate as cli_validate
+    from tripwire.cli.project import validate as cli_validate
     from tripwire.core import validator as core_validator
 
     monkeypatch.setattr(
@@ -741,7 +741,7 @@ def test_prepare_for_completion_pr_blocked(
     )
 
     from tripwire.cli import session as cli_session
-    from tripwire.cli import validate as cli_validate
+    from tripwire.cli.project import validate as cli_validate
     from tripwire.core import session_complete as sc
     from tripwire.core import validator as core_validator
 
@@ -796,7 +796,7 @@ def test_prepare_for_abandon_happy_path(
 
     monkeypatch.setattr(os, "kill", fake_kill)
 
-    from tripwire.cli import session as cli_session
+    from tripwire.cli.session import prepare_for_abandon as cli_pfa
     from tripwire.core import session_abandon as sa
 
     def fake_close(branch, worktree_path):
@@ -811,7 +811,7 @@ def test_prepare_for_abandon_happy_path(
     def fake_remove(clone, wt):
         removed.append(wt)
 
-    monkeypatch.setattr(cli_session, "worktree_remove", fake_remove)
+    monkeypatch.setattr(cli_pfa, "worktree_remove", fake_remove)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -835,7 +835,7 @@ def test_prepare_for_abandon_no_pid_proceeds(
         tmp_path_project, "s1", status="executing", runtime_state=rs.model_dump()
     )
 
-    from tripwire.cli import session as cli_session
+    from tripwire.cli.session import prepare_for_abandon as cli_pfa
     from tripwire.core import session_abandon as sa
 
     def fake_close(branch, worktree_path):
@@ -844,7 +844,7 @@ def test_prepare_for_abandon_no_pid_proceeds(
         return v
 
     monkeypatch.setattr(sa, "_close_pr_for_branch", fake_close)
-    monkeypatch.setattr(cli_session, "worktree_remove", lambda c, w: None)
+    monkeypatch.setattr(cli_pfa, "worktree_remove", lambda c, w: None)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -870,7 +870,7 @@ def test_prepare_for_abandon_close_prs_fails_continues(
 
     monkeypatch.setattr(os, "kill", lambda pid, sig: None)
 
-    from tripwire.cli import session as cli_session
+    from tripwire.cli.session import prepare_for_abandon as cli_pfa
     from tripwire.core import session_abandon as sa
 
     def fake_close(branch, worktree_path):
@@ -885,7 +885,7 @@ def test_prepare_for_abandon_close_prs_fails_continues(
     def fake_remove(clone, wt):
         remove_calls.append(wt)
 
-    monkeypatch.setattr(cli_session, "worktree_remove", fake_remove)
+    monkeypatch.setattr(cli_pfa, "worktree_remove", fake_remove)
 
     runner = CliRunner()
     result = runner.invoke(

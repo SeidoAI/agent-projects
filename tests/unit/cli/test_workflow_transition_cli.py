@@ -133,14 +133,14 @@ def clean_validator(monkeypatch):
         return ValidationReport(exit_code=0, errors=[], warnings=[])
 
     _clean.calls = calls
-    monkeypatch.setattr("tripwire.cli.transition.validate_project", _clean)
+    monkeypatch.setattr("tripwire.cli._cross.transition.validate_project", _clean)
     return _clean
 
 
 def test_transition_pass_path_advances_session(tmp_path: Path, clean_validator) -> None:
     """Happy path: gate passes, session.status flips, transition.completed
     emitted, status-instance id written."""
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
     from tripwire.core.events.log import read_events
 
     pd = _project_dir(tmp_path)
@@ -171,7 +171,7 @@ def test_transition_pass_path_advances_session(tmp_path: Path, clean_validator) 
 def test_transition_uses_target_status_validators(
     tmp_path: Path, clean_validator
 ) -> None:
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
 
     pd = _project_dir(tmp_path)
     (pd / "workflow.yaml").write_text(
@@ -224,7 +224,7 @@ def test_transition_uses_route_controls_when_routes_declared(
     referenced ids must be registered in the validator catalog (the
     fail-loud unknown-tripwire check rejects otherwise), so this test
     uses real shipped validator ids rather than fake placeholders."""
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
 
     pd = _project_dir(tmp_path)
     (pd / "workflow.yaml").write_text(
@@ -266,8 +266,8 @@ def test_transition_uses_route_controls_when_routes_declared(
 def test_transition_prompt_check_gate_accepts_recorded_invocation(
     tmp_path: Path, clean_validator
 ) -> None:
-    from tripwire.cli.prompt_check import prompt_check_cmd
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
+    from tripwire.cli._dev.prompt_check import prompt_check_cmd
 
     pd = _project_dir(tmp_path)
     (pd / "workflow.yaml").write_text(
@@ -331,7 +331,7 @@ def test_transition_prompt_check_gate_accepts_recorded_invocation(
 def test_transition_rejects_disallowed_target(tmp_path: Path) -> None:
     """Rejecting an unreachable status emits transition.rejected with
     a structured reason naming the gate check that failed."""
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
     from tripwire.core.events.log import read_events
 
     pd = _project_dir(tmp_path)
@@ -361,7 +361,7 @@ def test_transition_increments_status_instance_n(
     tmp_path: Path, clean_validator
 ) -> None:
     """Repeat visits to a status bump the {n} suffix."""
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
 
     pd = _project_dir(tmp_path)
     runner = CliRunner()
@@ -381,7 +381,7 @@ def test_transition_increments_status_instance_n(
 
 
 def test_transition_unknown_session_errors(tmp_path: Path) -> None:
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
 
     pd = _project_dir(tmp_path)
     runner = CliRunner()
@@ -394,7 +394,7 @@ def test_transition_unknown_session_errors(tmp_path: Path) -> None:
 
 
 def test_transition_unknown_station_errors(tmp_path: Path) -> None:
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
 
     pd = _project_dir(tmp_path)
     runner = CliRunner()
@@ -410,7 +410,7 @@ def test_transition_lockfile_serialises_concurrent(
     tmp_path: Path, clean_validator
 ) -> None:
     """The lockfile path must be created when the gate runs."""
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
 
     pd = _project_dir(tmp_path)
     runner = CliRunner()
@@ -424,7 +424,7 @@ def test_transition_lockfile_serialises_concurrent(
 def test_transition_completed_event_carries_status_instance(
     tmp_path: Path, clean_validator
 ) -> None:
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
     from tripwire.core.events.log import read_events
 
     pd = _project_dir(tmp_path)
@@ -446,7 +446,7 @@ def test_transition_completed_event_carries_status_instance(
 def test_transition_rejected_when_tripwires_fail(tmp_path: Path) -> None:
     """If `tripwire validate` reports errors at the destination status,
     the gate rejects with reason=tripwires_failed."""
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
     from tripwire.core.events.log import read_events
 
     pd = _project_dir(tmp_path)
@@ -479,13 +479,13 @@ def test_transition_uses_validate_project_for_filesystem_gate(tmp_path: Path) ->
     `validate_project` and confirming the gate calls it."""
     from unittest.mock import patch
 
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
     from tripwire.core.validator._types import ValidationReport
 
     pd = _project_dir(tmp_path)
     runner = CliRunner()
     with patch(
-        "tripwire.cli.transition.validate_project",
+        "tripwire.cli._cross.transition.validate_project",
         return_value=ValidationReport(exit_code=0, errors=[], warnings=[]),
     ) as mocked:
         result = runner.invoke(
@@ -501,7 +501,7 @@ def test_transition_emits_requested_before_completed_or_rejected(
 ) -> None:
     """Event ordering: `transition.requested` always precedes
     `transition.completed` or `transition.rejected` for the same call."""
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
     from tripwire.core.events.log import read_events
 
     pd = _project_dir(tmp_path)
@@ -534,7 +534,7 @@ def test_transition_reloads_session_inside_lock(
     transitions from there. Post-fix, the gate sees the fresh state
     and rejects (or accepts) based on what's actually on disk.
     """
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
     from tripwire.core.events.log import read_events
     from tripwire.core.session_store import load_session, save_session
 
@@ -717,7 +717,7 @@ def test_transition_rejects_route_with_unknown_tripwire(
     skip the missing check (the v0.9 deferred-from-PR-#73 silent-skip
     fix). This is the runtime defense-in-depth complement to the
     load-time `workflow/unknown_tripwire` lint."""
-    from tripwire.cli.transition import transition_cmd
+    from tripwire.cli._cross.transition import transition_cmd
 
     pd = _project_dir(tmp_path)
     (pd / "workflow.yaml").write_text(

@@ -78,7 +78,7 @@ def fake_validate(monkeypatch):
         return ValidationReport(exit_code=0, errors=[], warnings=[], fixed=[])
 
     monkeypatch.setattr(
-        "tripwire.cli.transition.validate_project",
+        "tripwire.cli._cross.transition.validate_project",
         _ok,
     )
 
@@ -365,7 +365,9 @@ def test_other_sessions_findings_do_not_block_target_transition(
             fixed=[],
         )
 
-    monkeypatch.setattr("tripwire.cli.transition.validate_project", _fake_validate)
+    monkeypatch.setattr(
+        "tripwire.cli._cross.transition.validate_project", _fake_validate
+    )
 
     # Add a route-level tripwire so the gate calls validate_project.
     (project_with_workflow / "workflow.yaml").write_text(
@@ -458,7 +460,9 @@ def test_member_issue_finding_blocks_session_transition(
             fixed=[],
         )
 
-    monkeypatch.setattr("tripwire.cli.transition.validate_project", _fake_validate)
+    monkeypatch.setattr(
+        "tripwire.cli._cross.transition.validate_project", _fake_validate
+    )
 
     (project_with_workflow / "workflow.yaml").write_text(
         dedent(
@@ -512,9 +516,8 @@ def test_telemetry_fires_only_on_completed_transition(
     v0.13.1 code path gated only on workflow id (coding-session), so
     every transition fired a row: a typical session wrote ~5 rows
     (planned→queued→…→completed), each carrying cumulative cost +
-    hardcoded ``merged=True``. ``queue_runner._recent_spend_usd``
-    summed ~Nx actual spend, tripping false `cap_usd_per_window`
-    rejections; analyze-routing's $/merged-PR was inflated.
+    hardcoded ``merged=True``, leaving analyze-routing's $/merged-PR
+    ~Nx inflated.
     """
     from tripwire.core.workflow.transitions import execute_transition
 
@@ -524,7 +527,7 @@ def test_telemetry_fires_only_on_completed_transition(
         calls.append(session.status.value)
 
     monkeypatch.setattr(
-        "tripwire.core.workflow.side_effects.append_telemetry_record",
+        "tripwire.core.workflow.post_write_hooks.append_telemetry_record",
         _record,
     )
 

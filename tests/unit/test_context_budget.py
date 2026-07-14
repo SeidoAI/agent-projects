@@ -19,20 +19,57 @@ from tripwire.templates import get_templates_dir
 TEMPLATES_DIR = get_templates_dir()
 
 
+# Subdirectories under templates/ that are NOT part of per-project context.
+# `tripwire init` doesn't copy these; the agent never loads them as context.
+# They live under templates/ purely because the package layout puts shipped
+# data files there.
+#
+# `side_effects/`  (v0.14.0+): standalone Python scripts the workflow
+#                  executor invokes via subprocess. Never read as text by
+#                  any agent.
+_NON_CONTEXT_TEMPLATE_DIRS: frozenset[str] = frozenset({"side_effects"})
+
+
+def _is_context_file(f: Path, base: Path) -> bool:
+    """True if *f* counts toward the agent-context budget.
+
+    Files under `_NON_CONTEXT_TEMPLATE_DIRS` are excluded — they're
+    standalone artefacts that don't appear in any agent's prompt.
+    """
+    rel = f.relative_to(base)
+    return not any(part in _NON_CONTEXT_TEMPLATE_DIRS for part in rel.parts)
+
+
 def _total_chars(directory: Path) -> int:
-    """Sum of all text file sizes under a directory."""
+    """Sum of all text file sizes under a directory.
+
+    Skips files under non-context template subdirectories (see
+    ``_NON_CONTEXT_TEMPLATE_DIRS``).
+    """
     total = 0
     for f in directory.rglob("*"):
-        if f.is_file() and f.suffix in (".md", ".yaml", ".j2", ".py"):
+        if (
+            f.is_file()
+            and f.suffix in (".md", ".yaml", ".j2", ".py")
+            and _is_context_file(f, directory)
+        ):
             total += len(f.read_text(encoding="utf-8"))
     return total
 
 
 def _total_lines(directory: Path) -> int:
-    """Sum of all text file lines under a directory."""
+    """Sum of all text file lines under a directory.
+
+    Skips files under non-context template subdirectories (see
+    ``_NON_CONTEXT_TEMPLATE_DIRS``).
+    """
     total = 0
     for f in directory.rglob("*"):
-        if f.is_file() and f.suffix in (".md", ".yaml", ".j2", ".py"):
+        if (
+            f.is_file()
+            and f.suffix in (".md", ".yaml", ".j2", ".py")
+            and _is_context_file(f, directory)
+        ):
             total += len(f.read_text(encoding="utf-8").splitlines())
     return total
 

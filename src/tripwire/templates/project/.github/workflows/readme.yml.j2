@@ -42,7 +42,7 @@ jobs:
         run: uv tool install "tripwire-pm>={{ tripwire_version }}"
 
       - name: Regenerate README
-        run: tripwire readme generate
+        run: tripwire project readme generate
 
       - name: Commit + push if changed
         run: |

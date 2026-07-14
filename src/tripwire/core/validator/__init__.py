@@ -63,56 +63,88 @@ from tripwire.core.validator._types import (
     ValidationReport,
 )
 
-# Check functions live in `validator/checks/<theme>.py`. Re-imported here so
-# the historical `from tripwire.core.validator import check_*` import paths
-# keep resolving (and so tests importing the constants `_SESSION_STATUS_TO_PHASE`
-# / `_COHERENCE_MATRIX` keep working).
-from tripwire.core.validator.checks.artifacts import (
-    _load_manifest,
-    check_artifact_presence,
-    check_issue_artifact_presence,
-    check_manifest_phase_ownership_consistent,
-    check_manifest_schema,
-)
-from tripwire.core.validator.checks.coherence import (
-    _COHERENCE_MATRIX,
-    _SESSION_STATUS_TO_PHASE,
-    check_comment_provenance,
-    check_done_implies_session_completed,
-    check_freshness,
-    check_issue_session_status_compatibility,
-    check_pm_response_covers_self_review,
-    check_pm_response_followups_resolve,
-    check_session_issue_coherence,
-)
-from tripwire.core.validator.checks.enums import check_enum_values
-from tripwire.core.validator.checks.identity import (
-    check_id_collisions,
-    check_id_format,
-    check_sequence_drift,
-    check_timestamps,
-    check_uuid_present,
-    uuid_v4_load_error,
-)
-from tripwire.core.validator.checks.quality import (
-    check_coverage_heuristics,
-    check_phase_requirements,
-    check_project_standards,
-    check_quality_consistency,
-)
-from tripwire.core.validator.checks.references import (
+# Check functions live one-per-file under `validator/checks/`. Re-imported
+# here so the historical `from tripwire.core.validator import check_*` import
+# paths keep resolving (and so tests importing the constants
+# `_SESSION_STATUS_TO_PHASE` / `_COHERENCE_MATRIX` keep working).
+from tripwire.core.validator.checks._cross.bidirectional_related import (
     check_bidirectional_related,
+)
+from tripwire.core.validator.checks._cross.comment_provenance import (
+    check_comment_provenance,
+)
+from tripwire.core.validator.checks._cross.enum_values import check_enum_values
+from tripwire.core.validator.checks._cross.freshness import check_freshness
+from tripwire.core.validator.checks._cross.handoff_artifact import (
+    check_handoff_artifact,
+)
+from tripwire.core.validator.checks._cross.id_collisions import check_id_collisions
+from tripwire.core.validator.checks._cross.id_format import check_id_format
+from tripwire.core.validator.checks._cross.reference_integrity import (
     check_reference_integrity,
 )
-from tripwire.core.validator.checks.structure import (
+from tripwire.core.validator.checks._cross.sequence_drift import check_sequence_drift
+from tripwire.core.validator.checks._cross.timestamps import check_timestamps
+from tripwire.core.validator.checks._cross.uuid_present import check_uuid_present
+from tripwire.core.validator.checks._helpers import (
+    _load_manifest,
+    uuid_v4_load_error,
+)
+from tripwire.core.validator.checks.artifact.artifact_presence import (
+    check_artifact_presence,
+)
+from tripwire.core.validator.checks.artifact.manifest_phase_ownership_consistent import (
+    check_manifest_phase_ownership_consistent,
+)
+from tripwire.core.validator.checks.artifact.manifest_schema import (
+    check_manifest_schema,
+)
+from tripwire.core.validator.checks.issue.done_implies_session_completed import (
+    check_done_implies_session_completed,
+)
+from tripwire.core.validator.checks.issue.issue_artifact_presence import (
+    check_issue_artifact_presence,
+)
+from tripwire.core.validator.checks.issue.issue_body_structure import (
     REQUIRED_EPIC_BODY_HEADINGS,
     REQUIRED_ISSUE_BODY_HEADINGS,
-    check_handoff_artifact,
-    check_instance_shape_conforms,
     check_issue_body_structure,
+)
+from tripwire.core.validator.checks.issue.issue_session_status_compatibility import (
+    check_issue_session_status_compatibility,
+)
+from tripwire.core.validator.checks.project.coverage_heuristics import (
+    check_coverage_heuristics,
+)
+from tripwire.core.validator.checks.project.project_standards import (
+    check_project_standards,
+)
+from tripwire.core.validator.checks.project.quality_consistency import (
+    check_quality_consistency,
+)
+from tripwire.core.validator.checks.session.phase_requirements import (
+    check_phase_requirements,
+)
+from tripwire.core.validator.checks.session.pm_response_covers_self_review import (
+    check_pm_response_covers_self_review,
+)
+from tripwire.core.validator.checks.session.pm_response_followups_resolve import (
+    check_pm_response_followups_resolve,
+)
+from tripwire.core.validator.checks.session.session_issue_coherence import (
+    _COHERENCE_MATRIX,
+    _SESSION_STATUS_TO_PHASE,
+    check_session_issue_coherence,
+)
+from tripwire.core.validator.checks.workflow.instance_shape_conforms import (
+    check_instance_shape_conforms,
+)
+from tripwire.core.validator.checks.workflow.status_transitions import (
     check_status_transitions,
 )
-from tripwire.core.validator.checks.workflow import check_workflow_well_formed
+from tripwire.core.validator.checks.workflow.workflow_well_formed import (
+    check_workflow_well_formed,
+)
 from tripwire.models.comment import Comment
 from tripwire.models.issue import Issue
 from tripwire.models.node import ConceptNode
@@ -553,20 +585,18 @@ from tripwire.core.fix import apply_fixes  # noqa: E402  (after fix-section anch
 #   done         → error on anything else
 # v0.7.9 §A9 — project-state lint rules live in ``./lint/`` (one module
 # per rule, each exporting ``check``). ``LINT_CHECKS`` collects them so
-# they run alongside the in-file ``check_*`` functions.
+# they run alongside the per-file ``check_*`` functions under
+# ``./checks/``.
 # Imported at the bottom of this module to avoid a circular dependency
 # (lint rules import ``CheckResult`` / ``ValidationContext`` from here).
-# ALL_CHECKS is built from themed groupings in `validator/checks/`.
-# Each constant there (IDENTITY_CHECKS, ENUM_CHECKS, etc.) groups
-# related check functions; the aggregator concatenates them in the
-# canonical run order so finding output ordering stays byte-stable.
-# The function bodies still live in this file — physical per-file
-# extraction is a future cycle.
-from tripwire.core.validator.checks import ALL_CHECKS as _THEMED_CHECKS  # noqa: E402
+# ``./checks/__init__.py`` builds ``ALL_CHECKS`` from one-file-per-check
+# modules in the canonical run order so finding output ordering stays
+# byte-stable.
+from tripwire.core.validator.checks import ALL_CHECKS as _CHECKS  # noqa: E402
 from tripwire.core.validator.lint import LINT_CHECKS  # noqa: E402
 
 ALL_CHECKS = [
-    *_THEMED_CHECKS,
+    *_CHECKS,
     # KUI-89 (§A9) — project-state lint rules under ``./lint/``.
     *LINT_CHECKS,
 ]

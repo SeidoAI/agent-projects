@@ -320,6 +320,7 @@ def merge_brief_path(project_dir: Path, node_id: str) -> Path:
 TRIPWIRE_DIR = ".tripwire"
 TRIPWIRE_COMMANDS_SUBDIR = ".tripwire/commands"
 TRIPWIRE_SPAWN_SUBDIR = ".tripwire/spawn"
+TRIPWIRE_SIDE_EFFECTS_SUBDIR = ".tripwire/side_effects"
 
 # Concept-graph canvas positions live in a project-scoped sidecar so layout
 # edits don't churn content YAML, bump `updated_at`, or fan `file_changed`
@@ -340,6 +341,10 @@ def project_commands_dir(project_dir: Path) -> Path:
 
 def project_spawn_dir(project_dir: Path) -> Path:
     return project_dir / TRIPWIRE_SPAWN_SUBDIR
+
+
+def project_side_effects_dir(project_dir: Path) -> Path:
+    return project_dir / TRIPWIRE_SIDE_EFFECTS_SUBDIR
 
 
 def concept_layout_path(project_dir: Path) -> Path:
@@ -406,4 +411,63 @@ def resolve_command_path(project_dir: Path, command_name: str) -> Path:
 
     return (
         Path(tripwire.__file__).parent / "templates" / "commands" / f"{command_name}.md"
+    )
+
+
+# Maps a ``workflow_id`` to the entity subdirectory holding its
+# side_effect scripts and post_write_hooks. Transitions are scoped to a
+# single entity (a ``coding-session`` transition operates on a session),
+# so the on-disk layout under ``templates/side_effects/<entity>/`` and
+# ``post_write_hooks/<entity>/`` is organised by that entity — symmetric
+# with ``models/session.py``, ``cli/session/``, etc. Extend this dict
+# when v2 schema introduces new workflow-id → entity mappings.
+_WORKFLOW_ENTITY_DIR: dict[str, str] = {
+    "coding-session": "session",
+    # future workflows extend here as they get side_effects, e.g.:
+    #   "issue-closure": "issue",
+    #   "code-review":   "code_review",
+    #   "pr-lifecycle":  "pr",
+}
+
+
+def resolve_side_effect_path(project_dir: Path, name: str, *, workflow_id: str) -> Path:
+    """Resolve a workflow side_effect script, preferring project override.
+
+    Side effects are standalone Python scripts the workflow executor
+    invokes synchronously before flipping status. Each declared
+    side_effect name in ``workflow.yaml`` maps to a file by the same
+    name with ``.py`` appended, scoped under the entity directory the
+    workflow operates on (see :data:`_WORKFLOW_ENTITY_DIR`).
+
+    Lookup order (``<entity>`` resolved from ``workflow_id``):
+      1. ``<project>/.tripwire/side_effects/<entity>/<name>.py`` (project override)
+      2. ``src/tripwire/templates/side_effects/<entity>/<name>.py`` (packaged default)
+
+    Returns the resolved path. Caller is responsible for checking
+    ``is_file()`` and emitting a clean error if neither exists.
+
+    Raises:
+        ValueError: if ``workflow_id`` is not registered in
+            :data:`_WORKFLOW_ENTITY_DIR`. Fail-loud; no silent fallback
+            to a top-level lookup.
+    """
+    try:
+        entity = _WORKFLOW_ENTITY_DIR[workflow_id]
+    except KeyError as exc:
+        raise ValueError(
+            f"unknown workflow_id for side_effect resolution: {workflow_id!r}. "
+            f"Register it in _WORKFLOW_ENTITY_DIR."
+        ) from exc
+
+    override = project_side_effects_dir(project_dir) / entity / f"{name}.py"
+    if override.is_file():
+        return override
+    import tripwire
+
+    return (
+        Path(tripwire.__file__).parent
+        / "templates"
+        / "side_effects"
+        / entity
+        / f"{name}.py"
     )

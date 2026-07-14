@@ -16,7 +16,7 @@ from pathlib import Path
 import yaml
 from click.testing import CliRunner
 
-from tripwire.cli.graph import graph_cmd
+from tripwire.cli.node.graph import graph_cmd
 from tripwire.core.graph.cache import full_rebuild
 from tripwire.core.graph.index import UnifiedIndex
 from tripwire.core.node_store import save_node

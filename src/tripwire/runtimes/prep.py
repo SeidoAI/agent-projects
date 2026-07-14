@@ -694,7 +694,7 @@ def install_claude_settings(*, worktree: Path) -> None:
     the same shape. Failures are logged and swallowed — a settings
     install glitch must not block spawn.
     """
-    from tripwire.cli.hooks import install_settings_into
+    from tripwire.cli.project.hooks import install_settings_into
 
     try:
         install_settings_into(worktree)

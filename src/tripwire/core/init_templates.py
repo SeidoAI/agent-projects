@@ -15,7 +15,7 @@ Three distinct sub-paths (see :func:`copy_templates`):
 3. **Root-level files** (``standards.md.j2``): Jinja-rendered into the
    project root.
 
-The CLI wrapper at ``cli/init.py:init_cmd`` calls these in sequence
+The CLI wrapper at ``cli/project/init.py:init_cmd`` calls these in sequence
 after collecting the rendering context.
 """
 

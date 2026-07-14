@@ -25,7 +25,7 @@ from textwrap import dedent
 def test_known_ids_includes_declared_side_effects() -> None:
     """The static set must enumerate every side-effect id the workflow
     template references so the lint doesn't fire false positives."""
-    from tripwire.core.workflow.side_effects import known_ids
+    from tripwire.core.workflow.post_write_hooks import known_ids
 
     expected = {
         "sweep_issues_forward",
@@ -49,7 +49,7 @@ def test_known_ids_includes_declared_side_effects() -> None:
 
 def test_known_ids_returns_a_set_copy() -> None:
     """Mutating the returned set must not affect subsequent calls."""
-    from tripwire.core.workflow.side_effects import known_ids
+    from tripwire.core.workflow.post_write_hooks import known_ids
 
     snapshot = known_ids()
     snapshot.add("new-id")
@@ -60,7 +60,9 @@ def test_unknown_side_effect_lint_fires_with_known_ids(tmp_path: Path) -> None:
     """A workflow that declares a side-effect not in ``known_ids()`` is
     flagged by the lint."""
     from tripwire.core.validator._types import ValidationContext
-    from tripwire.core.validator.checks.workflow import check_workflow_well_formed
+    from tripwire.core.validator.checks.workflow.workflow_well_formed import (
+        check_workflow_well_formed,
+    )
 
     (tmp_path / "workflow.yaml").write_text(
         dedent(
@@ -94,7 +96,9 @@ def test_unknown_side_effect_lint_fires_with_known_ids(tmp_path: Path) -> None:
 def test_known_side_effect_does_not_fire_lint(tmp_path: Path) -> None:
     """A workflow declaring a known side-effect id passes the lint."""
     from tripwire.core.validator._types import ValidationContext
-    from tripwire.core.validator.checks.workflow import check_workflow_well_formed
+    from tripwire.core.validator.checks.workflow.workflow_well_formed import (
+        check_workflow_well_formed,
+    )
 
     (tmp_path / "workflow.yaml").write_text(
         dedent(
@@ -130,7 +134,9 @@ def test_unknown_status_field_lint_uses_agent_session_fields(tmp_path: Path) -> 
     ``preserve_fields`` paths against ``AgentSession.model_fields``.
     ``runtime_state`` resolves; ``bogus_field`` doesn't."""
     from tripwire.core.validator._types import ValidationContext
-    from tripwire.core.validator.checks.workflow import check_workflow_well_formed
+    from tripwire.core.validator.checks.workflow.workflow_well_formed import (
+        check_workflow_well_formed,
+    )
 
     (tmp_path / "workflow.yaml").write_text(
         dedent(
@@ -204,7 +210,7 @@ def _make_route(to_ref: str):
 def test_close_active_engagement_stamps_ended_at_and_outcome() -> None:
     """Target ``completed`` → ``ended_at`` set, ``outcome='completed'``,
     returns True."""
-    from tripwire.core.workflow.side_effects import close_active_engagement
+    from tripwire.core.workflow.post_write_hooks import close_active_engagement
 
     session = _make_session_with_open_engagement()
     route = _make_route("completed")
@@ -218,7 +224,7 @@ def test_close_active_engagement_stamps_ended_at_and_outcome() -> None:
 
 def test_close_active_engagement_maps_target_to_outcome() -> None:
     """``abandoned`` and ``failed`` targets produce matching outcomes."""
-    from tripwire.core.workflow.side_effects import close_active_engagement
+    from tripwire.core.workflow.post_write_hooks import close_active_engagement
 
     for target in ("abandoned", "failed"):
         session = _make_session_with_open_engagement()
@@ -231,7 +237,7 @@ def test_close_active_engagement_maps_target_to_outcome() -> None:
 def test_close_active_engagement_noop_on_non_terminal_target() -> None:
     """Targets not in the engagement-outcome map (e.g. ``in_review``)
     leave the engagement untouched."""
-    from tripwire.core.workflow.side_effects import close_active_engagement
+    from tripwire.core.workflow.post_write_hooks import close_active_engagement
 
     session = _make_session_with_open_engagement()
     route = _make_route("in_review")
@@ -246,7 +252,7 @@ def test_close_active_engagement_noop_when_already_closed() -> None:
     """If ``last.ended_at`` is already set, leave it alone — the
     engagement was closed by a pre-executor path (e.g. ``complete_session``)
     and we must not overwrite the original timestamp."""
-    from tripwire.core.workflow.side_effects import close_active_engagement
+    from tripwire.core.workflow.post_write_hooks import close_active_engagement
 
     session = _make_session_with_open_engagement()
     last = session.engagements[-1]
@@ -266,7 +272,7 @@ def test_close_active_engagement_noop_when_already_closed() -> None:
 
 def test_close_active_engagement_noop_when_no_engagements() -> None:
     """A session with no engagement history is a no-op (returns False)."""
-    from tripwire.core.workflow.side_effects import close_active_engagement
+    from tripwire.core.workflow.post_write_hooks import close_active_engagement
     from tripwire.models.session import AgentSession, SessionStatus
 
     session = AgentSession.model_construct(
@@ -287,7 +293,7 @@ def test_close_active_engagement_noop_when_no_engagements() -> None:
 
 def test_reset_acks_if_requested_returns_zero_when_flag_unset(tmp_path: Path) -> None:
     """No-op when ``flags['reset_acks']`` is unset or False."""
-    from tripwire.core.workflow.side_effects import reset_acks_if_requested
+    from tripwire.core.workflow.post_write_hooks import reset_acks_if_requested
 
     session = _make_session_with_open_engagement()
     assert reset_acks_if_requested(tmp_path, session=session, flags={}) == 0

@@ -19,7 +19,7 @@ artefacts before merging.
 
 Workflow:
 
-1. Run `tripwire brief` to load current project state.
+1. Run `tripwire project brief` to load current project state.
 2. Fetch the PR diff via `gh pr diff $ARGUMENTS` or equivalent.
 3. Run `tripwire validate` on the PR branch.
 4. Read the substance of the changes:

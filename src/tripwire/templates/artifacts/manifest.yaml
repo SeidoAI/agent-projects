@@ -49,7 +49,7 @@ artifacts:
   - name: recommended-testing-plan
     file: recommended-testing-plan.md
     template: recommended-testing-plan.md.j2
-    produced_at: completed
+    produced_at: executing
     produced_by: execution-agent
     owned_by: execution-agent
     required: true
@@ -58,7 +58,7 @@ artifacts:
   - name: post-completion-comments
     file: post-completion-comments.md
     template: post-completion-comments.md.j2
-    produced_at: completed
+    produced_at: executing
     produced_by: execution-agent
     owned_by: execution-agent
     required: true
@@ -66,11 +66,14 @@ artifacts:
 
   # v0.7.9 §A2 — agent's four-lens self-review committed to the PT
   # branch BEFORE the PR is opened. The PR-comment self-review is
-  # generated FROM this file.
+  # generated FROM this file. produced_at: executing gates the
+  # executing→in_review transition (validator fires when session is
+  # still at executing, before status flip) — without this, the
+  # agent can open the PR without ever writing self-review.md.
   - name: self-review
     file: self-review.md
     template: self-review.md.j2
-    produced_at: completed
+    produced_at: executing
     produced_by: execution-agent
     owned_by: execution-agent
     required: true

@@ -35,4 +35,4 @@ joins against `sessions/*.yaml` for completion timestamps.
 ## Where it surfaces
 
 - Tripwire log screen (S6) — aggregate chart at the top
-- `tripwire status` — single-line summary
+- `tripwire project status` — single-line summary

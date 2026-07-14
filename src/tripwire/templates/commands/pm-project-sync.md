@@ -19,7 +19,7 @@ Workflow:
    - `--push-only` — push local changes only (requires no pending briefs)
    - `--nodes=a,b,c` — restrict to specific nodes
    - default — bidirectional (pull, resolve, push)
-2. Run `tripwire brief` to load project state.
+2. Run `tripwire project brief` to load project state.
 3. Pull phase (skip if `--push-only`):
    a. Run `tripwire workspace pull [--nodes=...]`.
    b. Exit 0 — auto-merges applied, continue to step 5.

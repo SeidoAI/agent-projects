@@ -20,10 +20,10 @@ jobs:
       - name: Validate
         run: tripwire validate --format=json
       - name: Lint scoping
-        run: tripwire lint scoping
+        run: tripwire project lint scoping
       - name: Lint handoff
-        run: tripwire lint handoff
+        run: tripwire project lint handoff
       - name: Lint session
-        run: tripwire lint session
+        run: tripwire project lint session
       - name: Brief (smoke test)
-        run: tripwire brief --format=json > /dev/null
+        run: tripwire project brief --format=json > /dev/null

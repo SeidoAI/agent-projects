@@ -33,6 +33,7 @@ def _init_project(runner: CliRunner, target: Path) -> None:
     result = runner.invoke(
         cli,
         [
+            "project",
             "init",
             str(target),
             "--name",

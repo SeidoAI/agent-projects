@@ -1,4 +1,4 @@
-"""Tests for ``tripwire watch`` CLI commands."""
+"""Tests for ``tripwire pr watch`` CLI commands."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-from tripwire.cli.watch import watch_cmd
+from tripwire.cli.pr.watch import watch_cmd
 
 
 @pytest.fixture
@@ -48,7 +48,9 @@ def test_watch_start_foreground_invokes_run_forever(project: Path):
     """Foreground mode: blocks on WatchDaemon.run_forever()."""
     fake_daemon = MagicMock()
     runner = CliRunner()
-    with patch("tripwire.cli.watch.WatchDaemon", return_value=fake_daemon) as mock_cls:
+    with patch(
+        "tripwire.cli.pr.watch.WatchDaemon", return_value=fake_daemon
+    ) as mock_cls:
         result = runner.invoke(
             watch_cmd,
             ["start", "--project-dir", str(project), "--poll-interval", "0.05"],
@@ -65,7 +67,7 @@ def test_watch_start_background_spawns_detached_subprocess(project: Path):
     fake_proc.pid = 4242
     runner = CliRunner()
     with patch(
-        "tripwire.cli.watch.subprocess.Popen", return_value=fake_proc
+        "tripwire.cli.pr.watch.subprocess.Popen", return_value=fake_proc
     ) as mock_popen:
         result = runner.invoke(
             watch_cmd, ["start", "--background", "--project-dir", str(project)]
@@ -97,7 +99,7 @@ def test_watch_stop_sends_sigterm_to_pid(project: Path):
 
     write_pidfile(project, 9999)
     runner = CliRunner()
-    with patch("tripwire.cli.watch.send_sigterm", return_value=True) as mock_term:
+    with patch("tripwire.cli.pr.watch.send_sigterm", return_value=True) as mock_term:
         result = runner.invoke(watch_cmd, ["stop", "--project-dir", str(project)])
     assert result.exit_code == 0
     mock_term.assert_called_once_with(9999)

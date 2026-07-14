@@ -15,9 +15,9 @@ $ARGUMENTS
    - `handoff <session-id>` — handoff-readiness checks for one session
    - `session <session-id>` — in-flight session health checks
 2. Run the corresponding command:
-   - `tripwire lint scoping`
-   - `tripwire lint handoff <session-id>`
-   - `tripwire lint session <session-id>`
+   - `tripwire project lint scoping`
+   - `tripwire project lint handoff <session-id>`
+   - `tripwire project lint session <session-id>`
 3. Interpret the findings:
    - Group by severity (error, warning, info)
    - For each, explain what it means concretely and what to do about

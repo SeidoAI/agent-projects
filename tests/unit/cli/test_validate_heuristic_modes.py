@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from tripwire.cli.validate import validate_cmd
+from tripwire.cli.project.validate import validate_cmd
 from tripwire.core.validator import ValidationReport
 
 
@@ -34,7 +34,7 @@ def test_default_uses_surface_mode():
     captured: dict = {}
     runner = CliRunner()
     with patch(
-        "tripwire.cli.validate.validate_project",
+        "tripwire.cli.project.validate.validate_project",
         side_effect=_stub_validate_project(captured),
     ):
         result = runner.invoke(validate_cmd, ["--project-dir", "."])
@@ -46,7 +46,7 @@ def test_quiet_heuristics_flag_maps_to_quiet_mode():
     captured: dict = {}
     runner = CliRunner()
     with patch(
-        "tripwire.cli.validate.validate_project",
+        "tripwire.cli.project.validate.validate_project",
         side_effect=_stub_validate_project(captured),
     ):
         result = runner.invoke(
@@ -60,7 +60,7 @@ def test_no_heuristics_flag_maps_to_none_mode():
     captured: dict = {}
     runner = CliRunner()
     with patch(
-        "tripwire.cli.validate.validate_project",
+        "tripwire.cli.project.validate.validate_project",
         side_effect=_stub_validate_project(captured),
     ):
         result = runner.invoke(validate_cmd, ["--no-heuristics", "--project-dir", "."])
@@ -72,7 +72,7 @@ def test_heuristics_as_tripwires_flag_maps_to_as_tripwires_mode():
     captured: dict = {}
     runner = CliRunner()
     with patch(
-        "tripwire.cli.validate.validate_project",
+        "tripwire.cli.project.validate.validate_project",
         side_effect=_stub_validate_project(captured),
     ):
         result = runner.invoke(
@@ -84,7 +84,7 @@ def test_heuristics_as_tripwires_flag_maps_to_as_tripwires_mode():
 
 def test_heuristic_flags_are_mutually_exclusive():
     runner = CliRunner()
-    with patch("tripwire.cli.validate.validate_project") as mock:
+    with patch("tripwire.cli.project.validate.validate_project") as mock:
         result = runner.invoke(
             validate_cmd,
             ["--quiet-heuristics", "--no-heuristics", "--project-dir", "."],

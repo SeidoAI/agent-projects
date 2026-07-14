@@ -72,7 +72,9 @@ def test_workflow_well_formed_resolves_prompt_check_refs(tmp_path: Path) -> None
         encoding="utf-8",
     )
     from tripwire.core.validator import load_context
-    from tripwire.core.validator.checks.workflow import check_workflow_well_formed
+    from tripwire.core.validator.checks.workflow.workflow_well_formed import (
+        check_workflow_well_formed,
+    )
 
     ctx = load_context(tmp_path)
     findings = check_workflow_well_formed(ctx)

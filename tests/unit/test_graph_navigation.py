@@ -5,7 +5,7 @@ from __future__ import annotations
 import click
 import pytest
 
-from tripwire.cli.graph import _bfs_reachable, _filter_graph_by_direction
+from tripwire.cli.node.graph import _bfs_reachable, _filter_graph_by_direction
 from tripwire.models.graph import FullGraphResult, GraphEdge, GraphNode
 
 

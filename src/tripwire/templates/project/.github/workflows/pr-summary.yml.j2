@@ -24,7 +24,7 @@ jobs:
 {% raw %}      - name: Compute summary
         id: summary
         run: |
-          tripwire pr-summary \
+          tripwire pr summary \
             --base "origin/${{ github.base_ref }}" \
             --head HEAD > /tmp/summary.md
       - name: Post / update PR comment

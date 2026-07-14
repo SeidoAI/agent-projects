@@ -54,7 +54,7 @@ def _project_dir(tmp_path: Path) -> Path:
 
 
 def test_prompt_check_invoke_emits_workflow_event(tmp_path: Path) -> None:
-    from tripwire.cli.prompt_check import prompt_check_cmd
+    from tripwire.cli._dev.prompt_check import prompt_check_cmd
     from tripwire.core.events.log import read_events
 
     project_dir = _project_dir(tmp_path)
@@ -83,7 +83,7 @@ def test_prompt_check_invoke_emits_workflow_event(tmp_path: Path) -> None:
 
 
 def test_prompt_check_invoke_rejects_undeclared_check(tmp_path: Path) -> None:
-    from tripwire.cli.prompt_check import prompt_check_cmd
+    from tripwire.cli._dev.prompt_check import prompt_check_cmd
 
     project_dir = _project_dir(tmp_path)
     result = CliRunner().invoke(
@@ -111,7 +111,7 @@ def test_declared_prompt_check_refs_includes_route_level_declarations(
     invocation got rejected as ``not declared in workflow.yaml`` and
     the gate failed with ``prompt_checks_missing``.
     """
-    from tripwire.cli.prompt_check import _declared_prompt_check_refs
+    from tripwire.cli._dev.prompt_check import _declared_prompt_check_refs
 
     (tmp_path / "project.yaml").write_text(
         "name: test\nkey_prefix: TST\nbase_branch: main\nstatuses: [planned]\n"
@@ -159,7 +159,7 @@ def test_declared_prompt_check_refs_dedups_status_and_route_placements(
 ) -> None:
     """If the same prompt-check id is declared on both a status and a
     route into that status, the result list is de-duplicated."""
-    from tripwire.cli.prompt_check import _declared_prompt_check_refs
+    from tripwire.cli._dev.prompt_check import _declared_prompt_check_refs
 
     (tmp_path / "project.yaml").write_text(
         "name: test\nkey_prefix: TST\nbase_branch: main\nstatuses: [planned]\n"

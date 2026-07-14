@@ -32,7 +32,7 @@ every reference.
 
 - `tripwire validate` rejects entities whose `uuid` field changed
   between commits
-- `tripwire next-key` allocates human keys; UUIDs are minted at
+- `tripwire project next-key` allocates human keys; UUIDs are minted at
   entity creation and never re-minted
 - Schema doesn't expose a "rename UUID" surface
 

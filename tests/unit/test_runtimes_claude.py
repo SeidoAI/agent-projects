@@ -5,12 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from tripwire.core.spawn_config import shipped_with_overrides
 from tripwire.models.session import (
     AgentSession,
     RuntimeState,
     WorktreeEntry,
 )
-from tripwire.models.spawn import SpawnDefaults
 from tripwire.runtimes import ClaudeRuntime
 from tripwire.runtimes.base import (
     AttachExec,
@@ -38,7 +38,7 @@ def _prepped(tmp_path: Path, *, resume: bool = False) -> PreppedSession:
         prompt="DO THE THING",
         system_append="",
         project_slug="test-proj",
-        spawn_defaults=SpawnDefaults.model_validate(
+        spawn_defaults=shipped_with_overrides(
             {
                 "prompt_template": "{plan}",
                 "resume_prompt_template": "resuming",

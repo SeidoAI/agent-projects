@@ -13,7 +13,7 @@ GitHub responses, and the watcher returns ``WatcherAction`` records
 the executor turns into side effects (plan-md follow-up, status
 writeback, GH issue comment, agent re-engagement).
 
-The runtime daemon (``tripwire watch start``) builds the
+The runtime daemon (``tripwire pr watch start``) builds the
 :class:`WatchedSession` list each tick from the live session-store,
 calls :meth:`PRWatcher.tick`, and dispatches the actions.
 """

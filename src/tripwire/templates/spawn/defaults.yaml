@@ -6,10 +6,19 @@
 invocation:
   command: claude
   runtime: claude
+  # Sandbox policy for the codex runtime; ignored when runtime=claude.
+  codex_sandbox: read-only
   background: true
   log_path_template: "~/.tripwire/logs/{project_slug}/{session_id}-{timestamp}.log"
+  # v0.7.9 §A7 — fork an in-flight monitor process alongside the
+  # agent. Set false to opt out (perf-sensitive hosts, tests).
+  monitor: true
+  monitor_log_path_template: "~/.tripwire/logs/{project_slug}/{session_id}-{timestamp}.monitor.log"
 
 config:
+  # Model provider. Drives provider-aware validation (warn-and-drop
+  # claude-only flags for codex sessions).
+  provider: claude
   model: opus
   fallback_model: sonnet
   effort: xhigh
@@ -21,6 +30,9 @@ config:
   max_turns: 200
   max_budget_usd: 100
   output_format: stream-json
+  # v0.7.10 §3.A2 — empty string falls back to the routing table's
+  # `default:` route. Set per-session to pick a non-default route.
+  task_kind: ""
 
 prompt_template: |
   {plan}

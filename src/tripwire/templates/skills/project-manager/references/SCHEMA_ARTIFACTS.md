@@ -60,7 +60,7 @@ artifacts:
 ## Fields
 
 - `name` — short identifier used when referring to the artifact (e.g.
-  in `tripwire artifacts show api-endpoints plan`).
+  in `tripwire project artifacts show api-endpoints plan`).
 - `file` — the actual filename under `sessions/<id>/artifacts/`.
 - `template` — the Jinja template in `templates/artifacts/` the agent
   renders from.

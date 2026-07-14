@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 class TestCheckPort:
     def test_connection_refused_returns_free(self):
-        from tripwire.cli.ui import _check_port
+        from tripwire.cli.project.ui import _check_port
 
         # Port 1 is reserved and almost certainly unbound on localhost,
         # so the probe should return "free" via the connection-refused
@@ -22,7 +22,7 @@ class TestCheckPort:
         assert url == "http://127.0.0.1:1"
 
     def test_tripwire_response_returns_reuse(self):
-        from tripwire.cli.ui import _check_port
+        from tripwire.cli.project.ui import _check_port
 
         class _FakeResponse:
             def __enter__(self):
@@ -39,7 +39,7 @@ class TestCheckPort:
         assert verdict == "reuse"
 
     def test_non_tripwire_json_returns_conflict(self):
-        from tripwire.cli.ui import _check_port
+        from tripwire.cli.project.ui import _check_port
 
         class _FakeResponse:
             def __enter__(self):
@@ -56,7 +56,7 @@ class TestCheckPort:
         assert verdict == "conflict"
 
     def test_non_json_response_returns_conflict(self):
-        from tripwire.cli.ui import _check_port
+        from tripwire.cli.project.ui import _check_port
 
         class _FakeResponse:
             def __enter__(self):
@@ -80,7 +80,7 @@ class TestCheckPort:
         """
         import http.client
 
-        from tripwire.cli.ui import _check_port
+        from tripwire.cli.project.ui import _check_port
 
         with patch(
             "urllib.request.urlopen",
@@ -96,7 +96,7 @@ class TestCheckPort:
         """
         import http.client
 
-        from tripwire.cli.ui import _check_port
+        from tripwire.cli.project.ui import _check_port
 
         with patch(
             "urllib.request.urlopen",

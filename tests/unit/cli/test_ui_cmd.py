@@ -36,11 +36,11 @@ def _stub_check_port():
     Without this, tests that don't explicitly care about the probe still
     hit whatever's actually on port 8000 of the host running the suite,
     which is non-hermetic. Tests that *do* care override the mock with
-    their own ``patch("tripwire.cli.ui._check_port", ...)``; tests that
+    their own ``patch("tripwire.cli.project.ui._check_port", ...)``; tests that
     exercise the probe itself live in test_ui_check_port.py (no stub).
     """
     with patch(
-        "tripwire.cli.ui._check_port",
+        "tripwire.cli.project.ui._check_port",
         return_value=("free", "http://127.0.0.1:8000"),
     ):
         yield
@@ -48,7 +48,7 @@ def _stub_check_port():
 
 class TestUiHelp:
     def test_help_shows_all_flags(self):
-        result = runner.invoke(cli, ["ui", "--help"])
+        result = runner.invoke(cli, ["project", "ui", "--help"])
         assert result.exit_code == 0
         assert "--project-dir" in result.output
         assert "--port" in result.output
@@ -62,7 +62,7 @@ class TestGracefulDegradation:
             "builtins.__import__",
             side_effect=_make_import_blocker("fastapi"),
         ):
-            result = runner.invoke(cli, ["ui"])
+            result = runner.invoke(cli, ["project", "ui"])
         assert result.exit_code == 1
         assert "full tripwire install" in result.output
         assert "pip install tripwire-pm" in result.output
@@ -72,7 +72,7 @@ class TestGracefulDegradation:
             "builtins.__import__",
             side_effect=_make_import_blocker("uvicorn"),
         ):
-            result = runner.invoke(cli, ["ui"])
+            result = runner.invoke(cli, ["project", "ui"])
         assert result.exit_code == 1
         assert "full tripwire install" in result.output
 
@@ -95,7 +95,7 @@ class TestNoProjects:
             ),
             patch("tripwire.ui.server.start_server") as start_server,
         ):
-            result = runner.invoke(cli, ["ui", "--no-browser"])
+            result = runner.invoke(cli, ["project", "ui", "--no-browser"])
         assert result.exit_code == 0, result.output
         assert "No projects discovered" in result.output
         # Server still launched, with an empty project list.
@@ -119,7 +119,7 @@ class TestCwdAutodetect:
             return_value=[],
         ):
             with patch("tripwire.ui.server.start_server") as mock_start:
-                result = runner.invoke(cli, ["ui"])
+                result = runner.invoke(cli, ["project", "ui"])
         assert result.exit_code == 0
         assert mock_start.call_args.kwargs["project_dirs"] == [proj.resolve()]
 
@@ -135,7 +135,7 @@ class TestCwdAutodetect:
             return_value=[],
         ):
             with patch("tripwire.ui.server.start_server") as mock_start:
-                result = runner.invoke(cli, ["ui"])
+                result = runner.invoke(cli, ["project", "ui"])
         assert result.exit_code == 0
         assert mock_start.call_args.kwargs["project_dirs"] == [proj.resolve()]
 
@@ -152,7 +152,9 @@ class TestCwdAutodetect:
         )
         monkeypatch.chdir(cwd_proj)
         with patch("tripwire.ui.server.start_server") as mock_start:
-            result = runner.invoke(cli, ["ui", "--project-dir", str(explicit)])
+            result = runner.invoke(
+                cli, ["project", "ui", "--project-dir", str(explicit)]
+            )
         assert result.exit_code == 0
         assert mock_start.call_args.kwargs["project_dirs"] == [explicit.resolve()]
 
@@ -167,7 +169,7 @@ class TestServerLaunch:
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
         with patch("tripwire.ui.server.start_server") as mock_start:
-            result = runner.invoke(cli, ["ui", "--project-dir", str(proj)])
+            result = runner.invoke(cli, ["project", "ui", "--project-dir", str(proj)])
         assert result.exit_code == 0
         mock_start.assert_called_once()
         kwargs = mock_start.call_args.kwargs
@@ -184,7 +186,7 @@ class TestServerLaunch:
         )
         with patch("tripwire.ui.server.start_server") as mock_start:
             result = runner.invoke(
-                cli, ["ui", "--project-dir", str(proj), "--port", "9999"]
+                cli, ["project", "ui", "--project-dir", str(proj), "--port", "9999"]
             )
         assert result.exit_code == 0
         assert mock_start.call_args.kwargs["port"] == 9999
@@ -198,7 +200,7 @@ class TestServerLaunch:
         with patch("tripwire.ui.server.start_server") as mock_start:
             result = runner.invoke(
                 cli,
-                ["ui", "--project-dir", str(proj), "--no-browser", "--dev"],
+                ["project", "ui", "--project-dir", str(proj), "--no-browser", "--dev"],
             )
         assert result.exit_code == 0
         kwargs = mock_start.call_args.kwargs
@@ -221,7 +223,7 @@ class TestPinBehavior:
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
         with patch("tripwire.ui.server.start_server") as mock_start:
-            result = runner.invoke(cli, ["ui", "--project-dir", str(proj)])
+            result = runner.invoke(cli, ["project", "ui", "--project-dir", str(proj)])
         assert result.exit_code == 0
         assert mock_start.call_args.kwargs["pin"] is True
 
@@ -233,7 +235,7 @@ class TestPinBehavior:
         )
         monkeypatch.chdir(proj)
         with patch("tripwire.ui.server.start_server") as mock_start:
-            result = runner.invoke(cli, ["ui"])
+            result = runner.invoke(cli, ["project", "ui"])
         assert result.exit_code == 0
         assert mock_start.call_args.kwargs["pin"] is False
 
@@ -245,7 +247,7 @@ class TestPinBehavior:
         )
         monkeypatch.chdir(proj / "instances" / "issues" / "KUI-1")
         with patch("tripwire.ui.server.start_server") as mock_start:
-            result = runner.invoke(cli, ["ui"])
+            result = runner.invoke(cli, ["project", "ui"])
         assert result.exit_code == 0
         assert mock_start.call_args.kwargs["pin"] is False
 
@@ -275,7 +277,7 @@ class TestPinBehavior:
             ],
         ):
             with patch("tripwire.ui.server.start_server") as mock_start:
-                result = runner.invoke(cli, ["ui"])
+                result = runner.invoke(cli, ["project", "ui"])
         assert result.exit_code == 0
         assert mock_start.call_args.kwargs["pin"] is False
         # And project_dirs reflects the discovered project, not cwd.
@@ -353,13 +355,13 @@ class TestSingleInstanceProbe:
         )
         with (
             patch(
-                "tripwire.cli.ui._check_port",
+                "tripwire.cli.project.ui._check_port",
                 return_value=("reuse", "http://127.0.0.1:8000"),
             ),
-            patch("tripwire.cli.ui.webbrowser.open") as mock_open,
+            patch("tripwire.cli.project.ui.webbrowser.open") as mock_open,
             patch("tripwire.ui.server.start_server") as mock_start,
         ):
-            result = runner.invoke(cli, ["ui", "--project-dir", str(proj)])
+            result = runner.invoke(cli, ["project", "ui", "--project-dir", str(proj)])
         assert result.exit_code == 0
         assert "already running" in result.output
         assert "http://127.0.0.1:8000" in result.output
@@ -374,14 +376,14 @@ class TestSingleInstanceProbe:
         )
         with (
             patch(
-                "tripwire.cli.ui._check_port",
+                "tripwire.cli.project.ui._check_port",
                 return_value=("reuse", "http://127.0.0.1:8000"),
             ),
-            patch("tripwire.cli.ui.webbrowser.open") as mock_open,
+            patch("tripwire.cli.project.ui.webbrowser.open") as mock_open,
             patch("tripwire.ui.server.start_server"),
         ):
             result = runner.invoke(
-                cli, ["ui", "--project-dir", str(proj), "--no-browser"]
+                cli, ["project", "ui", "--project-dir", str(proj), "--no-browser"]
             )
         assert result.exit_code == 0
         mock_open.assert_not_called()
@@ -394,12 +396,12 @@ class TestSingleInstanceProbe:
         )
         with (
             patch(
-                "tripwire.cli.ui._check_port",
+                "tripwire.cli.project.ui._check_port",
                 return_value=("conflict", "http://127.0.0.1:8000"),
             ),
             patch("tripwire.ui.server.start_server") as mock_start,
         ):
-            result = runner.invoke(cli, ["ui", "--project-dir", str(proj)])
+            result = runner.invoke(cli, ["project", "ui", "--project-dir", str(proj)])
         assert result.exit_code == 1
         assert "in use by another service" in result.output
         mock_start.assert_not_called()
@@ -412,12 +414,12 @@ class TestSingleInstanceProbe:
         )
         with (
             patch(
-                "tripwire.cli.ui._check_port",
+                "tripwire.cli.project.ui._check_port",
                 return_value=("free", "http://127.0.0.1:8000"),
             ),
             patch("tripwire.ui.server.start_server") as mock_start,
         ):
-            result = runner.invoke(cli, ["ui", "--project-dir", str(proj)])
+            result = runner.invoke(cli, ["project", "ui", "--project-dir", str(proj)])
         assert result.exit_code == 0
         mock_start.assert_called_once()
 
@@ -428,10 +430,12 @@ class TestSingleInstanceProbe:
             "name: test\nkey_prefix: TST\nnext_issue_number: 1\nnext_session_number: 1\n"
         )
         with (
-            patch("tripwire.cli.ui._check_port") as mock_probe,
+            patch("tripwire.cli.project.ui._check_port") as mock_probe,
             patch("tripwire.ui.server.start_server") as mock_start,
         ):
-            result = runner.invoke(cli, ["ui", "--project-dir", str(proj), "--dev"])
+            result = runner.invoke(
+                cli, ["project", "ui", "--project-dir", str(proj), "--dev"]
+            )
         assert result.exit_code == 0
         mock_probe.assert_not_called()
         mock_start.assert_called_once()

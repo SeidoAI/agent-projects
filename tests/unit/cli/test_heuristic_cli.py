@@ -9,7 +9,7 @@ from click.testing import CliRunner
 
 from tripwire._internal.heuristics import write_marker
 from tripwire._internal.heuristics._acks import ACK_DIR_REL, MarkerKey
-from tripwire.cli.heuristic import heuristic_cmd
+from tripwire.cli.project.heuristic import heuristic_cmd
 
 
 def test_list_with_no_markers(tmp_path: Path):
@@ -91,6 +91,7 @@ def test_gc_runs_against_real_project(tmp_path: Path):
             "--project",
             str(repo_root),
             "tripwire",
+            "project",
             "init",
             "--name",
             "p",

@@ -16,7 +16,7 @@ def test_git_rebase_pt_invokes_fetch_and_rebase(tmp_path: Path, monkeypatch) -> 
     """Happy path: ``fetch_origin`` + ``rebase_branch_onto`` are called
     once each with the worktree resolved to an absolute path."""
     import tripwire.core.git_helpers as gh
-    from tripwire.cli import git as git_mod
+    from tripwire.cli._tools import git as git_mod
 
     wt = tmp_path / "wt"
     wt.mkdir()
@@ -47,7 +47,7 @@ def test_git_rebase_pt_surfaces_rebase_conflict(tmp_path: Path, monkeypatch) -> 
     """A ``RebaseConflict`` raised by the helper becomes a non-zero exit
     with the conflict message preserved."""
     import tripwire.core.git_helpers as gh
-    from tripwire.cli import git as git_mod
+    from tripwire.cli._tools import git as git_mod
 
     wt = tmp_path / "wt"
     wt.mkdir()
@@ -69,7 +69,7 @@ def test_git_rebase_pt_surfaces_rebase_conflict(tmp_path: Path, monkeypatch) -> 
 
 def test_git_rebase_pt_rejects_missing_worktree(tmp_path: Path) -> None:
     """Click's ``exists=True`` guard rejects a non-existent path."""
-    from tripwire.cli import git as git_mod
+    from tripwire.cli._tools import git as git_mod
 
     runner = CliRunner()
     result = runner.invoke(

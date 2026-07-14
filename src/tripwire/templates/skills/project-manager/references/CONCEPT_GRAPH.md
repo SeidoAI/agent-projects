@@ -104,11 +104,11 @@ auto-adds the missing side. Write both yourself — it's clearer.
 
 ## Commands
 
-- `tripwire refs list <issue-key>` — issue's references
-- `tripwire refs reverse <node-id>` — what references a node
-- `tripwire refs check` — full dangling/orphan/stale scan
+- `tripwire node refs list <issue-key>` — issue's references
+- `tripwire node refs reverse <node-id>` — what references a node
+- `tripwire node refs check` — full dangling/orphan/stale scan
 - `tripwire node check [node-id]` — freshness check
-- `tripwire graph --type concept` — render the graph
+- `tripwire node graph --type concept` — render the graph
 
 ## See also
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from tripwire.core.codex_args import build_codex_args
+from tripwire.core.spawn_config import shipped_with_overrides
 from tripwire.models.spawn import SpawnDefaults
 
 
@@ -29,7 +30,7 @@ def _defaults(**overrides) -> SpawnDefaults:
             base[k].update(v)
         else:
             base[k] = v
-    return SpawnDefaults.model_validate(base)
+    return shipped_with_overrides(base)
 
 
 def test_build_args_first_spawn_shape():

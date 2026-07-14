@@ -10,6 +10,7 @@ from tripwire.core.spawn_config import (
     build_claude_args,
     load_resolved_spawn_config,
     render_prompt,
+    shipped_with_overrides,
 )
 
 
@@ -74,9 +75,8 @@ def test_session_override_wins_over_project(tmp_path_project: Path, save_test_se
 
 
 def test_render_prompt_substitutes_placeholders():
-    from tripwire.models.spawn import SpawnDefaults
 
-    defaults = SpawnDefaults.model_validate(
+    defaults = shipped_with_overrides(
         {"prompt_template": "hello {name} on {session_id}"}
     )
     rendered = render_prompt(defaults, name="agent", session_id="s1")
@@ -84,9 +84,8 @@ def test_render_prompt_substitutes_placeholders():
 
 
 def test_build_claude_args_shape():
-    from tripwire.models.spawn import SpawnDefaults
 
-    defaults = SpawnDefaults.model_validate({})
+    defaults = shipped_with_overrides({})
     args = build_claude_args(
         defaults,
         prompt="Do the thing.",
@@ -124,9 +123,8 @@ def test_build_claude_args_shape():
 def test_build_claude_args_with_resume():
     """resume=True: --resume <uuid> is emitted, --session-id is NOT
     (claude rejects the combination without --fork-session)."""
-    from tripwire.models.spawn import SpawnDefaults
 
-    defaults = SpawnDefaults.model_validate({})
+    defaults = shipped_with_overrides({})
     args = build_claude_args(
         defaults,
         prompt="x",
@@ -145,9 +143,8 @@ def test_build_claude_args_with_resume():
 
 def test_build_claude_args_resume_false_uses_session_id():
     """resume=False: --session-id <uuid> is emitted, --resume is NOT."""
-    from tripwire.models.spawn import SpawnDefaults
 
-    defaults = SpawnDefaults.model_validate({})
+    defaults = shipped_with_overrides({})
     args = build_claude_args(
         defaults,
         prompt="x",
@@ -216,9 +213,8 @@ def test_disallowed_tools_includes_ask_and_send_user_message(tmp_path_project):
 
 def test_render_resume_prompt_interpolates():
     from tripwire.core.spawn_config import render_resume_prompt
-    from tripwire.models.spawn import SpawnDefaults
 
-    defaults = SpawnDefaults.model_validate(
+    defaults = shipped_with_overrides(
         {"resume_prompt_template": "Resuming {session_id} at {plan_path}"}
     )
     out = render_resume_prompt(defaults, session_id="s1", plan_path="/tmp/x")

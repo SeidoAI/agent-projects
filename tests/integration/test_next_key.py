@@ -35,6 +35,7 @@ def _init_project(
     result = runner.invoke(
         cli,
         [
+            "project",
             "init",
             str(target),
             "--name",
@@ -60,7 +61,9 @@ class TestBasic:
         target = tmp_path / "p"
         _init_project(runner, target)
 
-        result = runner.invoke(cli, ["next-key", "--project-dir", str(target)])
+        result = runner.invoke(
+            cli, ["project", "next-key", "--project-dir", str(target)]
+        )
         assert result.exit_code == 0
         assert result.output.strip() == "TST-1"
 
@@ -68,9 +71,15 @@ class TestBasic:
         target = tmp_path / "p"
         _init_project(runner, target)
 
-        first = runner.invoke(cli, ["next-key", "--project-dir", str(target)])
-        second = runner.invoke(cli, ["next-key", "--project-dir", str(target)])
-        third = runner.invoke(cli, ["next-key", "--project-dir", str(target)])
+        first = runner.invoke(
+            cli, ["project", "next-key", "--project-dir", str(target)]
+        )
+        second = runner.invoke(
+            cli, ["project", "next-key", "--project-dir", str(target)]
+        )
+        third = runner.invoke(
+            cli, ["project", "next-key", "--project-dir", str(target)]
+        )
 
         assert first.output.strip() == "TST-1"
         assert second.output.strip() == "TST-2"
@@ -81,7 +90,7 @@ class TestBasic:
         _init_project(runner, target)
 
         result = runner.invoke(
-            cli, ["next-key", "--project-dir", str(target), "--count", "5"]
+            cli, ["project", "next-key", "--project-dir", str(target), "--count", "5"]
         )
         assert result.exit_code == 0
         keys = result.output.strip().split("\n")
@@ -93,8 +102,12 @@ class TestBasic:
         target = tmp_path / "p"
         _init_project(runner, target)
 
-        runner.invoke(cli, ["next-key", "--project-dir", str(target), "--count", "3"])
-        single = runner.invoke(cli, ["next-key", "--project-dir", str(target)])
+        runner.invoke(
+            cli, ["project", "next-key", "--project-dir", str(target), "--count", "3"]
+        )
+        single = runner.invoke(
+            cli, ["project", "next-key", "--project-dir", str(target)]
+        )
         assert single.output.strip() == "TST-4"
 
     def test_counter_persisted_to_project_yaml(
@@ -103,7 +116,9 @@ class TestBasic:
         target = tmp_path / "p"
         _init_project(runner, target)
 
-        runner.invoke(cli, ["next-key", "--project-dir", str(target), "--count", "5"])
+        runner.invoke(
+            cli, ["project", "next-key", "--project-dir", str(target), "--count", "5"]
+        )
         raw = yaml.safe_load((target / "project.yaml").read_text())
         assert raw["next_issue_number"] == 6
 
@@ -114,10 +129,13 @@ class TestBasic:
         _init_project(runner, target)
 
         # Allocate a couple of issue keys to advance the issue counter.
-        runner.invoke(cli, ["next-key", "--project-dir", str(target), "--count", "3"])
+        runner.invoke(
+            cli, ["project", "next-key", "--project-dir", str(target), "--count", "3"]
+        )
         # Session counter should still start from 1.
         result = runner.invoke(
-            cli, ["next-key", "--project-dir", str(target), "--type", "session"]
+            cli,
+            ["project", "next-key", "--project-dir", str(target), "--type", "session"],
         )
         assert result.exit_code == 0
         # Session keys use the `<PREFIX>-S<N>` form from core.key_allocator
@@ -128,7 +146,9 @@ class TestBasic:
     ) -> None:
         target = tmp_path / "p"
         _init_project(runner, target, key_prefix="PKB")
-        result = runner.invoke(cli, ["next-key", "--project-dir", str(target)])
+        result = runner.invoke(
+            cli, ["project", "next-key", "--project-dir", str(target)]
+        )
         assert result.output.strip() == "PKB-1"
 
 
@@ -139,7 +159,9 @@ class TestBasic:
 
 class TestErrors:
     def test_missing_project_yaml(self, runner: CliRunner, tmp_path: Path) -> None:
-        result = runner.invoke(cli, ["next-key", "--project-dir", str(tmp_path)])
+        result = runner.invoke(
+            cli, ["project", "next-key", "--project-dir", str(tmp_path)]
+        )
         assert result.exit_code != 0
         assert "project.yaml not found" in result.output
 
@@ -149,7 +171,8 @@ class TestErrors:
         target = tmp_path / "p"
         _init_project(runner, target)
         result = runner.invoke(
-            cli, ["next-key", "--project-dir", str(target), "--type", "bogus"]
+            cli,
+            ["project", "next-key", "--project-dir", str(target), "--type", "bogus"],
         )
         assert result.exit_code != 0
 
@@ -159,7 +182,7 @@ class TestErrors:
         target = tmp_path / "p"
         _init_project(runner, target)
         result = runner.invoke(
-            cli, ["next-key", "--project-dir", str(target), "--count", "0"]
+            cli, ["project", "next-key", "--project-dir", str(target), "--count", "0"]
         )
         assert result.exit_code != 0
 
@@ -169,7 +192,7 @@ class TestErrors:
         target = tmp_path / "p"
         _init_project(runner, target)
         result = runner.invoke(
-            cli, ["next-key", "--project-dir", str(target), "--count", "-3"]
+            cli, ["project", "next-key", "--project-dir", str(target), "--count", "-3"]
         )
         assert result.exit_code != 0
 
@@ -190,6 +213,7 @@ def _allocate_via_subprocess(project_dir_str: str) -> str:
             sys.executable,
             "-m",
             "tripwire.cli.main",
+            "project",
             "next-key",
             "--project-dir",
             project_dir_str,
@@ -248,12 +272,18 @@ class TestScaffoldIntegration:
         target = tmp_path / "p"
         _init_project(runner, target)
 
-        scaffold = runner.invoke(cli, ["brief", "--project-dir", str(target)])
+        scaffold = runner.invoke(
+            cli, ["project", "brief", "--project-dir", str(target)]
+        )
         assert "next issue key: TST-1" in scaffold.output
 
-        allocated = runner.invoke(cli, ["next-key", "--project-dir", str(target)])
+        allocated = runner.invoke(
+            cli, ["project", "next-key", "--project-dir", str(target)]
+        )
         assert allocated.output.strip() == "TST-1"
 
         # After allocation, scaffold should advance
-        scaffold_after = runner.invoke(cli, ["brief", "--project-dir", str(target)])
+        scaffold_after = runner.invoke(
+            cli, ["project", "brief", "--project-dir", str(target)]
+        )
         assert "next issue key: TST-2" in scaffold_after.output

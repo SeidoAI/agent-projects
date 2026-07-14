@@ -787,8 +787,8 @@ class TestBuildClaudeArgsResumePropagation:
         build_claude_args so claude -p --resume <uuid> is invoked."""
         from unittest.mock import MagicMock
 
+        from tripwire.core.spawn_config import shipped_with_overrides
         from tripwire.models.session import AgentSession, WorktreeEntry
-        from tripwire.models.spawn import SpawnDefaults
         from tripwire.runtimes import ClaudeRuntime
         from tripwire.runtimes.base import PreppedSession
 
@@ -810,7 +810,7 @@ class TestBuildClaudeArgsResumePropagation:
             prompt="RESUMING",
             system_append="",
             project_slug="test-proj",
-            spawn_defaults=SpawnDefaults.model_validate(
+            spawn_defaults=shipped_with_overrides(
                 {
                     "prompt_template": "{plan}",
                     "resume_prompt_template": "resuming",

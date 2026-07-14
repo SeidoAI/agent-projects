@@ -1,0 +1,75 @@
+"""side_effect: flip_drafts_to_draft.
+
+Move every session PR back to draft state. Wired into the
+``completed → paused`` reopen route so a PM-initiated reopen flips
+drafts that may have been promoted to ready-for-review.
+
+Uses ``gh pr ready --undo`` per PR url. Skips worktrees with no
+``draft_pr_url`` recorded.
+"""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(prog="flip_drafts_to_draft")
+    parser.add_argument("--project-dir", type=Path, required=True)
+    parser.add_argument("--session-id", required=True)
+    parser.add_argument("--from-status", help="(unused — uniform executor interface)")
+    parser.add_argument("--to-status", help="(unused — uniform executor interface)")
+    args = parser.parse_args()
+
+    from tripwire.core.store import load_session
+
+    project_dir = args.project_dir.expanduser().resolve()
+    session = load_session(project_dir, args.session_id)
+
+    runtime = getattr(session, "runtime_state", None)
+    worktrees = list(getattr(runtime, "worktrees", None) or []) if runtime else []
+
+    flipped = 0
+    failed: list[str] = []
+
+    for wt in worktrees:
+        pr_url = getattr(wt, "draft_pr_url", None)
+        if not pr_url:
+            continue
+        print(f"  flipping {pr_url} back to draft", file=sys.stderr)
+        try:
+            subprocess.run(
+                ["gh", "pr", "ready", "--undo", pr_url],
+                check=True,
+                capture_output=True,
+                text=True,
+                cwd=wt.worktree_path if Path(wt.worktree_path).is_dir() else None,
+            )
+            flipped += 1
+        except subprocess.CalledProcessError as exc:
+            stderr_text = (exc.stderr or "").strip() or str(exc)
+            print(
+                f"  FAILED to flip {pr_url}: {stderr_text}",
+                file=sys.stderr,
+            )
+            failed.append(pr_url)
+        except FileNotFoundError:
+            print(
+                "  FAILED: `gh` CLI not installed or not on PATH",
+                file=sys.stderr,
+            )
+            return 1
+
+    print(
+        f"flipped {flipped} PR(s) back to draft"
+        + (f"; {len(failed)} failed" if failed else ""),
+        file=sys.stderr,
+    )
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

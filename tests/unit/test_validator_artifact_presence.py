@@ -3,17 +3,51 @@
 v0.11.1: the rule consults each manifest entry's `produced_at` and skips
 sessions whose `status` has not yet reached that threshold. Mirrors how
 `check_issue_artifact_presence` already gates issue artifacts.
+
+v0.14.0: the shipped manifest declares self-review, recommended-
+testing-plan, and post-completion-comments at `produced_at: executing`
+so the executing→in_review transition is gated on their presence.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 from tests.unit.test_validator import (  # type: ignore[import-not-found]
     write_project_yaml,
     write_session,
 )
 from tripwire.core.validator import validate_project
+
+
+def test_shipped_manifest_gates_agent_artifacts_at_executing() -> None:
+    """The shipped manifest must declare the three executing-agent
+    artifacts at `produced_at: executing` so the validator gates the
+    executing→in_review transition on their presence.
+
+    Regression test for the v0.13.2 drift where these three artifacts
+    were declared at `produced_at: completed` — far too late to gate
+    the transition where the coding agent submits the PR pair.
+    """
+    import tripwire
+
+    pkg_root = Path(tripwire.__file__).parent
+    manifest_path = pkg_root / "templates" / "artifacts" / "manifest.yaml"
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    by_name = {a["name"]: a for a in manifest["artifacts"]}
+
+    expected_executing = (
+        "self-review",
+        "recommended-testing-plan",
+        "post-completion-comments",
+    )
+    for name in expected_executing:
+        assert by_name[name]["produced_at"] == "executing", (
+            f"manifest entry {name!r} must be produced_at: executing to gate "
+            f"executing→in_review; got {by_name[name]['produced_at']!r}"
+        )
 
 
 def _write_minimal_manifest(project_dir: Path) -> None:

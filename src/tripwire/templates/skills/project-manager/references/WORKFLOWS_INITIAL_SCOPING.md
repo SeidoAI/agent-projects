@@ -10,7 +10,7 @@ delegation.
 
 ## Precondition
 
-A freshly-init'd `tripwire` directory. `tripwire init` creates an empty
+A freshly-init'd `tripwire` directory. `tripwire project init` creates an empty
 `./plans/`; the user drops raw planning docs there before invoking
 scoping. If `./plans/` is empty or missing, scope from user intent
 alone.
@@ -34,7 +34,7 @@ without exception throughout this workflow.
 Run:
 
 ```bash
-tripwire brief
+tripwire project brief
 ```
 
 Read the output. Note the `next issue key`, active enums, registered
@@ -114,7 +114,7 @@ cannot proceed.
 Read `plans/artifacts/scoping-plan.md`. For each issue listed, run:
 
 ```bash
-tripwire next-key --type issue --count N
+tripwire project next-key --type issue --count N
 ```
 
 where N is the number of issues. Collect the allocated keys.
@@ -227,7 +227,7 @@ Scan every issue body:
   narrow (merge) or other issues forgot to reference it (add refs).
 - Issue with 0 `[[node-id]]` refs → not linked to the graph; add refs.
 
-Run `tripwire refs summary` for reference counts.
+Run `tripwire node refs summary` for reference counts.
 
 After every change in this pass: `tripwire validate`. Exit 0 →
 continue. Non-zero → STOP and fix.
@@ -253,8 +253,8 @@ other? Does the API spec reference infra the infra spec doesn't
 mention? Does the frontend depend on endpoints the API spec doesn't
 list? Flag **INCONSISTENCY** and comment on the relevant issue.
 
-**Project self-coherence.** Run `tripwire agenda` and
-`tripwire graph --type concept`. Flag: issues with 0 node refs, nodes
+**Project self-coherence.** Run `tripwire project agenda` and
+`tripwire node graph --type concept`. Flag: issues with 0 node refs, nodes
 with only 1 referrer, sessions with 0 issues, dependency cycles or
 orphans.
 
@@ -281,10 +281,10 @@ Run, in order:
 
 ```bash
 tripwire validate
-tripwire status
-tripwire agenda --by status
-tripwire graph --type concept
-tripwire refs summary
+tripwire project status
+tripwire project agenda --by status
+tripwire node graph --type concept
+tripwire node refs summary
 ```
 
 Exit 0 on validate. Counts match your scoping plan. No orphan nodes.

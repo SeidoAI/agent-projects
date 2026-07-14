@@ -35,6 +35,12 @@ def _ctx(tmp_path: Path, **overrides) -> MonitorContext:
         "pt_worktree": pt,
         "project_dir": tmp_path / "proj",
         "max_budget_usd": 10.0,
+        # v0.14.0 — required fields, sourced from
+        # templates/runtime/defaults.yaml in production. Tests pin
+        # explicit values so push-loop tests don't depend on the
+        # shipped YAML.
+        "push_loop_warn_threshold": 5,
+        "push_loop_terminate_threshold": 10,
         "model_name": "claude-opus-4-7",
         "key_files": ["src/foo.py"],
         "required_artifacts": ["self-review.md"],

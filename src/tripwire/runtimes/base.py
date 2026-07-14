@@ -157,6 +157,7 @@ class BasePopenRuntime(ABC):
         # v0.7.9 §A7 — fork the in-flight monitor so cost / quota /
         # push-loop tripwires fire even after the spawning CLI exits.
         if prepped.spawn_defaults.invocation.monitor:
+            from tripwire.core.runtime_config import load_resolved_runtime_config
             from tripwire.runtimes.monitor_runner import (
                 RunnerConfig,
                 spawn_monitor_runner,
@@ -173,6 +174,10 @@ class BasePopenRuntime(ABC):
             monitor_log_path = _render_path_template(
                 prepped.spawn_defaults.invocation.monitor_log_path_template, prepped
             )
+            # v0.14.0 — runtime tunables (stream_idle, max_runtime,
+            # push_loop thresholds) live in
+            # templates/runtime/defaults.yaml + project overrides.
+            runtime = load_resolved_runtime_config(prepped.project_dir).monitor
             spawn_monitor_runner(
                 cfg=RunnerConfig(
                     session_id=prepped.session_id,
@@ -183,6 +188,10 @@ class BasePopenRuntime(ABC):
                     project_dir=prepped.project_dir,
                     max_budget_usd=float(cfg_values.max_budget_usd),
                     monitor_log_path=monitor_log_path,
+                    stream_idle_threshold_seconds=runtime.stream_idle_threshold_seconds,
+                    max_runtime_seconds=runtime.max_runtime_seconds,
+                    push_loop_warn_threshold=runtime.push_loop.warn_threshold,
+                    push_loop_terminate_threshold=runtime.push_loop.terminate_threshold,
                     model_name=cfg_values.model,
                     key_files=list(prepped.session.key_files),
                     required_artifacts=["self-review.md"],

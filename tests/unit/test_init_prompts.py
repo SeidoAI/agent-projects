@@ -13,7 +13,7 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from tripwire.cli.init import (
+from tripwire.cli.project.init import (
     _guess_local_for_slug,
     _prompt_for_repo_locals,
     init_cmd,

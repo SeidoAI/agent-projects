@@ -101,7 +101,7 @@ scripts in `package.json` rather than calling them directly.
 
 ### Phase 2: Planning
 
-5. `tripwire brief` to front-load context.
+5. `tripwire project brief` to front-load context.
 6. Read the source at each node path. Understand existing components,
    hooks, contexts, and patterns before designing anything new.
 7. Write `plan.md` to `<project>/sessions/<session-id>/artifacts/`,
@@ -170,7 +170,7 @@ scripts in `package.json` rather than calling them directly.
 21. Target-repo checks: `npm run lint`, `npm test`, `npm run build`.
     All must pass. (Project-side validate is the
     `tripwire session transition` gate — see Phase 6.)
-22. `tripwire refs check` — no dangling or stale refs in anything
+22. `tripwire node refs check` — no dangling or stale refs in anything
     you wrote.
 
 ### Phase 6: Delivery

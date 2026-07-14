@@ -29,7 +29,7 @@ transition.
 Run:
 
 ```bash
-tripwire brief
+tripwire project brief
 ```
 
 Even for small updates, this is worth running — it confirms the
@@ -51,7 +51,7 @@ cat issues/<KEY>/issue.yaml
 | Small non-status frontmatter tweak | Use `Edit` tool on the file. Update `updated_at`. |
 | Comment | Write a new file at `issues/<KEY>/comments/<NNN>-<topic>-<date>.yaml`. Use the next sequence number. See `examples/comment-status-change.yaml`. |
 | New concept node | Write a new file at `nodes/<id>.yaml`. Use the matching example. Add `[[<id>]]` references where needed. |
-| New issue | Run `tripwire next-key --type issue` for the key, then write `issues/<KEY>/issue.yaml`. See initial scoping workflow for the full procedure. |
+| New issue | Run `tripwire project next-key --type issue` for the key, then write `issues/<KEY>/issue.yaml`. See initial scoping workflow for the full procedure. |
 | Session re-engagement event | Edit `sessions/<id>/session.yaml` to append an engagement entry. Append only — never overwrite. |
 
 If any step fails: read the error, fix the underlying cause, re-run.
@@ -136,7 +136,7 @@ If any step fails: read the validator finding; fix in place; re-validate.
 |---|---|
 | "It's just one field change, I don't need to validate" | You do. One field change can break a reference chain. Always validate. |
 | "I'll just edit `status:` directly — it's faster" | No. Run `tripwire transition`. Direct edits bypass validators and audit. |
-| "I'll update the status without checking `refs reverse`" | Run `tripwire refs reverse <id>` first on nodes. Status changes on heavily-referenced entities may need downstream updates. |
+| "I'll update the status without checking `refs reverse`" | Run `tripwire node refs reverse <id>` first on nodes. Status changes on heavily-referenced entities may need downstream updates. |
 
 ## See also
 

@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from tripwire.core.validator import load_context
-from tripwire.core.validator.lint import stale_concept
+from tripwire.core.validator.lint.node import stale_concept
 from tripwire.models.graph import FreshnessResult, FreshnessStatus
 
 

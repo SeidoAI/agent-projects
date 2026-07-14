@@ -116,6 +116,7 @@ class TestCreateAndLinkTwoProjects:
             proj_dir = tmp_path / name
             r = _run_tripwire(
                 tmp_path,
+                "project",
                 "init",
                 "--name",
                 name,
@@ -147,6 +148,7 @@ class TestSyncHappyPath:
             proj_dir = tmp_path / name
             r = _run_tripwire(
                 tmp_path,
+                "project",
                 "init",
                 "--name",
                 name,
@@ -202,6 +204,7 @@ class TestSyncConflict:
         ]:
             r = _run_tripwire(
                 tmp_path,
+                "project",
                 "init",
                 "--name",
                 name,
@@ -263,6 +266,7 @@ class TestStandaloneProjectUnchanged:
         proj = tmp_path / "standalone"
         r = _run_tripwire(
             tmp_path,
+            "project",
             "init",
             "--name",
             "standalone",
@@ -308,6 +312,7 @@ class TestConcurrentPushes:
             proj_dir = tmp_path / name
             r = _run_tripwire(
                 tmp_path,
+                "project",
                 "init",
                 "--name",
                 name,

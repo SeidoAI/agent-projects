@@ -13,8 +13,8 @@ deduplication) and on disk in:
   ``<project>/.tripwire/watch/state.json`` — per-session snapshot
                                               (code_pr_opened_at, etc.)
 
-The CLI surface (``tripwire watch start / stop / status / logs``) lives
-in :mod:`tripwire.cli.watch`; this module provides the building blocks.
+The CLI surface (``tripwire pr watch start / stop / status / logs``) lives
+in :mod:`tripwire.cli.pr.watch`; this module provides the building blocks.
 """
 
 from __future__ import annotations
@@ -63,9 +63,30 @@ _ACTIVE_STATUSES = {
 
 @dataclass
 class DaemonConfig:
+    """Watch daemon config.
+
+    v0.14.0: ``poll_interval`` has no Python-side default. Values
+    live in ``templates/runtime/defaults.yaml`` (``pr_watcher.poll_interval``);
+    callers pass it explicitly or use :meth:`from_runtime`.
+    """
+
     project_dir: Path
-    poll_interval: float = 300.0  # 5 min default per spec
+    poll_interval: float
     token: str | None = None
+
+    @classmethod
+    def from_runtime(
+        cls, project_dir: Path, token: str | None = None, **overrides: float
+    ) -> DaemonConfig:
+        """Load ``poll_interval`` from runtime YAML; allow override."""
+        from tripwire.core.runtime_config import load_resolved_runtime_config
+
+        rt = load_resolved_runtime_config(project_dir).pr_watcher
+        return cls(
+            project_dir=project_dir,
+            poll_interval=overrides.get("poll_interval", rt.poll_interval),
+            token=token,
+        )
 
 
 def watch_dir(project_dir: Path) -> Path:

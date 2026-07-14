@@ -24,17 +24,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from tripwire.core.validator import CheckResult, ValidationContext
 
-from . import (
-    concept_name_prose,
-    done_implies_issue_artifacts_on_main,
-    mega_issue,
-    no_orphan_proj_branches,
-    node_ratio,
-    self_review_implies_pm_response,
-    semantic_coverage,
-    stale_concept,
-    worktree_paths_unique,
-)
+from .issue import done_implies_issue_artifacts_on_main, mega_issue
+from .node import concept_name_prose, node_ratio, semantic_coverage, stale_concept
+from .pr import no_orphan_proj_branches
+from .session import self_review_implies_pm_response, worktree_paths_unique
 
 CheckFunc = Callable[["ValidationContext"], "list[CheckResult]"]
 

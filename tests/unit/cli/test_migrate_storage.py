@@ -139,7 +139,14 @@ class TestMigrateStorage:
 
         result = runner.invoke(
             cli,
-            ["migrate", "storage", "--project-dir", str(project), "--skip-validate"],
+            [
+                "project",
+                "migrate",
+                "storage",
+                "--project-dir",
+                str(project),
+                "--skip-validate",
+            ],
         )
         assert result.exit_code == 0, result.output
 
@@ -162,13 +169,27 @@ class TestMigrateStorage:
         _git_init(project)
         first = runner.invoke(
             cli,
-            ["migrate", "storage", "--project-dir", str(project), "--skip-validate"],
+            [
+                "project",
+                "migrate",
+                "storage",
+                "--project-dir",
+                str(project),
+                "--skip-validate",
+            ],
         )
         assert first.exit_code == 0, first.output
 
         second = runner.invoke(
             cli,
-            ["migrate", "storage", "--project-dir", str(project), "--skip-validate"],
+            [
+                "project",
+                "migrate",
+                "storage",
+                "--project-dir",
+                str(project),
+                "--skip-validate",
+            ],
         )
         assert second.exit_code == 0, second.output
         assert "nothing to migrate" in second.output.lower()
@@ -186,7 +207,14 @@ class TestMigrateStorage:
 
         result = runner.invoke(
             cli,
-            ["migrate", "storage", "--project-dir", str(project), "--skip-validate"],
+            [
+                "project",
+                "migrate",
+                "storage",
+                "--project-dir",
+                str(project),
+                "--skip-validate",
+            ],
         )
         assert result.exit_code != 0
         assert "refusing to merge" in result.output.lower()
@@ -195,6 +223,7 @@ class TestMigrateStorage:
         merged = runner.invoke(
             cli,
             [
+                "project",
                 "migrate",
                 "storage",
                 "--project-dir",
@@ -218,7 +247,14 @@ class TestMigrateStorage:
 
         result = runner.invoke(
             cli,
-            ["migrate", "storage", "--project-dir", str(project), "--skip-validate"],
+            [
+                "project",
+                "migrate",
+                "storage",
+                "--project-dir",
+                str(project),
+                "--skip-validate",
+            ],
         )
         assert result.exit_code == 0, result.output
 
@@ -244,7 +280,14 @@ class TestMigrateStorage:
 
         result = runner.invoke(
             cli,
-            ["migrate", "storage", "--project-dir", str(project), "--skip-validate"],
+            [
+                "project",
+                "migrate",
+                "storage",
+                "--project-dir",
+                str(project),
+                "--skip-validate",
+            ],
         )
         assert result.exit_code == 0, result.output
         assert (project / "instances" / "sessions" / "s1" / "session.yaml").is_file()
@@ -258,7 +301,14 @@ class TestMigrateStorage:
 
         result = runner.invoke(
             cli,
-            ["migrate", "storage", "--project-dir", str(project), "--skip-validate"],
+            [
+                "project",
+                "migrate",
+                "storage",
+                "--project-dir",
+                str(project),
+                "--skip-validate",
+            ],
         )
         assert result.exit_code == 0, result.output
 
@@ -277,14 +327,14 @@ class TestMigrateStorage:
     def test_missing_project_yaml_rejected(self, tmp_path: Path):
         """No project.yaml at the root — refuse with explanation."""
         result = runner.invoke(
-            cli, ["migrate", "storage", "--project-dir", str(tmp_path)]
+            cli, ["project", "migrate", "storage", "--project-dir", str(tmp_path)]
         )
         assert result.exit_code != 0
         assert "doesn't look like a tripwire project" in result.output
 
     def test_help_describes_command(self):
         """`tripwire migrate storage --help` advertises the command."""
-        result = runner.invoke(cli, ["migrate", "storage", "--help"])
+        result = runner.invoke(cli, ["project", "migrate", "storage", "--help"])
         assert result.exit_code == 0
         assert "instances/" in result.output
         assert "--yes" in result.output

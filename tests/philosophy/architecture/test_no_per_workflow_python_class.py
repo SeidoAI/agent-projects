@@ -70,6 +70,7 @@ ALLOWED_MODEL_FILES = {
     "issue_artifacts.py",  # per-issue developer.md / verified.md
     "manifest.py",  # project artifact manifest declaration
     "pr_review.py",  # PR-review artifact (multi-lens findings)
+    "runtime.py",  # runtime config (monitor/queue/pr_watcher tunables) loaded from templates/runtime/defaults.yaml — v0.14.0 step 3
     "spawn.py",  # session-spawn invocation parameters
     "workspace.py",  # workspace (multi-project root) entity
 }

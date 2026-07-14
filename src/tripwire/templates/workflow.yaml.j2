@@ -262,6 +262,7 @@ workflows:
             - v_artifact_presence
             - v_phase_requirements
             - v_issue_artifact_presence
+            - v_member_issues_at_or_past_in_review
           heuristics:
             - v_coverage_heuristics
             - v_quality_consistency
@@ -344,8 +345,6 @@ workflows:
           - flip_drafts_to_ready
           - sweep_issues_forward
           - remove_worktrees
-          - close_active_engagement
-          - append_telemetry_row
         emits:
           artifacts:
             - id: session-signature
@@ -379,8 +378,6 @@ workflows:
         preserve_fields:
           - runtime_state.claude_session_id
           - runtime_state.worktrees
-        side_effects:
-          - close_active_engagement
       - id: paused-to-executing
         actor: pm-agent
         trigger:
@@ -428,8 +425,6 @@ workflows:
         preserve_fields:
           - runtime_state.claude_session_id
           - runtime_state.worktrees
-        side_effects:
-          - close_active_engagement
 
       # Reopen (completed → paused) — PM-handoff #5 Gap A path.
       - id: completed-to-paused-reopen
@@ -444,11 +439,15 @@ workflows:
         preserve_fields:
           - runtime_state.claude_session_id
           - runtime_state.worktrees
+        # v0.14.0 — reset_acks moved from side_effects (informational
+        # only; the executor read flags, not the list) to a
+        # route-level field. The executor reads this declarative tag
+        # on terminal-bound transitions to decide whether to clear
+        # the JIT-prompt ack markers for the instance.
+        reset_acks: true
         side_effects:
           - flip_drafts_to_draft
           - append_pm_followup_stub
-          - reset_acks
-          - append_audit_log_entry
         emits:
           events: [session.reopened]
 
@@ -463,8 +462,6 @@ workflows:
         to: abandoned
         kind: side
         label: abandon (planned)
-        side_effects:
-          - close_active_engagement
       - id: queued-to-abandoned
         actor: pm-agent
         trigger:
@@ -474,8 +471,6 @@ workflows:
         to: abandoned
         kind: side
         label: abandon (queued)
-        side_effects:
-          - close_active_engagement
       - id: executing-to-abandoned
         actor: pm-agent
         trigger:
@@ -486,7 +481,6 @@ workflows:
         kind: side
         label: abandon (executing)
         side_effects:
-          - close_active_engagement
           - kill_runtime
           - close_open_prs
           - remove_worktrees
@@ -500,7 +494,6 @@ workflows:
         kind: side
         label: abandon (paused)
         side_effects:
-          - close_active_engagement
           - close_open_prs
           - remove_worktrees
       - id: failed-to-abandoned
@@ -513,7 +506,6 @@ workflows:
         kind: side
         label: abandon (failed)
         side_effects:
-          - close_active_engagement
           - close_open_prs
           - remove_worktrees
       - id: in_review-to-abandoned
@@ -526,7 +518,6 @@ workflows:
         kind: side
         label: abandon (in_review)
         side_effects:
-          - close_active_engagement
           - close_open_prs
           - remove_worktrees
       - id: verified-to-abandoned
@@ -539,7 +530,6 @@ workflows:
         kind: side
         label: abandon (verified)
         side_effects:
-          - close_active_engagement
           - close_open_prs
           - remove_worktrees
 

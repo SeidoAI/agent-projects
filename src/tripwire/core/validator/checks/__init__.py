@@ -1,9 +1,27 @@
-"""Themed groupings of validator check functions.
+"""Validator check functions — organised by the entity each check operates on.
 
-Each constant is a list of check functions sharing a domain — identity
-invariants, enum-value validity, reference integrity, etc. The aggregator
-:data:`ALL_CHECKS` rebuilds the canonical run order by concatenating
-the themed lists in the same order they appeared pre-split.
+Layout:
+
+- ``session/``    — checks that operate on ``AgentSession`` and its lifecycle
+- ``issue/``      — checks that operate on ``Issue`` shape/lifecycle
+- ``project/``    — checks against the project config and standards
+- ``workflow/``   — workflow definitions and instances
+- ``workspace/``  — workspace link
+- ``artifact/``   — artifact manifests and presence
+- ``_cross/``     — cross-cutting rules that genuinely span multiple
+  entities (identity invariants, reference integrity, enums, freshness,
+  comment provenance, handoff)
+
+To add a new check:
+
+1. Create ``<entity>/<short_name>.py`` exporting
+   ``def check_<short_name>(ctx): ...``.
+   (Filename = function name minus the ``check_`` prefix.)
+2. Import it below and append the function to ``ALL_CHECKS`` in the
+   canonical run-order position.
+
+Shared private helpers used by 2+ checks live in ``_helpers.py`` at this
+package level. Single-use helpers stay in the check file that needs them.
 
 The four ``LINT_CHECKS`` (under ``validator/lint/``) are appended to
 ``ALL_CHECKS`` separately because they're stateful rules that already
@@ -12,155 +30,115 @@ own their own files — see ``lint/__init__.py``.
 
 from __future__ import annotations
 
-from tripwire.core.validator.checks.artifacts import (
-    check_artifact_presence,
-    check_issue_artifact_presence,
-    check_manifest_phase_ownership_consistent,
-    check_manifest_schema,
-)
-from tripwire.core.validator.checks.coherence import (
-    check_comment_provenance,
-    check_done_implies_session_completed,
-    check_freshness,
-    check_issue_session_status_compatibility,
-    check_pm_response_covers_self_review,
-    check_pm_response_followups_resolve,
-    check_session_issue_coherence,
-)
-from tripwire.core.validator.checks.enums import check_enum_values
-from tripwire.core.validator.checks.identity import (
-    check_id_collisions,
-    check_id_format,
-    check_sequence_drift,
-    check_timestamps,
-    check_uuid_present,
-)
-from tripwire.core.validator.checks.pr_review import (
-    check_pr_review_code_review_skill,
-    check_pr_review_evidence,
-    check_pr_review_external_reviewer,
-    check_pr_review_threshold_findings,
-)
-from tripwire.core.validator.checks.quality import (
-    check_coverage_heuristics,
-    check_phase_requirements,
-    check_project_standards,
-    check_quality_consistency,
-)
-from tripwire.core.validator.checks.references import (
+from tripwire.core.validator.checks._cross.bidirectional_related import (
     check_bidirectional_related,
-    check_no_stale_pins,
+)
+from tripwire.core.validator.checks._cross.comment_provenance import (
+    check_comment_provenance,
+)
+from tripwire.core.validator.checks._cross.enum_values import check_enum_values
+from tripwire.core.validator.checks._cross.freshness import check_freshness
+from tripwire.core.validator.checks._cross.handoff_artifact import (
+    check_handoff_artifact,
+)
+from tripwire.core.validator.checks._cross.id_collisions import check_id_collisions
+from tripwire.core.validator.checks._cross.id_format import check_id_format
+from tripwire.core.validator.checks._cross.no_stale_pins import check_no_stale_pins
+from tripwire.core.validator.checks._cross.reference_integrity import (
     check_reference_integrity,
 )
-from tripwire.core.validator.checks.session_lifecycle import (
-    check_pr_merged_for_session,
-    check_pr_review_approved,
-    check_session_has_developer_md,
-    check_session_has_verified_md,
-)
-from tripwire.core.validator.checks.structure import (
-    check_handoff_artifact,
-    check_instance_shape_conforms,
-    check_issue_body_structure,
-    check_project_repos_present,
-    check_status_transitions,
-)
-from tripwire.core.validator.checks.workflow import check_workflow_well_formed
-from tripwire.core.validator.checks.workspace_link import check_workspace_link
-
-# Identity: every entity has a uuid, the right id format, no collisions,
-# the next-id counter is consistent, timestamps are parseable.
-IDENTITY_CHECKS = [
-    check_uuid_present,
-    check_id_format,
-    check_id_collisions,
-    check_sequence_drift,
-    check_timestamps,
-]
-
-# Enums: every enum-typed field carries a value present in the active enum.
-ENUM_CHECKS = [check_enum_values]
-
-# References: every link between entities resolves; bi-directional links stay symmetric.
-REFERENCE_CHECKS = [
-    check_reference_integrity,
-    check_bidirectional_related,
-    check_no_stale_pins,
-]
-
-# Structure: required Markdown sections in issue bodies, status transitions,
-# handoff.yaml schema, project.yaml.repos presence, per-workflow instance
-# shape conformance.
-STRUCTURE_CHECKS = [
-    check_issue_body_structure,
-    check_status_transitions,
-    check_handoff_artifact,
-    check_project_repos_present,
-    check_instance_shape_conforms,
-]
-
-# Artifacts: manifest schema valid, completed sessions ship required artifacts.
-ARTIFACTS_CHECKS = [
-    check_manifest_schema,
-    check_manifest_phase_ownership_consistent,
+from tripwire.core.validator.checks._cross.sequence_drift import check_sequence_drift
+from tripwire.core.validator.checks._cross.timestamps import check_timestamps
+from tripwire.core.validator.checks._cross.uuid_present import check_uuid_present
+from tripwire.core.validator.checks.artifact.artifact_presence import (
     check_artifact_presence,
-    check_issue_artifact_presence,
-]
-
-# Coherence: cross-entity invariants — freshness of cached content, comment
-# provenance, session-vs-issue lifecycle alignment, PM response covers
-# self-review items, follow-ups close out properly.
-COHERENCE_CHECKS = [
-    check_freshness,
-    check_comment_provenance,
-    check_session_issue_coherence,
-    check_issue_session_status_compatibility,
+)
+from tripwire.core.validator.checks.artifact.manifest_phase_ownership_consistent import (
+    check_manifest_phase_ownership_consistent,
+)
+from tripwire.core.validator.checks.artifact.manifest_schema import (
+    check_manifest_schema,
+)
+from tripwire.core.validator.checks.issue.done_implies_session_completed import (
     check_done_implies_session_completed,
-    check_pm_response_covers_self_review,
-    check_pm_response_followups_resolve,
-]
-
-# PR-review (v0.12 — handoff #3): pr-review.yaml content gates that
-# block transitions to verified/completed without substantive review.
-# Missing-file enforcement is handled by check_artifact_presence via
-# the manifest entry's `produced_at: in_review`.
-PR_REVIEW_CHECKS = [
-    check_pr_review_evidence,
-    check_pr_review_threshold_findings,
-    check_pr_review_external_reviewer,
-    check_pr_review_code_review_skill,
-]
-
-# Session-lifecycle: gates the verified → completed route on PR merge,
-# review approval, and the per-issue developer.md / verified.md
-# artifacts that the session's member issues are required to produce.
-SESSION_LIFECYCLE_CHECKS = [
-    check_pr_merged_for_session,
-    check_pr_review_approved,
-    check_session_has_developer_md,
-    check_session_has_verified_md,
-]
-
-# Quality: project-standards, coverage heuristics, phase requirements,
-# anti-fatigue degradation detection.
-QUALITY_CHECKS = [
-    check_project_standards,
+)
+from tripwire.core.validator.checks.issue.issue_artifact_presence import (
+    check_issue_artifact_presence,
+)
+from tripwire.core.validator.checks.issue.issue_body_structure import (
+    check_issue_body_structure,
+)
+from tripwire.core.validator.checks.issue.issue_session_status_compatibility import (
+    check_issue_session_status_compatibility,
+)
+from tripwire.core.validator.checks.project.coverage_heuristics import (
     check_coverage_heuristics,
-    check_phase_requirements,
+)
+from tripwire.core.validator.checks.project.project_repos_present import (
+    check_project_repos_present,
+)
+from tripwire.core.validator.checks.project.project_standards import (
+    check_project_standards,
+)
+from tripwire.core.validator.checks.project.quality_consistency import (
     check_quality_consistency,
-]
-
-# Workflow: well-formedness of `<project>/workflow.yaml` (KUI-119).
-WORKFLOW_CHECKS = [check_workflow_well_formed]
-
-# Workspace: bidirectional project<->workspace link consistency.
-WORKSPACE_CHECKS = [check_workspace_link]
+)
+from tripwire.core.validator.checks.session.member_issues_at_or_past_in_review import (
+    check_member_issues_at_or_past_in_review,
+)
+from tripwire.core.validator.checks.session.phase_requirements import (
+    check_phase_requirements,
+)
+from tripwire.core.validator.checks.session.pm_response_covers_self_review import (
+    check_pm_response_covers_self_review,
+)
+from tripwire.core.validator.checks.session.pm_response_followups_resolve import (
+    check_pm_response_followups_resolve,
+)
+from tripwire.core.validator.checks.session.pr_merged_for_session import (
+    check_pr_merged_for_session,
+)
+from tripwire.core.validator.checks.session.pr_review_approved import (
+    check_pr_review_approved,
+)
+from tripwire.core.validator.checks.session.pr_review_code_review_skill import (
+    check_pr_review_code_review_skill,
+)
+from tripwire.core.validator.checks.session.pr_review_evidence import (
+    check_pr_review_evidence,
+)
+from tripwire.core.validator.checks.session.pr_review_external_reviewer import (
+    check_pr_review_external_reviewer,
+)
+from tripwire.core.validator.checks.session.pr_review_threshold_findings import (
+    check_pr_review_threshold_findings,
+)
+from tripwire.core.validator.checks.session.session_has_developer_md import (
+    check_session_has_developer_md,
+)
+from tripwire.core.validator.checks.session.session_has_verified_md import (
+    check_session_has_verified_md,
+)
+from tripwire.core.validator.checks.session.session_issue_coherence import (
+    check_session_issue_coherence,
+)
+from tripwire.core.validator.checks.workflow.instance_shape_conforms import (
+    check_instance_shape_conforms,
+)
+from tripwire.core.validator.checks.workflow.status_transitions import (
+    check_status_transitions,
+)
+from tripwire.core.validator.checks.workflow.workflow_well_formed import (
+    check_workflow_well_formed,
+)
+from tripwire.core.validator.checks.workspace.workspace_link import (
+    check_workspace_link,
+)
 
 # Canonical run order: matches the pre-split ALL_CHECKS literal so finding
-# output ordering stays byte-stable. The workflow check is appended at
-# the END so it doesn't perturb the byte-stable position of any
-# pre-existing check (KUI-119 — workflow.yaml is opt-in for v0.9; older
-# projects without one see no findings from this check).
+# output ordering stays byte-stable. The workflow check sits where it
+# always has (before workspace_link); the instance-shape check stays
+# at the end so v0.9 projects without one see no perturbation.
 ALL_CHECKS = [
     check_uuid_present,
     check_id_format,
@@ -196,6 +174,7 @@ ALL_CHECKS = [
     check_pr_review_threshold_findings,
     check_pr_review_external_reviewer,
     check_pr_review_code_review_skill,
+    check_member_issues_at_or_past_in_review,
     check_pr_merged_for_session,
     check_pr_review_approved,
     check_session_has_developer_md,
@@ -204,17 +183,4 @@ ALL_CHECKS = [
 ]
 
 
-__all__ = [
-    "ALL_CHECKS",
-    "ARTIFACTS_CHECKS",
-    "COHERENCE_CHECKS",
-    "ENUM_CHECKS",
-    "IDENTITY_CHECKS",
-    "PR_REVIEW_CHECKS",
-    "QUALITY_CHECKS",
-    "REFERENCE_CHECKS",
-    "SESSION_LIFECYCLE_CHECKS",
-    "STRUCTURE_CHECKS",
-    "WORKFLOW_CHECKS",
-    "WORKSPACE_CHECKS",
-]
+__all__ = ["ALL_CHECKS"]

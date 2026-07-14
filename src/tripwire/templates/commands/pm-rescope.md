@@ -15,14 +15,14 @@ $ARGUMENTS
 Rescoping differs from initial scoping because the project already has
 content:
 
-1. Run `tripwire brief` to load current project state.
+1. Run `tripwire project brief` to load current project state.
 2. Read the existing issues, concept nodes, and sessions so you know
    what's already scoped and what's in progress.
 3. If the user's description references a new planning doc path, read
    those files.
 4. Identify what the new scope adds:
    - **New issues** to create (allocate new keys via
-     `tripwire next-key --type issue`)
+     `tripwire project next-key --type issue`)
    - **New concept nodes** to add
    - **Existing issues to modify** (priority changes, acceptance
      criteria updates, new references)

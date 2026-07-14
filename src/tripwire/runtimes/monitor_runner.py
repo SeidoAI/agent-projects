@@ -51,6 +51,15 @@ class RunnerConfig:
     """Serialisable handoff between the runtime that spawns the agent
     and the standalone monitor process. JSON-encoded; paths are
     rendered as strings on disk and decoded back to :class:`Path`.
+
+    v0.14.0: the four operational-tunable fields
+    (``stream_idle_threshold_seconds``, ``max_runtime_seconds``,
+    ``push_loop_warn_threshold``, ``push_loop_terminate_threshold``)
+    have no Python defaults — callers load them from
+    ``templates/runtime/defaults.yaml`` (and project overrides) via
+    ``tripwire.core.runtime_config.load_resolved_runtime_config`` at
+    spawn time. ``model_name``, ``key_files``, ``required_artifacts``,
+    ``poll_interval`` are framework constants kept as defaults.
     """
 
     session_id: str
@@ -61,17 +70,23 @@ class RunnerConfig:
     project_dir: Path
     max_budget_usd: float
     monitor_log_path: Path
-    model_name: str = "claude-opus-4-7"
-    key_files: list[str] = field(default_factory=list)
-    required_artifacts: list[str] = field(default_factory=list)
-    poll_interval: float = 1.0
+    # v0.14.0 — runtime YAML tunables (required, no defaults).
     # Stream-idle threshold: if the agent's log file has produced no
     # new events for this many seconds while the process is still
     # alive, the runner classifies it as a silent stream-idle death
     # (typically a wedged libuv loop after a SIGSTOP/SIGCONT cycle, or
-    # a `claude -p` post-end_turn hang) and reaps it. 600s = 10 min,
-    # well above any normal between-events gap during heavy tool use.
-    stream_idle_threshold_seconds: float = 600.0
+    # a `claude -p` post-end_turn hang) and reaps it.
+    stream_idle_threshold_seconds: float
+    # Hard wall-clock cap on the agent's runtime.
+    max_runtime_seconds: float
+    # Push-loop tripwire thresholds — fire warn then SIGTERM when
+    # consecutive failed `git push` attempts cross them.
+    push_loop_warn_threshold: int
+    push_loop_terminate_threshold: int
+    model_name: str = "claude-opus-4-7"
+    key_files: list[str] = field(default_factory=list)
+    required_artifacts: list[str] = field(default_factory=list)
+    poll_interval: float = 1.0
 
 
 def write_runner_config(cfg: RunnerConfig, target: Path) -> None:
@@ -94,16 +109,18 @@ def read_runner_config(source: Path) -> RunnerConfig:
 
 
 class MonitorRunner:
-    """Owns the monitor + executor + log-tail thread for one agent."""
+    """Owns the monitor + executor + log-tail thread for one agent.
 
-    def __init__(
-        self,
-        cfg: RunnerConfig,
-        *,
-        max_runtime_seconds: float = 6 * 60 * 60,  # 6h hard cap
-    ) -> None:
+    v0.14.0: ``max_runtime_seconds`` and ``push_loop_*`` thresholds
+    now live on the supplied :class:`RunnerConfig` (loaded from
+    ``templates/runtime/defaults.yaml`` at spawn time). The previous
+    ``max_runtime_seconds`` kwarg has been removed — callers pass
+    the value via ``cfg``.
+    """
+
+    def __init__(self, cfg: RunnerConfig) -> None:
         self.cfg = cfg
-        self.max_runtime_seconds = max_runtime_seconds
+        self.max_runtime_seconds = cfg.max_runtime_seconds
         self.exit_reason: str | None = None
         self._executor = ActionExecutor(
             project_dir=cfg.project_dir,
@@ -119,6 +136,8 @@ class MonitorRunner:
                 pt_worktree=cfg.pt_worktree,
                 project_dir=cfg.project_dir,
                 max_budget_usd=cfg.max_budget_usd,
+                push_loop_warn_threshold=cfg.push_loop_warn_threshold,
+                push_loop_terminate_threshold=cfg.push_loop_terminate_threshold,
                 model_name=cfg.model_name,
                 key_files=list(cfg.key_files),
                 required_artifacts=list(cfg.required_artifacts),

@@ -49,7 +49,9 @@ def build_workflow(
         project_id=project_id,
         is_pm_role=is_pm_role,
     )
-    from tripwire.core.workflow.side_effects import known_ids as _known_side_effects
+    from tripwire.core.workflow.post_write_hooks import (
+        known_ids as _known_side_effects,
+    )
     from tripwire.models.session import AgentSession
 
     definition_findings = validate_workflow_spec(

@@ -320,7 +320,7 @@ canonical issue lifecycle; it is also the source of truth for
 | `tripwire validate --quiet-heuristics` | Drop heuristic findings whose suppression marker exists. |
 | `tripwire validate --no-heuristics` | Skip heuristic-class findings entirely. |
 | `tripwire validate --heuristics-as-tripwires` | Promote every fired heuristic to error (CI gating). |
-| `tripwire brief` | Print project config, active enums, templates, next-available IDs — the agent's first call on every session. |
+| `tripwire project brief` | Print project config, active enums, templates, next-available IDs — the agent's first call on every session. |
 
 ### Layer 1 — Individual operation wrappers
 

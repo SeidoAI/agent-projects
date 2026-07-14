@@ -9,7 +9,7 @@ the spec because the cost is one warning, not a build break.
 from pathlib import Path
 
 from tripwire.core.validator import load_context
-from tripwire.core.validator.lint import concept_name_prose
+from tripwire.core.validator.lint.node import concept_name_prose
 
 
 def _body(prose: str) -> str:
